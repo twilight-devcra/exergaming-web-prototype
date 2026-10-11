@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>엑서게임 프로토타입</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 메뉴 -->
+  <section id="menu" class="screen active">
+    <div class="menu-main">
+      <h1>페달 &amp; 브레인</h1>
+      <p>일정한 속도로 페달을 밟으면서, 화면 아래 인지 게임을 풀어 점수를 모으세요.</p>
+      <p>
+        페달링: <span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기<br>
+        터치: 마우스 클릭<br>
+        일시정지: <kbd>Esc</kbd> · 디버그 표시: <kbd>`</kbd>
+      </p>
+      <button class="btn" id="btn-start">시작하기</button>
+    </div>
+    <div class="menu-side">
+      <div class="panel">
+        <h2>시연 설정</h2>
+        <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
+        <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
+        <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
+        <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
+        <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
+        <label class="setting">속도 전환 시간 (초)<input type="number" id="cfg-ramp" min="0" max="30" step="1"></label>
+        <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
+      </div>
+      <div class="panel">
+        <h2>순위</h2>
+        <ol class="board-list" id="menu-board"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 편안한 속도 측정 -->
+  <section id="calib" class="screen">
+    <h2>편안한 속도로 페달을 밟아주세요</h2>
+    <p><span class="keys"><kbd>A</kbd><kbd>D</kbd></span>를 번갈아 누르세요. 이 속도가 게임의 기준 속도가 됩니다.</p>
+    <div class="calib-ring">
+      <svg viewBox="0 0 220 220">
+        <circle cx="110" cy="110" r="96" fill="none" stroke="#e4e7ec" stroke-width="14"/>
+        <circle id="calib-arc" cx="110" cy="110" r="96" fill="none" stroke="#2f6fed" stroke-width="14"
+                stroke-linecap="round" transform="rotate(-90 110 110)" stroke-dasharray="603.2" stroke-dashoffset="603.2"/>
+        <g id="calib-crank">
+          <line x1="110" y1="110" x2="110" y2="52" stroke="#c3c8d0" stroke-width="8" stroke-linecap="round"/>
+          <circle cx="110" cy="52" r="10" fill="#2f6fed"/>
+        </g>
+      </svg>
+      <div class="num" id="calib-num"></div>
+    </div>
+    <div class="calib-state" id="calib-state"></div>
+  </section>
+
+  <!-- 게임 -->
+  <section id="game" class="screen">
+    <div id="band">
+      <canvas id="band-canvas"></canvas>
+      <div class="hud" id="hud-time"><div class="label">TIME</div><div class="value">0:00</div></div>
+      <div class="hud" id="hud-score"><div class="label">SCORE</div><div class="value">0</div></div>
+      <div id="keyhint"><kbd data-k="KeyA">A</kbd><kbd data-k="KeyD">D</kbd></div>
+    </div>
+    <div id="cog"></div>
+  </section>
+
+  <!-- 결과 -->
+  <section id="result" class="screen">
+    <h2>라운드 종료</h2>
+    <div class="result-total" id="res-total">0</div>
+    <div class="result-grid">
+      <div class="result-card">
+        <h3>운동 점수</h3>
+        <div class="v" id="res-ex"></div>
+        <div class="sub" id="res-ex-sub"></div>
+      </div>
+      <div class="result-card">
+        <h3>인지 게임 점수</h3>
+        <div class="v" id="res-cog"></div>
+        <div class="sub" id="res-cog-sub"></div>
+      </div>
+    </div>
+    <div class="save-row" id="save-row">
+      <input id="res-name" maxlength="12" placeholder="이름 (순위 등록)">
+      <button class="btn" id="btn-save">등록</button>
+    </div>
+    <div class="panel"><h2>순위</h2><ol class="board-list" id="res-board"></ol></div>
+    <div class="result-actions">
+      <button class="btn" id="btn-again">다시 하기</button>
+      <button class="btn secondary" id="btn-menu">메뉴로</button>
+    </div>
+  </section>
+
+  <div class="edge left"></div>
+  <div class="edge right"></div>
+
+  <div id="pause">
+    <div class="panel">
+      <h2>일시정지</h2>
+      <button class="btn" id="btn-resume">계속하기</button>
+      <button class="btn secondary" id="btn-quit">메뉴로 나가기</button>
+    </div>
+  </div>
+  <div id="debug"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/pedal.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/band.js"></script>
+  <script src="js/games/path.js"></script>
+  <script src="js/games/symbol.js"></script>
+  <script src="js/games/arith.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,474 @@
+const $ = (s) => document.querySelector(s);
+const GAME_TYPES = [PathGame, SymbolGame, ArithGame];
+const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
+const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
+
+const App = {
+  cfg: Config.load(),
+  pedal: new Pedal(),
+  audio: new BeatAudio(),
+  state: 'menu', // menu | calib | countdown | play | result
+  paused: false,
+  clock: 0,      // 일시정지 중에는 멈추는 게임 시계 (ms)
+  timers: [],
+  gen: 0,        // 인지 게임 세대. 바뀌면 이전 게임의 예약 콜백/점수 지급은 무시된다
+
+  init() {
+    this.band = new Band($('#band-canvas'), this.cfg);
+    this.bindMenu();
+    this.bindKeys();
+    this.pedal.onStroke = (key) => this.onStroke(key);
+    $('#btn-start').onclick = () => this.startRound();
+    $('#btn-again').onclick = () => this.startRound();
+    $('#btn-menu').onclick = () => this.show('menu');
+    $('#btn-resume').onclick = () => this.setPaused(false);
+    $('#btn-quit').onclick = () => this.quit();
+    $('#btn-save').onclick = () => this.saveScore();
+    $('#res-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.saveScore(); });
+    window.addEventListener('resize', () => this.band.resize());
+    this.renderBoard($('#menu-board'));
+    this.last = performance.now();
+    requestAnimationFrame((t) => this.loop(t));
+  },
+
+  // ---------------- 메뉴 / 설정 ----------------
+  bindMenu() {
+    const c = this.cfg;
+    $('#cfg-duration').value = c.durationSec;
+    $('#cfg-calib').value = c.calibrationSec;
+    $('#cfg-tol').value = Math.round(c.tolerance * 100);
+    $('#cfg-mult').value = c.multiplierStep;
+    $('#cfg-change').checked = c.rpmChange;
+    $('#cfg-ramp').value = c.rpmRampSec;
+    $('#cfg-sound').checked = c.sound;
+  },
+
+  readMenu() {
+    const num = (id, lo, hi, def) => {
+      const v = parseFloat($(id).value);
+      return Number.isFinite(v) ? U.clamp(v, lo, hi) : def;
+    };
+    const c = this.cfg;
+    c.durationSec = num('#cfg-duration', 30, 900, 180);
+    c.calibrationSec = num('#cfg-calib', 5, 60, 15);
+    c.tolerance = num('#cfg-tol', 3, 40, 12) / 100;
+    c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
+    c.rpmChange = $('#cfg-change').checked;
+    c.rpmRampSec = num('#cfg-ramp', 0, 30, 12);
+    c.sound = $('#cfg-sound').checked;
+    Config.save(c);
+    this.bindMenu();
+  },
+
+  show(id) {
+    document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+    if (id === 'menu') {
+      this.state = 'menu';
+      this.renderBoard($('#menu-board'));
+    }
+  },
+
+  // ---------------- 입력 ----------------
+  bindKeys() {
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape') {
+        if (['calib', 'countdown', 'play'].includes(this.state)) this.setPaused(!this.paused);
+        return;
+      }
+      if (e.target.tagName === 'INPUT') return;
+      if (e.code === 'Backquote') {
+        $('#debug').classList.toggle('active');
+        return;
+      }
+      if (e.repeat || this.paused) return;
+      if (e.code === 'KeyA' || e.code === 'KeyD') this.pedal.press(e.code);
+    });
+  },
+
+  onStroke(key) {
+    const k = document.querySelector(`#keyhint kbd[data-k="${key}"]`);
+    if (k) {
+      k.classList.add('hit');
+      setTimeout(() => k.classList.remove('hit'), 90);
+    }
+  },
+
+  setPaused(p) {
+    this.paused = p;
+    $('#pause').classList.toggle('active', p);
+    if (p) this.audio.pause();
+    else this.audio.resume();
+  },
+
+  quit() {
+    this.setPaused(false);
+    this.audio.stop();
+    this.gen++;
+    this.timers = [];
+    $('#cog').innerHTML = '';
+    this.show('menu');
+  },
+
+  // ---------------- 게임 시계 기반 예약 ----------------
+  after(ms, fn, gen = this.gen) {
+    this.timers.push({ t: this.clock + ms, fn, gen });
+  },
+
+  runTimers() {
+    const due = this.timers.filter((x) => x.t <= this.clock);
+    if (!due.length) return;
+    this.timers = this.timers.filter((x) => x.t > this.clock);
+    due.sort((a, b) => a.t - b.t);
+    for (const x of due) if (x.gen === this.gen) x.fn();
+  },
+
+  // ---------------- 라운드 흐름 ----------------
+  startRound() {
+    this.readMenu();
+    this.audio.ensure();
+    this.audio.setMuted(!this.cfg.sound);
+    this.pedal.reset();
+    this.gen++;
+    this.timers = [];
+    this.clock = 0;
+    this.calib = { elapsed: 0, started: false, samples: [], angle: 0 };
+    this.show('calib');
+    this.state = 'calib';
+  },
+
+  updateCalib(dt, rpm) {
+    const c = this.calib;
+    const total = this.cfg.calibrationSec;
+    if (!c.started && rpm > 0) c.started = true;
+    if (c.started) {
+      c.elapsed += dt;
+      if (c.elapsed > Math.min(this.cfg.calibrationIgnoreSec, total * 0.3) && rpm > 0) c.samples.push(rpm);
+    }
+    c.angle += (rpm / 60) * 360 * dt;
+    $('#calib-crank').setAttribute('transform', `rotate(${c.angle} 110 110)`);
+    const frac = U.clamp(c.elapsed / total, 0, 1);
+    $('#calib-arc').setAttribute('stroke-dashoffset', String(603.2 * (1 - frac)));
+    $('#calib-num').textContent = c.started ? Math.ceil(total - c.elapsed) : '';
+    $('#calib-state').textContent = !c.started
+      ? '페달을 밟으면 측정이 시작됩니다'
+      : rpm > 0 ? '좋아요, 이 속도를 유지하세요' : '계속 밟아주세요';
+    if (c.elapsed >= total) this.finishCalib();
+  },
+
+  finishCalib() {
+    const s = this.calib.samples.slice().sort((a, b) => a - b);
+    let base = s.length ? s[Math.floor(s.length / 2)] : 0;
+    if (base < this.cfg.minRpm) base = this.cfg.fallbackRpm;
+    this.baseline = base;
+    this.target = base;
+    this.beginCountdown();
+  },
+
+  beginCountdown() {
+    this.state = 'countdown';
+    this.score = 0;
+    this.exScore = 0;
+    this.cogScore = 0;
+    this.elapsed = 0;
+    this.tickAcc = 0;
+    this.tickTime = 0;
+    this.slopeDir = 0;
+    this.slopeLevel = 0;
+    this.ramp = null;
+    this.gameIndex = 0;
+    this.current = null;
+    this.stats = {};
+    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0 }));
+    this.band.cfg = this.cfg;
+    this.band.setSlope(0);
+    this.band.theta = 0;
+    this.band.floaters = [];
+    this.show('game');
+    this.band.resize();
+    this.updateHud();
+    this.audio.start(() => this.target * 2);
+
+    const cog = $('#cog');
+    const gen = this.gen;
+    const intro = U.el('div', 'intro');
+    intro.innerHTML = `
+      <div class="tag">준비</div>
+      <div class="hint">비트에 맞춰 <b>A · D</b>를 밟아 공을 <b style="color:var(--good)">초록 구역</b> 안에 두세요.<br>
+      그러면서 아래에 나오는 게임을 풀면 됩니다.</div>
+      <div class="big-count">3</div>`;
+    cog.innerHTML = '';
+    cog.append(intro);
+    const num = intro.querySelector('.big-count');
+    this.audio.sfx('count');
+    this.after(1000, () => { num.textContent = '2'; this.audio.sfx('count'); }, gen);
+    this.after(2000, () => { num.textContent = '1'; this.audio.sfx('count'); }, gen);
+    this.after(3000, () => {
+      num.textContent = 'GO!';
+      this.audio.sfx('go');
+      this.state = 'play';
+    }, gen);
+    this.after(3600, () => this.nextGame(), gen);
+  },
+
+  nextGame() {
+    const T = GAME_TYPES[this.gameIndex % GAME_TYPES.length];
+    const cycle = Math.floor(this.gameIndex / GAME_TYPES.length);
+    const level = Math.min(cycle + 1, T.maxLevel);
+    const mult = 1 + this.cfg.multiplierStep * (level - 1);
+    const firstTime = cycle === 0;
+    this.gameIndex++;
+    this.current = null;
+
+    const gen = ++this.gen;
+    const cog = $('#cog');
+    cog.innerHTML = '';
+    const intro = U.el('div', 'intro');
+    intro.innerHTML = `
+      <div class="tag">${firstTime ? '새 게임' : `레벨 업 · x${mult.toFixed(1)}`}</div>
+      <div class="name">${T.title}</div>
+      <div class="hint">${T.hint}</div>`;
+    cog.append(intro);
+    this.after(firstTime ? 2600 : 1500, () => {
+      cog.innerHTML = '';
+      const stage = U.el('div', 'stage');
+      cog.append(stage);
+      const host = this.makeHost(T, stage, level, mult, gen);
+      this.current = { T, game: new T(host), host };
+      this.current.game.start();
+    }, gen);
+  },
+
+  makeHost(T, stage, level, mult, gen) {
+    return {
+      stage,
+      level,
+      mult,
+      base: this.cfg.cogBasePoints,
+      after: (ms, fn) => this.after(ms, fn, gen),
+      sfx: (n) => this.audio.sfx(n),
+      award: (pts, anchor, prefix = '') => {
+        if (gen !== this.gen || this.state !== 'play') return;
+        pts = Math.round(pts);
+        if (pts <= 0) return;
+        this.cogScore += pts;
+        this.stats[T.id].points += pts;
+        this.addScore(pts);
+        this.floatAt(anchor, `${prefix}+${pts}`);
+      },
+      done: (res) => {
+        if (gen !== this.gen || this.state !== 'play') return;
+        this.record(T, res);
+        this.nextGame();
+      },
+    };
+  },
+
+  record(T, res) {
+    const s = this.stats[T.id];
+    s.plays++;
+    if (res.cleared) s.cleared++;
+    s.correct += res.correct;
+    s.total += res.total;
+  },
+
+  floatAt(anchor, text) {
+    const cog = $('#cog');
+    const cr = cog.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
+    const f = U.el('div', 'floater', text);
+    f.style.left = `${r.left + r.width / 2 - cr.left}px`;
+    f.style.top = `${r.top + r.height / 2 - cr.top}px`;
+    cog.append(f);
+    setTimeout(() => f.remove(), 950);
+  },
+
+  addScore(pts) {
+    this.score += pts;
+    const v = $('#hud-score .value');
+    v.textContent = this.score;
+    v.classList.remove('bump');
+    void v.offsetWidth;
+    v.classList.add('bump');
+  },
+
+  updateHud() {
+    const left = this.state === 'play' ? this.cfg.durationSec - this.elapsed : this.cfg.durationSec;
+    $('#hud-time .value').textContent = U.fmtTime(left);
+    $('#hud-time').classList.toggle('warn', this.state === 'play' && left <= 10);
+    $('#hud-score .value').textContent = this.score;
+  },
+
+  // 목표 RPM 대비 편차로 이번 프레임의 운동 점수(0~max)를 계산
+  frameScore(dev) {
+    const { tolerance, maxDeviation, tickMaxPoints } = this.cfg;
+    const d = Math.abs(dev);
+    if (d <= tolerance) return tickMaxPoints;
+    return tickMaxPoints * Math.max(0, 1 - (d - tolerance) / (maxDeviation - tolerance));
+  },
+
+  updatePlay(dt, rpm) {
+    const { cfg } = this;
+    this.elapsed += dt;
+
+    // 목표 RPM 변화 → 지면 각도
+    const seg = Math.floor(this.elapsed / cfg.rpmChangeSegmentSec);
+    const dir = cfg.rpmChange ? SLOPE_PATTERN[seg % SLOPE_PATTERN.length] : 0;
+    if (dir !== this.slopeDir) {
+      this.slopeDir = dir;
+      this.ramp = { from: this.slopeLevel, to: dir, t0: this.elapsed };
+      this.flashBandMsg(SLOPE_MSG[dir]);
+    }
+    // 목표 RPM과 지면 각도를 rpmRampSec에 걸쳐 부드럽게 전환 (smoothstep)
+    if (this.ramp) {
+      const t = U.clamp((this.elapsed - this.ramp.t0) / Math.max(cfg.rpmRampSec, 0.001), 0, 1);
+      const e = t * t * (3 - 2 * t);
+      this.slopeLevel = U.lerp(this.ramp.from, this.ramp.to, e);
+      if (t >= 1) this.ramp = null;
+    }
+    this.band.setSlope(this.slopeLevel);
+    this.target = this.baseline * (1 + this.slopeLevel * cfg.rpmChangeAmount);
+
+    // 짧은 간격으로 운동 점수 지급
+    const dev = (rpm - this.target) / this.target;
+    this.tickAcc += this.frameScore(dev) * dt;
+    this.tickTime += dt;
+    if (this.tickTime >= cfg.tickSec) {
+      const pts = Math.round(this.tickAcc / this.tickTime);
+      this.tickAcc = 0;
+      this.tickTime -= cfg.tickSec;
+      this.exScore += pts;
+      if (pts > 0) this.addScore(pts);
+      const color = pts >= cfg.tickMaxPoints ? '#1f9d55' : pts > 0 ? '#e08a00' : '#e5484d';
+      this.band.addFloater(`+${pts}`, color);
+    }
+
+    if (this.elapsed >= cfg.durationSec) this.endRound();
+  },
+
+  flashBandMsg(text) {
+    let m = $('#band-msg');
+    if (!m) {
+      m = U.el('div');
+      m.id = 'band-msg';
+      $('#band').append(m);
+    }
+    m.textContent = text;
+    m.classList.remove('show');
+    void m.offsetWidth;
+    m.classList.add('show');
+  },
+
+  endRound() {
+    this.state = 'result';
+    if (this.current) {
+      // 중단된 게임: 부분 점수는 abort 안에서 지급될 수 있도록 상태를 잠깐 play로 둔다
+      this.state = 'play';
+      const res = this.current.game.abort();
+      this.state = 'result';
+      if (res.total > 0) this.record(this.current.T, res);
+    }
+    this.gen++;
+    this.timers = [];
+    this.audio.stop();
+    this.audio.sfx('end');
+    $('#cog').innerHTML = '';
+    this.showResult();
+  },
+
+  showResult() {
+    const cfg = this.cfg;
+    const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
+    $('#res-total').textContent = this.score;
+    $('#res-ex').textContent = `${this.exScore} / ${exMax}`;
+    $('#res-ex-sub').textContent = `일정 속도 유지율 ${Math.round((this.exScore / exMax) * 100)}%`;
+    $('#res-cog').textContent = this.cogScore;
+    $('#res-cog-sub').innerHTML = GAME_TYPES.map((T) => {
+      const s = this.stats[T.id];
+      return `${T.title}: ${s.plays}회 · 정답 ${s.correct}/${s.total} · ${s.points}점`;
+    }).join('<br>');
+    $('#save-row').style.display = '';
+    $('#res-name').value = '';
+    this.savedId = null;
+    this.renderBoard($('#res-board'));
+    this.show('result');
+    setTimeout(() => $('#res-name').focus(), 50);
+  },
+
+  // ---------------- 순위 ----------------
+  loadBoard() {
+    try { return JSON.parse(localStorage.getItem('exergame.board') || '[]'); } catch (e) { return []; }
+  },
+
+  saveScore() {
+    if (this.savedId) return;
+    const name = $('#res-name').value.trim() || '이름없음';
+    const board = this.loadBoard();
+    this.savedId = Date.now();
+    board.push({ id: this.savedId, name, score: this.score, ex: this.exScore, cog: this.cogScore, dur: this.cfg.durationSec });
+    board.sort((a, b) => b.score - a.score);
+    try { localStorage.setItem('exergame.board', JSON.stringify(board.slice(0, 50))); } catch (e) {}
+    $('#save-row').style.display = 'none';
+    this.renderBoard($('#res-board'));
+  },
+
+  renderBoard(el) {
+    const board = this.loadBoard().slice(0, 8);
+    if (!board.length) {
+      el.innerHTML = '<li class="board-empty">아직 기록이 없습니다</li>';
+      return;
+    }
+    el.innerHTML = board.map((b, i) => `
+      <li class="${b.id === this.savedId ? 'me' : ''}">
+        <span class="rank">${i + 1}</span>
+        <span class="name">${b.name.replace(/[<>&]/g, '')}</span>
+        <span>${b.score}점 <small style="color:var(--ink-soft)">(${U.fmtTime(b.dur)})</small></span>
+      </li>`).join('');
+  },
+
+  // ---------------- 메인 루프 ----------------
+  loop(now) {
+    const dt = Math.min(0.1, (now - this.last) / 1000);
+    this.last = now;
+    if (!this.paused) {
+      this.clock += dt * 1000;
+      const rpm = this.pedal.update(dt);
+
+      if (this.state === 'calib') this.updateCalib(dt, rpm);
+
+      if (this.state === 'countdown' || this.state === 'play') {
+        if (this.state === 'play') this.updatePlay(dt, rpm);
+        if (this.state === 'countdown' || this.state === 'play') {
+          this.band.update(dt, rpm, (rpm - this.target) / this.target);
+          this.band.draw();
+          this.updateHud();
+        }
+      }
+      this.runTimers();
+      this.updateDebug(rpm);
+    }
+    // 비트에 맞춰 화면 가장자리 깜빡임 (짝수 = A쪽 왼편, 홀수 = D쪽 오른편)
+    for (const b of this.audio.pollBeats()) {
+      if (this.state !== 'countdown' && this.state !== 'play') continue;
+      const e = document.querySelector(b.i % 2 === 0 ? '.edge.left' : '.edge.right');
+      e.classList.remove('flash');
+      void e.offsetWidth;
+      e.classList.add('flash');
+    }
+    requestAnimationFrame((t) => this.loop(t));
+  },
+
+  updateDebug(rpm) {
+    const d = $('#debug');
+    if (!d.classList.contains('active')) return;
+    d.textContent = [
+      `state    ${this.state}`,
+      `rpm      ${rpm.toFixed(1)}`,
+      `target   ${this.target ? this.target.toFixed(1) : '-'}`,
+      `baseline ${this.baseline ? this.baseline.toFixed(1) : '-'}`,
+      `dev      ${this.target ? (((rpm - this.target) / this.target) * 100).toFixed(1) + '%' : '-'}`,
+      `ex/cog   ${this.exScore ?? 0} / ${this.cogScore ?? 0}`,
+    ].join('\n');
+  },
+};
+
+App.init();

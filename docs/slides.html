@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>페달 & 브레인 기획 요약</title>
+<style>
+  /* 16:9 슬라이드, 게임과 같은 평면·미니멀 톤. 파란 강조색은 게임 UI와 동일 */
+  :root {
+    --ink: #161b26;
+    --muted: #5b6474;
+    --faint: #8a93a3;
+    --line: #dde1e8;
+    --paper: #ffffff;
+    --tint: #f2f4f8;
+    --accent: #2f6fed;
+    --accent-soft: #e3ebfd;
+    --good: #1f9d55;
+    --bad: #e5484d;
+    --font: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  }
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #c9ced6; }
+  body { word-break: keep-all; font-family: var(--font); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .slide {
+    width: 1280px;
+    height: 720px;
+    background: var(--paper);
+    position: relative;
+    overflow: hidden;
+    padding: 56px 72px 64px;
+    display: flex;
+    flex-direction: column;
+    page-break-after: always;
+    break-after: page;
+  }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .eyebrow { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: 0.06em; margin-bottom: 10px; }
+  h1 { font-size: 40px; font-weight: 800; margin: 0 0 28px; letter-spacing: -0.02em; line-height: 1.2; }
+  h3 { font-size: 19px; font-weight: 800; margin: 0 0 8px; }
+  p, li { font-size: 17px; line-height: 1.6; color: var(--muted); margin: 0; }
+  ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  b, strong { color: var(--ink); }
+  .foot {
+    position: absolute; left: 72px; right: 72px; bottom: 26px;
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--faint); letter-spacing: 0.04em;
+  }
+  .shot { display: block; width: 100%; border-radius: 10px; border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(22, 27, 38, 0.08); }
+  .cap { font-size: 13px; color: var(--faint); margin-top: 8px; }
+  .tag { align-self: flex-start; display: inline-block; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+  .grow { flex: 1; min-height: 0; }
+
+  /* 표지 */
+  .cover { padding: 0; flex-direction: row; }
+  .cover .left { width: 520px; padding: 80px 56px 64px 72px; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+  .cover .title { font-size: 68px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; margin: 0; }
+  .cover .sub { font-size: 22px; color: var(--muted); line-height: 1.5; }
+  .cover .meta { font-size: 14px; color: var(--faint); margin-top: 24px; }
+  .cover .right { flex: 1; background: var(--tint); display: flex; align-items: center; padding: 48px 0 48px 48px; }
+  .cover .right img { width: 760px; border-radius: 12px 0 0 12px; border-right: none; }
+  .keys { display: inline-flex; gap: 6px; }
+  kbd { font-family: var(--font); font-size: 14px; font-weight: 700; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 1px 8px; background: #fff; color: var(--ink); }
+
+  /* 카드 그리드 */
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .card { background: var(--tint); border-radius: 14px; padding: 22px 26px; }
+  .card .k { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 0.08em; margin-bottom: 6px; }
+  .card li { font-size: 16px; }
+
+  /* 흐름 */
+  .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+  .step .n { font-size: 14px; font-weight: 800; color: var(--accent); margin: 14px 0 4px; }
+  .step h3 { font-size: 18px; }
+  .step p { font-size: 15px; }
+
+  /* 화면 구성 주석 */
+  .anno-wrap { display: flex; gap: 36px; align-items: flex-start; }
+  .anno { position: relative; width: 760px; flex: none; }
+  .box { position: absolute; border: 3px solid var(--accent); border-radius: 8px; }
+  .box.cog { border-color: var(--good); }
+  .pin {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 14px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 3px #fff;
+  }
+  .legend { display: flex; flex-direction: column; gap: 14px; }
+  .legend .row { display: flex; gap: 12px; align-items: flex-start; }
+  .legend .row .pin { position: static; transform: none; flex: none; margin-top: 2px; }
+  .legend .row p { font-size: 15.5px; }
+  .legend .zone { font-size: 14px; font-weight: 800; padding: 4px 10px; border-radius: 6px; color: #fff; display: inline-block; }
+
+  /* 밴드 비교 */
+  .bands { display: flex; flex-direction: column; gap: 14px; width: 700px; flex: none; }
+  .band-row { display: flex; flex-direction: column; gap: 4px; }
+  .band-row .lbl { font-size: 14px; font-weight: 800; }
+  .band-row img { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+
+  /* 2단 */
+  .two { display: flex; gap: 40px; }
+  .two > .col-shots { width: 640px; flex: none; display: flex; flex-direction: column; gap: 14px; }
+  .two > .col-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 10px 14px; }
+  .kv dt { font-size: 14px; font-weight: 800; color: var(--accent); padding-top: 2px; }
+  .kv dd { margin: 0; font-size: 16px; line-height: 1.55; color: var(--muted); }
+
+  /* 표 */
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 11px 16px; font-size: 16px; border-bottom: 1px solid var(--line); }
+  th { font-size: 13px; color: var(--faint); font-weight: 700; letter-spacing: 0.04em; }
+  td:first-child { font-weight: 800; }
+  td.m { color: var(--accent); font-weight: 800; }
+
+  /* 스코어 */
+  .score-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .score-col { border: 1px solid var(--line); border-radius: 14px; padding: 26px 28px; display: flex; flex-direction: column; gap: 14px; }
+  .big { font-size: 44px; font-weight: 900; letter-spacing: -0.02em; color: var(--ink); line-height: 1.1; }
+  .big small { font-size: 18px; color: var(--muted); font-weight: 700; margin-left: 6px; }
+  .formula { margin-top: 22px; background: var(--tint); border-radius: 12px; padding: 16px 24px; font-size: 18px; color: var(--muted); }
+  .formula b { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- 1. 표지 -->
+<section class="slide cover">
+  <div class="left">
+    <div class="eyebrow">엑서게임 프로토타입 기획</div>
+    <h2 class="title">페달 &amp;<br>브레인</h2>
+    <p class="sub">고정형 사이클을 일정한 속도로 밟으면서 화면의 인지 게임을 함께 푸는 시연용 엑서게임</p>
+    <div class="meta">기획 요약 · 웹 프로토타입 v1 · 2026.10</div>
+  </div>
+  <div class="right"><img class="shot" src="shots/05-path-input.png" alt=""></div>
+</section>
+
+<!-- 2. 핵심 기획 -->
+<section class="slide">
+  <div class="eyebrow">핵심 기획</div>
+  <h1>누가, 어디서, 무엇을 경험하는가</h1>
+  <div class="cards">
+    <div class="card">
+      <div class="k">대상</div>
+      <ul><li>신체와 정신 모두 건강한 <b>성인</b></li><li>너무 쉽지 않게 조정해 <b>점수로 순위</b>를 매길 수 있게</li></ul>
+    </div>
+    <div class="card">
+      <div class="k">시연 환경</div>
+      <ul><li>고정형 사이클 여러 대 + 정면 <b>태블릿 거치대</b>(가로 화면)</li><li>페달 강도 조절, 센서로 <b>RPM 측정</b> · 조명/소음 통제 어려움</li></ul>
+    </div>
+    <div class="card">
+      <div class="k">목표</div>
+      <ul><li><b>일정한 강도의 운동</b>과 <b>인지 능력 테스트</b>를 병행</li><li>점수 비교로 플레이·클리어 욕구 자극</li></ul>
+    </div>
+    <div class="card">
+      <div class="k">플레이 경험</div>
+      <ul><li>몇 분짜리 <b>1회성</b> 경험, 길이는 현장에 맞춰 조절</li><li>규칙과 페달링 모두 직관적으로 → <b>학습 시간 최소화</b></li></ul>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>2</span></div>
+</section>
+
+<!-- 3. 한 판의 흐름 -->
+<section class="slide">
+  <div class="eyebrow">플레이 흐름</div>
+  <h1>한 판은 네 단계로 진행됩니다</h1>
+  <div class="flow">
+    <div class="step">
+      <img class="shot" src="shots/02-calib.png" alt="">
+      <div class="n">1 · 15초</div>
+      <h3>편안한 속도 측정</h3>
+      <p>편하게 밟는 속도의 중간값을 <b>기준 RPM</b>으로 저장합니다. 초반 가속 구간은 제외합니다.</p>
+    </div>
+    <div class="step">
+      <img class="shot" src="shots/03-countdown.png" alt="">
+      <div class="n">2 · 3초</div>
+      <h3>카운트다운</h3>
+      <p>기준 속도에 맞춘 <b>비트와 깜빡임</b>이 시작되어 리듬을 미리 익힙니다.</p>
+    </div>
+    <div class="step">
+      <img class="shot" src="shots/12-arith-right.png" alt="">
+      <div class="n">3 · 고정 시간 (기본 3분)</div>
+      <h3>본 라운드</h3>
+      <p>페달링을 유지하며 <b>인지 게임 3종</b>을 번갈아 끊임없이 풉니다.</p>
+    </div>
+    <div class="step">
+      <img class="shot" src="shots/14-result.png" alt="">
+      <div class="n">4</div>
+      <h3>결과 · 순위</h3>
+      <p>운동 점수와 인지 게임 점수를 나눠 보여주고 <b>순위에 등록</b>합니다.</p>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약 &nbsp;|&nbsp; 결과 화면의 순위는 예시 데이터</span><span>3</span></div>
+</section>
+
+<!-- 4. 화면 구성 -->
+<section class="slide">
+  <div class="eyebrow">화면 구성</div>
+  <h1>위 1/4은 페달링, 아래 3/4은 인지 게임</h1>
+  <div class="anno-wrap">
+    <div class="anno">
+      <img class="shot" src="shots/05-path-input.png" alt="">
+      <div class="box" style="left:-4px;top:-4px;width:calc(100% + 8px);height:calc(25% + 6px)"></div>
+      <div class="box cog" style="left:-4px;top:calc(25% + 6px);width:calc(100% + 8px);height:calc(75% - 2px)"></div>
+      <div class="pin" style="left:13%;top:15%">1</div>
+      <div class="pin" style="left:41%;top:6%">2</div>
+      <div class="pin" style="left:88%;top:15%">3</div>
+      <div class="pin" style="left:96%;top:45%">4</div>
+      <div class="pin" style="left:22%;top:39%">5</div>
+    </div>
+    <div class="legend">
+      <span class="zone" style="background:var(--accent)">상단 · 상시 표시</span>
+      <div class="row"><div class="pin">1</div><p><b>남은 시간</b> (분:초) 카운트다운</p></div>
+      <div class="row"><div class="pin">2</div><p><b>구르는 공과 허용 구역</b>. RPM 숫자 대신 공의 위치로 속도를 보여주고, 공 위에 <b>+점수</b>가 계속 뜹니다</p></div>
+      <div class="row"><div class="pin">3</div><p><b>누적 점수</b></p></div>
+      <div class="row"><div class="pin">4</div><p>비트에 맞춘 <b>화면 가장자리 깜빡임</b> (좌 = A, 우 = D)</p></div>
+      <span class="zone" style="background:var(--good)">하단 · 연속 진행</span>
+      <div class="row"><div class="pin">5</div><p><b>인지 게임</b>과 레벨. 한 게임이 끝나면 다음 게임이 바로 이어집니다</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>4</span></div>
+</section>
+
+<!-- 5. 페달링 유도 -->
+<section class="slide">
+  <div class="eyebrow">일정한 페달링 유도</div>
+  <h1>숫자 없이, 공 하나로 속도를 맞춥니다</h1>
+  <div class="two">
+    <div class="bands">
+      <div class="band-row"><span class="lbl" style="color:var(--good)">목표 속도 유지 · 초록 구역 안 → 초당 +10점</span><img src="shots/band-ok.png" alt=""></div>
+      <div class="band-row"><span class="lbl" style="color:var(--bad)">너무 느림 · 공이 왼쪽으로 밀려나고 구역이 붉게 → 점수 감소</span><img src="shots/band-slow.png" alt=""></div>
+      <div class="band-row"><span class="lbl" style="color:var(--accent)">목표 속도 상승 · 지면이 오르막으로 기울어짐</span><img src="shots/band-uphill.png" alt=""></div>
+    </div>
+    <div class="col-text">
+      <div><h3>공의 위치 = 속도</h3><p>목표보다 느리면 왼쪽, 빠르면 오른쪽으로 움직입니다. 구역 밖에서는 <b>›››</b> 표시로 방향을 알려줍니다.</p></div>
+      <div><h3>목표 속도 변화</h3><p>40초마다 평지 → 오르막(+12%) → 평지 → 내리막(−12%). 지면 각도와 비트 템포가 <b>12초에 걸쳐 부드럽게</b> 바뀝니다.</p></div>
+      <div><h3>리듬으로 유도</h3><p>기준 속도에 맞춘 <b>비트 음악</b>(킥 = A, 스네어 = D)과 좌우 가장자리 깜빡임. 소음이 커도 시각 신호로 맞출 수 있습니다.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>5</span></div>
+</section>
+
+<!-- 6. 길 따라 그리기 -->
+<section class="slide">
+  <div class="eyebrow">인지 게임 1</div>
+  <h1>길 따라 그리기</h1>
+  <div class="two">
+    <div class="col-shots">
+      <img class="shot" src="shots/04-path-show.png" alt="">
+      <div class="cap">경로가 왼쪽 열에서 오른쪽 열까지 한 칸씩 켜지며 연결선으로 이어집니다. 이후 모두 꺼지고 첫 칸만 남습니다.</div>
+    </div>
+    <div class="col-text">
+      <p>보여준 경로를 기억했다가 <b>같은 순서로 칸을 눌러</b> 길을 완성합니다.</p>
+      <dl class="kv">
+        <dt>난이도</dt><dd>격자 크기 3×4 → 6×9</dd>
+        <dt>고정 요소</dt><dd>경로 한 칸을 보여주는 시간 (0.38초)</dd>
+        <dt>직관성</dt><dd>떨어진 네모 배열 + 칸 사이 연결선으로 ‘길’을 표현, 첫 칸은 미리 켜 둠</dd>
+        <dt>점수</dt><dd>맞힌 칸마다 60점을 나눠 지급 + 완성 보너스 40점, 난이도 배율 적용</dd>
+        <dt>오답</dt><dd>틀린 칸을 누르면 즉시 종료, 남은 정답 경로를 흐리게 보여줌</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>6</span></div>
+</section>
+
+<!-- 7. 심볼 위치 외우기 -->
+<section class="slide">
+  <div class="eyebrow">인지 게임 2</div>
+  <h1>심볼 위치 외우기</h1>
+  <div class="two">
+    <div class="col-shots">
+      <div class="pair">
+        <div><img class="shot" src="shots/07-symbol-banner.png" alt=""><div class="cap">① ‘외우세요!’ 안내</div></div>
+        <div><img class="shot" src="shots/08-symbol-show.png" alt=""><div class="cap">② 심볼을 3.2초 동안 공개</div></div>
+      </div>
+      <div class="pair">
+        <div><img class="shot" src="shots/09-symbol-ask.png" alt=""><div class="cap">③ 위 칸의 심볼이 어디 있었는지 선택</div></div>
+        <div><img class="shot" src="shots/10-symbol-wrong.png" alt=""><div class="cap">④ 고른 칸은 닫히고 ✓ / ✕ 표시</div></div>
+      </div>
+    </div>
+    <div class="col-text">
+      <p>2×4 판에 잠깐 나타난 심볼의 <b>위치를 기억</b>해, 위쪽 칸에 뜬 심볼이 있던 곳을 3번 맞힙니다.</p>
+      <dl class="kv">
+        <dt>난이도</dt><dd>심볼 수 3개 → 8개</dd>
+        <dt>고정 요소</dt><dd>노출 시간 3.2초, 8종 심볼은 모양과 색이 모두 다름</dd>
+        <dt>직관성</dt><dd>질문 단계에서 ‘어디 있었나요?’ 문구, 한 번 고른 칸은 다시 못 고름</dd>
+        <dt>점수</dt><dd>3문항을 모두 끝낸 뒤 맞힌 개수만큼 지급 (개당 100/3점 × 배율)</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>7</span></div>
+</section>
+
+<!-- 8. 사칙연산 역산 -->
+<section class="slide">
+  <div class="eyebrow">인지 게임 3</div>
+  <h1>사칙연산 역산</h1>
+  <div class="two">
+    <div class="col-shots">
+      <div class="pair">
+        <div><img class="shot" src="shots/11-arith-slow.png" alt=""><div class="cap">채울 칸은 강조 테두리, 고른 숫자는 비활성</div></div>
+        <div><img class="shot" src="shots/12-arith-right.png" alt=""><div class="cap">정답 시 초록색, 진행 점으로 3문제 표시</div></div>
+      </div>
+    </div>
+    <div class="col-text">
+      <p><b>(?) ± (?) = 답</b> 형태의 식에서, 아래 후보 숫자 중 두 개를 골라 식을 완성합니다.</p>
+      <dl class="kv">
+        <dt>난이도</dt><dd>후보 4개·한 자리 수 → 후보 8개·두 자리 수</dd>
+        <dt>생성 규칙</dt><dd>답이 되는 조합이 <b>정확히 하나</b>만 있도록 후보를 고름</dd>
+        <dt>오답</dt><dd>답이 될 수 없는 숫자를 고르는 즉시 오답, 정답 식을 보여줌</dd>
+        <dt>점수</dt><dd>맞든 틀리든 3문제, 맞힌 식마다 100/3점 × 배율</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>8</span></div>
+</section>
+
+<!-- 9. 라운드 구성 -->
+<section class="slide">
+  <div class="eyebrow">라운드 내 인지 게임 구성</div>
+  <h1>세 게임이 한 번씩 돌고, 돌 때마다 레벨이 오릅니다</h1>
+  <table>
+    <thead><tr><th>순환</th><th>배율</th><th>길 따라 그리기 (격자)</th><th>심볼 위치 외우기 (심볼 수)</th><th>사칙연산 역산 (후보 · 숫자 범위)</th></tr></thead>
+    <tbody>
+      <tr><td>Lv.1</td><td class="m">×1.0</td><td>3 × 4</td><td>3개</td><td>4개 · 1–9</td></tr>
+      <tr><td>Lv.2</td><td class="m">×1.2</td><td>3 × 5</td><td>4개</td><td>5개 · 1–9</td></tr>
+      <tr><td>Lv.3</td><td class="m">×1.4</td><td>4 × 6</td><td>5개</td><td>5개 · 2–30</td></tr>
+      <tr><td>Lv.4</td><td class="m">×1.6</td><td>5 × 7</td><td>6개</td><td>6개 · 5–60</td></tr>
+      <tr><td>Lv.5</td><td class="m">×1.8</td><td>5 × 8</td><td>7개</td><td>7개 · 10–99</td></tr>
+      <tr><td>Lv.6</td><td class="m">×2.0</td><td>6 × 9</td><td>8개</td><td>8개 · 10–99</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:20px">순서가 모두에게 같아서 <b>등장 순서 때문에 얻을 수 있는 점수가 달라지지 않습니다</b>. 한 게임을 통과하는 시간의 개인차는 감수합니다. Lv.6 이후는 최고 난이도로 계속 반복합니다.</p>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>9</span></div>
+</section>
+
+<!-- 10. 스코어링 -->
+<section class="slide">
+  <div class="eyebrow">스코어링</div>
+  <h1>꾸준한 운동과 정확한 풀이를 모두 보상합니다</h1>
+  <div class="score-cols">
+    <div class="score-col">
+      <span class="tag">운동 점수</span>
+      <div class="big">10점<small>/ 1초 최대</small></div>
+      <ul>
+        <li>허용 구역(±12%) 안이면 만점, 벗어난 만큼 줄고 <b>±45%에서 0점</b></li>
+        <li>라운드 길이가 고정이라 <b>만점도 고정</b>: 3분이면 1,800점</li>
+        <li>인지 게임을 얼마나 빨리 풀든 운동 만점은 같음</li>
+      </ul>
+    </div>
+    <div class="score-col">
+      <span class="tag">인지 게임 점수</span>
+      <div class="big">100점<small>× 난이도 배율 / 1게임 만점</small></div>
+      <ul>
+        <li>세 게임 모두 <b>같은 만점</b>, 레벨당 배율 +0.2</li>
+        <li>오답은 0점이라 <b>대충 빨리보다 정확하게</b>가 유리</li>
+        <li>레벨은 순환 횟수로만 오르고 배율 증가폭을 낮게 잡아, <b>쉬운 게임을 일부러 빨리 틀려도 이득이 없음</b></li>
+      </ul>
+    </div>
+  </div>
+  <div class="formula">총점 = <b>운동 점수</b> + <b>인지 게임 점수</b> &nbsp;·&nbsp; 결과 화면에서 두 점수를 따로 보여줍니다</div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>10</span></div>
+</section>
+
+<!-- 11. 시연 설정 · 다음 단계 -->
+<section class="slide">
+  <div class="eyebrow">프로토타입 현황</div>
+  <h1>현장에 맞춰 조절하고, 실제 기기로 넘어갑니다</h1>
+  <div class="two">
+    <div class="col-shots" style="width:560px">
+      <img class="shot" src="shots/01-menu.png" alt="">
+      <div class="cap">메뉴의 시연 설정: 라운드 길이 · 측정 시간 · 허용 구역 · 배율 증가폭 · 목표 속도 변화 · 전환 시간 · 사운드 (순위는 예시 데이터)</div>
+    </div>
+    <div class="col-text">
+      <div>
+        <h3>지금의 입력 대체</h3>
+        <ul>
+          <li>페달링: <span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기 (한 번 = 반 바퀴)</li>
+          <li>터치: 마우스 클릭</li>
+          <li>웹 링크로 공유, 별도 설치 없음</li>
+        </ul>
+      </div>
+      <div>
+        <h3>다음 단계</h3>
+        <ul>
+          <li>페달 <b>RPM 센서 연동</b> (입력 모듈만 교체)</li>
+          <li>실제 사이클로 기준 속도·허용 구역·변화폭 튜닝</li>
+          <li>시연장 조명·소음 환경에서 피드백 가독성 확인</li>
+          <li>플레이테스트로 레벨 곡선과 배율 검증</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>페달 &amp; 브레인 · 기획 요약</span><span>11</span></div>
+</section>
+
+</body>
+</html>

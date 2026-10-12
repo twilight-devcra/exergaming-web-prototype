@@ -13,10 +13,14 @@
       <h1>페달 &amp; 브레인</h1>
       <p>일정한 속도로 페달을 밟으면서, 화면 아래 인지 게임을 풀어 점수를 모으세요.</p>
       <p>
-        페달링: <span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기<br>
+        페달링: <span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기</span><span class="sensor-only">연결된 페달 센서</span><br>
         터치: 마우스 클릭<br>
         일시정지: <kbd>Esc</kbd> · 디버그 표시: <kbd>`</kbd>
       </p>
+      <div class="pedal-row">
+        <span class="pedal-status" id="pedal-status"></span>
+        <button class="btn secondary small" id="btn-pedal">페달 연결</button>
+      </div>
       <button class="btn" id="btn-start">시작하기</button>
     </div>
     <div class="menu-side">
@@ -40,7 +44,7 @@
   <!-- 편안한 속도 측정 -->
   <section id="calib" class="screen">
     <h2>편안한 속도로 페달을 밟아주세요</h2>
-    <p><span class="keys"><kbd>A</kbd><kbd>D</kbd></span>를 번갈아 누르세요. 이 속도가 게임의 기준 속도가 됩니다.</p>
+    <p><span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span>를 번갈아 누르세요.</span> 이 속도가 게임의 기준 속도가 됩니다.</p>
     <div class="calib-ring">
       <svg viewBox="0 0 220 220">
         <circle cx="110" cy="110" r="96" fill="none" stroke="#e4e7ec" stroke-width="14"/>
@@ -100,6 +104,7 @@
   <div id="pause">
     <div class="panel">
       <h2>일시정지</h2>
+      <div id="pause-note"></div>
       <button class="btn" id="btn-resume">계속하기</button>
       <button class="btn secondary" id="btn-quit">메뉴로 나가기</button>
     </div>
@@ -108,6 +113,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/pedal.js"></script>
+  <script src="js/pedal-link.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/band.js"></script>
   <script src="js/games/path.js"></script>

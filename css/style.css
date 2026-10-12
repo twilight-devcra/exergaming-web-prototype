@@ -86,6 +86,30 @@ kbd {
 }
 .btn:hover { filter: brightness(1.07); }
 .btn.secondary { background: var(--cell); color: var(--ink); }
+.btn.small { padding: 8px 14px; font-size: 15px; border-radius: 10px; flex: none; }
+.btn:disabled { opacity: 0.45; cursor: default; filter: none; }
+
+/* 페달 센서 연결 */
+.pedal-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+.pedal-status { font-size: 14px; color: var(--ink-soft); line-height: 1.4; }
+.pedal-status::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.pedal-status[data-state="ready"] { color: var(--good); font-weight: 700; }
+.pedal-status[data-state="ready"]::before { background: var(--good); }
+.pedal-status[data-state="connecting"]::before,
+.pedal-status[data-state="reconnecting"]::before { background: var(--accent); }
+.pedal-status[data-state="disconnected"]::before { background: var(--bad); }
+/* 입력원에 따라 안내 문구를 바꾼다 (body.sensor = 페달 센서 사용 중) */
+.sensor-only { display: none; }
+body.sensor .sensor-only { display: inline; }
+body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 
 .panel {
   background: var(--panel);
@@ -433,6 +457,8 @@ kbd {
 #pause.active { display: flex; }
 #pause .panel { text-align: center; display: flex; flex-direction: column; gap: 12px; }
 #pause h2 { font-size: 26px; color: var(--ink); margin: 0 0 8px; }
+#pause-note { font-size: 15px; color: var(--bad); line-height: 1.5; }
+#pause-note:empty { display: none; }
 
 #debug {
   position: fixed;

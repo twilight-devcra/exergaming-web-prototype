@@ -6,9 +6,11 @@ const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조�
 const App = {
   cfg: Config.load(),
   pedal: new Pedal(),
+  link: new PedalLink(),
   audio: new BeatAudio(),
   state: 'menu', // menu | calib | countdown | play | result
   paused: false,
+  linkPaused: false, // 페달 연결이 끊겨서 걸린 일시정지. 다시 연결되면 자동으로 풀린다
   clock: 0,      // 일시정지 중에는 멈추는 게임 시계 (ms)
   timers: [],
   gen: 0,        // 인지 게임 세대. 바뀌면 이전 게임의 예약 콜백/점수 지급은 무시된다
@@ -17,6 +19,7 @@ const App = {
     this.band = new Band($('#band-canvas'), this.cfg);
     this.bindMenu();
     this.bindKeys();
+    this.bindLink();
     this.pedal.onStroke = (key) => this.onStroke(key);
     $('#btn-start').onclick = () => this.startRound();
     $('#btn-again').onclick = () => this.startRound();
@@ -93,8 +96,46 @@ const App = {
     }
   },
 
+  // ---------------- 페달 센서 ----------------
+  bindLink() {
+    const btn = $('#btn-pedal');
+    btn.onclick = () => (this.link.wantLink ? this.link.disconnect() : this.link.connect());
+    this.link.onState = (state, detail) => this.onLinkState(state, detail);
+    this.link.onWorkout = (w) => this.pedal.sensorFrame(w.rpm);
+    if (this.link.supported) {
+      this.onLinkState('idle', '키보드로 입력 중');
+    } else {
+      btn.disabled = true;
+      this.onLinkState('idle', '이 브라우저에서는 페달을 연결할 수 없습니다 (Chrome·Edge 필요)');
+    }
+  },
+
+  onLinkState(state, detail) {
+    const ready = state === 'ready';
+    this.pedal.setSensor(ready);
+    document.body.classList.toggle('sensor', ready);
+    const s = $('#pedal-status');
+    s.dataset.state = state;
+    s.textContent = detail;
+    $('#btn-pedal').textContent = this.link.wantLink ? '연결 해제' : '페달 연결';
+
+    // 센서로 하던 라운드 도중 연결이 끊기면 '멈춤'으로 채점하지 않고 시계를 세운다
+    const inRound = ['calib', 'countdown', 'play'].includes(this.state);
+    if (ready) {
+      if (this.linkPaused) this.setPaused(false);
+    } else if (this.roundSensor && inRound && !this.paused) {
+      this.setPaused(true);
+      this.linkPaused = true;
+    }
+    $('#pause-note').textContent = this.linkPaused ? `${detail} — 계속하기를 누르면 키보드로 이어갑니다.` : '';
+  },
+
   setPaused(p) {
     this.paused = p;
+    if (!p) {
+      this.linkPaused = false;
+      $('#pause-note').textContent = '';
+    }
     $('#pause').classList.toggle('active', p);
     if (p) this.audio.pause();
     else this.audio.resume();
@@ -128,6 +169,7 @@ const App = {
     this.audio.ensure();
     this.audio.setMuted(!this.cfg.sound);
     this.pedal.reset();
+    this.roundSensor = this.pedal.sensorOn;
     this.gen++;
     this.timers = [];
     this.clock = 0;
@@ -193,7 +235,7 @@ const App = {
     const intro = U.el('div', 'intro');
     intro.innerHTML = `
       <div class="tag">준비</div>
-      <div class="hint">비트에 맞춰 <b>A · D</b>를 밟아 공을 <b style="color:var(--good)">초록 구역</b> 안에 두세요.<br>
+      <div class="hint">비트에 맞춰 ${this.pedal.sensorOn ? '<b>페달</b>을' : '<b>A · D</b>를'} 밟아 공을 <b style="color:var(--good)">초록 구역</b> 안에 두세요.<br>
       그러면서 아래에 나오는 게임을 풀면 됩니다.</div>
       <div class="big-count">3</div>`;
     cog.innerHTML = '';
@@ -462,6 +504,7 @@ const App = {
     if (!d.classList.contains('active')) return;
     d.textContent = [
       `state    ${this.state}`,
+      `input    ${this.pedal.sensorOn ? `sensor ${this.pedal.sensorRpm}rpm fw ${this.link.firmware || '?'}` : `keyboard (link ${this.link.state})`}`,
       `rpm      ${rpm.toFixed(1)}`,
       `target   ${this.target ? this.target.toFixed(1) : '-'}`,
       `baseline ${this.baseline ? this.baseline.toFixed(1) : '-'}`,

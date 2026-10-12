@@ -42,11 +42,22 @@ class Band {
     const speed = rpm / 60; // 초당 회전 수
     this.roll += speed * Math.PI * 2 * dt;
     this.travel += speed * 70 * dt;
-    const out = Math.max(0, Math.abs(deviation) - tolerance) / (maxDeviation - tolerance);
+    // 색과 점수는 실제 편차가 아니라 화면에 보이는 공 위치를 기준으로 한다 (보이는 대로 채점)
+    const out = Math.max(0, Math.abs(this.deviation) - tolerance) / (maxDeviation - tolerance);
     this.outAmount = U.lerp(this.outAmount, U.clamp(out * 1.5 + (out > 0 ? 0.35 : 0), 0, 1), 1 - Math.exp(-dt / 0.12));
-    this.slowSide = deviation < 0;
+    this.slowSide = this.ballX < 0;
     this.floaters.forEach((f) => (f.t += dt));
     this.floaters = this.floaters.filter((f) => f.t < 1);
+  }
+
+  // 화면에 그려진 공 위치에 해당하는 편차
+  get deviation() {
+    return this.ballX * this.cfg.maxDeviation;
+  }
+
+  // 공의 중심이 허용 구역 점선 안에 있는가
+  get inZone() {
+    return Math.abs(this.deviation) <= this.cfg.tolerance;
   }
 
   draw() {
@@ -72,7 +83,7 @@ class Band {
     const zb = Math.round(U.lerp(224, 214, red));
     g.fillStyle = `rgb(${zr},${zg},${zb})`;
     g.fillRect(-zoneHalf, -zoneH, zoneHalf * 2, zoneH);
-    g.strokeStyle = red > 0.05 ? `rgba(229,72,77,${0.4 + red * 0.6})` : '#1f9d55';
+    g.strokeStyle = this.inZone ? '#1f9d55' : `rgba(229,72,77,${0.4 + red * 0.6})`;
     g.lineWidth = 3;
     g.setLineDash([6, 6]);
     g.beginPath();
@@ -106,7 +117,7 @@ class Band {
     // 공
     const bx = this.ballX * trackHalf;
     const by = -r - 2;
-    g.fillStyle = red > 0.05 ? '#e5484d' : '#2f6fed';
+    g.fillStyle = this.inZone ? '#2f6fed' : '#e5484d';
     g.beginPath();
     g.arc(bx, by, r, 0, Math.PI * 2);
     g.fill();
@@ -121,7 +132,7 @@ class Band {
     g.stroke();
 
     // 이탈 시 방향 힌트
-    if (red > 0.25) {
+    if (!this.inZone && red > 0.25) {
       g.fillStyle = `rgba(229,72,77,${Math.min(1, red)})`;
       g.font = `800 ${Math.round(r * 0.9)}px system-ui, sans-serif`;
       g.textAlign = 'center';

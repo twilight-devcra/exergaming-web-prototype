@@ -214,6 +214,7 @@ const App = {
     this.elapsed = 0;
     this.tickAcc = 0;
     this.tickTime = 0;
+    this.tickOut = false;
     this.slopeDir = 0;
     this.slopeLevel = 0;
     this.ramp = null;
@@ -370,12 +371,15 @@ const App = {
     this.band.setSlope(this.slopeLevel);
     this.target = this.baseline * (1 + this.slopeLevel * cfg.rpmChangeAmount);
 
-    // 짧은 간격으로 운동 점수 지급
-    const dev = (rpm - this.target) / this.target;
-    this.tickAcc += this.frameScore(dev) * dt;
+    // 짧은 간격으로 운동 점수 지급. 화면의 공 위치(band)를 기준으로 채점해서 보이는 것과 점수가 어긋나지 않게 한다.
+    this.tickAcc += this.frameScore(this.band.deviation) * dt;
     this.tickTime += dt;
+    if (!this.band.inZone) this.tickOut = true;
     if (this.tickTime >= cfg.tickSec) {
-      const pts = Math.round(this.tickAcc / this.tickTime);
+      let pts = Math.round(this.tickAcc / this.tickTime);
+      // 공이 한 번이라도 구역을 벗어난(빨간) 틱은 만점을 주지 않는다
+      if (this.tickOut) pts = Math.min(pts, cfg.tickMaxPoints - 1);
+      this.tickOut = false;
       this.tickAcc = 0;
       this.tickTime -= cfg.tickSec;
       this.exScore += pts;

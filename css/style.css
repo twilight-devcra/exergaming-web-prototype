@@ -281,7 +281,11 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   background: var(--cell);
   transition: background 0.12s, transform 0.12s;
 }
-.pcell.clickable:hover { background: var(--cell-hover); }
+/* hover는 마우스가 있을 때만, 그리고 아직 상태 색이 없는 칸에만 적용한다.
+   터치에서는 마지막으로 누른 칸에 :hover가 남아 방금 켜진 색을 덮어 버린다. */
+@media (hover: hover) {
+  .pcell.clickable:hover:not(.on, .start, .done, .wrong) { background: var(--cell-hover); }
+}
 .pcell.clickable { cursor: pointer; }
 .pcell.on { background: var(--accent); transform: scale(1.04); }
 .pcell.start { background: var(--accent); }
@@ -323,7 +327,9 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   transition: background 0.12s;
 }
 .scell.clickable { cursor: pointer; }
-.scell.clickable:hover { background: var(--cell-hover); }
+@media (hover: hover) {
+  .scell.clickable:hover { background: var(--cell-hover); }
+}
 .scell.closed { background: #c9ced6; }
 .scell.closed.right { background: var(--good-soft); box-shadow: inset 0 0 0 4px var(--good); }
 .scell.closed.wrong { background: var(--bad-soft); box-shadow: inset 0 0 0 4px var(--bad); }
@@ -391,7 +397,9 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.ar-cand:hover:not(:disabled) { background: var(--cell-hover); }
+@media (hover: hover) {
+  .ar-cand:hover:not(:disabled, .wrong) { background: var(--cell-hover); }
+}
 .ar-cand:disabled { opacity: 0.25; cursor: default; }
 .ar-cand.wrong { background: var(--bad); color: #fff; opacity: 1; }
 .ar-cand.answer { box-shadow: inset 0 0 0 4px var(--good); opacity: 1; }

@@ -135,7 +135,8 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   text-align: right;
 }
 .setting input[type="checkbox"] { width: 20px; height: 20px; }
-.menu-side { display: flex; flex-direction: column; gap: 16px; }
+/* 패널이 늘어나 화면보다 길어지면 이 열만 스크롤한다 (body가 overflow: hidden이라 안 그러면 잘린다) */
+.menu-side { display: flex; flex-direction: column; gap: 16px; max-height: 100%; overflow-y: auto; }
 
 .board-list { margin: 0; padding: 0; list-style: none; font-size: 15px; }
 .board-list li {
@@ -356,11 +357,12 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 
 /* 사칙연산 역산 */
 .ar-wrap { display: flex; flex-direction: column; align-items: center; gap: 36px; flex: 1; justify-content: center; }
-.ar-progress { display: flex; gap: 10px; }
-.ar-progress span { width: 14px; height: 14px; border-radius: 50%; background: var(--cell); }
-.ar-progress span.cur { background: var(--accent); }
-.ar-progress span.right { background: var(--good); }
-.ar-progress span.wrong { background: var(--bad); }
+/* 라운드 진행 표시 (여러 게임 공용) */
+.dots { display: flex; gap: 10px; }
+.dots span { width: 14px; height: 14px; border-radius: 50%; background: var(--cell); }
+.dots span.cur { background: var(--accent); }
+.dots span.right { background: var(--good); }
+.dots span.wrong { background: var(--bad); }
 .ar-eq {
   display: flex;
   align-items: center;
@@ -403,6 +405,82 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .ar-cand:disabled { opacity: 0.25; cursor: default; }
 .ar-cand.wrong { background: var(--bad); color: #fff; opacity: 1; }
 .ar-cand.answer { box-shadow: inset 0 0 0 4px var(--good); opacity: 1; }
+
+/* 우세한 색 찾기 */
+.cnt-wrap { display: flex; flex-direction: column; align-items: center; gap: 26px; flex: 1; justify-content: center; }
+.cnt-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--csz));
+  grid-auto-rows: var(--csz);
+  gap: 6px;
+}
+.ccell { border-radius: 8px; background: var(--cell); transition: opacity 0.2s; }
+.ccell svg { width: 100%; height: 100%; display: block; fill: rgba(255, 255, 255, 0.7); }
+.ccell.dim { opacity: 0.2; }
+.cnt-opts { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; padding-bottom: 26px; }
+.cnt-opt {
+  position: relative;
+  width: clamp(60px, 10vh, 88px);
+  height: clamp(60px, 10vh, 88px);
+  padding: 0;
+  border: 4px solid transparent;
+  border-radius: 16px;
+}
+.cnt-opt svg { width: 56%; height: 56%; margin: 0 auto; display: block; fill: rgba(255, 255, 255, 0.8); }
+.cnt-opt .n {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -26px;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) {
+  .cnt-opt:hover:not(:disabled) { border-color: var(--ink-soft); }
+}
+.cnt-opt.right { border-color: var(--good); }
+.cnt-opt.right .n { color: var(--good); }
+.cnt-opt.wrong { border-color: var(--bad); }
+
+/* 구멍에 맞는 조각 */
+.fit-wrap { display: flex; flex-direction: column; align-items: center; gap: 24px; flex: 1; justify-content: center; }
+.fit-hole {
+  width: var(--hsz);
+  height: var(--hsz);
+  background: var(--panel);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.fit-hole svg { width: 100%; height: 100%; display: block; }
+/* 칸마다 옅은 테두리를 둬서 몇 칸짜리인지 한눈에 보이게 한다 */
+.fit-hole .hole rect { fill: #2b2f38; stroke: rgba(255, 255, 255, 0.14); stroke-width: 0.8; }
+/* 고른 조각이 구멍 쪽으로 돌아 들어가는 동작 */
+.fit-hole .seat {
+  transform-origin: 50px 50px;
+  transition: transform 0.55s cubic-bezier(0.3, 0.8, 0.4, 1);
+  opacity: 0.92;
+}
+.fit-hole .seat rect { stroke: rgba(255, 255, 255, 0.3); stroke-width: 0.8; }
+.fit-hole .seat.right rect { fill: var(--good); }
+.fit-hole .seat.wrong rect { fill: var(--bad); }
+.fit-cands { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.fit-cand {
+  width: var(--psz);
+  height: var(--psz);
+  padding: 0;
+  border: 4px solid transparent;
+  border-radius: 16px;
+  background: var(--cell);
+}
+.fit-cand svg { width: 100%; height: 100%; display: block; }
+.fit-cand rect { fill: var(--accent); stroke: rgba(255, 255, 255, 0.3); stroke-width: 0.8; }
+@media (hover: hover) {
+  .fit-cand:hover:not(:disabled) { background: var(--cell-hover); }
+}
+.fit-cand.right { border-color: var(--good); }
+.fit-cand.wrong { border-color: var(--bad); }
 
 /* ---------- 측정 화면 ---------- */
 #calib, #result {

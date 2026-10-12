@@ -28,7 +28,7 @@ class ArithGame {
     stage.append(U.el('div', 'stage-title', `${ArithGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg', '');
     this.wrap = U.el('div', 'ar-wrap');
-    this.progress = U.el('div', 'ar-progress');
+    this.progress = U.el('div', 'dots');
     for (let i = 0; i < ArithGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.eq = U.el('div', 'ar-eq');
     this.cands = U.el('div', 'ar-cands');

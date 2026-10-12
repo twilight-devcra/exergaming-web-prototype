@@ -29,10 +29,15 @@
         <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
         <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
         <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
+        <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
         <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
         <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
         <label class="setting">속도 전환 시간 (초)<input type="number" id="cfg-ramp" min="0" max="30" step="1"></label>
         <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
+      </div>
+      <div class="panel">
+        <h2>사용할 게임</h2>
+        <div id="cfg-games"></div>
       </div>
       <div class="panel">
         <h2>순위</h2>
@@ -119,6 +124,8 @@
   <script src="js/games/path.js"></script>
   <script src="js/games/symbol.js"></script>
   <script src="js/games/arith.js"></script>
+  <script src="js/games/count.js"></script>
+  <script src="js/games/fit.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

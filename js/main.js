@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const GAME_TYPES = [PathGame, SymbolGame, ArithGame];
+const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
 const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
 
@@ -17,6 +17,7 @@ const App = {
 
   init() {
     this.band = new Band($('#band-canvas'), this.cfg);
+    this.renderGameToggles();
     this.bindMenu();
     this.bindKeys();
     this.bindLink();
@@ -35,15 +36,46 @@ const App = {
   },
 
   // ---------------- 메뉴 / 설정 ----------------
+  // 게임 목록은 GAME_TYPES에서 만든다 — 게임을 추가하면 설정에도 저절로 나타난다
+  renderGameToggles() {
+    const box = $('#cfg-games');
+    GAME_TYPES.forEach((T) => {
+      box.append(U.el('label', 'setting', `${T.title}<input type="checkbox" data-game="${T.id}">`));
+    });
+    box.addEventListener('change', (e) => {
+      // 전부 끄면 넣을 게임이 없다. 마지막 하나는 꺼지지 않게 되돌린다.
+      const on = [...box.querySelectorAll('input')].some((b) => b.checked);
+      if (!on) e.target.checked = true;
+    });
+  },
+
+  // 가장 단계가 많은 게임에 맞춘다 — 그보다 높게 시작하면 모든 게임이 최고 난이도로 고정된다
+  maxStartLevel() {
+    return Math.max(...GAME_TYPES.map((T) => T.maxLevel));
+  },
+
+  // 설정에서 켜 둔 게임만, GAME_TYPES에 적힌 순서대로
+  enabledTypes() {
+    const ids = this.cfg.games;
+    if (!ids) return GAME_TYPES;
+    const list = GAME_TYPES.filter((T) => ids.includes(T.id));
+    return list.length ? list : GAME_TYPES;
+  },
+
   bindMenu() {
     const c = this.cfg;
     $('#cfg-duration').value = c.durationSec;
     $('#cfg-calib').value = c.calibrationSec;
     $('#cfg-tol').value = Math.round(c.tolerance * 100);
+    $('#cfg-start-level').max = this.maxStartLevel();
+    $('#cfg-start-level').value = c.startLevel;
     $('#cfg-mult').value = c.multiplierStep;
     $('#cfg-change').checked = c.rpmChange;
     $('#cfg-ramp').value = c.rpmRampSec;
     $('#cfg-sound').checked = c.sound;
+    document.querySelectorAll('#cfg-games input').forEach((b) => {
+      b.checked = !c.games || c.games.includes(b.dataset.game);
+    });
   },
 
   readMenu() {
@@ -55,10 +87,12 @@ const App = {
     c.durationSec = num('#cfg-duration', 30, 900, 180);
     c.calibrationSec = num('#cfg-calib', 5, 60, 15);
     c.tolerance = num('#cfg-tol', 3, 40, 12) / 100;
+    c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), 1));
     c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
     c.rpmChange = $('#cfg-change').checked;
     c.rpmRampSec = num('#cfg-ramp', 0, 30, 12);
     c.sound = $('#cfg-sound').checked;
+    c.games = [...document.querySelectorAll('#cfg-games input')].filter((b) => b.checked).map((b) => b.dataset.game);
     Config.save(c);
     this.bindMenu();
   },
@@ -220,6 +254,7 @@ const App = {
     this.ramp = null;
     this.gameIndex = 0;
     this.current = null;
+    this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
     this.stats = {};
     GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0 }));
     this.band.cfg = this.cfg;
@@ -254,9 +289,9 @@ const App = {
   },
 
   nextGame() {
-    const T = GAME_TYPES[this.gameIndex % GAME_TYPES.length];
-    const cycle = Math.floor(this.gameIndex / GAME_TYPES.length);
-    const level = Math.min(cycle + 1, T.maxLevel);
+    const T = this.types[this.gameIndex % this.types.length];
+    const cycle = Math.floor(this.gameIndex / this.types.length);
+    const level = Math.min(cycle + this.cfg.startLevel, T.maxLevel);
     const mult = 1 + this.cfg.multiplierStep * (level - 1);
     const firstTime = cycle === 0;
     this.gameIndex++;
@@ -267,7 +302,7 @@ const App = {
     cog.innerHTML = '';
     const intro = U.el('div', 'intro');
     intro.innerHTML = `
-      <div class="tag">${firstTime ? '새 게임' : `레벨 업 · x${mult.toFixed(1)}`}</div>
+      <div class="tag">${firstTime ? '새 게임' : '레벨 업'}${mult > 1 ? ` · x${mult.toFixed(1)}` : ''}</div>
       <div class="name">${T.title}</div>
       <div class="hint">${T.hint}</div>`;
     cog.append(intro);
@@ -428,7 +463,8 @@ const App = {
     $('#res-ex').textContent = `${this.exScore} / ${exMax}`;
     $('#res-ex-sub').textContent = `일정 속도 유지율 ${Math.round((this.exScore / exMax) * 100)}%`;
     $('#res-cog').textContent = this.cogScore;
-    $('#res-cog-sub').innerHTML = GAME_TYPES.map((T) => {
+    // 이번 라운드에 실제로 나온 게임만 적는다
+    $('#res-cog-sub').innerHTML = GAME_TYPES.filter((T) => this.stats[T.id].plays).map((T) => {
       const s = this.stats[T.id];
       return `${T.title}: ${s.plays}회 · 정답 ${s.correct}/${s.total} · ${s.points}점`;
     }).join('<br>');

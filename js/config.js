@@ -12,7 +12,9 @@ const DEFAULT_CONFIG = {
   rpmChangeAmount: 0.12,     // 목표 RPM 변화폭
   rpmRampSec: 12,            // 목표 RPM이 다음 값까지 서서히 바뀌는 데 걸리는 시간
   sound: true,
+  games: null,               // 라운드에 넣을 인지 게임 id 목록 (null = 전체). 메뉴의 '사용할 게임'에서 바뀐다.
   cogBasePoints: 100,        // 인지 게임 1회를 완벽히 했을 때의 기본 점수 (모든 유형 동일)
+  startLevel: 1,             // 라운드를 시작할 난이도. 올리면 쉬운 단계를 건너뛰고 바로 어려운 문제부터 나온다
   multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv1 x1.0, Lv2 x1.2 ...)
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
   minRpm: 25,

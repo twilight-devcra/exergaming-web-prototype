@@ -1,5 +1,7 @@
 // 상단 1/4 영역: 평지를 구르는 공으로 페달링 속도를 시각화
 class Band {
+  static RING_SEC = 0.7;
+
   constructor(canvas, cfg) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
@@ -10,6 +12,8 @@ class Band {
     this.theta = 0;       // 현재 지면 각도 (rad)
     this.thetaTarget = 0;
     this.floaters = [];
+    this.rings = [];      // 인지 게임 정답 때 공에서 퍼지는 고리
+    this.pop = 0;         // 정답 직후 공이 커졌다 돌아오는 정도 1→0
     this.outAmount = 0;   // 구역 이탈 정도 0~1
     this.resize();
   }
@@ -33,6 +37,13 @@ class Band {
     this.floaters.push({ text, color, t: 0, x: this.ballX });
   }
 
+  // 아래쪽 인지 게임을 맞혔을 때 위쪽 공도 같이 반응한다.
+  // 화면 위아래가 따로 노는 두 화면이 아니라 한 게임으로 느껴지게 하려는 것.
+  celebrate() {
+    this.rings.push({ t: 0, x: this.ballX });
+    this.pop = 1;
+  }
+
   // deviation: (rpm - target) / target
   update(dt, rpm, deviation) {
     const { tolerance, maxDeviation } = this.cfg;
@@ -48,6 +59,9 @@ class Band {
     this.slowSide = this.ballX < 0;
     this.floaters.forEach((f) => (f.t += dt));
     this.floaters = this.floaters.filter((f) => f.t < 1);
+    this.rings.forEach((r) => (r.t += dt));
+    this.rings = this.rings.filter((r) => r.t < Band.RING_SEC);
+    this.pop = Math.max(0, this.pop - dt / 0.4);
   }
 
   // 화면에 그려진 공 위치에 해당하는 편차
@@ -114,20 +128,35 @@ class Band {
     }
     g.stroke();
 
-    // 공
+    // 정답 고리 — 공 뒤에서 퍼져 나간다
+    for (const ring of this.rings) {
+      const p = ring.t / Band.RING_SEC;
+      g.globalAlpha = (1 - p) * 0.6;
+      g.strokeStyle = '#1f9d55';
+      g.lineWidth = Math.max(1.5, r * 0.2 * (1 - p));
+      g.beginPath();
+      g.arc(ring.x * trackHalf, -r - 2, r * (1 + p * 2.8), 0, Math.PI * 2);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+
+    // 공 (정답 직후에는 잠깐 커지면서 초록으로 물든다)
     const bx = this.ballX * trackHalf;
-    const by = -r - 2;
-    g.fillStyle = this.inZone ? '#2f6fed' : '#e5484d';
+    const br = r * (1 + 0.25 * this.pop);
+    const by = -br - 2;
+    const base = this.inZone ? [47, 111, 237] : [229, 72, 77];
+    g.fillStyle = `rgb(${Math.round(U.lerp(base[0], 31, this.pop))},` +
+      `${Math.round(U.lerp(base[1], 157, this.pop))},${Math.round(U.lerp(base[2], 85, this.pop))})`;
     g.beginPath();
-    g.arc(bx, by, r, 0, Math.PI * 2);
+    g.arc(bx, by, br, 0, Math.PI * 2);
     g.fill();
     g.strokeStyle = 'rgba(255,255,255,0.9)';
-    g.lineWidth = Math.max(2, r * 0.14);
+    g.lineWidth = Math.max(2, br * 0.14);
     g.beginPath();
     for (let k = 0; k < 2; k++) {
       const a = this.roll + (k * Math.PI) / 2;
-      g.moveTo(bx + Math.cos(a) * r * 0.62, by + Math.sin(a) * r * 0.62);
-      g.lineTo(bx - Math.cos(a) * r * 0.62, by - Math.sin(a) * r * 0.62);
+      g.moveTo(bx + Math.cos(a) * br * 0.62, by + Math.sin(a) * br * 0.62);
+      g.lineTo(bx - Math.cos(a) * br * 0.62, by - Math.sin(a) * br * 0.62);
     }
     g.stroke();
 
@@ -146,7 +175,8 @@ class Band {
     g.textBaseline = 'bottom';
     for (const f of this.floaters) {
       const fx = f.x * trackHalf;
-      const fy = -r * 2 - 6 - f.t * 16;
+      // 처음에 튕겨 오르고 끝에서 느려지게. 일정한 속도로 올라가면 흘러가는 느낌이 난다.
+      const fy = -r * 2 - 6 - (1 - Math.pow(1 - f.t, 3)) * 26;
       g.globalAlpha = f.t < 0.15 ? f.t / 0.15 : 1 - (f.t - 0.15) / 0.85;
       g.fillStyle = f.color;
       g.font = `800 ${Math.round(r * 0.95)}px system-ui, sans-serif`;

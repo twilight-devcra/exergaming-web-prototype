@@ -162,11 +162,57 @@ class BeatAudio {
     o.stop(t + dur + 0.02);
   }
 
+  // 연속 정답 보상음. 한 번 맞힐 때마다 음이 한 단계씩 올라가서, 연속이 쌓이는 게 귀로 들린다.
+  // 음은 비트의 베이스(A 단조)와 같은 음계라 반주 위에 얹혀도 어긋나지 않는다.
+  static LADDER = [880, 1046.5, 1174.7, 1318.5, 1568, 1760];
+
+  reward(streak) {
+    if (!this.ctx) return;
+    const L = BeatAudio.LADDER;
+    this.blip(L[Math.max(0, Math.min(streak - 1, L.length - 1))]);
+  }
+
+  // 사인파 하나보다 두툼하게 — 살짝 어긋난 두 음을 겹치고, 음을 아래에서 끌어올리고,
+  // 맨 앞에 아주 짧은 잡음을 얹어 또렷하게 친다.
+  blip(freq) {
+    const c = this.ctx;
+    const t = c.currentTime;
+    for (const [type, detune, vol] of [['triangle', 1, 0.2], ['sine', 1.006, 0.14]]) {
+      const o = c.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(freq * detune * 0.84, t);
+      o.frequency.exponentialRampToValueAtTime(freq * detune, t + 0.045);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      o.connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + 0.32);
+    }
+    const s = c.createBufferSource();
+    s.buffer = this.noise;
+    const hp = c.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 4200;
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(0.09, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    s.connect(hp).connect(ng).connect(this.master);
+    s.start(t);
+    s.stop(t + 0.06);
+  }
+
   sfx(name) {
     switch (name) {
       case 'tap': this.tone(660, 0.08, 'sine', 0.2); break;
       case 'good': this.tone(880, 0.1, 'sine', 0.25); break;
       case 'bad': this.tone(180, 0.25, 'square', 0.15); break;
+      // 길게 이어 온 연속이 끊길 때. 그냥 틀렸을 때보다 아깝게 들리도록 떨어뜨린다.
+      case 'drop':
+        this.tone(392, 0.14, 'triangle', 0.18);
+        this.tone(262, 0.28, 'triangle', 0.18, 0.1);
+        break;
       case 'clear':
         this.tone(660, 0.12, 'sine', 0.25);
         this.tone(880, 0.12, 'sine', 0.25, 0.09);

@@ -90,7 +90,7 @@ class PathGame {
     this.h.after(200, () => this.h.award(this.h.base * 0.4 * this.h.mult, this.cells[lr][lc], '완성 '));
     this.msg.textContent = '완성!';
     this.msg.className = 'stage-msg good';
-    this.h.sfx('clear');
+    this.h.sfx('good');   // 다 맞혔을 때의 축하음은 host가 따로 울린다
     this.cleared = true;
     this.h.after(1100, () => this.finish());
   }

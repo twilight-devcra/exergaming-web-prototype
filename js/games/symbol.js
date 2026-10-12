@@ -138,7 +138,7 @@ class SymbolGame {
     // 점수는 모든 심볼을 맞춘 뒤 한 번에 지급
     const pts = (this.correct * this.h.base * this.h.mult) / SymbolGame.QUESTIONS;
     if (pts > 0) this.h.award(pts, this.grid);
-    this.h.sfx(this.correct === SymbolGame.QUESTIONS ? 'clear' : this.correct ? 'good' : 'bad');
+    // 문제마다 이미 정답/오답 소리를 들려줬다. 다 맞혔을 때의 축하음은 host가 울린다.
     this.h.after(1200, () => {
       this.ro.disconnect();
       this.h.done(this.result());

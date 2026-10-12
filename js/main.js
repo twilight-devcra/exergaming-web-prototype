@@ -254,6 +254,9 @@ const App = {
     this.ramp = null;
     this.gameIndex = 0;
     this.current = null;
+    this.streak = 0;
+    this.bestStreak = 0;
+    this.renderStreak();
     this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
     this.stats = {};
     GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0 }));
@@ -323,7 +326,13 @@ const App = {
       mult,
       base: this.cfg.cogBasePoints,
       after: (ms, fn) => this.after(ms, fn, gen),
-      sfx: (n) => this.audio.sfx(n),
+      // 게임들은 정답에 'good', 오답에 'bad'를 울린다. 그 둘만 가로채 연속 정답을 세고 보상을 키운다.
+      // (게임 쪽 코드를 건드리지 않고 한 곳에서 보상을 다룰 수 있다)
+      sfx: (n) => {
+        if (n === 'good') return this.hit(true);
+        if (n === 'bad') return this.hit(false);
+        this.audio.sfx(n);
+      },
       award: (pts, anchor, prefix = '') => {
         if (gen !== this.gen || this.state !== 'play') return;
         pts = Math.round(pts);
@@ -336,9 +345,50 @@ const App = {
       done: (res) => {
         if (gen !== this.gen || this.state !== 'play') return;
         this.record(T, res);
-        this.nextGame();
+        // 한 게임을 다 맞혔으면 따로 축하한다. 게임마다 넣지 않고 여기서 한 번에 처리한다.
+        if (!res.cleared) return this.nextGame();
+        this.audio.sfx('clear');
+        const b = U.el('div', 'perfect', '완벽!');
+        stage.append(b);
+        this.after(950, () => this.nextGame(), gen);
       },
     };
+  },
+
+  // ---------------- 정답 보상 ----------------
+  // 연속 정답은 점수에 손대지 않는다. 운동 점수와 인지 점수의 균형을 흔들지 않으면서
+  // '지키고 싶은 것'만 하나 만들어 주는 게 목적이다.
+  hit(ok) {
+    if (ok) {
+      this.streak++;
+      this.bestStreak = Math.max(this.bestStreak, this.streak);
+      this.audio.reward(this.streak);
+      this.band.celebrate();
+      this.flashGlow(this.streak);
+    } else {
+      this.audio.sfx(this.streak >= 3 ? 'drop' : 'bad');
+      this.streak = 0;
+    }
+    this.renderStreak();
+  },
+
+  renderStreak() {
+    const el = $('#streak');
+    el.classList.toggle('on', this.streak >= 2);
+    if (this.streak < 2) return;
+    el.textContent = `${this.streak} 연속`;
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  },
+
+  // 맞힌 순간 게임 영역 전체가 한 번 밝아진다. 연속이 쌓일수록 세진다.
+  flashGlow(streak) {
+    const a = Math.min(0.1 + streak * 0.045, 0.34);
+    const el = U.el('div', 'glow');
+    el.style.background = `radial-gradient(ellipse at 50% 55%, rgba(31,157,85,${a}) 0%, rgba(31,157,85,0) 62%)`;
+    $('#cog').append(el);
+    setTimeout(() => el.remove(), 440);
   },
 
   record(T, res) {
@@ -464,10 +514,12 @@ const App = {
     $('#res-ex-sub').textContent = `일정 속도 유지율 ${Math.round((this.exScore / exMax) * 100)}%`;
     $('#res-cog').textContent = this.cogScore;
     // 이번 라운드에 실제로 나온 게임만 적는다
-    $('#res-cog-sub').innerHTML = GAME_TYPES.filter((T) => this.stats[T.id].plays).map((T) => {
+    const lines = GAME_TYPES.filter((T) => this.stats[T.id].plays).map((T) => {
       const s = this.stats[T.id];
       return `${T.title}: ${s.plays}회 · 정답 ${s.correct}/${s.total} · ${s.points}점`;
-    }).join('<br>');
+    });
+    if (this.bestStreak >= 2) lines.push(`<b>최고 연속 정답 ${this.bestStreak}회</b>`);
+    $('#res-cog-sub').innerHTML = lines.join('<br>');
     $('#save-row').style.display = '';
     $('#res-name').value = '';
     this.savedId = null;

@@ -467,6 +467,10 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   justify-content: center;
   color: var(--ink-soft);
 }
+/* 빈칸이 셋 이상이면 한 줄에 들어가도록 조금 줄인다 */
+.ar-eq.long { gap: 16px; font-size: clamp(40px, 7.5vh, 72px); }
+.ar-eq.long .ar-slot { min-width: 1.6em; }
+.ar-slot.filled { cursor: pointer; }
 .ar-slot.active { border-color: var(--accent); box-shadow: 0 0 0 6px var(--accent-soft); color: var(--accent); }
 .ar-slot.filled { color: var(--ink); }
 .ar-slot.right { border-color: var(--good); color: var(--good); }

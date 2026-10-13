@@ -1,16 +1,31 @@
 // 길 따라 그리기
-// 왼쪽 열의 한 칸에서 시작해 오른쪽 열까지 이어지는 경로를 한 칸씩 보여준 뒤, 같은 순서대로 선택하게 한다.
+// 격자 위에 경로를 한 칸씩 보여준 뒤, 같은 순서대로 선택하게 한다.
+// 난이도는 격자를 키우는 대신 길을 더 꼬아서 올린다. 곧게 뻗은 구간은 한 덩어리로 외워지므로
+// 기억에 부담을 주는 것은 길이보다 꺾이는 횟수다.
+//   len   — 경로의 칸 수 범위
+//   turns — 최소 꺾임 횟수
+//   free  — 꺼져 있으면 왼쪽 열에서 시작해 오른쪽 열에서 끝난다 (진행 방향을 짐작할 수 있다).
+//           켜면 아무 칸에서나 시작해 아무 데서나 끝나고, 되돌아가기도 한다.
+//   touch — 켜면 길이 자기 자신 바로 옆을 지나갈 수 있다. 옆 칸이 다음 칸인지 헷갈리게 된다.
 class PathGame {
   static id = 'path';
   static title = '길 따라 그리기';
   static hint = '불이 켜지며 만들어지는 길을 기억했다가<br>같은 순서대로 칸을 눌러 길을 완성하세요';
-  static sizes = [[3, 4], [3, 5], [4, 6], [5, 7], [5, 8], [6, 9]]; // [행, 열] = 난이도
-  static maxLevel = PathGame.sizes.length;
+  static levels = [
+    { grid: [3, 4], len: [5, 6], turns: 1 },
+    { grid: [3, 5], len: [6, 8], turns: 2 },
+    { grid: [4, 5], len: [8, 9], turns: 4 },
+    { grid: [4, 6], len: [10, 11], turns: 5, free: true },
+    { grid: [5, 6], len: [12, 13], turns: 7, free: true, touch: true },
+    { grid: [5, 7], len: [14, 15], turns: 9, free: true, touch: true },
+  ];
+  static maxLevel = PathGame.levels.length;
   static STEP_MS = 380; // 경로 한 칸을 보여주는 시간 (난이도와 무관하게 고정)
 
   constructor(host) {
     this.h = host;
-    [this.rows, this.cols] = PathGame.sizes[host.level - 1];
+    this.spec = PathGame.levels[host.level - 1];
+    [this.rows, this.cols] = this.spec.grid;
     this.k = 1;          // 다음에 선택해야 할 경로 인덱스
     this.phase = 'show';
     this.lines = [];
@@ -26,7 +41,7 @@ class PathGame {
     this.board.append(this.svg);
     stage.append(this.board);
 
-    this.path = PathGame.genPath(this.rows, this.cols);
+    this.path = PathGame.genPath(this.spec);
     this.cells = [];
     for (let r = 0; r < this.rows; r++) {
       this.cells[r] = [];
@@ -142,6 +157,7 @@ class PathGame {
     const ox = (w - (size * this.cols + gap * (this.cols - 1))) / 2;
     const oy = (h - (size * this.rows + gap * (this.rows - 1))) / 2;
     this.geo = { size, gap, ox, oy };
+    this.board.style.setProperty('--pw', `${size * 0.2}px`);
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const s = this.cells[r][c].style;
@@ -169,16 +185,14 @@ class PathGame {
   }
 
   placeLine({ i, j, el }) {
-    // 칸 사이의 틈만 잇는 짧은 선
+    // 칸 중심에서 중심까지 긋는다. 이어 붙이면 길 전체가 칸 위를 지나는 한 줄이 되어,
+    // 길이 자기 옆을 지나가도 어느 칸이 어느 칸으로 이어지는지 바로 보인다.
     const [x1, y1] = this.center(i);
     const [x2, y2] = this.center(j);
-    const half = this.geo.size / 2 - 4;
-    const dx = Math.sign(x2 - x1);
-    const dy = Math.sign(y2 - y1);
-    el.setAttribute('x1', x1 + dx * half);
-    el.setAttribute('y1', y1 + dy * half);
-    el.setAttribute('x2', x2 - dx * half);
-    el.setAttribute('y2', y2 - dy * half);
+    el.setAttribute('x1', x1);
+    el.setAttribute('y1', y1);
+    el.setAttribute('x2', x2);
+    el.setAttribute('y2', y2);
   }
 
   clearLines() {
@@ -187,55 +201,62 @@ class PathGame {
   }
 
   // ---- 경로 생성 ----
-  // 상하좌우 이동, 자기 자신과 맞닿지 않는(헷갈리지 않는) 경로를 랜덤 DFS로 생성
-  static genPath(rows, cols) {
-    const minLen = cols + Math.floor(rows / 2);
-    const maxLen = cols + rows + 2;
-    const moves = [
-      { dr: 0, dc: 1, w: 3 },
-      { dr: -1, dc: 0, w: 2 },
-      { dr: 1, dc: 0, w: 2 },
-      { dr: 0, dc: -1, w: 0.5 },
-    ];
+  // 상하좌우로만 움직이는 경로를 랜덤 DFS로 만든다. 길이는 len 범위에서 먼저 정하고 정확히 그 길이로 맞춘다.
+  static genPath({ grid: [rows, cols], len, turns, free = false, touch = false }) {
     const key = (r, c) => r * 100 + c;
+    const moves = [
+      { dr: 0, dc: 1, w: free ? 1 : 3 },
+      { dr: -1, dc: 0, w: free ? 1 : 2 },
+      { dr: 1, dc: 0, w: free ? 1 : 2 },
+      { dr: 0, dc: -1, w: free ? 1 : 0.5 },
+    ];
+    // 꺾임이 많이 필요한 단계에서는 직진보다 꺾는 쪽을 먼저 시도한다
+    const turnBias = turns >= 4 ? 2 : 1;
 
-    for (let attempt = 0; attempt < 300; attempt++) {
-      const path = [[U.rand(rows), 0]];
-      const visited = new Set([key(...path[0])]);
-      let budget = 4000;
+    // 조건이 너무 빡빡해 못 찾으면 꺾임 조건을 하나씩 풀어 가며 다시 시도한다
+    for (let need = turns; need >= 0; need--) {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const length = U.randInt(len[0], len[1]);
+        const path = [[U.rand(rows), free ? U.rand(cols) : 0]];
+        const visited = new Set([key(...path[0])]);
+        let budget = 4000;
 
-      const touchesOther = (r, c, fromR, fromC) => {
-        for (const [ar, ac] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
-          if (ar === fromR && ac === fromC) continue;
-          if (visited.has(key(ar, ac))) return true;
-        }
-        return false;
-      };
+        const touchesOther = (r, c, fromR, fromC) => {
+          for (const [ar, ac] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
+            if (ar === fromR && ac === fromC) continue;
+            if (visited.has(key(ar, ac))) return true;
+          }
+          return false;
+        };
 
-      const dfs = () => {
-        if (--budget < 0) return false;
-        const [r, c] = path[path.length - 1];
-        if (c === cols - 1) return path.length >= minLen;
-        if (path.length >= maxLen) return false;
-        const order = moves
-          .map((m) => ({ m, s: Math.pow(Math.random(), 1 / m.w) }))
-          .sort((a, b) => b.s - a.s)
-          .map((o) => o.m);
-        for (const { dr, dc } of order) {
-          const nr = r + dr;
-          const nc = c + dc;
-          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-          if (visited.has(key(nr, nc)) || touchesOther(nr, nc, r, c)) continue;
-          path.push([nr, nc]);
-          visited.add(key(nr, nc));
-          if (dfs()) return true;
-          path.pop();
-          visited.delete(key(nr, nc));
-        }
-        return false;
-      };
+        // last = 직전 이동, bends = 지금까지 꺾인 횟수
+        const dfs = (last, bends) => {
+          if (--budget < 0) return false;
+          const [r, c] = path[path.length - 1];
+          if (path.length === length) return bends >= need && (free || c === cols - 1);
+          // 남은 칸을 전부 꺾어도 모자라면 더 볼 필요가 없다
+          if (bends + (length - path.length) < need) return false;
+          const order = moves
+            .map((m) => ({ m, s: Math.pow(Math.random(), 1 / (m.w * (last && m !== last ? turnBias : 1))) }))
+            .sort((a, b) => b.s - a.s)
+            .map((o) => o.m);
+          for (const m of order) {
+            const nr = r + m.dr;
+            const nc = c + m.dc;
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+            if (visited.has(key(nr, nc))) continue;
+            if (!touch && touchesOther(nr, nc, r, c)) continue;
+            path.push([nr, nc]);
+            visited.add(key(nr, nc));
+            if (dfs(m, bends + (last && m !== last ? 1 : 0))) return true;
+            path.pop();
+            visited.delete(key(nr, nc));
+          }
+          return false;
+        };
 
-      if (dfs()) return path;
+        if (dfs(null, 0)) return path;
+      }
     }
     const r = U.rand(rows);
     return Array.from({ length: cols }, (_, c) => [r, c]);

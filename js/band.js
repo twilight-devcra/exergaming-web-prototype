@@ -1,7 +1,13 @@
 // 상단 1/4 영역: 평지를 구르는 공으로 페달링 속도를 시각화.
 // 속도 전환 구간에는 같은 캔버스가 화면 전체로 커진다 (크기에 맞춰 공과 구역도 조금 커진다).
+// 지면은 페달 속도가 아니라 점수만큼 흘러간다. 초록 구역 안에서는 꾸준히 나아가고, 벗어나면 느려지다 멈추며,
+// 인지 게임을 맞히면 한꺼번에 쭉 나아간다. 일정 점수마다 깃발이 서 있어 점수가 '달린 거리'로 보인다.
 class Band {
   static RING_SEC = 0.7;
+  static PX_PER_POINT = 8;   // 1점에 지면이 움직이는 거리
+  static MARK_EVERY = 200;   // 깃발 간격 (점)
+  static MARK_BIG = 1000;     // 큰 깃발 간격 (점)
+  static POP_SEC = 0.5;      // 깃발을 지난 직후 깃발이 커졌다 돌아오는 시간
 
   constructor(canvas, cfg) {
     this.canvas = canvas;
@@ -9,7 +15,9 @@ class Band {
     this.cfg = cfg;
     this.ballX = 0;       // -1 ~ 1 (트랙 기준 정규화 위치)
     this.roll = 0;        // 공 회전각
-    this.travel = 0;      // 지면 무늬 스크롤
+    this.dist = 0;        // 지금까지 나아간 거리 (점수 단위). 점수를 조금 늦게 부드럽게 따라간다
+    this.passed = null;   // 방금 지난 깃발 { m, t }
+    this.onMilestone = null; // (m) 깃발을 지나는 순간
     this.theta = 0;       // 현재 지면 각도 (rad)
     this.thetaTarget = 0;
     this.floaters = [];
@@ -50,15 +58,33 @@ class Band {
     this.pop = 1;
   }
 
+  // 새 라운드: 출발선으로 되돌린다
+  restart() {
+    this.dist = 0;
+    this.passed = null;
+    this.floaters = [];
+    this.rings = [];
+  }
+
   // deviation: (rpm - target) / target
-  update(dt, rpm, deviation) {
+  // score: 지금까지의 점수 (틱 사이에도 이어지도록 진행 중인 틱의 몫까지 더한 값)
+  update(dt, rpm, deviation, score = 0) {
     const { tolerance, maxDeviation } = this.cfg;
     const target = U.clamp(deviation / maxDeviation, -1, 1);
     this.ballX = U.lerp(this.ballX, target, 1 - Math.exp(-dt / 0.18));
     this.theta = U.lerp(this.theta, this.thetaTarget, 1 - Math.exp(-dt / 0.6));
     const speed = rpm / 60; // 초당 회전 수
     this.roll += speed * Math.PI * 2 * dt;
-    this.travel += speed * 70 * dt;
+    // 점수를 따라간다. 인지 게임 점수처럼 한 번에 크게 오르면 잠깐 사이에 쭉 달려가는 것으로 보인다.
+    const before = this.dist;
+    // (틱이 끝날 때 반올림으로 점수가 살짝 내려앉을 수 있다. 그렇다고 지면이 뒤로 가지는 않게 한다)
+    this.dist = Math.max(this.dist, U.lerp(this.dist, score, 1 - Math.exp(-dt / 0.25)));
+    const m = Math.floor(this.dist / Band.MARK_EVERY) * Band.MARK_EVERY;
+    if (m > 0 && before < m) {
+      this.passed = { m, t: 0 };
+      if (this.onMilestone) this.onMilestone(m);
+    }
+    if (this.passed) this.passed.t += dt;
     // 색과 점수는 실제 편차가 아니라 화면에 보이는 공 위치를 기준으로 한다 (보이는 대로 채점)
     const out = Math.max(0, Math.abs(this.deviation) - tolerance) / (maxDeviation - tolerance);
     this.outAmount = U.lerp(this.outAmount, U.clamp(out * 1.5 + (out > 0 ? 0.35 : 0), 0, 1), 1 - Math.exp(-dt / 0.12));
@@ -124,16 +150,48 @@ class Band {
     g.lineTo(ext, 0);
     g.stroke();
     // 지면 무늬 (공이 굴러가는 느낌)
-    g.strokeStyle = '#d6d9df';
+    g.strokeStyle = '#c3c8d0';
     g.lineWidth = 3;
     const spacing = 36;
-    const off = -(this.travel % spacing);
+    const off = -((this.dist * Band.PX_PER_POINT) % spacing);
     g.beginPath();
     for (let x = -ext + off; x < ext; x += spacing) {
       g.moveTo(x, 10);
       g.lineTo(x - 12, 22);
     }
     g.stroke();
+
+    // 점수 깃발 — 구역 한가운데를 지나는 순간이 그 점수에 닿은 때다
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    const first = Math.max(Band.MARK_EVERY, Math.ceil((this.dist - ext / Band.PX_PER_POINT) / Band.MARK_EVERY) * Band.MARK_EVERY);
+    for (let m = first; (m - this.dist) * Band.PX_PER_POINT < ext; m += Band.MARK_EVERY) {
+      const x = (m - this.dist) * Band.PX_PER_POINT;
+      // 양옆의 시간·점수 표시와 겹치지 않게 가장자리에서는 사라진다
+      const alpha = U.clamp((W / 2 - 170 - Math.abs(x)) / 100, 0, 1);
+      if (alpha <= 0) continue;
+      const big = m % Band.MARK_BIG === 0;
+      const done = m <= this.dist;
+      const pop = this.passed && this.passed.m === m ? Math.max(0, 1 - this.passed.t / Band.POP_SEC) : 0;
+      const top = -(zoneH + (big ? r * 0.75 : r * 0.3));
+      const fw = r * (big ? 1.25 : 0.9) * (1 + 0.5 * pop);
+      const fh = fw * 0.8;
+      g.globalAlpha = alpha;
+      g.strokeStyle = g.fillStyle = done ? '#1f9d55' : big ? '#2f6fed' : '#9aa1ad';
+      g.lineWidth = big ? 4 : 3;
+      g.beginPath();
+      g.moveTo(x, 0);
+      g.lineTo(x, top);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(x, top);
+      g.lineTo(x + fw, top + fh / 2);
+      g.lineTo(x, top + fh);
+      g.fill();
+      g.font = `800 ${Math.round(r * (big ? 0.7 : 0.55))}px system-ui, sans-serif`;
+      g.fillText(String(m), x + fw + 5, top + fh / 2);
+    }
+    g.globalAlpha = 1;
 
     // 정답 고리 — 공 뒤에서 퍼져 나간다
     for (const ring of this.rings) {

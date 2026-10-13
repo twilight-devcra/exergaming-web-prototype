@@ -19,6 +19,8 @@ const App = {
 
   init() {
     this.band = new Band($('#band-canvas'), this.cfg);
+    // 큰 깃발을 지날 때만 소리를 낸다. 작은 깃발까지 울리면 박자 소리와 섞여 시끄럽다.
+    this.band.onMilestone = (m) => { if (m % Band.MARK_BIG === 0) this.audio.sfx('go'); };
     this.renderGameToggles();
     this.bindMenu();
     this.bindKeys();
@@ -266,7 +268,7 @@ const App = {
     this.band.cfg = this.cfg;
     this.band.setSlope(0);
     this.band.theta = 0;
-    this.band.floaters = [];
+    this.band.restart();
     this.show('game');
     this.band.resize();
     this.updateHud();
@@ -595,7 +597,8 @@ const App = {
       if (this.state === 'countdown' || this.state === 'play') {
         if (this.state === 'play') this.updatePlay(dt, rpm);
         if (this.state === 'countdown' || this.state === 'play') {
-          this.band.update(dt, rpm, (rpm - this.target) / this.target);
+          // 틱 사이에도 지면이 끊기지 않도록 진행 중인 틱에서 쌓인 몫까지 넘긴다
+          this.band.update(dt, rpm, (rpm - this.target) / this.target, this.score + this.tickAcc / this.cfg.tickSec);
           this.band.draw();
           this.updateHud();
         }

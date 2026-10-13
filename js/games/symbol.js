@@ -110,6 +110,8 @@ class SymbolGame {
     cell.append(U.el('span', 'mark', ok ? '✓' : '✕'));
     if (ok) {
       this.correct++;
+      // 점수는 맞힐 때마다 바로 지급한다
+      this.h.award((this.h.base * this.h.mult) / SymbolGame.QUESTIONS, cell);
       this.h.sfx('good');
     } else {
       this.h.sfx('bad');
@@ -135,9 +137,6 @@ class SymbolGame {
     this.target.classList.remove('active');
     this.target.innerHTML = '';
     this.question.textContent = `${this.correct} / ${SymbolGame.QUESTIONS} 정답`;
-    // 점수는 모든 심볼을 맞춘 뒤 한 번에 지급
-    const pts = (this.correct * this.h.base * this.h.mult) / SymbolGame.QUESTIONS;
-    if (pts > 0) this.h.award(pts, this.grid);
     // 문제마다 이미 정답/오답 소리를 들려줬다. 다 맞혔을 때의 축하음은 host가 울린다.
     this.h.after(1200, () => {
       this.ro.disconnect();
@@ -149,12 +148,9 @@ class SymbolGame {
     return { cleared: this.correct === SymbolGame.QUESTIONS, correct: this.correct, total: SymbolGame.QUESTIONS };
   }
 
-  // 시간 종료로 중단될 때는 그때까지 맞힌 만큼 지급
+  // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
     this.ro.disconnect();
-    if (this.phase !== 'end' && this.correct > 0) {
-      this.h.award((this.correct * this.h.base * this.h.mult) / SymbolGame.QUESTIONS, this.grid, '', true);
-    }
     return { cleared: false, correct: this.correct, total: this.answered };
   }
 }

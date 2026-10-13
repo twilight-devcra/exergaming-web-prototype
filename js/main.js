@@ -2,6 +2,8 @@ const $ = (s) => document.querySelector(s);
 const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
 const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
+const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다
+const SHIFT_OUT_MS = 650;    // 화면이 다시 줄어드는 시간. 그 뒤에 다음 인지 게임이 나온다
 
 const App = {
   cfg: Config.load(),
@@ -29,7 +31,6 @@ const App = {
     $('#btn-quit').onclick = () => this.quit();
     $('#btn-save').onclick = () => this.saveScore();
     $('#res-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.saveScore(); });
-    window.addEventListener('resize', () => this.band.resize());
     this.renderBoard($('#menu-board'));
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
@@ -71,7 +72,7 @@ const App = {
     $('#cfg-start-level').value = c.startLevel;
     $('#cfg-mult').value = c.multiplierStep;
     $('#cfg-change').checked = c.rpmChange;
-    $('#cfg-ramp').value = c.rpmRampSec;
+    $('#cfg-shift').value = c.shiftSec;
     $('#cfg-sound').checked = c.sound;
     document.querySelectorAll('#cfg-games input').forEach((b) => {
       b.checked = !c.games || c.games.includes(b.dataset.game);
@@ -90,7 +91,7 @@ const App = {
     c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), 1));
     c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
     c.rpmChange = $('#cfg-change').checked;
-    c.rpmRampSec = num('#cfg-ramp', 0, 30, 12);
+    c.shiftSec = num('#cfg-shift', 4, 30, 8);
     c.sound = $('#cfg-sound').checked;
     c.games = [...document.querySelectorAll('#cfg-games input')].filter((b) => b.checked).map((b) => b.dataset.game);
     Config.save(c);
@@ -180,6 +181,7 @@ const App = {
     this.audio.stop();
     this.gen++;
     this.timers = [];
+    this.clearShift();
     $('#cog').innerHTML = '';
     this.show('menu');
   },
@@ -249,9 +251,10 @@ const App = {
     this.tickAcc = 0;
     this.tickTime = 0;
     this.tickOut = false;
-    this.slopeDir = 0;
-    this.slopeLevel = 0;
-    this.ramp = null;
+    this.slopeStep = 0;                 // SLOPE_PATTERN에서 지금 몇 번째인가
+    this.slopeLevel = 0;                // 현재 지면 기울기 -1 ~ 1 (목표 RPM 배율과 지면 각도를 함께 정한다)
+    this.nextShiftAt = this.cfg.rpmChangeSegmentSec;
+    this.clearShift();
     this.gameIndex = 0;
     this.current = null;
     this.streak = 0;
@@ -292,6 +295,7 @@ const App = {
   },
 
   nextGame() {
+    if (this.shiftDue()) return this.beginShift();
     const T = this.types[this.gameIndex % this.types.length];
     const cycle = Math.floor(this.gameIndex / this.types.length);
     const level = Math.min(cycle + this.cfg.startLevel, T.maxLevel);
@@ -353,6 +357,50 @@ const App = {
         this.after(950, () => this.nextGame(), gen);
       },
     };
+  },
+
+  // ---------------- 속도 전환 구간 ----------------
+  // 목표 속도는 인지 게임 도중에는 바뀌지 않는다. 게임과 게임 사이에 따로 구간을 두고,
+  // 그 동안은 위쪽 띠를 화면 전체로 넓혀 새 속도에 맞추는 것에만 집중하게 한다.
+  shiftDue() {
+    const { cfg } = this;
+    if (!cfg.rpmChange || this.elapsed < this.nextShiftAt) return false;
+    // 라운드가 곧 끝나면 새 속도에 맞추기만 하다 끝나므로 건너뛴다
+    return cfg.durationSec - this.elapsed >= cfg.shiftSec + 5;
+  },
+
+  beginShift() {
+    const gen = ++this.gen;
+    this.current = null;
+    $('#cog').innerHTML = '';
+    const to = SLOPE_PATTERN[++this.slopeStep % SLOPE_PATTERN.length];
+    this.shift = { from: this.slopeLevel, to, t0: this.elapsed };
+    $('#shift-name').textContent = SLOPE_MSG[to];
+    $('#game').classList.add('shift');
+    this.audio.sfx('go');
+    this.after(this.cfg.shiftSec * 1000, () => this.endShift(), gen);
+  },
+
+  endShift() {
+    this.slopeLevel = this.shift.to;
+    this.clearShift();
+    this.nextShiftAt = this.elapsed + this.cfg.rpmChangeSegmentSec;
+    this.after(SHIFT_OUT_MS, () => this.nextGame());
+  },
+
+  clearShift() {
+    this.shift = null;
+    $('#game').classList.remove('shift');
+  },
+
+  // 구간 안에서 목표 RPM과 지면 각도를 shiftRampSec에 걸쳐 부드럽게 옮긴다 (smoothstep)
+  updateShift() {
+    const { cfg, shift } = this;
+    const since = this.elapsed - shift.t0;
+    const ramp = Math.min(cfg.shiftRampSec, cfg.shiftSec - SHIFT_LEAD_SEC - 1);
+    const t = U.clamp((since - SHIFT_LEAD_SEC) / ramp, 0, 1);
+    this.slopeLevel = U.lerp(shift.from, shift.to, t * t * (3 - 2 * t));
+    $('#shift-bar').style.transform = `scaleX(${U.clamp(1 - since / cfg.shiftSec, 0, 1)})`;
   },
 
   // ---------------- 정답 보상 ----------------
@@ -438,21 +486,8 @@ const App = {
     const { cfg } = this;
     this.elapsed += dt;
 
-    // 목표 RPM 변화 → 지면 각도
-    const seg = Math.floor(this.elapsed / cfg.rpmChangeSegmentSec);
-    const dir = cfg.rpmChange ? SLOPE_PATTERN[seg % SLOPE_PATTERN.length] : 0;
-    if (dir !== this.slopeDir) {
-      this.slopeDir = dir;
-      this.ramp = { from: this.slopeLevel, to: dir, t0: this.elapsed };
-      this.flashBandMsg(SLOPE_MSG[dir]);
-    }
-    // 목표 RPM과 지면 각도를 rpmRampSec에 걸쳐 부드럽게 전환 (smoothstep)
-    if (this.ramp) {
-      const t = U.clamp((this.elapsed - this.ramp.t0) / Math.max(cfg.rpmRampSec, 0.001), 0, 1);
-      const e = t * t * (3 - 2 * t);
-      this.slopeLevel = U.lerp(this.ramp.from, this.ramp.to, e);
-      if (t >= 1) this.ramp = null;
-    }
+    // 목표 RPM 변화 → 지면 각도. 속도 전환 구간에서만 움직인다.
+    if (this.shift) this.updateShift();
     this.band.setSlope(this.slopeLevel);
     this.target = this.baseline * (1 + this.slopeLevel * cfg.rpmChangeAmount);
 
@@ -476,19 +511,6 @@ const App = {
     if (this.elapsed >= cfg.durationSec) this.endRound();
   },
 
-  flashBandMsg(text) {
-    let m = $('#band-msg');
-    if (!m) {
-      m = U.el('div');
-      m.id = 'band-msg';
-      $('#band').append(m);
-    }
-    m.textContent = text;
-    m.classList.remove('show');
-    void m.offsetWidth;
-    m.classList.add('show');
-  },
-
   endRound() {
     this.state = 'result';
     if (this.current) {
@@ -500,6 +522,7 @@ const App = {
     }
     this.gen++;
     this.timers = [];
+    this.clearShift();
     this.audio.stop();
     this.audio.sfx('end');
     $('#cog').innerHTML = '';
@@ -598,7 +621,7 @@ const App = {
       `state    ${this.state}`,
       `input    ${this.pedal.sensorOn ? `sensor ${this.pedal.sensorRpm}rpm fw ${this.link.firmware || '?'}` : `keyboard (link ${this.link.state})`}`,
       `rpm      ${rpm.toFixed(1)}`,
-      `target   ${this.target ? this.target.toFixed(1) : '-'}`,
+      `target   ${this.target ? this.target.toFixed(1) : '-'}${this.shift ? ' (shift)' : ''}`,
       `baseline ${this.baseline ? this.baseline.toFixed(1) : '-'}`,
       `dev      ${this.target ? (((rpm - this.target) / this.target) * 100).toFixed(1) + '%' : '-'}`,
       `ex/cog   ${this.exScore ?? 0} / ${this.cogScore ?? 0}`,

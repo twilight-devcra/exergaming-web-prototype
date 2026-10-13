@@ -32,7 +32,7 @@
         <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
         <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
         <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
-        <label class="setting">속도 전환 시간 (초)<input type="number" id="cfg-ramp" min="0" max="30" step="1"></label>
+        <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
         <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
       </div>
       <div class="panel">
@@ -69,10 +69,19 @@
   <section id="game" class="screen">
     <div id="band">
       <canvas id="band-canvas"></canvas>
+      <div id="shift-msg">
+        <div class="tag">속도 전환</div>
+        <div class="name" id="shift-name"></div>
+        <div class="hint">공이 <b style="color:var(--good)">초록 구역</b>에 들어오도록 페달 속도를 맞추세요</div>
+        <div class="shift-bar"><i id="shift-bar"></i></div>
+      </div>
+      <div id="keyhint"><kbd data-k="KeyA">A</kbd><kbd data-k="KeyD">D</kbd></div>
+    </div>
+    <!-- 속도 전환 구간에 #band가 화면 전체로 커져도 제자리에 있도록 #band 밖에 둔다 -->
+    <div id="band-ui">
       <div class="hud" id="hud-time"><div class="label">TIME</div><div class="value">0:00</div></div>
       <div class="hud" id="hud-score"><div class="label">SCORE</div><div class="value">0</div></div>
       <div id="streak"></div>
-      <div id="keyhint"><kbd data-k="KeyA">A</kbd><kbd data-k="KeyD">D</kbd></div>
     </div>
     <div id="cog"></div>
   </section>

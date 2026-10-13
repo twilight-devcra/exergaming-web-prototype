@@ -1,4 +1,5 @@
-// 상단 1/4 영역: 평지를 구르는 공으로 페달링 속도를 시각화
+// 상단 1/4 영역: 평지를 구르는 공으로 페달링 속도를 시각화.
+// 속도 전환 구간에는 같은 캔버스가 화면 전체로 커진다 (크기에 맞춰 공과 구역도 조금 커진다).
 class Band {
   static RING_SEC = 0.7;
 
@@ -16,6 +17,11 @@ class Band {
     this.pop = 0;         // 정답 직후 공이 커졌다 돌아오는 정도 1→0
     this.outAmount = 0;   // 구역 이탈 정도 0~1
     this.resize();
+    // 높이가 바뀌는 동안(전환 애니메이션) 매번 다시 맞춘다. 캔버스 크기를 바꾸면 내용이 지워지므로 바로 다시 그린다.
+    new ResizeObserver(() => {
+      this.resize();
+      this.draw();
+    }).observe(canvas);
   }
 
   resize() {
@@ -83,8 +89,9 @@ class Band {
     const gy = H * 0.72;
     const trackHalf = Math.max(120, W / 2 - 230);
     const zoneHalf = trackHalf * (tolerance / maxDeviation);
-    const r = U.clamp(H * 0.14, 14, 30);
-    const zoneH = r * 2 + H * 0.14;
+    // 띠 높이에서는 반지름이 30에서 멈추고, 화면 전체로 커지면 그만큼 더 커진다
+    const r = U.clamp(H * 0.14, 14, 30 + Math.max(0, H - 320) * 0.035);
+    const zoneH = r * 2 + Math.min(H * 0.14, r * 1.6);
 
     g.save();
     g.translate(cx, gy);

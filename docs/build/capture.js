@@ -122,9 +122,7 @@ const HELPERS = `
     await shot('12-arith-right');
 
     // 오르막 구간: 목표 RPM +12%로 전환된 상태
-    await page.eval(`App.elapsed = Math.max(App.elapsed, 40.5); true`);
-    await sleep(200);
-    await page.eval(`if (App.ramp) App.ramp.t0 -= 12; __pedalAt(Math.round(400 / 1.12)); true`);
+    await page.eval(`App.slopeLevel = 1; __pedalAt(Math.round(400 / 1.12)); true`);
     await sleep(3500);
     await shot('band-uphill', BAND);
     await shot('13-uphill');

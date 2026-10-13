@@ -8,9 +8,10 @@ const DEFAULT_CONFIG = {
   tickSec: 1,                // 운동 점수 취득 간격
   tickMaxPoints: 10,         // 틱당 최대 운동 점수
   rpmChange: true,           // 라운드 중 목표 RPM 변화 여부
-  rpmChangeSegmentSec: 40,   // 목표 RPM 변화 주기
+  rpmChangeSegmentSec: 40,   // 속도 전환 구간 사이의 최소 간격. 지나면 진행 중인 인지 게임이 끝난 뒤 전환한다
   rpmChangeAmount: 0.12,     // 목표 RPM 변화폭
-  rpmRampSec: 12,            // 목표 RPM이 다음 값까지 서서히 바뀌는 데 걸리는 시간
+  shiftSec: 8,               // 속도 전환 구간 길이. 이 동안은 인지 게임 없이 새 속도에 맞추기만 한다
+  shiftRampSec: 3,           // 그중 목표 RPM이 새 값까지 서서히 바뀌는 시간 (나머지는 적응 시간)
   sound: true,
   games: null,               // 라운드에 넣을 인지 게임 id 목록 (null = 전체). 메뉴의 '사용할 게임'에서 바뀐다.
   cogBasePoints: 100,        // 인지 게임 1회를 완벽히 했을 때의 기본 점수 (모든 유형 동일)

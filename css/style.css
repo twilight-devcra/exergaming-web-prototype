@@ -564,6 +564,51 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .fit-cand.right { border-color: var(--good); }
 .fit-cand.wrong { border-color: var(--bad); }
 
+/* 숨은 순서 찾기 */
+.seek-wrap { display: flex; align-items: center; justify-content: center; gap: 48px; flex: 1; width: 100%; }
+.seek-side { display: flex; flex-direction: column; align-items: center; gap: 20px; flex: none; }
+.seek-target {
+  width: var(--side);
+  height: var(--side);
+  border-radius: 50%;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 사슬 전체가 돌고, 그림 하나하나는 반대로 돌아 판에서와 같은 방향으로 서 있는다 */
+.seek-chain { position: relative; display: flex; gap: 6px; animation: seekspin 30s linear infinite; }
+.seek-chain::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--bead) / 2);
+  right: calc(var(--bead) / 2);
+  top: 50%;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 3px;
+  background: var(--line);
+}
+.seek-bead { position: relative; width: var(--bead); height: var(--bead); animation: seekspin 30s linear infinite reverse; }
+.seek-bead svg { display: block; width: 100%; height: 100%; }
+.hexbg { fill: var(--cell); }
+@keyframes seekspin { to { transform: rotate(360deg); } }
+
+.seek-board { display: block; flex: none; touch-action: none; }
+.hcell > polygon { fill: var(--cell); stroke: transparent; stroke-width: 5; transition: fill 0.12s; }
+.hcell { transition: opacity 0.2s; }
+.hcell.clickable { cursor: pointer; }
+@media (hover: hover) {
+  .hcell.clickable:hover > polygon { fill: var(--cell-hover); }
+}
+.hcell.dim { opacity: 0.4; }
+.hcell.right > polygon { fill: var(--good-soft); stroke: var(--good); }
+.hcell.reveal > polygon { fill: var(--accent-soft); stroke: var(--accent); }
+.hcell.wrong > polygon { fill: var(--bad-soft); stroke: var(--bad); }
+.seek-stroke { stroke-width: 22; stroke-linecap: round; opacity: 0.28; pointer-events: none; }
+.seek-stroke.right { stroke: var(--good); }
+.seek-stroke.reveal { stroke: var(--accent); }
+
 /* ---------- 측정 화면 ---------- */
 #calib, #result {
   align-items: center;

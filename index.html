@@ -35,6 +35,15 @@
         <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
         <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
         <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
+        <label class="setting">속도 측정 방식
+          <select id="cfg-source">
+            <option value="zc">파형 영교차 (권장)</option>
+            <option value="comb">파형 결합</option>
+            <option value="teo">파형 모양</option>
+            <option value="pedal">페달 avg_rpm</option>
+          </select>
+        </label>
+        <p class="setting-note" id="cfg-source-note"></p>
       </div>
       <div class="panel">
         <h2>사용할 게임</h2>
@@ -130,6 +139,7 @@
   <script src="js/config.js"></script>
   <script src="js/pedal.js"></script>
   <script src="js/pedal-link.js"></script>
+  <script src="js/cadence-est.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/band.js"></script>
   <script src="js/games/path.js"></script>

@@ -9,17 +9,35 @@
 //  teo   파형 모양: 고조파를 걸러낸 뒤 Teager 에너지 연산자 비 ω² = ΣΨ[y'] / ΣΨ[y] 를 0.5초 창으로 매 샘플 계산.
 //        지연 약 0.65초로 빠르지만 일정하게 밟을 때 흔들림이 7% 정도라 단독으로는 공이 떨린다
 //  comb  결합: 평소에는 zc, teo 가 zc 에서 COMB_DEV 넘게 COMB_HOLD 이상 벗어나 있으면 teo (실제 속도 변화로 본다)
-// 진폭이 정지 수준(STOP_MG)으로 떨어지면 셋 다 0. 정지 중 lz 잡음은 약 1 mg, 페달링 중 최소는 약 130 mg 였다.
+// 최근 1초 동안 lz 의 변화 폭(최대 − 최소)이 STOP_RANGE_MG 아래면 정지로 보고 셋 다 0.
+// DC 제거 뒤 진폭으로 판정하면 DC 추정의 잔물결(최대 40 mg 정도)이 1.5초 시정수로 빠질 때까지 정지가 늦게 잡힌다.
+// 녹화 두 개에서 1초 변화 폭은 페달링 중 최소 110 mg (약 30 rpm), 정지 중 최대 16.6 mg 였다.
 class LzCadence {
   constructor() {
     this.reset();
+    this.seq = -1;
+  }
+
+  // CAPD 프레임 하나를 넣고 read() 결과를 돌려준다. v = [seq, 그 뒤 5샘플 × (lz, ly, gx, gz)], lz 는 0.1 mg 단위.
+  // 짧은 유실(4프레임 이하)은 시계만 넘기고 이어 가고, 그보다 길거나 seq 가 되감기면(CAP 을 다시 건 경우) 처음부터 잡는다.
+  capd(v) {
+    const seq = v[0];
+    const gap = seq - this.seq - 1;
+    if (this.seq < 0 || gap < 0 || gap > 4) this.reset();
+    else if (gap > 0) this.skip(gap * 5);
+    this.seq = seq;
+    for (let k = 0; k < 5; k++) this.sample(v[1 + k * 4] / 10);
+    return this.read();
   }
 
   reset() {
     this.t = 0;              // 이 추정기 기준 샘플 시계 (초)
     this.dc = null;
     this.ampSlow = 0;        // 영교차 히스테리시스 기준
-    this.ampFast = 0;        // 정지 판정
+    this.win = new Float64Array(LzCadence.STOP_W); // 정지 판정용 최근 lz (원신호)
+    this.wi = 0;
+    this.wn = 0;
+    this.range = 0;
     this.state = 0;
     this.cross = [];         // 최근 교차 시각 3개
     this.full = 0;           // 최근 한 바퀴 시간 (초)
@@ -78,7 +96,12 @@ class LzCadence {
     this.dc += (lz - this.dc) * LzCadence.A_DC;
     const y = lz - this.dc;
     this.ampSlow += (Math.abs(y) - this.ampSlow) * LzCadence.A_SLOW;
-    this.ampFast += (Math.abs(y) - this.ampFast) * LzCadence.A_FAST;
+    this.win[this.wi] = lz;
+    this.wi = (this.wi + 1) % LzCadence.STOP_W;
+    if (this.wn < LzCadence.STOP_W) this.wn++;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < this.wn; i++) { const v = this.win[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    this.range = hi - lo;
     const stopped = this.stopped;
     if (stopped && !this.wasStopped) {
       this.cross = [];
@@ -122,7 +145,7 @@ class LzCadence {
   }
 
   get stopped() {
-    return this.ampFast < LzCadence.STOP_MG;
+    return this.range < LzCadence.STOP_RANGE_MG;
   }
 
   zcRpm() {
@@ -160,8 +183,8 @@ class LzCadence {
 LzCadence.DT = 0.01;
 LzCadence.A_DC = 1 - Math.exp(-0.01 / 1.5);   // DC 제거 EMA 1.5초
 LzCadence.A_SLOW = 1 - Math.exp(-0.01 / 1.0);
-LzCadence.A_FAST = 1 - Math.exp(-0.01 / 0.3);
-LzCadence.STOP_MG = 6;
+LzCadence.STOP_W = 100;                        // 정지 판정 창 1초
+LzCadence.STOP_RANGE_MG = 30;
 LzCadence.ZC_TIMEOUT = 4;
 LzCadence.TEO_W = 50;                          // 0.5초
 LzCadence.TEO_MAX = 150;

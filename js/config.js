@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
   shiftSec: 8,               // 속도 전환 구간 길이. 이 동안은 인지 게임 없이 새 속도에 맞추기만 한다
   shiftRampSec: 3,           // 그중 목표 RPM이 새 값까지 서서히 바뀌는 시간 (나머지는 적응 시간)
   sound: true,
+  rpmSource: 'zc',           // 페달 센서 속도 측정 방식: zc 파형 영교차 | comb 파형 결합 | teo 파형 모양 | pedal 페달 avg_rpm
   games: null,               // 라운드에 넣을 인지 게임 id 목록 (null = 전체). 메뉴의 '사용할 게임'에서 바뀐다.
   cogBasePoints: 100,        // 인지 게임 1회를 완벽히 했을 때의 기본 점수 (모든 유형 동일)
   startLevel: 1,             // 라운드를 시작할 난이도. 올리면 쉬운 단계를 건너뛰고 바로 어려운 문제부터 나온다

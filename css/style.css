@@ -136,6 +136,16 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   text-align: right;
 }
 .setting input[type="checkbox"] { width: 20px; height: 20px; }
+.setting select {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--panel);
+  color: var(--ink);
+}
+.setting-note { margin: 0 0 4px; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
 /* 패널이 늘어나 화면보다 길어지면 이 열만 스크롤한다 (body가 overflow: hidden이라 안 그러면 잘린다) */
 .menu-side { display: flex; flex-direction: column; gap: 16px; max-height: 100%; overflow-y: auto; }
 

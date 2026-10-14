@@ -39,6 +39,7 @@ const AUTOSAVE_MS = 5000;
 const cfg = Config.load();
 const link = new PedalLink();
 const pedal = new Pedal();
+pedal.lzOn = cfg.rpmSource !== 'pedal'; // 게임 메뉴의 '속도 측정 방식'을 따른다
 
 // 화면에 보이는 데이터 묶음. t는 모두 이 묶음이 시작된 때부터의 초.
 // 저장은 '기록 시작'을 누른 때부터 '기록 중지'를 누를 때까지만 한다 (session.recording).
@@ -242,17 +243,14 @@ const Cmd = {
 const Est = {
   lz: new LzCadence(),
   seg: -1,
-  seq: -1,
   frame(v, seg, t) {
-    const seq = v[0];
-    const gap = seq - this.seq - 1;
-    if (seg !== this.seg || gap < 0 || gap > 4) this.lz.reset();
-    else if (gap > 0) this.lz.skip(gap * CAP_BATCH); // 짧은 유실은 시계만 넘기고 이어 간다
+    if (seg !== this.seg) this.lz.seq = -1; // 새 캡처 구간: capd() 가 처음부터 잡는다
     this.seg = seg;
-    this.seq = seq;
-    for (let k = 0; k < CAP_BATCH; k++) this.lz.sample(v[1 + k * CAP_CH.length] / 10);
-    const r = this.lz.read();
+    const r = this.lz.capd(v);
     this.last = { t, ...r };
+    // 게임과 같은 설정으로 페달에 넣어 '게임 ③' 이 실제 게임과 같은 값이 되게 한다
+    // (준비되지 않은 0 은 넣지 않는다 — main.js onPedalFrame 과 같은 규칙)
+    if (cfg.rpmSource !== 'pedal' && (r.stopped || r[cfg.rpmSource] > 0)) pedal.lzFrame(r.stopped ? 0 : r[cfg.rpmSource]);
     if (r.zcNew) session.zcUpd.push({ t, v: r.zcFull });
     const est = session.est;
     if (!est.length || t - est[est.length - 1].t >= 0.1 || r.zcNew) {
@@ -1056,7 +1054,7 @@ function drawWave(now) {
 const EST_SERIES = [
   { key: 'workout', name: '페달 avg_rpm (WORKOUT)', color: '--s-workout', rate: '1초마다' },
   { key: 'turn', name: '페달 회전 확정 (DBG)', color: '--s-turn', rate: '회전마다 · 0.5초 폴링' },
-  { key: 'game', name: '게임 ③ (지금 공을 움직이는 값)', color: '--s-game', rate: '연속' },
+  { key: 'game', name: `게임 ③ (지금 공을 움직이는 값 · ${{ zc: '파형 영교차', comb: '파형 결합', teo: '파형 모양', pedal: '페달 avg_rpm' }[cfg.rpmSource]})`, color: '--s-game', rate: '연속' },
   { key: 'zc', name: 'lz 영교차', color: '--s-zc', rate: '반 바퀴마다' },
   { key: 'teo', name: 'lz 파형 모양 (TEO 0.5초)', color: '--s-teo', rate: 'CAPD 마다 (20Hz)' },
   { key: 'comb', name: 'lz 결합', color: '--s-comb', rate: 'CAPD 마다 (20Hz)' },

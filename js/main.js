@@ -9,6 +9,8 @@ const App = {
   cfg: Config.load(),
   pedal: new Pedal(),
   link: new PedalLink(),
+  lz: new LzCadence(),
+  capAt: 0,      // 마지막으로 CAP 을 건 시각 (performance.now). 0 = 걸려 있지 않음
   audio: new BeatAudio(),
   state: 'menu', // menu | calib | countdown | play | result
   paused: false,
@@ -76,9 +78,23 @@ const App = {
     $('#cfg-change').checked = c.rpmChange;
     $('#cfg-shift').value = c.shiftSec;
     $('#cfg-sound').checked = c.sound;
+    $('#cfg-source').value = c.rpmSource;
+    this.applySource();
     document.querySelectorAll('#cfg-games input').forEach((b) => {
       b.checked = !c.games || c.games.includes(b.dataset.game);
     });
+  },
+
+  // 측정 방식은 고르는 즉시 적용한다 (라운드 시작을 기다리지 않고 페달 연결 상태에도 바로 반영)
+  applySource() {
+    const src = this.cfg.rpmSource;
+    this.pedal.lzOn = src !== 'pedal';
+    $('#cfg-source-note').textContent = {
+      zc: '페달 원시 파형에서 반 바퀴마다 갱신. 느리게 밟아도 놓치지 않고 지연이 짧습니다 (약 1.4초).',
+      comb: '영교차에 빠른 파형 모양 추정을 섞음. 조금 빠르지만 느릴 때 흔들립니다.',
+      teo: '가장 빠르지만(약 1.1초) 느리게 밟을 때 공이 떨립니다.',
+      pedal: '페달이 1초마다 보내는 값 (지연 약 3.9초). 느리게 밟으면 0으로 떨어질 수 있습니다.',
+    }[src] + (src !== 'pedal' ? ' 파형이 끊기면 avg_rpm 으로 돌아갑니다.' : '');
   },
 
   readMenu() {
@@ -95,6 +111,7 @@ const App = {
     c.rpmChange = $('#cfg-change').checked;
     c.shiftSec = num('#cfg-shift', 4, 30, 8);
     c.sound = $('#cfg-sound').checked;
+    c.rpmSource = $('#cfg-source').value;
     c.games = [...document.querySelectorAll('#cfg-games input')].filter((b) => b.checked).map((b) => b.dataset.game);
     Config.save(c);
     this.bindMenu();
@@ -139,6 +156,12 @@ const App = {
     btn.onclick = () => (this.link.wantLink ? this.link.disconnect() : this.link.connect());
     this.link.onState = (state, detail) => this.onLinkState(state, detail);
     this.link.onWorkout = (w) => this.pedal.sensorFrame(w.rpm);
+    this.link.onFrame = (raw, f) => this.onPedalFrame(f);
+    $('#cfg-source').onchange = () => {
+      this.cfg.rpmSource = $('#cfg-source').value;
+      Config.save(this.cfg);
+      this.applySource();
+    };
     if (this.link.supported) {
       this.onLinkState('idle', '키보드로 입력 중');
     } else {
@@ -147,9 +170,36 @@ const App = {
     }
   },
 
+  // 원시 파형(CAPD) → 케이던스. 고른 방식의 값을 페달에 넣는다
+  onPedalFrame(f) {
+    if (!f || f.name !== 'CAPD' || f.values.length !== 21) return;
+    const v = f.values.map(Number);
+    if (v.some((x) => !Number.isFinite(x))) return;
+    const r = this.lz.capd(v);
+    const src = this.cfg.rpmSource;
+    // 추정이 아직 준비되지 않은 0(연결 직후·긴 유실 뒤 첫 바퀴)은 넣지 않는다. 진짜 정지(진폭이 정지 수준)만 0 으로 넣는다.
+    // 넣지 않는 동안은 직전 값이 유지되다가 1초가 지나면 avg_rpm 으로 돌아간다.
+    if (src !== 'pedal' && (r.stopped || r[src] > 0)) this.pedal.lzFrame(r.stopped ? 0 : r[src]);
+  },
+
+  // 파형을 쓰는 동안 CAP 을 켜 둔다. 펌웨어가 300초 뒤 스스로 멈추므로 그 전에 다시 건다.
+  // (페달 저장소 docs/02-system-sequence.md §5 — 읽기 전용, 연결이 끊기면 펌웨어가 바로 멈춘다)
+  capTick(now) {
+    const want = this.link.state === 'ready' && this.cfg.rpmSource !== 'pedal';
+    if (want && (!this.capAt || now - this.capAt > 280000)) {
+      this.capAt = now;
+      this.link.send(NUS.command('CAP', [300])).catch(() => (this.capAt = 0));
+    } else if (!want && this.capAt) {
+      this.capAt = 0;
+      if (this.link.state === 'ready') this.link.send(NUS.command('CAP', [0])).catch(() => {});
+    }
+  },
+
   onLinkState(state, detail) {
     const ready = state === 'ready';
     this.pedal.setSensor(ready);
+    this.capAt = 0;
+    this.lz.reset();
     document.body.classList.toggle('sensor', ready);
     const s = $('#pedal-status');
     s.dataset.state = state;
@@ -606,6 +656,7 @@ const App = {
       this.runTimers();
       this.updateDebug(rpm);
     }
+    this.capTick(now);
     // 비트에 맞춰 화면 가장자리 깜빡임 (짝수 = A쪽 왼편, 홀수 = D쪽 오른편)
     for (const b of this.audio.pollBeats()) {
       if (this.state !== 'countdown' && this.state !== 'play') continue;
@@ -622,7 +673,7 @@ const App = {
     if (!d.classList.contains('active')) return;
     d.textContent = [
       `state    ${this.state}`,
-      `input    ${this.pedal.sensorOn ? `sensor ${this.pedal.sensorRpm}rpm fw ${this.link.firmware || '?'}` : `keyboard (link ${this.link.state})`}`,
+      `input    ${this.pedal.sensorOn ? `sensor ${this.pedal.lzLive ? `lz ${this.cfg.rpmSource} ${this.pedal.lzRpm.toFixed(1)}` : 'avg_rpm'} / avg ${this.pedal.sensorRpm}rpm fw ${this.link.firmware || '?'}` : `keyboard (link ${this.link.state})`}`,
       `rpm      ${rpm.toFixed(1)}`,
       `target   ${this.target ? this.target.toFixed(1) : '-'}${this.shift ? ' (shift)' : ''}`,
       `baseline ${this.baseline ? this.baseline.toFixed(1) : '-'}`,

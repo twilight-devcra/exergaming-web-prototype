@@ -77,6 +77,7 @@ class PedalLink {
     this.retries = 0;
     this.retryTimer = null;
     this.connectedAt = 0;
+    this.txChain = Promise.resolve();
     this.handleGone = () => this.lost('페달과의 연결이 끊어졌습니다');
     this.handleNotify = (e) => this.notify(e.target.value);
   }
@@ -181,9 +182,14 @@ class PedalLink {
     if (d.gatt.connected) d.gatt.disconnect();
   }
 
+  // 쓰기는 하나씩 차례로 보낸다. Web Bluetooth 는 GATT 쓰기가 겹치면 예외를 던진다.
   send(text) {
-    if (!this.rx) return Promise.reject(new Error('not connected'));
-    return this.rx.writeValueWithResponse(new TextEncoder().encode(text));
+    const rx = this.rx;
+    if (!rx) return Promise.reject(new Error('not connected'));
+    const run = () => rx.writeValueWithResponse(new TextEncoder().encode(text));
+    const p = this.txChain.then(run, run);
+    this.txChain = p.catch(() => {});
+    return p;
   }
 
   notify(value) {

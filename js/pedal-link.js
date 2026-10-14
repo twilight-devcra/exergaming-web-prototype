@@ -6,7 +6,7 @@ const NUS = {
   RX: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // 웹 → 페달 (write)
   TX: '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // 페달 → 웹 (notify)
   NAME_PREFIX: 'Cardio-P',                    // 광고 이름은 "Cardio-P 3A7F" 형태
-  command: (name) => `${name},0:;`,
+  command: (name, values = []) => `${name},${values.length}:${values.join(',')};`,
 };
 
 const FrameCodec = {

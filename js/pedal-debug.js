@@ -3,7 +3,33 @@
 //  ① WORKOUT 프레임의 avg_rpm → ② Pedal.sensorFrame()의 0 유예를 거친 값 → ③ Pedal.update()로 다듬은 값
 // rev_count 기준 RPM은 게임이 쓰지 않는 참고값이다. 느리게 밟을 때 avg_rpm과 비교하려고 둔다.
 // 기록은 브라우저(IndexedDB)에 계속 저장되므로, 회전을 놓친 순간에 표시를 남겨두고 나중에 파일로 꺼내 볼 수 있다.
+//
+// 페달 펌웨어의 진단 명령도 쓴다 (페달 저장소 docs/02-system-sequence.md §5, 모두 읽기 전용):
+//  DBG   회전 검출기 내부 상태 24필드. 요청할 때마다 1회 응답 → DBG_POLL_MS 마다 폴링한다
+//  CAP   검출기에 들어가는 필터 후 100Hz 파형(lz, ly, gx, gz)을 CAPD 프레임으로 20Hz push. 최대 300초라 갱신한다
+//  RS_G  회전 검출 파라미터 14개 (정지 판정 기준 등) — 연결 때 한 번 읽는다
+// 같은 조합을 페달 쪽 PC 툴이 tools/capture_dbg_cap.py 로 받는다. CAP CSV 는 그 툴과 같은 형식이라
+// 페달 저장소의 tools/verify_phase_detector.py 로 그대로 재생할 수 있다.
 const $ = (s) => document.querySelector(s);
+
+const DBG_POLL_MS = 500;
+const CAP_SEC = 300;         // 펌웨어 상한 RAW_CAP_MAX_SEC
+const CAP_RENEW_MS = 280000; // 자동 정지 전에 다시 건다 (다시 걸면 seq 가 0부터 새로 시작한다)
+const CAP_BATCH = 5;
+const CAP_CH = ['lz', 'ly', 'gx', 'gz'];
+const CAP_FS = 100;
+// cardio_tool/protocol.py DBG_FIELDS 와 같은 순서
+const DBG_FIELDS = ['moving', 'locked_revs', 'status', 'period', 'r_win_mg', 'rev_r_mg', 'lz_mg', 'ly_mg', 'gz_x10',
+  'gx_min', 'gx_max', 'rev_cnt', 'reject_cnt', 'relock_cnt', 'avg_rpm', 'torque_x10', 'watt',
+  'w_lz_pk_mg', 'w_lz_rms_mg', 'w_ly_rms_mg', 'w_gz_x10', 'w_gx_x10', 'w_r_rms_mg', 'dc_mg'];
+const DBG_I = Object.fromEntries(DBG_FIELDS.map((f, i) => [f, i]));
+const RS_FIELDS = ['min_period', 'max_period', 'lock_revs', 'ratio_min', 'ratio_max', 'r_min_mg', 'hyst_ratio',
+  'motion_min_mg', 'hpf_fc_mhz', 'gx_limit_dps', 'rev_r_min_mg', 'stall_windows', 'out_ema_alpha', 'supervise_ratio'];
+const RS_STATUS = { 0: 'OK', 1: 'PERIOD_RANGE', 2: 'PERIOD_JUMP', 3: 'GX_LIMIT', 4: 'AMP_LOW', 5: 'LOCKING', 6: 'DIR_FLIP' };
+const RS_STATUS_KO = {
+  0: '정상 회전', 1: '주기가 허용 범위 밖', 2: '직전 회전 대비 주기 급변', 3: 'gx 포화',
+  4: '진폭 부족 (rev_r < rev_r_min)', 5: '락온 전 (출력 안 함)', 6: '위상 방향 뒤집힘',
+};
 
 const REV_WINDOW_MS = 5000;  // rev_count 기준 RPM을 계산할 구간
 const SAMPLE_MS = 100;       // ③을 기록하는 간격
@@ -21,6 +47,10 @@ const pedal = new Pedal();
 //  frames  { t, gap, raw, rpm, watt, rev, dRev, revRpm, held, zeroRun, note, kind }
 //  samples { t, game }
 //  marks   { t, kind: 'manual'|'auto', note }
+//  dbg     { t, v: [24 ints] }               DBG 응답
+//  cap     CapBuf (메모리) / 저장 형식은 CapBuf.pack()   CAPD 100Hz 파형
+//  capSegs { t, sec }                        CAP 시작 응답. 다시 걸 때마다 seq 가 0부터라 구간을 나눈다
+//  rs      { min_period: …, … } | null       RS_G 응답
 let session;
 let t0;
 const sec = (t = performance.now()) => (t - t0) / 1000;
@@ -34,11 +64,50 @@ function newSession(recording) {
     endedAt: null, // 기록 중지를 눌러야 채워진다. 비어 있는 채로 저장된 기록은 페이지가 닫혀 끊긴 것
     recording,
     chunks: [], frames: [], samples: [], marks: [],
+    dbg: [], cap: new CapBuf(), capSegs: [], rs: lastRs,
   };
   edge = true;
   dirty = { frames: true, raw: true, save: false };
 }
 
+// CAPD 는 초당 100샘플 × 4채널이라 객체 배열로 두면 자동 저장(구조화 복제)이 무거워진다. 형식 배열에 쌓는다.
+class CapBuf {
+  constructor() {
+    this.n = 0;
+    this.alloc(1024);
+  }
+  alloc(cap) {
+    const grow = (Old, old, k) => { const a = new Old(cap * k); if (old) a.set(old.subarray(0, this.n * k)); return a; };
+    this.t = grow(Float64Array, this.t, 1);     // 프레임 첫 샘플의 시각 (기록 시작부터의 초, seq 로 복원)
+    this.seq = grow(Uint32Array, this.seq, 1);
+    this.seg = grow(Uint16Array, this.seg, 1);
+    this.v = grow(Int16Array, this.v, CAP_BATCH * CAP_CH.length);
+    this.cap = cap;
+  }
+  push(t, seg, seq, vals) {
+    if (this.n === this.cap) this.alloc(this.cap * 2);
+    const i = this.n++;
+    this.t[i] = t; this.seq[i] = seq; this.seg[i] = seg;
+    this.v.set(vals, i * vals.length);
+  }
+  // IndexedDB·JSON 용. 형식 배열은 slice 로 길이에 맞춰 복사한다 (subarray 는 버퍼 전체가 복제된다)
+  pack() {
+    const W = CAP_BATCH * CAP_CH.length;
+    return { n: this.n, t: this.t.slice(0, this.n), seq: this.seq.slice(0, this.n), seg: this.seg.slice(0, this.n), v: this.v.slice(0, this.n * W) };
+  }
+}
+// 저장된 형식(pack 결과, IndexedDB 에서 읽으면 형식 배열 / JSON 이면 일반 배열) → 샘플 순회
+function forEachCapSample(c, fn) {
+  const W = CAP_BATCH * CAP_CH.length;
+  for (let i = 0; i < c.n; i++) {
+    for (let k = 0; k < CAP_BATCH; k++) {
+      const o = i * W + k * CAP_CH.length;
+      fn(c.t[i] + k / CAP_FS, c.v[o], c.v[o + 1], c.v[o + 2], c.v[o + 3], c.seg[i], c.seq[i]);
+    }
+  }
+}
+
+let lastRs = null; // 페달이 바뀌지 않는 한 그대로이므로 새 묶음에도 이어 붙인다
 let frozen = false;
 let dirty;
 // 공이 왼쪽 끝에 붙어 있는 중인지. 자동 표시를 끝에 닿는 순간 한 번만 남기려고 둔다.
@@ -58,9 +127,12 @@ link.onState = (state, detail) => {
   // 연결 상태가 바뀐 것도 기록에 남긴다 (끊김과 놓침이 겹치는지 보려고)
   if (session.recording) mark('auto', `연결 상태: ${state}${detail ? ` (${detail})` : ''}`);
   if (state === 'ready' && link.device) session.device = link.device.name;
+  Diag.onState(state);
 };
 
 link.onRaw = (text) => {
+  // CAPD(초당 20개)·DBG(초당 2개)는 원본 로그를 덮어 버린다. 온전한 알림 하나면 파싱된 저장소에만 남긴다.
+  if (/^(CAPD|DBG),[^;]*;$/.test(text)) return;
   session.chunks.push({ t: sec(), dir: 'in', text });
   dirty.raw = dirty.save = true;
 };
@@ -68,6 +140,8 @@ link.onRaw = (text) => {
 link.onFrame = (raw, f) => {
   const { frames } = session;
   const t = sec();
+  // 진단 응답은 프레임 표에 섞지 않고 따로 쌓는다
+  if (f && Diag.frame(f, t)) return;
   dirty.frames = dirty.save = true;
   if (f && f.name === 'VER') {
     session.firmware = f.values.join(' ');
@@ -140,6 +214,123 @@ function mark(kind, note) {
     Saver.save(); // 직접 남긴 표시는 바로 저장한다
   }
 }
+
+// ---------------- 펌웨어 진단 (DBG / CAP / RS_G) ----------------
+// 명령은 한 번에 하나씩 보낸다. Web Bluetooth 는 GATT 쓰기가 겹치면 예외를 던진다.
+const Cmd = {
+  chain: Promise.resolve(),
+  send(text, log = true) {
+    const run = async () => {
+      await link.send(text);
+      if (log) {
+        session.chunks.push({ t: sec(), dir: 'out', text });
+        dirty.raw = dirty.save = true;
+      }
+    };
+    const p = this.chain.then(run, run);
+    this.chain = p.catch(() => {});
+    return p;
+  },
+};
+
+const Diag = {
+  dbgOn: true,
+  capOn: true,
+  dbgBusy: false,
+  capAt: 0,         // 마지막으로 CAP 을 건 시각 (performance.now). 0 = 걸려 있지 않음
+  prev: null,       // 직전 DBG 값 (자동 표시용)
+  lastDbgAt: 0,
+
+  onState(state) {
+    if (state === 'ready') {
+      this.capAt = 0;
+      // VER 는 PedalLink 가 연결 직후 보낸다. 겹치지 않게 조금 뒤에 읽는다
+      setTimeout(() => Cmd.send(NUS.command('RS_G')).catch(() => {}), 400);
+    } else {
+      this.capAt = 0; // 펌웨어는 연결이 끊기면 캡처를 스스로 멈춘다
+    }
+  },
+
+  // 진단 프레임이면 처리하고 true
+  frame(f, t) {
+    const ints = (n) => (f.values.length === n && f.values.every((v) => /^-?\d+$/.test(v)) ? f.values.map(Number) : null);
+    if (f.name === 'DBG') {
+      const v = ints(DBG_FIELDS.length);
+      if (!v) return true;
+      session.dbg.push({ t, v });
+      this.lastDbgAt = performance.now();
+      this.autoMarks(v);
+      this.prev = v;
+      dirty.save = true;
+      dirty.dbg = true;
+      return true;
+    }
+    if (f.name === 'CAPD') {
+      const v = ints(1 + CAP_BATCH * CAP_CH.length);
+      if (!v) return true;
+      const segs = session.capSegs;
+      // CAP 응답보다 CAPD 가 먼저 오는 일은 없지만, 기록 도중에 시작된 캡처를 이어 받는 경우를 위해 구간을 만든다
+      if (!segs.length) segs.push({ t: t - (v[0] * CAP_BATCH) / CAP_FS, sec: null });
+      const seg = segs.length - 1;
+      session.cap.push(segs[seg].t + (v[0] * CAP_BATCH) / CAP_FS, seg, v[0], v.slice(1));
+      dirty.save = true;
+      return true;
+    }
+    if (f.name === 'CAP') {
+      const v = ints(1);
+      if (v && v[0] > 0) session.capSegs.push({ t, sec: v[0] });
+      return true;
+    }
+    if (f.name === 'RS_G') {
+      const v = ints(RS_FIELDS.length);
+      // 미설정 기기는 'RS_G,0:;' — 펌웨어가 컴파일 기본값을 쓴다는 뜻이다
+      lastRs = v ? Object.fromEntries(RS_FIELDS.map((k, i) => [k, v[i]])) : { unset: true };
+      session.rs = lastRs;
+      dirty.save = dirty.dbg = true;
+      return true;
+    }
+    return false;
+  },
+
+  // 검출기가 회전을 기각하거나 다시 락온하는 순간이 '놓침'의 직접 원인이다
+  autoMarks(v) {
+    const p = this.prev;
+    if (!p) return;
+    const I = DBG_I;
+    const rej = v[I.reject_cnt] - p[I.reject_cnt];
+    if (rej > 0) {
+      const st = v[I.status];
+      mark('auto', `페달 검출기: 회전 기각 ${rej}회 — ${RS_STATUS[st] || st} (${RS_STATUS_KO[st] || '?'}), period ${v[I.period]} = ${fmt(6000 / v[I.period], 1)} rpm, rev_r ${v[I.rev_r_mg]} mg`);
+    }
+    if (v[I.relock_cnt] > p[I.relock_cnt]) mark('auto', '페달 검출기: 재락온 (감독자 FFT 교차검증)');
+    if (p[I.moving] === 1 && v[I.moving] === 0) mark('auto', `페달 검출기: 움직임 없음 판정 (w_r_rms ${v[I.w_r_rms_mg]} mg)`);
+    if (p[I.avg_rpm] > 0 && v[I.avg_rpm] === 0) mark('auto', `페달 검출기: 출력 0 (status ${RS_STATUS[v[I.status]]}, locked ${v[I.locked_revs]})`);
+  },
+
+  tick(now) {
+    if (link.state !== 'ready' || sim.timer) return;
+    if (this.dbgOn && !this.dbgBusy && now - this.lastPoll >= DBG_POLL_MS) {
+      this.lastPoll = now;
+      this.dbgBusy = true;
+      Cmd.send(NUS.command('DBG'), false).catch(() => {}).finally(() => (this.dbgBusy = false));
+    }
+    // 원시 파형은 기록 중에만 받는다 (데이터가 많고, 화면용으로는 DBG 로 충분하다)
+    const wantCap = this.capOn && session.recording && !session.stopping;
+    if (wantCap && (!this.capAt || now - this.capAt > CAP_RENEW_MS)) {
+      this.capAt = now;
+      Cmd.send(NUS.command('CAP', [CAP_SEC])).catch(() => (this.capAt = 0));
+    } else if (!wantCap && this.capAt) {
+      this.stopCap();
+    }
+  },
+  lastPoll: 0,
+
+  stopCap() {
+    if (!this.capAt) return Promise.resolve();
+    this.capAt = 0;
+    return link.state === 'ready' ? Cmd.send(NUS.command('CAP', [0])).catch(() => {}) : Promise.resolve();
+  },
+};
 
 // ---------------- 저장 (IndexedDB) ----------------
 // sessions에는 기록 전체, index에는 목록에 보여줄 요약만 둔다 (목록을 그릴 때 큰 기록을 다 읽지 않으려고)
@@ -220,6 +411,8 @@ function summarize(s) {
     zeros: workouts.filter((f) => f.rpm === 0).length,
     manual: s.marks.filter((m) => m.kind === 'manual').length,
     auto: s.marks.filter((m) => m.kind === 'auto').length,
+    dbg: s.dbg ? s.dbg.length : 0,
+    cap: s.cap ? s.cap.n * CAP_BATCH : 0,
   };
 }
 
@@ -236,7 +429,39 @@ function exportData(s) {
     target: +targetInput.value,
     config: cfg,
     chunks: s.chunks, frames: s.frames, samples: s.samples, marks: s.marks,
+    dbgFields: DBG_FIELDS, dbg: s.dbg, rs: s.rs,
+    capChannels: CAP_CH, capScale: { acc: 'g × 10000 (0.1 mg)', gyr: 'dps × 10 (0.1 dps)' },
+    capSegs: s.capSegs, cap: s.cap instanceof CapBuf ? s.cap.pack() : s.cap,
   };
+}
+
+// 형식 배열은 JSON.stringify 하면 {"0":…} 객체가 되므로 일반 배열로 바꾼다
+function jsonable(d) {
+  if (!d.cap) return d;
+  const c = d.cap;
+  return { ...d, cap: { n: c.n, t: Array.from(c.t), seq: Array.from(c.seq), seg: Array.from(c.seg), v: Array.from(c.v) } };
+}
+
+// 페달 저장소 cardio_tool 의 cap CSV 와 같은 형식 — tools/verify_phase_detector.py --csv 로 재생된다.
+// t_s 는 기록 시작부터의 초. CAP 을 다시 건 구간 경계에서는 몇 샘플이 비고, seq 유실 구간도 빈 채로 둔다.
+function capCsv(d) {
+  const lines = ['t_s,lz_g,ly_g,gx_dps,gz_dps'];
+  const rows = [];
+  forEachCapSample(d.cap, (t, lz, ly, gx, gz) => rows.push([t, lz, ly, gx, gz]));
+  rows.sort((a, b) => a[0] - b[0]);
+  for (const r of rows) lines.push(`${r[0].toFixed(4)},${(r[1] / 10000).toFixed(5)},${(r[2] / 10000).toFixed(5)},${(r[3] / 10).toFixed(2)},${(r[4] / 10).toFixed(2)}`);
+  return lines.join('\n');
+}
+
+// 페달 저장소 cardio_tool 의 dbg CSV 와 같은 형식 (timestamp, epoch_ms, 24필드). t_s 열을 덧붙인다
+function dbgCsv(d) {
+  const start = Date.parse(d.startedAt);
+  const lines = [['timestamp', 'epoch_ms'].concat(DBG_FIELDS, ['t_s']).join(',')];
+  for (const r of d.dbg) {
+    const ms = Math.round(start + r.t * 1000);
+    lines.push([new Date(ms).toISOString(), ms].concat(r.v, [r.t.toFixed(3)]).join(','));
+  }
+  return lines.join('\n');
 }
 
 // ---------------- 내보내기 ----------------
@@ -274,8 +499,8 @@ async function deliver(name, text, type, viaShare) {
 
 // 저장된 기록은 저장할 때 이미 exportData() 형태로 만들어 둔 것이다
 function exportJson(s, viaShare) {
-  const data = s === session ? exportData(s) : s;
-  return deliver(`pedal-debug-${fileStamp(s.startedAt)}.json`, JSON.stringify(data, null, 1), 'application/json', viaShare);
+  const data = jsonable(s === session ? exportData(s) : s);
+  return deliver(`pedal-debug-${fileStamp(s.startedAt)}.json`, JSON.stringify(data), 'application/json', viaShare);
 }
 
 // ---------------- 저장된 기록 목록 ----------------
@@ -297,6 +522,8 @@ async function renderSessions() {
         ${canShare ? '<button class="btn small" data-act="share">공유</button>' : ''}
         <button class="btn small" data-act="json">JSON</button>
         <button class="btn small" data-act="csv">CSV</button>
+        ${s.dbg ? '<button class="btn small" data-act="dbg">DBG CSV</button>' : ''}
+        ${s.cap ? '<button class="btn small" data-act="cap">CAP CSV</button>' : ''}
         ${cur ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}
       </td></tr>`;
   }).join('') : '<tr><td class="l" colspan="7">아직 저장된 기록이 없습니다. <b>● 기록 시작</b>을 누르면 그때부터 저장됩니다.</td></tr>';
@@ -319,6 +546,9 @@ $('#sessions').onclick = async (e) => {
   if (act === 'share') exportJson(s, true);
   if (act === 'json') exportJson(s, false);
   if (act === 'csv') deliver(`pedal-frames-${fileStamp(s.startedAt)}.csv`, toCsv(s), 'text/csv', false);
+  const d = s === session ? exportData(s) : s;
+  if (act === 'dbg') deliver(`pedal-dbg-${fileStamp(s.startedAt)}.csv`, dbgCsv(d), 'text/csv', false);
+  if (act === 'cap') deliver(`pedal-cap-${fileStamp(s.startedAt)}.csv`, capCsv(d), 'text/csv', false);
 };
 
 const fmtDur = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -378,6 +608,8 @@ async function setRecording(on) {
     if (link.device) session.device = link.device.name;
     mark('auto', `기록 시작 (연결 상태: ${link.state})`);
   } else {
+    session.stopping = true; // CAP 정지 응답을 기다리는 동안 루프가 캡처를 다시 걸지 않게
+    await Diag.stopCap();
     session.endedAt = new Date().toISOString();
     mark('auto', '기록 중지');
   }
@@ -412,14 +644,15 @@ window.addEventListener('beforeunload', (e) => {
 $('#btn-send').onclick = async () => {
   const text = $('#cmd').value;
   try {
-    await link.send(text);
-    session.chunks.push({ t: sec(), dir: 'out', text });
-    dirty.raw = dirty.save = true;
+    await Cmd.send(text);
     $('#send-note').textContent = '';
   } catch (e) {
     $('#send-note').textContent = `실패: ${e.message}`;
   }
 };
+
+$('#opt-dbg').onchange = (e) => (Diag.dbgOn = e.target.checked);
+$('#opt-cap').onchange = (e) => (Diag.capOn = e.target.checked);
 
 const targetInput = $('#target');
 const tolInput = $('#tol');
@@ -677,6 +910,111 @@ function drawChart(now) {
   g.restore();
 }
 
+// ---------------- 펌웨어 진단 화면 ----------------
+function renderDbg() {
+  const last = session.dbg[session.dbg.length - 1];
+  const rs = session.rs;
+  const rsText = !rs ? 'RS_G 응답 없음' : rs.unset ? 'RS_G 미설정 — 펌웨어 컴파일 기본값 사용 중'
+    : `정지 판정: 락온 전 ${rs.max_period / 100}s (= ${fmt(6000 / rs.max_period, 1)} rpm) 넘게 회전 없음 · 락온 후 직전 주기의 ${rs.ratio_max / 1000}배 · `
+      + `주기 급변 허용 ${rs.ratio_min / 1000}~${rs.ratio_max / 1000}배 · 진폭 하한 rev_r_min ${rs.rev_r_min_mg} mg · 움직임 하한 ${rs.motion_min_mg} mg · `
+      + `저진폭 ${rs.stall_windows}창 연속이면 즉시 정지 · 락온 ${rs.lock_revs}회전`;
+  $('#rs-text').textContent = rsText;
+  if (!last) return;
+  const v = last.v, I = DBG_I;
+  const st = v[I.status];
+  const items = [
+    ['moving', v[I.moving] ? '1 (움직임)' : '0 (정지)', `w_r_rms ${v[I.w_r_rms_mg]} mg`, !v[I.moving]],
+    ['status', `${st} ${RS_STATUS[st] || ''}`, RS_STATUS_KO[st] || '', st !== 0 && st !== 5],
+    ['locked_revs', v[I.locked_revs], '연속 유효 회전'],
+    ['period', `${v[I.period]}`, v[I.period] ? `${(v[I.period] / 100).toFixed(2)}s = ${fmt(6000 / v[I.period], 1)} rpm` : ''],
+    ['rev_r_mg', v[I.rev_r_mg], rs && !rs.unset ? `하한 ${rs.rev_r_min_mg} mg` : '마지막 회전 진폭', rs && !rs.unset && v[I.rev_r_mg] < rs.rev_r_min_mg],
+    ['avg_rpm', v[I.avg_rpm], '검출기 출력 (EMA)', v[I.avg_rpm] === 0],
+    ['torque_x10', v[I.torque_x10], `gz_x10 ${v[I.gz_x10]} (회전당 원시)`],
+    ['watt', v[I.watt], ''],
+    ['rev / reject / relock', `${v[I.rev_cnt]} / ${v[I.reject_cnt]} / ${v[I.relock_cnt]}`, '누적'],
+    ['gx min / max', `${v[I.gx_min]} / ${v[I.gx_max]}`, 'dps, 마지막 회전'],
+  ];
+  $('#dbg-tiles').innerHTML = items.map(([k, val, sub, warn]) =>
+    `<div class="tile${warn ? ' alert' : ''}"><div class="k">${esc(k)}</div><div class="v">${esc(val)}</div><div class="s">${esc(sub)}</div></div>`).join('');
+  $('#dbg-note').textContent = `DBG ${session.dbg.length}개 · CAP ${session.cap.n * CAP_BATCH}샘플${session.capSegs.length > 1 ? ` (${session.capSegs.length}구간)` : ''}`;
+}
+
+// 원시 파형: 위는 lz/ly (가속도, mg), 아래는 gx/gz (자이로, dps). 위쪽 시계열과 같은 시간 창
+const wave = $('#wave');
+const wg = wave.getContext('2d');
+function drawWave(now) {
+  const dpr = window.devicePixelRatio || 1;
+  const r = wave.getBoundingClientRect();
+  if (wave.width !== Math.round(r.width * dpr) || wave.height !== Math.round(r.height * dpr)) {
+    wave.width = Math.round(r.width * dpr);
+    wave.height = Math.round(r.height * dpr);
+  }
+  wg.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = r.width, H = r.height;
+  wg.clearRect(0, 0, W, H);
+  const span = +$('#window').value;
+  const tEnd = sec(now), tStart = tEnd - span;
+  const pad = { l: 44, r: 8 };
+  const X = (t) => pad.l + ((t - tStart) / span) * (W - pad.l - pad.r);
+  const c = session.cap;
+  const W20 = CAP_BATCH * CAP_CH.length;
+  // 창 안의 첫 프레임을 찾는다 (t 는 단조 증가에 가깝다 — 구간 경계에서만 약간 겹칠 수 있다)
+  let i0 = c.n;
+  for (let i = c.n - 1; i >= 0; i--) { if (c.t[i] < tStart) break; i0 = i; }
+  const n = (c.n - i0) * CAP_BATCH;
+  wg.font = '11px ui-monospace, Consolas, monospace';
+  if (!n) {
+    wg.fillStyle = css('--ink-soft');
+    wg.textAlign = 'center';
+    wg.fillText(session.recording ? (Diag.capOn ? 'CAPD 대기 중…' : 'CAP 꺼짐') : '기록 중에만 받습니다', W / 2, H / 2);
+    return;
+  }
+  const stride = Math.max(1, Math.floor(n / (W - pad.l - pad.r) / 2));
+  const panes = [
+    { y0: 6, h: H / 2 - 12, ch: [[0, '--accent'], [1, '--warn']], scale: 10, unit: 'mg' },
+    { y0: H / 2 + 6, h: H / 2 - 12, ch: [[2, '--good'], [3, '--mark']], scale: 10, unit: 'dps' },
+  ];
+  for (const p of panes) {
+    let m = 1;
+    for (let i = i0; i < c.n; i++) for (const [k] of p.ch) for (let s2 = 0; s2 < CAP_BATCH; s2++) m = Math.max(m, Math.abs(c.v[i * W20 + s2 * 4 + k]));
+    const Y = (v) => p.y0 + p.h / 2 - (v / m) * (p.h / 2);
+    wg.strokeStyle = css('--line');
+    wg.lineWidth = 1;
+    wg.beginPath(); wg.moveTo(pad.l, Y(0)); wg.lineTo(W - pad.r, Y(0)); wg.stroke();
+    wg.fillStyle = css('--ink-soft');
+    wg.textAlign = 'right';
+    wg.fillText(`${Math.round(m / p.scale)}`, pad.l - 4, p.y0 + 10);
+    wg.fillText(p.unit, pad.l - 4, Y(0) + 4);
+    wg.fillText(`-${Math.round(m / p.scale)}`, pad.l - 4, p.y0 + p.h);
+    for (const [k, color] of p.ch) {
+      wg.strokeStyle = css(color);
+      wg.lineWidth = 1.2;
+      wg.beginPath();
+      let started = false, cnt = 0, prevSeq = -1, prevSeg = -1;
+      for (let i = i0; i < c.n; i++) {
+        // seq 가 끊긴 곳(유실·구간 경계)은 선을 잇지 않는다
+        if (c.seg[i] !== prevSeg || c.seq[i] !== prevSeq + 1) started = false;
+        prevSeg = c.seg[i]; prevSeq = c.seq[i];
+        for (let s2 = 0; s2 < CAP_BATCH; s2++, cnt++) {
+          if (cnt % stride) continue;
+          const x = X(c.t[i] + s2 / CAP_FS), y = Y(c.v[i * W20 + s2 * 4 + k]);
+          started ? wg.lineTo(x, y) : wg.moveTo(x, y);
+          started = true;
+        }
+      }
+      wg.stroke();
+    }
+  }
+  // 표시 위치
+  for (const mk of session.marks) {
+    if (mk.t < tStart) continue;
+    wg.strokeStyle = css(mk.kind === 'manual' ? '--mark' : '--bad');
+    wg.setLineDash(mk.kind === 'manual' ? [] : [2, 3]);
+    wg.beginPath(); wg.moveTo(X(mk.t), 0); wg.lineTo(X(mk.t), H); wg.stroke();
+  }
+  wg.setLineDash([]);
+}
+
 // ---------------- 루프 ----------------
 let last = performance.now();
 let lastSample = 0;
@@ -689,15 +1027,19 @@ function loop(now) {
     lastSample = now;
   }
   checkEdge(game);
+  Diag.tick(now);
   if (!frozen) {
     renderTiles(now, game);
     renderBall(game);
     drawChart(now);
+    drawWave(now);
+    if (dirty.dbg) { renderDbg(); dirty.dbg = false; }
     if (dirty.frames) { renderFrames(); dirty.frames = false; }
     if (dirty.raw) { renderRaw(); dirty.raw = false; }
   }
   requestAnimationFrame(loop);
 }
 renderRecording();
+renderDbg();
 renderSessions();
 requestAnimationFrame(loop);

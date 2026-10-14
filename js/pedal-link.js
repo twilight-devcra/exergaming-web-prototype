@@ -68,6 +68,8 @@ class PedalLink {
     this.wantLink = false; // 사용자가 연결을 원하는 상태. 끊기면 자동으로 다시 붙는다
     this.onState = null;   // (state, detail)
     this.onWorkout = null; // ({ rpm, watt, revCount })
+    this.onRaw = null;     // (text) 알림 하나를 디코딩한 그대로. 디버그 페이지용
+    this.onFrame = null;   // (raw, frame|null) ';'로 자른 프레임 하나와 파싱 결과. 디버그 페이지용
     this.rx = null;
     this.splitter = new FrameSplitter();
     this.decoder = new TextDecoder();
@@ -186,8 +188,11 @@ class PedalLink {
 
   notify(value) {
     if (this.state !== 'ready') return;
-    for (const raw of this.splitter.feed(this.decoder.decode(value))) {
+    const text = this.decoder.decode(value);
+    if (this.onRaw) this.onRaw(text);
+    for (const raw of this.splitter.feed(text)) {
       const f = FrameCodec.parse(raw);
+      if (this.onFrame) this.onFrame(raw, f);
       if (!f) continue;
       if (f.name === 'VER') {
         this.firmware = f.values.join(' ');

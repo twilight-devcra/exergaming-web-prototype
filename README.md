@@ -26,6 +26,16 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 - 연결 직후 몇 초 만에 계속 끊긴다면 페어링 키가 한쪽에만 남은 경우입니다. OS 블루투스 설정에서 페달을 제거한 뒤 다시 연결합니다.
 - 목록에 페달이 보이지 않으면 휴대폰의 CardioArcade 앱이 이미 페달에 연결되어 있지 않은지 확인합니다.
 
+### 센서 디버그 페이지
+
+`http://localhost:5173/pedal-debug.html` (메뉴의 **센서 디버그 페이지** 링크). 게임과 같은 연결·처리 코드로 페달을 붙여서 단계별 값을 보여줍니다.
+
+- 원본 BLE 알림, 프레임별 `avg_rpm`·`watt`·`rev_count`와 수신 간격
+- ① 페달이 보낸 RPM → ② 0 유예(`SENSOR_ZERO_GRACE`) 후 → ③ 게임이 쓰는 다듬은 RPM, 그리고 참고용 `rev_count` 기준 RPM
+- 목표 RPM을 넣으면 게임에서의 편차와 공 위치를 같이 보여줍니다
+- **프레임 CSV** / **전체 JSON**으로 기록을 저장합니다
+- `pedal-debug.html?sim`: 페달 없이 화면을 확인하는 시뮬레이터 (가정한 펌웨어 동작이라 실제 페달과 다를 수 있음)
+
 ## 구성
 
 | 경로 | 내용 |
@@ -34,6 +44,7 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 | `js/config.js` | 라운드 길이, 허용 구역, 목표 속도 변화 등 조절값 |
 | `js/pedal.js` | 페달 입력 (키보드 / 센서 RPM을 하나의 RPM 값으로) |
 | `js/pedal-link.js` | Cardio 페달 BLE 연결과 프레임 파서 (CardioArcade `ble/` 이식) |
+| `pedal-debug.html`, `js/pedal-debug.js` | 페달 센서 디버그 페이지 |
 | `js/games/` | 인지 게임 6종: 길 따라 그리기, 심볼 위치 외우기, 사칙연산 역산, 우세한 색 찾기, 구멍에 맞는 조각, 숨은 순서 찾기 |
 | `docs/엑서게임_기획_슬라이드.pdf` | 기획 요약 슬라이드 |
 | `docs/slides.html`, `docs/shots/` | 슬라이드 원본과 플레이 화면 스크린샷 |

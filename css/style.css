@@ -91,6 +91,7 @@ kbd {
 
 /* 페달 센서 연결 */
 .pedal-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+.debug-link { font-size: 13px; color: var(--ink-soft); align-self: flex-end; margin-top: -14px; }
 .pedal-status { font-size: 14px; color: var(--ink-soft); line-height: 1.4; }
 .pedal-status::before {
   content: "";

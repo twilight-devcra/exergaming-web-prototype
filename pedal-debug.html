@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>페달 센서 디버그</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --panel: #ffffff;
+      --ink: #1c2230;
+      --ink-soft: #6b7280;
+      --line: #d6d9df;
+      --accent: #2f6fed;
+      --good: #1f9d55;
+      --good-soft: #d5f2e0;
+      --bad: #e5484d;
+      --bad-soft: #fde2e2;
+      --warn: #d9822b;
+      --warn-soft: #fcebd7;
+      --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-size: 14px; }
+    button, input, select { font: inherit; }
+    main { max-width: 1280px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+    header h1 { font-size: 20px; margin: 0 8px 0 0; }
+    header a { color: var(--ink-soft); }
+    .status { padding: 4px 10px; border-radius: 999px; background: var(--line); font-size: 13px; }
+    .status[data-state="ready"] { background: var(--good-soft); color: var(--good); }
+    .status[data-state="reconnecting"], .status[data-state="connecting"] { background: var(--warn-soft); color: var(--warn); }
+    .status[data-state="disconnected"] { background: var(--bad-soft); color: var(--bad); }
+    .spacer { flex: 1; }
+    .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+    .panel h2 { font-size: 14px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+    .panel h2 .note { font-weight: normal; color: var(--ink-soft); font-size: 12px; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .tile { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+    .tile .k { font-size: 12px; color: var(--ink-soft); }
+    .tile .v { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; }
+    .tile .s { font-size: 11px; color: var(--ink-soft); }
+    .tile.alert { border-color: var(--bad); background: var(--bad-soft); }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+    .chart-wrap { position: relative; height: 320px; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-soft); }
+    .legend i { display: inline-block; width: 16px; height: 3px; vertical-align: middle; margin-right: 4px; border-radius: 2px; }
+    .ball-track { position: relative; height: 28px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); margin-top: 6px; }
+    .ball-zone { position: absolute; top: 0; bottom: 0; background: var(--good-soft); }
+    .ball { position: absolute; top: 3px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: var(--accent); }
+    .ball.out { background: var(--bad); }
+    .scroll { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; font: 12px var(--mono); font-variant-numeric: tabular-nums; }
+    th, td { padding: 3px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--bg); }
+    th { position: sticky; top: 0; background: var(--panel); color: var(--ink-soft); font-weight: normal; border-bottom: 1px solid var(--line); }
+    td.l, th.l { text-align: left; }
+    tr.zero td { background: var(--bad-soft); }
+    tr.held td { background: var(--warn-soft); }
+    tr.bad td { color: var(--bad); }
+    pre.raw { margin: 0; padding: 6px 8px; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; }
+    pre.raw .t { color: var(--ink-soft); }
+    pre.raw .out { color: var(--accent); }
+    input[type=number] { width: 72px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
+    input[type=text] { width: 140px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); }
+    .muted { color: var(--ink-soft); font-size: 12px; }
+    #sim-panel[hidden] { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>페달 센서 디버그</h1>
+    <span class="status" id="status">연결 안 됨</span>
+    <span class="muted" id="fw"></span>
+    <span class="spacer"></span>
+    <button class="btn primary" id="btn-connect">페달 연결</button>
+    <button class="btn" id="btn-freeze" aria-pressed="false">화면 멈춤</button>
+    <button class="btn" id="btn-clear">지우기</button>
+    <button class="btn" id="btn-csv">프레임 CSV</button>
+    <button class="btn" id="btn-json">전체 JSON</button>
+    <a href="index.html">게임으로</a>
+  </header>
+
+  <section class="panel" id="sim-panel" hidden>
+    <h2>시뮬레이터 <span class="note">실제 페달이 아닙니다. 펌웨어 동작을 가정해서 만든 가짜 프레임 (1초 창 안에 한 바퀴를 못 채우면 0을 보냄)</span></h2>
+    <div class="row">
+      <button class="btn" id="sim-toggle">시작</button>
+      <label>케이던스 <input type="range" id="sim-cadence" min="0" max="100" value="30"> <b id="sim-cadence-v">30</b> rpm</label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>현재 값</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">① 페달이 보낸 avg_rpm</div><div class="v" id="v-raw">-</div><div class="s" id="v-raw-s">마지막 WORKOUT 프레임</div></div>
+      <div class="tile"><div class="k">② 0 유예 후 (sensorRpm)</div><div class="v" id="v-held">-</div><div class="s" id="v-held-s"></div></div>
+      <div class="tile"><div class="k">③ 게임이 쓰는 RPM (smoothed)</div><div class="v" id="v-game">-</div><div class="s">Pedal.update() 결과</div></div>
+      <div class="tile"><div class="k">rev_count 기준 RPM</div><div class="v" id="v-rev">-</div><div class="s" id="v-rev-s"></div></div>
+      <div class="tile"><div class="k">rev_count / watt</div><div class="v" id="v-count">-</div><div class="s" id="v-count-s"></div></div>
+      <div class="tile" id="t-age"><div class="k">마지막 프레임 이후</div><div class="v" id="v-age">-</div><div class="s" id="v-age-s"></div></div>
+      <div class="tile"><div class="k">0 프레임 비율 (최근 30초)</div><div class="v" id="v-zero">-</div><div class="s" id="v-zero-s"></div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>게임 기준으로 보면
+      <span class="note">편차 = (③ − 목표) / 목표. 공은 편차 ±<span id="maxdev"></span>%에서 화면 끝에 닿습니다.</span>
+    </h2>
+    <div class="row">
+      <label>목표 RPM <input type="number" id="target" min="5" max="200" step="1"></label>
+      <button class="btn" id="btn-target-avg">최근 10초 ③ 평균으로</button>
+      <label>허용 구역 ±<input type="number" id="tol" min="1" max="50" step="1">%</label>
+      <span class="muted" id="dev-text"></span>
+    </div>
+    <div class="ball-track" id="ball-track"><div class="ball-zone" id="ball-zone"></div><div class="ball" id="ball"></div></div>
+  </section>
+
+  <section class="panel">
+    <h2>시계열
+      <select id="window"><option value="30">30초</option><option value="60" selected>60초</option><option value="120">2분</option><option value="300">5분</option></select>
+    </h2>
+    <div class="legend">
+      <span><i style="background:var(--ink)"></i>① avg_rpm (점, 0은 빨강)</span>
+      <span><i style="background:var(--warn)"></i>② 0 유예 후</span>
+      <span><i style="background:var(--accent)"></i>③ 게임 RPM</span>
+      <span><i style="background:var(--good)"></i>rev_count 기준</span>
+      <span><i style="background:var(--good-soft)"></i>허용 구역</span>
+      <span><i style="background:var(--bad)"></i>공이 왼쪽 끝에 닿는 선</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+  </section>
+
+  <div class="cols">
+    <section class="panel">
+      <h2>프레임 <span class="note" id="frame-count"></span></h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>t(s)</th><th>간격ms</th><th>rpm</th><th>watt</th><th>rev</th><th>Δrev</th><th>rev rpm</th><th>②</th><th class="l">처리</th></tr></thead>
+          <tbody id="frames"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>원본 알림 <span class="note">BLE notify 하나가 한 줄. ⏎·␍는 줄바꿈 문자</span></h2>
+      <div class="row" style="margin-bottom:8px">
+        <input type="text" id="cmd" value="VER,0:;" aria-label="보낼 명령">
+        <button class="btn" id="btn-send">보내기</button>
+        <span class="muted" id="send-note"></span>
+      </div>
+      <div class="scroll"><pre class="raw" id="raw"></pre></div>
+    </section>
+  </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/pedal.js"></script>
+<script src="js/pedal-link.js"></script>
+<script src="js/pedal-debug.js"></script>
+</body>
+</html>

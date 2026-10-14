@@ -51,6 +51,10 @@ const pedal = new Pedal();
 //  cap     CapBuf (메모리) / 저장 형식은 CapBuf.pack()   CAPD 100Hz 파형
 //  capSegs { t, sec }                        CAP 시작 응답. 다시 걸 때마다 seq 가 0부터라 구간을 나눈다
 //  rs      { min_period: …, … } | null       RS_G 응답
+//  est     { t, zc, teo, comb }              lz 기반 케이던스 추정 (js/cadence-est.js), 약 10Hz
+//  zcUpd   { t, v }                          영교차 추정이 새로 나온 순간 (반 바퀴마다)
+//  turns   { t, v }                          페달 검출기가 회전을 확정한 순간 (DBG rev_cnt 증가, 0.5초 폴링이라 최대 0.5초 늦게 보인다)
+// 모든 추정값의 t 는 그 값을 계산할 수 있게 된 시각(= CAPD 도착 시각)이다. 반응 속도를 공정하게 비교하려는 것.
 let session;
 let t0;
 const sec = (t = performance.now()) => (t - t0) / 1000;
@@ -65,6 +69,7 @@ function newSession(recording) {
     recording,
     chunks: [], frames: [], samples: [], marks: [],
     dbg: [], cap: new CapBuf(), capSegs: [], rs: lastRs,
+    est: [], zcUpd: [], turns: [],
   };
   edge = true;
   dirty = { frames: true, raw: true, save: false };
@@ -233,9 +238,34 @@ const Cmd = {
   },
 };
 
+// lz 케이던스 추정기에 CAPD 를 순서대로 넣는다. 구간이 바뀌거나 크게 끊기면 처음부터 다시 잡는다.
+const Est = {
+  lz: new LzCadence(),
+  seg: -1,
+  seq: -1,
+  frame(v, seg, t) {
+    const seq = v[0];
+    const gap = seq - this.seq - 1;
+    if (seg !== this.seg || gap < 0 || gap > 4) this.lz.reset();
+    else if (gap > 0) this.lz.skip(gap * CAP_BATCH); // 짧은 유실은 시계만 넘기고 이어 간다
+    this.seg = seg;
+    this.seq = seq;
+    for (let k = 0; k < CAP_BATCH; k++) this.lz.sample(v[1 + k * CAP_CH.length] / 10);
+    const r = this.lz.read();
+    this.last = { t, ...r };
+    if (r.zcNew) session.zcUpd.push({ t, v: r.zcFull });
+    const est = session.est;
+    if (!est.length || t - est[est.length - 1].t >= 0.1 || r.zcNew) {
+      est.push({ t, zc: +r.zc.toFixed(2), teo: +r.teo.toFixed(2), comb: +r.comb.toFixed(2) });
+    }
+  },
+  last: null,
+};
+
 const Diag = {
   dbgOn: true,
   capOn: true,
+  capIdle: true,    // 기록 중이 아닐 때도 받는다 (속도 추정 비교 그래프용)
   dbgBusy: false,
   capAt: 0,         // 마지막으로 CAP 을 건 시각 (performance.now). 0 = 걸려 있지 않음
   prev: null,       // 직전 DBG 값 (자동 표시용)
@@ -258,6 +288,9 @@ const Diag = {
       const v = ints(DBG_FIELDS.length);
       if (!v) return true;
       session.dbg.push({ t, v });
+      if (this.prev && v[DBG_I.rev_cnt] > this.prev[DBG_I.rev_cnt] && v[DBG_I.period] > 0) {
+        session.turns.push({ t, v: 6000 / v[DBG_I.period] });
+      }
       this.lastDbgAt = performance.now();
       this.autoMarks(v);
       this.prev = v;
@@ -273,6 +306,7 @@ const Diag = {
       if (!segs.length) segs.push({ t: t - (v[0] * CAP_BATCH) / CAP_FS, sec: null });
       const seg = segs.length - 1;
       session.cap.push(segs[seg].t + (v[0] * CAP_BATCH) / CAP_FS, seg, v[0], v.slice(1));
+      Est.frame(v, seg, t);
       dirty.save = true;
       return true;
     }
@@ -315,7 +349,7 @@ const Diag = {
       Cmd.send(NUS.command('DBG'), false).catch(() => {}).finally(() => (this.dbgBusy = false));
     }
     // 원시 파형은 기록 중에만 받는다 (데이터가 많고, 화면용으로는 DBG 로 충분하다)
-    const wantCap = this.capOn && session.recording && !session.stopping;
+    const wantCap = this.capOn && (session.recording || this.capIdle) && !session.stopping;
     if (wantCap && (!this.capAt || now - this.capAt > CAP_RENEW_MS)) {
       this.capAt = now;
       Cmd.send(NUS.command('CAP', [CAP_SEC])).catch(() => (this.capAt = 0));
@@ -430,6 +464,7 @@ function exportData(s) {
     config: cfg,
     chunks: s.chunks, frames: s.frames, samples: s.samples, marks: s.marks,
     dbgFields: DBG_FIELDS, dbg: s.dbg, rs: s.rs,
+    est: s.est, zcUpd: s.zcUpd, turns: s.turns,
     capChannels: CAP_CH, capScale: { acc: 'g × 10000 (0.1 mg)', gyr: 'dps × 10 (0.1 dps)' },
     capSegs: s.capSegs, cap: s.cap instanceof CapBuf ? s.cap.pack() : s.cap,
   };
@@ -653,6 +688,7 @@ $('#btn-send').onclick = async () => {
 
 $('#opt-dbg').onchange = (e) => (Diag.dbgOn = e.target.checked);
 $('#opt-cap').onchange = (e) => (Diag.capOn = e.target.checked);
+$('#opt-cap-idle').onchange = (e) => (Diag.capIdle = e.target.checked);
 
 const targetInput = $('#target');
 const tolInput = $('#tol');
@@ -966,7 +1002,7 @@ function drawWave(now) {
   if (!n) {
     wg.fillStyle = css('--ink-soft');
     wg.textAlign = 'center';
-    wg.fillText(session.recording ? (Diag.capOn ? 'CAPD 대기 중…' : 'CAP 꺼짐') : '기록 중에만 받습니다', W / 2, H / 2);
+    wg.fillText(!Diag.capOn ? 'CAP 꺼짐' : session.recording || Diag.capIdle ? 'CAPD 대기 중…' : '기록 중에만 받습니다', W / 2, H / 2);
     return;
   }
   const stride = Math.max(1, Math.floor(n / (W - pad.l - pad.r) / 2));
@@ -1015,6 +1051,162 @@ function drawWave(now) {
   wg.setLineDash([]);
 }
 
+// ---------------- 속도 추정 비교 ----------------
+// 방법마다 선 하나 + 아래 띠에 '새 추정값이 나온 순간' 눈금. 값은 계산할 수 있게 된 시각에 찍는다.
+const EST_SERIES = [
+  { key: 'workout', name: '페달 avg_rpm (WORKOUT)', color: '--s-workout', rate: '1초마다' },
+  { key: 'turn', name: '페달 회전 확정 (DBG)', color: '--s-turn', rate: '회전마다 · 0.5초 폴링' },
+  { key: 'game', name: '게임 ③ (지금 공을 움직이는 값)', color: '--s-game', rate: '연속' },
+  { key: 'zc', name: 'lz 영교차', color: '--s-zc', rate: '반 바퀴마다' },
+  { key: 'teo', name: 'lz 파형 모양 (TEO 0.5초)', color: '--s-teo', rate: 'CAPD 마다 (20Hz)' },
+  { key: 'comb', name: 'lz 결합', color: '--s-comb', rate: 'CAPD 마다 (20Hz)' },
+];
+const estShow = Object.fromEntries(EST_SERIES.map((s) => [s.key, true]));
+$('#est-legend').innerHTML = EST_SERIES.map((s) =>
+  `<label><input type="checkbox" data-key="${s.key}" checked><i style="background:var(${s.color})"></i>${esc(s.name)}</label>`).join('');
+$('#est-legend').onchange = (e) => (estShow[e.target.dataset.key] = e.target.checked);
+
+function estNow(now) {
+  const t = sec(now);
+  const lastW = lastWorkout();
+  const turn = session.turns[session.turns.length - 1];
+  // Est.last 는 묶음이 바뀌어도 남아 있으므로, 이번 묶음에 추정값이 쌓인 뒤에만 쓴다
+  const e = session.est.length ? Est.last : null;
+  const zcU = session.zcUpd[session.zcUpd.length - 1];
+  const g = session.samples[session.samples.length - 1];
+  return {
+    workout: lastW && [lastW.rpm, t - lastW.t],
+    turn: turn && [turn.v, t - turn.t],
+    game: g && [g.game, 0],
+    zc: e && [e.zc, zcU ? t - zcU.t : null],
+    teo: e && [e.teo, t - e.t],
+    comb: e && [e.comb, t - e.t],
+  };
+}
+
+function drawEst(now) {
+  const cv = $('#est-chart');
+  const g = cv.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) {
+    cv.width = Math.round(r.width * dpr);
+    cv.height = Math.round(r.height * dpr);
+  }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = r.width, H = r.height;
+  g.clearRect(0, 0, W, H);
+  const span = +$('#est-window').value;
+  const tEnd = sec(now), tStart = tEnd - span;
+  const rows = EST_SERIES.filter((s) => estShow[s.key]);
+  const stripH = 14 * rows.length + 6;
+  const pad = { l: 56, r: 8, t: 8, b: 20 + stripH };
+  const plotB = H - pad.b;
+  const X = (t) => pad.l + ((t - tStart) / span) * (W - pad.l - pad.r);
+
+  // 각 방법의 (갱신 시각, 값) 목록
+  const est = session.est.filter((p) => p.t >= tStart - 2);
+  const src = {
+    workout: session.frames.filter((f) => f.kind === 'workout' && f.t >= tStart - 2).map((f) => ({ t: f.t, v: f.rpm })),
+    turn: session.turns.filter((p) => p.t >= tStart - 10),
+    game: session.samples.filter((p) => p.t >= tStart - 2).map((p) => ({ t: p.t, v: p.game })),
+    zc: est.map((p) => ({ t: p.t, v: p.zc })),
+    teo: est.map((p) => ({ t: p.t, v: p.teo })),
+    comb: est.map((p) => ({ t: p.t, v: p.comb })),
+  };
+  const ticks = {
+    workout: src.workout, turn: src.turn, game: [], zc: session.zcUpd.filter((p) => p.t >= tStart),
+    teo: est, comb: est,
+  };
+
+  let yMax = 60;
+  for (const s of rows) for (const p of src[s.key]) if (p.t >= tStart && p.v > yMax) yMax = p.v;
+  yMax = Math.ceil(yMax / 20) * 20;
+  const Y = (v) => plotB - (v / yMax) * (plotB - pad.t);
+
+  g.font = '11px ui-monospace, Consolas, monospace';
+  g.strokeStyle = css('--bg');
+  g.fillStyle = css('--ink-soft');
+  g.lineWidth = 1;
+  g.textAlign = 'right';
+  for (let v = 0; v <= yMax; v += 10) {
+    g.beginPath(); g.moveTo(pad.l, Y(v)); g.lineTo(W - pad.r, Y(v)); g.stroke();
+    if (v % 20 === 0) g.fillText(v, pad.l - 4, Y(v) + 4);
+  }
+  g.textAlign = 'center';
+  const step = span <= 20 ? 2 : span <= 60 ? 5 : 10;
+  for (let t = Math.ceil(tStart / step) * step; t <= tEnd; t += step) {
+    if (t < 0) continue;
+    g.beginPath(); g.moveTo(X(t), pad.t); g.lineTo(X(t), plotB + stripH); g.stroke();
+    g.fillText(`${t}s`, X(t), H - 5);
+  }
+  // 표시 (놓침 등)
+  for (const m of session.marks) {
+    if (m.t < tStart) continue;
+    g.strokeStyle = css(m.kind === 'manual' ? '--mark' : '--bad');
+    g.setLineDash(m.kind === 'manual' ? [] : [2, 3]);
+    g.beginPath(); g.moveTo(X(m.t), pad.t); g.lineTo(X(m.t), plotB); g.stroke();
+  }
+  g.setLineDash([]);
+
+  g.save();
+  g.beginPath(); g.rect(pad.l, pad.t, W - pad.l - pad.r, plotB - pad.t); g.clip();
+  for (const s of rows) {
+    const pts = src[s.key];
+    if (!pts.length) continue;
+    const color = css(s.color);
+    g.strokeStyle = color;
+    g.lineWidth = s.key === 'comb' ? 3 : s.key === 'teo' ? 1.2 : 2;
+    g.beginPath();
+    // 갱신 사이에는 값이 그대로 유지되므로 계단으로 그린다 (연속 계열은 촘촘해서 사실상 선이 된다)
+    pts.forEach((p, i) => {
+      if (i === 0) g.moveTo(X(p.t), Y(p.v));
+      else { g.lineTo(X(p.t), Y(pts[i - 1].v)); g.lineTo(X(p.t), Y(p.v)); }
+    });
+    g.lineTo(X(tEnd), Y(pts[pts.length - 1].v));
+    g.stroke();
+    // 띄엄띄엄 갱신되는 방법은 갱신 순간에 점
+    if (s.key === 'workout' || s.key === 'turn' || s.key === 'zc') {
+      g.fillStyle = color;
+      for (const p of s.key === 'zc' ? session.zcUpd.filter((q) => q.t >= tStart - 2) : pts) {
+        g.beginPath(); g.arc(X(p.t), Y(p.v), 3, 0, Math.PI * 2); g.fill();
+      }
+    }
+  }
+  g.restore();
+
+  // 갱신 시점 띠
+  g.textAlign = 'left';
+  rows.forEach((s, i) => {
+    const y = plotB + 6 + i * 14;
+    g.fillStyle = css('--bg');
+    g.fillRect(pad.l, y, W - pad.l - pad.r, 11);
+    g.strokeStyle = css(s.color);
+    g.lineWidth = 1.5;
+    g.beginPath();
+    for (const p of ticks[s.key]) {
+      if (p.t < tStart) continue;
+      g.moveTo(X(p.t), y); g.lineTo(X(p.t), y + 11);
+    }
+    g.stroke();
+    if (s.key === 'game') {
+      g.fillStyle = css(s.color);
+      g.fillRect(pad.l, y + 4, W - pad.l - pad.r, 3);
+    }
+    g.fillStyle = css('--ink-soft');
+    g.textAlign = 'right';
+    g.fillText(s.key, pad.l - 4, y + 9);
+  });
+
+  // 현재 값 표
+  const cur = estNow(now);
+  $('#est-tiles').innerHTML = EST_SERIES.map((s) => {
+    const c = cur[s.key];
+    const age = c && c[1] != null && s.key !== 'game' ? `${c[1].toFixed(1)}초 전 갱신` : '';
+    return `<div class="tile est-tile" style="border-left:4px solid var(${s.color})"><div class="k">${esc(s.name)}</div><div class="v">${c ? fmt(c[0], 1) : '-'}</div><div class="s">${esc(s.rate)}${age ? ' · ' + age : ''}</div></div>`;
+  }).join('');
+}
+
 // ---------------- 루프 ----------------
 let last = performance.now();
 let lastSample = 0;
@@ -1033,6 +1225,7 @@ function loop(now) {
     renderBall(game);
     drawChart(now);
     drawWave(now);
+    drawEst(now);
     if (dirty.dbg) { renderDbg(); dirty.dbg = false; }
     if (dirty.frames) { renderFrames(); dirty.frames = false; }
     if (dirty.raw) { renderRaw(); dirty.raw = false; }

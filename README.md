@@ -44,6 +44,9 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
   - `CAP`: 기록 중에만 검출기 입력 파형(lz, ly, gx, gz · 100Hz)을 받습니다. 300초 상한이라 자동으로 다시 겁니다
   - `RS_G`: 연결 때 정지 판정 기준 등 검출 파라미터를 읽어 화면에 풀어 씁니다
   - 저장된 기록의 **DBG CSV** / **CAP CSV** 는 페달 저장소 `cardio_tool` 과 같은 형식이라 `tools/verify_phase_detector.py --csv` 로 재생할 수 있습니다
+- **속도 추정 비교**: 페달의 avg_rpm·회전 확정·게임 ③ 과, 원시 파형 lz 에서 직접 구한 추정값(영교차 / 파형 모양 TEO / 결합, `js/cadence-est.js`)을
+  같은 그래프에 그립니다. 각 값은 계산할 수 있게 된 시각에 찍히고, 아래 띠의 눈금이 각 방법이 새 값을 낸 순간입니다.
+  비교를 위해 기록 중이 아닐 때도 CAP 을 받습니다 (끌 수 있음)
 - `pedal-debug.html?sim`: 페달 없이 화면을 확인하는 시뮬레이터 (가정한 펌웨어 동작이라 실제 페달과 다를 수 있음)
 
 ## 구성
@@ -54,6 +57,7 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 | `js/config.js` | 라운드 길이, 허용 구역, 목표 속도 변화 등 조절값 |
 | `js/pedal.js` | 페달 입력 (키보드 / 센서 RPM을 하나의 RPM 값으로) |
 | `js/pedal-link.js` | Cardio 페달 BLE 연결과 프레임 파서 (CardioArcade `ble/` 이식) |
+| `js/cadence-est.js` | 원시 파형 lz 로 케이던스 추정 (영교차 · 파형 모양 · 결합) |
 | `pedal-debug.html`, `js/pedal-debug.js` | 페달 센서 디버그 페이지 |
 | `js/games/` | 인지 게임 6종: 길 따라 그리기, 심볼 위치 외우기, 사칙연산 역산, 우세한 색 찾기, 구멍에 맞는 조각, 숨은 순서 찾기 |
 | `docs/엑서게임_기획_슬라이드.pdf` | 기획 요약 슬라이드 |

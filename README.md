@@ -65,7 +65,7 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 | `js/pedal-link.js` | Cardio 페달 BLE 연결과 프레임 파서 (CardioArcade `ble/` 이식) |
 | `js/cadence-est.js` | 원시 파형 lz 로 케이던스 추정 (영교차 · 파형 모양 · 결합) |
 | `pedal-debug.html`, `js/pedal-debug.js` | 페달 센서 디버그 페이지 |
-| `js/games/` | 인지 게임 6종: 길 따라 그리기, 심볼 위치 외우기, 사칙연산 역산, 우세한 색 찾기, 구멍에 맞는 조각, 숨은 순서 찾기 |
+| `js/games/` | 인지 게임 6종: 길 따라 그리기, 심볼 위치 외우기, 사칙연산 역산, 우세한 색 찾기, 빈자리 채우기, 숨은 순서 찾기 |
 | `docs/엑서게임_기획_슬라이드.pdf` | 기획 요약 슬라이드 |
 | `docs/slides.html`, `docs/shots/` | 슬라이드 원본과 플레이 화면 스크린샷 |
 | `docs/build/` | 스크린샷 촬영·PDF 생성 스크립트 (Node 22+, Edge 필요) |

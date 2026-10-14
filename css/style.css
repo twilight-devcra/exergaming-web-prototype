@@ -543,27 +543,38 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .cnt-opt.right .n { color: var(--good); }
 .cnt-opt.wrong { border-color: var(--bad); }
 
-/* 구멍에 맞는 조각 */
+/* 빈자리 채우기 */
 .fit-wrap { display: flex; flex-direction: column; align-items: center; gap: 24px; flex: 1; justify-content: center; }
-.fit-hole {
-  width: var(--hsz);
-  height: var(--hsz);
+.fit-board {
+  width: var(--bsz);
+  height: var(--bsz);
   background: var(--panel);
   border-radius: 16px;
   overflow: hidden;
 }
-.fit-hole svg { width: 100%; height: 100%; display: block; }
-/* 칸마다 옅은 테두리를 둬서 몇 칸짜리인지 한눈에 보이게 한다 */
-.fit-hole .hole rect { fill: #2b2f38; stroke: rgba(255, 255, 255, 0.14); stroke-width: 0.8; }
-/* 고른 조각이 구멍 쪽으로 돌아 들어가는 동작 */
-.fit-hole .seat {
-  transform-origin: 50px 50px;
+.fit-board svg, .fit-cand svg { width: 100%; height: 100%; display: block; }
+.fit-board .tile { fill: var(--cell); stroke: var(--panel); stroke-width: 3; }
+.fit-board .gap { fill: #c3c8d1; stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.fit-board path, .fit-cand path { fill: none; stroke-linecap: round; }
+.fit-board .halo, .fit-cand .halo { stroke: rgba(28, 34, 48, 0.55); }
+.fit-cand .piece { fill: #fbfcfd; stroke: var(--line); stroke-width: 1.5; }
+/* 고른 조각이 빈자리로 돌아 들어가는 동작 */
+.fit-board .seat {
+  transform-origin: 0 0;
   transition: transform 0.55s cubic-bezier(0.3, 0.8, 0.4, 1);
-  opacity: 0.92;
 }
-.fit-hole .seat rect { stroke: rgba(255, 255, 255, 0.3); stroke-width: 0.8; }
-.fit-hole .seat.right rect { fill: var(--good); }
-.fit-hole .seat.wrong rect { fill: var(--bad); }
+.fit-board .seat .piece { fill: #fbfcfd; stroke-width: 3; }
+.fit-board .seat.right .piece { stroke: var(--good); }
+.fit-board .seat.wrong .piece { stroke: var(--bad); }
+/* 어긋난 변 표시는 조각이 다 돌아간 뒤에 나타난다 */
+.fit-board .miss circle {
+  fill: none;
+  stroke: var(--bad);
+  stroke-width: 3.5;
+  opacity: 0;
+  animation: fit-miss 0.3s 0.6s forwards;
+}
+@keyframes fit-miss { to { opacity: 1; } }
 .fit-cands { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
 .fit-cand {
   width: var(--psz);
@@ -573,8 +584,6 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   border-radius: 16px;
   background: var(--cell);
 }
-.fit-cand svg { width: 100%; height: 100%; display: block; }
-.fit-cand rect { fill: var(--accent); stroke: rgba(255, 255, 255, 0.3); stroke-width: 0.8; }
 @media (hover: hover) {
   .fit-cand:hover:not(:disabled) { background: var(--cell-hover); }
 }

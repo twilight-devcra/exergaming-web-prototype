@@ -27,7 +27,25 @@ It records the goal, what is already decided, and what is still open. Read `READ
   **It is display-only and does not count toward the prize score.** The prize score stays as it is now: speed-consistency points (운동 점수) plus minigame points.
 - **Radar graph axes are cognitive ability fields, not one axis per game.** It doesn't need to be scientifically exact. Each game feeds several axes with weights (see below).
 
-## Why the current build isn't demo-ready
+## Status (2026-10-15): station mode built
+
+`index.html?demo` (linked from the test menu) is the participant-facing flow. It shares the round engine in `js/main.js` with the test page. Everything demo-specific lives in `js/demo.js`, `js/abilities.js` and `js/exercise.js`. See the README section 시연 모드 for staff instructions.
+
+Implemented using the proposed defaults below, so revisit if the user disagrees:
+- Fixed `DEMO_CONFIG` in `js/config.js` (300 s, all games). It ignores the test page's `localStorage` config.
+- Operator access: long-press the top-left corner for 2 s, then enter `DEMO_OPERATOR_PIN` (default `2580`). The operator menu holds the station number, pedal connect, resume / end now / abandon, and the per-tablet result log with CSV export.
+- Result: large score, participant number `<station>-<seq>` (sequence persists per tablet), radar graph, and exercise amount (kcal with food comparison, pedaling time, revolutions, avg RPM, speed-keeping %). It stays on screen until staff hold the "다음 참가자" button for 2 s.
+- Radar uses the weight table below. Per-game performance = accuracy × (0.85 + 0.15 × level bonus for Lv3+). Processing speed also factors in seconds per question for count/seek (`ABILITY_PACE`). Display floor is 20 and axes with no data show 50.
+- Robustness: Wake Lock, fullscreen (re-entered on next touch), beforeunload/back/context-menu/zoom guards, pause with an on-screen notice on pedal loss, an idle prompt after 40 s and auto-end after 15 s more, and a calibration timeout back to attract after 60 s.
+- Attract screen starts on tap or ~2.5 s of pedaling, and requires a connected pedal (`?demo&kbd` overrides for testing).
+
+Still open / to do:
+- **RPM→watt curve** is a placeholder (`Exercise.watts`, 60 RPM ≈ 48 W). Replace it once recordings exist.
+- `ABILITY_PACE` thresholds and the weight table are guesses, so tune them by playtesting.
+- Not yet tested on real tablets with the pedal. Check fullscreen, Wake Lock, and reconnect behaviour on the actual devices.
+- How results leave the tablet, branding, and staffing are still undecided (see below).
+
+## Why the current build isn't demo-ready (original assessment)
 
 The build is set up for internal testing. Things a participant should not see or be able to reach:
 

@@ -5,14 +5,19 @@ const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조�
 const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다
 const SHIFT_OUT_MS = 650;    // 화면이 다시 줄어드는 시간. 그 뒤에 다음 인지 게임이 나온다
 
+// index.html?demo — 시연 행사용 스테이션 모드 (js/demo.js). 같은 라운드 흐름에 대기·결과·운영 화면만 바꿔 끼운다.
+const DEMO = new URLSearchParams(location.search).has('demo');
+
 const App = {
-  cfg: Config.load(),
+  demo: DEMO,
+  cfg: DEMO ? Config.demo() : Config.load(),
   pedal: new Pedal(),
   link: new PedalLink(),
   lz: new LzCadence(),
   capAt: 0,      // 마지막으로 CAP 을 건 시각 (performance.now). 0 = 걸려 있지 않음
   audio: new BeatAudio(),
-  state: 'menu', // menu | calib | countdown | play | result
+  state: 'menu', // menu | attract | calib | countdown | play | result
+  meter: new ExerciseMeter(),
   paused: false,
   linkPaused: false, // 페달 연결이 끊겨서 걸린 일시정지. 다시 연결되면 자동으로 풀린다
   clock: 0,      // 일시정지 중에는 멈추는 게임 시계 (ms)
@@ -24,10 +29,12 @@ const App = {
     // 큰 깃발을 지날 때만 소리를 낸다. 작은 깃발까지 울리면 박자 소리와 섞여 시끄럽다.
     this.band.onMilestone = (m) => { if (m % Band.MARK_BIG === 0) this.audio.sfx('go'); };
     this.renderGameToggles();
-    this.bindMenu();
+    if (!this.demo) this.bindMenu();
+    else this.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
     this.bindKeys();
     this.bindLink();
     this.pedal.onStroke = (key) => this.onStroke(key);
+    if (this.demo) Demo.init(this);
     $('#btn-start').onclick = () => this.startRound();
     $('#btn-again').onclick = () => this.startRound();
     $('#btn-menu').onclick = () => this.show('menu');
@@ -123,17 +130,24 @@ const App = {
       this.state = 'menu';
       this.renderBoard($('#menu-board'));
     }
+    if (id === 'attract') this.state = 'attract';
+  },
+
+  get inRound() {
+    return ['calib', 'countdown', 'play'].includes(this.state);
   },
 
   // ---------------- 입력 ----------------
   bindKeys() {
     window.addEventListener('keydown', (e) => {
+      // 스테이션 모드에는 일시정지 메뉴와 디버그 표시가 없다 (운영 메뉴로만 멈춘다)
       if (e.code === 'Escape') {
-        if (['calib', 'countdown', 'play'].includes(this.state)) this.setPaused(!this.paused);
+        if (!this.demo && this.inRound) this.setPaused(!this.paused);
         return;
       }
       if (e.target.tagName === 'INPUT') return;
       if (e.code === 'Backquote') {
+        if (this.demo) return;
         $('#debug').classList.toggle('active');
         return;
       }
@@ -152,8 +166,9 @@ const App = {
 
   // ---------------- 페달 센서 ----------------
   bindLink() {
-    const btn = $('#btn-pedal');
-    btn.onclick = () => (this.link.wantLink ? this.link.disconnect() : this.link.connect());
+    // 연결 버튼과 상태 표시는 메뉴·운영 메뉴·대기 화면에 여러 개 있다
+    const btns = document.querySelectorAll('[data-pedal-btn]');
+    btns.forEach((b) => (b.onclick = () => (this.link.wantLink ? this.link.disconnect() : this.link.connect())));
     this.link.onState = (state, detail) => this.onLinkState(state, detail);
     this.link.onWorkout = (w) => this.pedal.sensorFrame(w.rpm);
     this.link.onFrame = (raw, f) => this.onPedalFrame(f);
@@ -165,7 +180,7 @@ const App = {
     if (this.link.supported) {
       this.onLinkState('idle', '키보드로 입력 중');
     } else {
-      btn.disabled = true;
+      btns.forEach((b) => (b.disabled = true));
       this.onLinkState('idle', '이 브라우저에서는 페달을 연결할 수 없습니다 (Chrome·Edge 필요)');
     }
   },
@@ -201,13 +216,15 @@ const App = {
     this.capAt = 0;
     this.lz.reset();
     document.body.classList.toggle('sensor', ready);
-    const s = $('#pedal-status');
-    s.dataset.state = state;
-    s.textContent = detail;
-    $('#btn-pedal').textContent = this.link.wantLink ? '연결 해제' : '페달 연결';
+    document.querySelectorAll('.pedal-status').forEach((s) => {
+      s.dataset.state = state;
+      s.textContent = detail;
+    });
+    document.querySelectorAll('[data-pedal-btn]').forEach((b) => (b.textContent = this.link.wantLink ? '연결 해제' : '페달 연결'));
+    if (this.demo) return Demo.onLink(state, detail);
 
     // 센서로 하던 라운드 도중 연결이 끊기면 '멈춤'으로 채점하지 않고 시계를 세운다
-    const inRound = ['calib', 'countdown', 'play'].includes(this.state);
+    const inRound = this.inRound;
     if (ready) {
       if (this.linkPaused) this.setPaused(false);
     } else if (this.roundSensor && inRound && !this.paused) {
@@ -223,7 +240,7 @@ const App = {
       this.linkPaused = false;
       $('#pause-note').textContent = '';
     }
-    $('#pause').classList.toggle('active', p);
+    if (!this.demo) $('#pause').classList.toggle('active', p);
     if (p) this.audio.pause();
     else this.audio.resume();
   },
@@ -235,7 +252,7 @@ const App = {
     this.timers = [];
     this.clearShift();
     $('#cog').innerHTML = '';
-    this.show('menu');
+    this.show(this.demo ? 'attract' : 'menu');
   },
 
   // ---------------- 게임 시계 기반 예약 ----------------
@@ -253,7 +270,8 @@ const App = {
 
   // ---------------- 라운드 흐름 ----------------
   startRound() {
-    this.readMenu();
+    if (!this.demo) this.readMenu();
+    this.meter.reset();
     this.audio.ensure();
     this.audio.setMuted(!this.cfg.sound);
     this.pedal.reset();
@@ -314,7 +332,8 @@ const App = {
     this.renderStreak();
     this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
     this.stats = {};
-    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0 }));
+    // level = 도달한 최고 난이도, ms = 게임을 푸는 데 쓴 시간 (능력 그래프에 쓴다)
+    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, ms: 0 }));
     this.band.cfg = this.cfg;
     this.band.setSlope(0);
     this.band.theta = 0;
@@ -376,10 +395,12 @@ const App = {
   },
 
   makeHost(T, stage, level, mult, gen) {
+    const t0 = this.clock;
     return {
       stage,
       level,
       mult,
+      t0,
       base: this.cfg.cogBasePoints,
       after: (ms, fn) => this.after(ms, fn, gen),
       // 게임들은 정답에 'good', 오답에 'bad'를 울린다. 그 둘만 가로채 연속 정답을 세고 보상을 키운다.
@@ -400,7 +421,7 @@ const App = {
       },
       done: (res) => {
         if (gen !== this.gen || this.state !== 'play') return;
-        this.record(T, res);
+        this.record(T, res, level, this.clock - t0);
         // 한 게임을 다 맞혔으면 따로 축하한다. 게임마다 넣지 않고 여기서 한 번에 처리한다.
         if (!res.cleared) return this.nextGame();
         this.audio.sfx('clear');
@@ -491,9 +512,11 @@ const App = {
     setTimeout(() => el.remove(), 440);
   },
 
-  record(T, res) {
+  record(T, res, level, ms) {
     const s = this.stats[T.id];
     s.plays++;
+    s.level = Math.max(s.level, level);
+    s.ms += ms;
     if (res.cleared) s.cleared++;
     s.correct += res.correct;
     s.total += res.total;
@@ -570,7 +593,8 @@ const App = {
       this.state = 'play';
       const res = this.current.game.abort();
       this.state = 'result';
-      if (res.total > 0) this.record(this.current.T, res);
+      const { host } = this.current;
+      if (res.total > 0) this.record(this.current.T, res, host.level, this.clock - host.t0);
     }
     this.gen++;
     this.timers = [];
@@ -582,6 +606,7 @@ const App = {
   },
 
   showResult() {
+    if (this.demo) return Demo.showResult();
     const cfg = this.cfg;
     const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
     $('#res-total').textContent = this.score;
@@ -643,6 +668,11 @@ const App = {
       const rpm = this.pedal.update(dt);
 
       if (this.state === 'calib') this.updateCalib(dt, rpm);
+      // 운동량은 측정이 시작된 뒤부터 라운드가 끝날 때까지 밟은 것을 모두 센다
+      if ((this.state === 'calib' && this.calib.started) || this.state === 'countdown' || this.state === 'play') {
+        this.meter.add(dt, rpm);
+      }
+      if (this.demo) Demo.tick(dt, rpm);
 
       if (this.state === 'countdown' || this.state === 'play') {
         if (this.state === 'play') this.updatePlay(dt, rpm);

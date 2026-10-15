@@ -18,10 +18,13 @@
         일시정지: <kbd>Esc</kbd> · 디버그 표시: <kbd>`</kbd>
       </p>
       <div class="pedal-row">
-        <span class="pedal-status" id="pedal-status"></span>
-        <button class="btn secondary small" id="btn-pedal">페달 연결</button>
+        <span class="pedal-status"></span>
+        <button class="btn secondary small" data-pedal-btn>페달 연결</button>
       </div>
-      <a class="debug-link" href="pedal-debug.html">센서 디버그 페이지</a>
+      <div class="menu-links">
+        <a class="debug-link" href="?demo">시연 모드 (스테이션) →</a>
+        <a class="debug-link" href="pedal-debug.html">센서 디버그 페이지</a>
+      </div>
       <button class="btn" id="btn-start">시작하기</button>
     </div>
     <div class="menu-side">
@@ -123,6 +126,111 @@
     </div>
   </section>
 
+  <!-- ===== 시연(스테이션) 모드 전용: index.html?demo ===== -->
+  <!-- 대기 화면 -->
+  <section id="attract" class="screen">
+    <div class="att-main">
+      <div class="att-brand">페달 &amp; 브레인</div>
+      <h1>페달을 밟으며<br>두뇌를 깨워 보세요</h1>
+      <ol class="att-steps">
+        <li><b>1</b><span>편안한 속도 찾기</span><small id="att-calib"></small></li>
+        <li><b>2</b><span>페달 + 두뇌 게임</span><small id="att-dur"></small></li>
+        <li><b>3</b><span>나의 두뇌 그래프와 점수</span></li>
+      </ol>
+      <button class="btn att-start" id="att-start">시작하기</button>
+      <div class="att-hint" id="att-hint">화면을 누르거나 페달을 밟으면 시작합니다</div>
+    </div>
+    <div class="att-visual">
+      <svg class="radar deco" id="att-radar"></svg>
+    </div>
+    <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span></div>
+  </section>
+
+  <!-- 시연 결과 -->
+  <section id="demo-result" class="screen">
+    <header class="dr-head">
+      <div class="dr-title">수고하셨습니다!</div>
+      <div class="dr-id" id="dr-id"></div>
+    </header>
+    <div class="dr-grid">
+      <div class="dr-card dr-score">
+        <h3>최종 점수</h3>
+        <div class="dr-total" id="dr-total">0</div>
+        <div class="dr-break" id="dr-break"></div>
+        <div class="dr-note">진행 요원에게 이 화면을 보여주세요<br>점수로 행사 마지막에 시상합니다</div>
+      </div>
+      <div class="dr-card dr-brain">
+        <h3>나의 두뇌 그래프</h3>
+        <svg class="radar" id="dr-radar"></svg>
+        <div class="dr-best" id="dr-best"></div>
+      </div>
+      <div class="dr-card dr-ex">
+        <h3>오늘의 운동량</h3>
+        <div class="dr-kcal"><b id="dr-kcal">0</b><span>kcal</span></div>
+        <div class="dr-food" id="dr-food"></div>
+        <dl class="dr-facts">
+          <dt>밟은 시간</dt><dd id="dr-time"></dd>
+          <dt>페달 회전</dt><dd id="dr-revs"></dd>
+          <dt>평균 속도</dt><dd id="dr-rpm"></dd>
+          <dt>속도 유지</dt><dd id="dr-keep"></dd>
+        </dl>
+        <div class="dr-fine">운동량은 페달 속도로 추정한 값입니다</div>
+      </div>
+    </div>
+    <button class="hold-btn" id="dr-next"><i></i><span>진행 요원: 길게 눌러 다음 참가자</span></button>
+  </section>
+
+  <!-- 운영 메뉴 (처음 열 때, 또는 왼쪽 위 모서리 길게 누르기 + PIN) -->
+  <div id="op" class="overlay">
+    <div class="op-box">
+      <div class="op-col">
+        <h2>시연 스테이션</h2>
+        <label class="setting">스테이션 번호<input type="number" id="op-station" min="1" max="99" inputmode="numeric"></label>
+        <div class="pedal-row">
+          <span class="pedal-status"></span>
+          <button class="btn secondary small" data-pedal-btn>페달 연결</button>
+        </div>
+        <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
+        <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
+        <p class="setting-note" id="op-cfg"></p>
+        <div class="op-round" id="op-round">
+          <p class="op-round-note" id="op-round-note"></p>
+          <button class="btn secondary" id="op-end">지금 끝내고 결과 보기</button>
+          <button class="btn secondary" id="op-abandon">중단하고 대기 화면으로 (기록 안 함)</button>
+        </div>
+        <button class="btn" id="op-close">대기 화면 열기</button>
+        <a class="debug-link" href="#" id="op-exit">테스트 화면으로 나가기</a>
+      </div>
+      <div class="op-col">
+        <h2>이 태블릿의 기록 <small id="op-log-count"></small></h2>
+        <ol class="op-log" id="op-log"></ol>
+        <button class="btn secondary small" id="op-csv">CSV 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 운영 메뉴 PIN -->
+  <div id="pin" class="overlay">
+    <div class="pin-box">
+      <div class="pin-dots" id="pin-dots"><i></i><i></i><i></i><i></i></div>
+      <div class="pin-pad" id="pin-pad">
+        <button>1</button><button>2</button><button>3</button>
+        <button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button>
+        <button data-k="cancel">취소</button><button>0</button><button data-k="del">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 페달 끊김 / 자리 비움 안내 -->
+  <div id="alert" class="overlay">
+    <div class="alert-box">
+      <div class="alert-title" id="alert-title"></div>
+      <div class="alert-text" id="alert-text"></div>
+    </div>
+  </div>
+  <div id="op-corner"></div>
+
   <div class="edge left"></div>
   <div class="edge right"></div>
 
@@ -142,12 +250,15 @@
   <script src="js/cadence-est.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/band.js"></script>
+  <script src="js/exercise.js"></script>
   <script src="js/games/path.js"></script>
   <script src="js/games/symbol.js"></script>
   <script src="js/games/arith.js"></script>
   <script src="js/games/count.js"></script>
   <script src="js/games/fit.js"></script>
   <script src="js/games/seek.js"></script>
+  <script src="js/abilities.js"></script>
+  <script src="js/demo.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

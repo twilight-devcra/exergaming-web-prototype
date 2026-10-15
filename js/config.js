@@ -22,7 +22,23 @@ const DEFAULT_CONFIG = {
   minRpm: 25,
 };
 
+// 시연 행사 스테이션 모드(index.html?demo)의 고정 설정. localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것만 덮는다.
+// 상품을 걸고 점수를 비교하므로 모든 스테이션이 같은 설정이어야 한다. 바꾸려면 여기를 고쳐서 배포한다.
+const DEMO_CONFIG = {
+  durationSec: 300,
+  games: null,
+  startLevel: 1,
+  sound: true,
+  rpmSource: 'zc',
+};
+// 스테이션 모드에서 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력)
+const DEMO_OPERATOR_PIN = '2580';
+
 const Config = {
+  // 스테이션 모드: 저장된 값과 무관하게 언제나 같은 설정
+  demo() {
+    return Object.assign({}, DEFAULT_CONFIG, DEMO_CONFIG);
+  },
   load() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) {}

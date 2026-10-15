@@ -1,0 +1,81 @@
+# Demo Event Brief — Polish Pass
+
+Start here if you are picking up work on preparing this prototype for the public demonstration.
+It records the goal, what is already decided, and what is still open. Read `README.md` (Korean) for how to run the game and connect the pedal.
+
+## The event
+
+- **One-time public demonstration** to advertise the exergaming experience. Number of participants is unknown.
+- **Several stations**, each a stationary pedaling device (Cardio pedal, `Cardio-P xxxx`, over Web Bluetooth) with a **tablet** in front running this web game.
+- Each participant plays **one short session of a few minutes**.
+- At the end each participant gets:
+  1. a **spatial/radar-style graph of cognitive ("brain") abilities**, built from their minigame performance,
+  2. an **exercise amount** result,
+  3. a **single numeric score**. Prizes are given out at the end of the event based on this score.
+- **No server.** Staff record scores offline (on paper or a separate device). Each tablet runs on its own.
+- **Tablets are not iPads.** They will run a Chromium browser (Chrome/Edge), which Web Bluetooth requires. The exact model is not specified, so the layout must work across common tablet sizes in landscape.
+- **Session length: 5 minutes of play** (`durationSec: 300`; the current default is 180). Calibration and the countdown come on top of that.
+- **Internet is assumed to be available at the venue.** The repo is already hosted on **GitHub Pages** (`twilight-devcra/exergaming-web-prototype`), which provides the HTTPS that Web Bluetooth requires. Whatever is pushed to `main` is what the tablets load. Fallback: load the page on each tablet before the event, or ship an offline copy. Before relying on the fallback, test that the pedal still connects from a cached or offline copy.
+
+## What is settled
+
+- **Core gameplay is validated.** Internal playtests passed: pedal to keep the ball in the green zone (target speed = the player's calibrated comfortable speed, with uphill/downhill shifts) while solving touch minigames underneath. Don't redesign it. This pass is about **presentation and polish**.
+- Pedal speed comes from the lz waveform zero-crossing estimator (`rpmSource: 'zc'`, see `js/cadence-est.js`). This was tuned on 2026-10-14 recordings. Leave it alone unless a station-specific problem comes up.
+- The six minigames (`js/games/`): path (길 따라 그리기), symbol (심볼 위치 외우기), arith (사칙연산 역산), count (우세한 색 찾기), fit (빈자리 채우기, hex line tiles), seek (숨은 순서 찾기).
+- **The calibrated target speed does not affect the score.** Players aren't expected to pedal flat out during warm-up, and the score only measures how well they hold *their own* target. Don't treat "sandbagging the warm-up" as a fairness problem.
+- **Exercise amount = energy from pedal power (watts).** The pedal reports `watt` in its `WORKOUT` frames, but a known firmware bug makes it read 0 when pedaling slowly. So **estimate watts from the cadence the game already computes** (the `zc` RPM) using an RPM→watt curve. Fit that curve from real recordings, using the frames where the pedal's own `watt` is non-zero. The pedal debug page already saves these. Sum the estimated power over the round to get energy, then show it in a friendly unit (kcal, or a relatable comparison). It doesn't need to be exact, just plausible and consistent across stations. This assumes every station uses the same resistance setting.
+  **It is display-only and does not count toward the prize score.** The prize score stays as it is now: speed-consistency points (운동 점수) plus minigame points.
+- **Radar graph axes are cognitive ability fields, not one axis per game.** It doesn't need to be scientifically exact. Each game feeds several axes with weights (see below).
+
+## Why the current build isn't demo-ready
+
+The build is set up for internal testing. Things a participant should not see or be able to reach:
+
+- Menu screen: the **시연 설정** settings panel, the **사용할 게임** game picker, the link to the sensor debug page, and keyboard instructions (`A`/`D`, `Esc`, `` ` ``).
+- The `` ` `` debug overlay and the `Esc` pause menu, which can quit to the menu.
+- Result screen: the local leaderboard and name entry (`localStorage`, per tablet only, so it can't be used for prizes across stations), plus the **다시 하기** / **메뉴로** buttons.
+- Wording and visuals are functional rather than inviting. There is no attract/idle screen and no branding.
+
+Missing for the event:
+
+- **Cognitive ability radar graph.** The game already tracks per-game `plays / cleared / correct / total / points` in `Game.stats` (`js/main.js`), but none of it is mapped to abilities or charted.
+- **Exercise amount.** The current "운동 점수" measures *speed consistency*, not *amount*. It needs an energy figure estimated from RPM (see "What is settled"). `WORKOUT` frames are parsed in `js/pedal-link.js`, and RPM reaches the game through `js/pedal.js`.
+- **A score staff can record reliably.** It should be large, stay on screen until staff dismiss it, and show a station ID or a per-session number so paper records can't get mixed up.
+- **An operator flow** for resetting between participants without touching settings.
+
+## Proposed direction (not yet confirmed)
+
+These are reasonable defaults. Confirm with the user before relying on them.
+
+- **Ability fields and game weights.** A starting point to tune by feel:
+
+  | Game | 기억력 Memory | 공간지각 Spatial | 주의집중 Attention | 논리·수리 Logic/numeracy | 처리속도 Processing speed |
+  |---|---|---|---|---|---|
+  | path 길 따라 그리기 | 0.5 | 0.4 | 0.1 | | |
+  | symbol 심볼 위치 외우기 | 0.6 | 0.3 | 0.1 | | |
+  | arith 사칙연산 역산 | 0.2 | | 0.1 | 0.7 | |
+  | count 우세한 색 찾기 | | | 0.5 | | 0.5 |
+  | fit 빈자리 채우기 | | 0.6 | | 0.4 | |
+  | seek 숨은 순서 찾기 | | 0.3 | 0.4 | | 0.3 |
+
+  Per-game performance comes from accuracy (`correct/total`) and highest level reached. Each axis is the weighted average of the games that touch it, normalised to 0–100 (or to a display floor so the graph never looks empty). Because each axis draws on two or more games, a short session that skips a game still fills every axis. If an axis gets no data, show a neutral default rather than 0.
+  "Processing speed" would be better with timing, but the games don't record answer times today. Either add per-question timing through the host interface in `makeHost` (`js/main.js`), or use questions answered per minute as a proxy.
+- **Station mode**: a URL flag or hidden operator gesture (e.g. long-press a corner and enter a PIN). It locks the config, hides all test UI, and runs: attract screen → calibration → round → result → staff tap to reset. Settings stay reachable only through the operator gesture.
+- **One fixed config for every station** so scores are comparable for prizes. Ship it as defaults in `js/config.js` rather than relying on each tablet's `localStorage`.
+- **Robustness for unattended tablets**: fullscreen/kiosk, Wake Lock during play, a guard against accidental navigation, a clear on-screen state when the pedal disconnects, and recovery when a participant walks away mid-round.
+
+## Open questions
+
+- **RPM→watt curve (deferred).** Do we have enough recordings with non-zero `watt` across a range of cadences, at the event's resistance setting? This will be handled later. Until then, build the exercise-amount display around a placeholder conversion that can be swapped out.
+- **Long-running minigames (deferred).** Some games can take a long time at high levels, e.g. arith with many blanks. That eats into a 5-minute session and limits how many games, and therefore radar data, one player sees. The plan is to add per-game time limits later, not in the first polish pass.
+- **How results leave the tablet.** Does the participant just view the radar graph and exercise result, or take it with them (photo of the screen, QR code holding the result data, printout)?
+- **Language and branding.** UI is Korean. Are a logo, colours, sponsor marks, or a product name needed?
+- **Staffing.** Will one staff member watch each station, or will tablets run unattended between staff resets?
+
+## Working notes for future sessions
+
+- No build step and no dependencies. Plain HTML/CSS/JS loaded via `<script>` tags in `index.html`. Keep it that way unless there's a strong reason.
+- Code comments and UI text are Korean. Match that in code.
+- Config defaults: `js/config.js`. Round flow, scoring, and result screen: `js/main.js` (`beginCountdown`, `nextGame`, `updatePlay`, `endRound`, `showResult`).
+- Test without hardware: `A`/`D` keys simulate pedaling. `pedal-debug.html?sim` simulates the pedal on the debug page.
+- Update this file as open questions get answered.

@@ -109,7 +109,22 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 | `docs/DEMO_BRIEF.md` | 시연 행사 준비 작업 개요 (목표, 확정 사항, 미정 사항) |
 | `docs/엑서게임_기획_슬라이드.pdf` | 기획 요약 슬라이드 |
 | `docs/slides.html`, `docs/shots/` | 슬라이드 원본과 플레이 화면 스크린샷 |
-| `docs/build/` | 스크린샷 촬영·PDF 생성 스크립트 (Node 22+, Edge 필요) |
+| `docs/build/` | 스크린샷 촬영·PDF 생성 스크립트 (Node 22+, Edge 필요), 시연 GIF 녹화 `record_gifs.py` (Python, ffmpeg) |
+
+## 시연 GIF 만들기
+
+실제 게임을 헤드리스 Edge 로 돌리며 녹화합니다. Python 3, `pip install websocket-client`, PATH 의 ffmpeg, Microsoft Edge 가 필요합니다.
+
+```bash
+python docs/build/record_gifs.py            # 전부 (약 5분)
+python docs/build/record_gifs.py styles     # 스타일별 GIF 와 styles-tour.gif 만
+python docs/build/record_gifs.py flow --out 다른/폴더
+```
+
+- `demo-flow.gif`: 대기 화면부터 결과·다음 참가자까지 시연 한 판 (기본 스타일, GIF 용으로 55초 판)
+- `style-<id>.gif`: 스타일마다 대기 화면 → 우세한 색 찾기 → 결과. `styles-tour.gif`: 다섯 스타일 이어 붙임
+- 기본 출력 `docs/gifs/` 는 `.gitignore` 에 있어 저장소에 들어가지 않습니다
+- 페달은 연결된 것처럼 흉내 내고, 스타일 GIF 의 결과 화면 점수는 연출 값입니다 (스크립트 머리말 참고)
 
 ## 슬라이드 다시 만들기
 

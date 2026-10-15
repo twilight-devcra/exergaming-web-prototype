@@ -219,6 +219,7 @@ class BeatAudio {
         this.tone(1320, 0.2, 'sine', 0.25, 0.18);
         break;
       case 'blink': this.tone(520, 0.06, 'sine', 0.12); break;
+      case 'tick': this.tone(1200, 0.04, 'square', 0.06); break;
       case 'count': this.tone(440, 0.12, 'sine', 0.3); break;
       case 'go': this.tone(880, 0.25, 'sine', 0.3); break;
       case 'end':

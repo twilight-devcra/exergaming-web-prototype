@@ -92,6 +92,8 @@ class CountGame {
 
     this.layout();
     this.phase = 'input';
+    this.h.question({ grid: [rows, cols], colors: this.palette.map((c) => c.id), counts: this.counts, cells: owner });
+    this.h.timer(this.counts.reduce((a, b) => a + b, 0), () => this.pick(-1, null));
   }
 
   layout() {
@@ -103,10 +105,13 @@ class CountGame {
     this.wrap.style.setProperty('--csz', `${sz}px`);
   }
 
+  // i = 고른 색 (0 이 정답). -1 이면 시간이 다 된 것
   pick(i, btn) {
     if (this.phase !== 'input') return;
     this.phase = 'wait';
+    this.h.stopTimer();
     const ok = i === 0;
+    this.h.answer({ picked: i >= 0 ? this.palette[i].id : null, count: i >= 0 ? this.counts[i] : null, correct: ok, timedOut: !btn });
 
     // 보기마다 실제 개수를 적어 주고, 정답 색이 아닌 칸은 흐리게 해서 왜 그 색인지 보이게 한다
     this.btns.forEach(({ b, i: j }) => {
@@ -114,7 +119,7 @@ class CountGame {
       if (j === 0) b.classList.add('right');
       b.disabled = true;
     });
-    if (!ok) btn.classList.add('wrong');
+    if (!ok && btn) btn.classList.add('wrong');
     this.cells.forEach((c) => {
       if (c.classList.contains('lit') && c.dataset.c !== '0') c.classList.add('dim');
     });
@@ -130,7 +135,7 @@ class CountGame {
       this.h.award((this.h.base * this.h.mult) / CountGame.ROUNDS, this.grid);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = `가장 많은 색은 ${this.counts[0]}칸`;
+      this.msg.textContent = `${btn ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`;
       this.msg.className = 'stage-msg bad';
       this.h.sfx('bad');
     }

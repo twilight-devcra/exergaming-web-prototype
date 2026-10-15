@@ -24,6 +24,10 @@ class Band {
     this.rings = [];      // 인지 게임 정답 때 공에서 퍼지는 고리
     this.pop = 0;         // 정답 직후 공이 커졌다 돌아오는 정도 1→0
     this.outAmount = 0;   // 구역 이탈 정도 0~1
+    this.rpm = 0;
+    // 화면 스타일(js/themes.js)에 따른 색과 그리는 방식. glow = 빛 번짐, pixel = 픽셀 크기, outline = 테두리 두께, speedLines = 공 뒤 속도선
+    this.look = {};
+    this.pal = Band.readPalette();
     this.resize();
     // 높이가 바뀌는 동안(전환 애니메이션) 매번 다시 맞춘다. 캔버스 크기를 바꾸면 내용이 지워지므로 바로 다시 그린다.
     new ResizeObserver(() => {
@@ -32,8 +36,27 @@ class Band {
     }).observe(canvas);
   }
 
+  // 색은 CSS 변수에서 읽는다 (스타일을 바꾸면 setLook 으로 다시 읽는다)
+  static readPalette() {
+    const cs = getComputedStyle(document.body);
+    const v = (n) => cs.getPropertyValue(n).trim();
+    return {
+      good: v('--good'), goodSoft: v('--good-soft'), bad: v('--bad'), badSoft: v('--bad-soft'), warn: v('--warn'),
+      accent: v('--accent'), ink: v('--ink'), font: v('--font-num') || 'system-ui, sans-serif', onAccent: v('--on-accent'), ground: v('--ground'), groundMark: v('--ground-mark'),
+    };
+  }
+
+  setLook(look) {
+    this.look = look || {};
+    this.pal = Band.readPalette();
+    this.canvas.style.imageRendering = this.look.pixel ? 'pixelated' : '';
+    this.resize();
+    this.draw();
+  }
+
   resize() {
-    const dpr = window.devicePixelRatio || 1;
+    // 픽셀 스타일은 일부러 낮은 해상도로 그리고 늘려서 계단을 보이게 한다
+    const dpr = this.look.pixel ? 1 / this.look.pixel : window.devicePixelRatio || 1;
     const r = this.canvas.getBoundingClientRect();
     this.W = r.width;
     this.H = r.height;
@@ -73,6 +96,7 @@ class Band {
     const target = U.clamp(deviation / maxDeviation, -1, 1);
     this.ballX = U.lerp(this.ballX, target, 1 - Math.exp(-dt / 0.18));
     this.theta = U.lerp(this.theta, this.thetaTarget, 1 - Math.exp(-dt / 0.6));
+    this.rpm = rpm;
     const speed = rpm / 60; // 초당 회전 수
     this.roll += speed * Math.PI * 2 * dt;
     // 점수를 따라간다. 인지 게임 점수처럼 한 번에 크게 오르면 잠깐 사이에 쭉 달려가는 것으로 보인다.
@@ -107,9 +131,16 @@ class Band {
   }
 
   draw() {
-    const { g, W, H } = this;
+    const { g, W, H, pal, look } = this;
     const { tolerance, maxDeviation } = this.cfg;
     g.clearRect(0, 0, W, H);
+    // 네온 스타일: 선과 공에 빛 번짐
+    const glow = (c) => {
+      if (!look.glow) return;
+      g.shadowColor = c;
+      g.shadowBlur = look.glow;
+    };
+    const noGlow = () => (g.shadowBlur = 0);
 
     const cx = W / 2;
     const gy = H * 0.72;
@@ -125,12 +156,16 @@ class Band {
 
     // 허용 구역
     const red = this.outAmount;
-    const zr = Math.round(U.lerp(213, 253, red));
-    const zg = Math.round(U.lerp(242, 214, red));
-    const zb = Math.round(U.lerp(224, 214, red));
-    g.fillStyle = `rgb(${zr},${zg},${zb})`;
+    g.fillStyle = pal.goodSoft;
     g.fillRect(-zoneHalf, -zoneH, zoneHalf * 2, zoneH);
-    g.strokeStyle = this.inZone ? '#1f9d55' : `rgba(229,72,77,${0.4 + red * 0.6})`;
+    if (red > 0) {
+      g.globalAlpha = red;
+      g.fillStyle = pal.badSoft;
+      g.fillRect(-zoneHalf, -zoneH, zoneHalf * 2, zoneH);
+    }
+    g.globalAlpha = this.inZone ? 1 : 0.4 + red * 0.6;
+    g.strokeStyle = this.inZone ? pal.good : pal.bad;
+    glow(g.strokeStyle);
     g.lineWidth = 3;
     g.setLineDash([6, 6]);
     g.beginPath();
@@ -140,17 +175,21 @@ class Band {
     g.lineTo(zoneHalf, 0);
     g.stroke();
     g.setLineDash([]);
+    g.globalAlpha = 1;
+    noGlow();
 
     // 지면
     const ext = W;
-    g.strokeStyle = '#9aa1ad';
+    g.strokeStyle = pal.ground;
+    glow(pal.ground);
     g.lineWidth = 4;
     g.beginPath();
     g.moveTo(-ext, 0);
     g.lineTo(ext, 0);
     g.stroke();
+    noGlow();
     // 지면 무늬 (공이 굴러가는 느낌)
-    g.strokeStyle = '#c3c8d0';
+    g.strokeStyle = pal.groundMark;
     g.lineWidth = 3;
     const spacing = 36;
     const off = -((this.dist * Band.PX_PER_POINT) % spacing);
@@ -177,7 +216,8 @@ class Band {
       const fw = r * (big ? 1.25 : 0.9) * (1 + 0.5 * pop);
       const fh = fw * 0.8;
       g.globalAlpha = alpha;
-      g.strokeStyle = g.fillStyle = done ? '#1f9d55' : big ? '#2f6fed' : '#9aa1ad';
+      g.strokeStyle = g.fillStyle = done ? pal.good : big ? pal.accent : pal.ground;
+      glow(g.fillStyle);
       g.lineWidth = big ? 4 : 3;
       g.beginPath();
       g.moveTo(x, 0);
@@ -188,16 +228,17 @@ class Band {
       g.lineTo(x + fw, top + fh / 2);
       g.lineTo(x, top + fh);
       g.fill();
-      g.font = `800 ${Math.round(r * (big ? 0.7 : 0.55))}px system-ui, sans-serif`;
+      g.font = `800 ${Math.round(r * (big ? 0.7 : 0.55))}px ${pal.font}`;
       g.fillText(String(m), x + fw + 5, top + fh / 2);
     }
     g.globalAlpha = 1;
+    noGlow();
 
     // 정답 고리 — 공 뒤에서 퍼져 나간다
     for (const ring of this.rings) {
       const p = ring.t / Band.RING_SEC;
       g.globalAlpha = (1 - p) * 0.6;
-      g.strokeStyle = '#1f9d55';
+      g.strokeStyle = pal.good;
       g.lineWidth = Math.max(1.5, r * 0.2 * (1 - p));
       g.beginPath();
       g.arc(ring.x * trackHalf, -r - 2, r * (1 + p * 2.8), 0, Math.PI * 2);
@@ -209,13 +250,44 @@ class Band {
     const bx = this.ballX * trackHalf;
     const br = r * (1 + 0.25 * this.pop);
     const by = -br - 2;
-    const base = this.inZone ? [47, 111, 237] : [229, 72, 77];
-    g.fillStyle = `rgb(${Math.round(U.lerp(base[0], 31, this.pop))},` +
-      `${Math.round(U.lerp(base[1], 157, this.pop))},${Math.round(U.lerp(base[2], 85, this.pop))})`;
+    // 스포츠 스타일: 공 뒤로 속도선 (빠를수록 길다)
+    if (look.speedLines && this.rpm > 5) {
+      g.strokeStyle = pal.ground;
+      g.lineWidth = Math.max(2, r * 0.12);
+      g.lineCap = 'round';
+      for (let k = 0; k < 3; k++) {
+        const len = r * (0.8 + this.rpm / 45) * (k === 1 ? 1.3 : 0.9);
+        const ly = by + (k - 1) * br * 0.55;
+        const x0 = bx - br - 8 - ((this.roll * 6 + k * 7) % 6);
+        g.globalAlpha = 0.55;
+        g.beginPath();
+        g.moveTo(x0, ly);
+        g.lineTo(x0 - len, ly);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.lineCap = 'butt';
+    }
+    // 정답 직후에는 초록을 위에 겹쳐 물들인다
+    const ballColor = this.inZone ? pal.accent : pal.bad;
+    glow(ballColor);
+    g.fillStyle = ballColor;
     g.beginPath();
     g.arc(bx, by, br, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = 'rgba(255,255,255,0.9)';
+    noGlow();
+    if (this.pop > 0) {
+      g.globalAlpha = this.pop;
+      g.fillStyle = pal.good;
+      g.fill();
+      g.globalAlpha = 1;
+    }
+    if (look.outline) {
+      g.strokeStyle = pal.ink;
+      g.lineWidth = look.outline;
+      g.stroke();
+    }
+    g.strokeStyle = pal.onAccent;
     g.lineWidth = Math.max(2, br * 0.14);
     g.beginPath();
     for (let k = 0; k < 2; k++) {
@@ -227,12 +299,14 @@ class Band {
 
     // 이탈 시 방향 힌트
     if (!this.inZone && red > 0.25) {
-      g.fillStyle = `rgba(229,72,77,${Math.min(1, red)})`;
-      g.font = `800 ${Math.round(r * 0.9)}px system-ui, sans-serif`;
+      g.globalAlpha = Math.min(1, red);
+      g.fillStyle = pal.bad;
+      g.font = `800 ${Math.round(r * 0.9)}px ${pal.font}`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       const dir = this.slowSide ? 1 : -1;
       g.fillText(this.slowSide ? '›››' : '‹‹‹', bx + dir * (r * 2.1), by);
+      g.globalAlpha = 1;
     }
 
     // 점수 피드백
@@ -243,10 +317,12 @@ class Band {
       // 처음에 튕겨 오르고 끝에서 느려지게. 일정한 속도로 올라가면 흘러가는 느낌이 난다.
       const fy = -r * 2 - 6 - (1 - Math.pow(1 - f.t, 3)) * 26;
       g.globalAlpha = f.t < 0.15 ? f.t / 0.15 : 1 - (f.t - 0.15) / 0.85;
-      g.fillStyle = f.color;
-      g.font = `800 ${Math.round(r * 0.95)}px system-ui, sans-serif`;
+      g.fillStyle = pal[f.color] || f.color; // 'good' | 'warn' | 'bad' 또는 색 값
+      glow(g.fillStyle);
+      g.font = `800 ${Math.round(r * 0.95)}px ${pal.font}`;
       g.fillText(f.text, fx, fy);
     }
+    noGlow();
     g.globalAlpha = 1;
     g.restore();
   }

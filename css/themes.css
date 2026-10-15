@@ -1,0 +1,271 @@
+/* 화면 스타일 (js/themes.js 에서 고른다). body[data-theme] 가 색 변수와 모양을 바꾼다.
+   'clean'(기본)은 css/style.css 그대로라 여기에 없다.
+   큰 틀: 색 변수 → 배경 → 버튼·카드 → 게임 칸 → 큰 글자 순서 */
+
+/* ================= 아케이드 네온 ================= */
+body[data-theme="neon"] {
+  color-scheme: dark;
+  --bg: #070a1c;
+  --panel: #0e1330;
+  --ink: #e9ecff;
+  --ink-soft: #8b93c7;
+  --line: #2a3270;
+  --cell: #151b42;
+  --cell-hover: #1e2659;
+  --accent: #22e4ff;
+  --accent-soft: rgba(34, 228, 255, 0.16);
+  --good: #3dff8f;
+  --good-soft: rgba(61, 255, 143, 0.14);
+  --bad: #ff3d81;
+  --bad-soft: rgba(255, 61, 129, 0.18);
+  --warn: #ffcc33;
+  --beat: rgba(34, 228, 255, 0.5);
+  --on-accent: #04101f;
+  --closed: #2a3266;
+  --gap: #1b2150;
+  --piece: #dfe6ff;
+  --halo: rgba(0, 0, 0, 0.65);
+  --ground: #6f7ae0;
+  --ground-mark: #2c3470;
+  --scrim: rgba(3, 5, 15, 0.78);
+  --sym-ink: #f3f0dc;
+  --font-display: "Orbitron", "Do Hyeon", var(--font);
+  --font-num: "Orbitron", var(--font);
+  --glow-a: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: radial-gradient(ellipse 90% 60% at 50% 115%, #2a1468 0%, transparent 70%), var(--bg);
+}
+/* 바닥 격자 */
+body[data-theme="neon"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, transparent 20%, #000 100%);
+}
+body[data-theme="neon"] .btn { box-shadow: 0 0 18px var(--glow-a), inset 0 0 0 1px rgba(255, 255, 255, 0.4); letter-spacing: 0.04em; }
+body[data-theme="neon"] .btn.secondary { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent), 0 0 12px var(--glow-a); }
+body[data-theme="neon"] :is(.panel, .dr-card, .op-box, .alert-box, .pin-box, .result-card) {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 30px color-mix(in srgb, var(--accent) 12%, transparent);
+  backdrop-filter: blur(4px);
+}
+body[data-theme="neon"] #band {
+  background: linear-gradient(180deg, #0a0e28 0%, #111640 100%);
+  border-bottom: 1px solid var(--accent);
+  box-shadow: 0 0 24px var(--glow-a);
+}
+body[data-theme="neon"] :is(.pcell, .scell, .ar-cand, .ccell, .fit-cand, .seek-target) { box-shadow: inset 0 0 0 1px var(--line); }
+body[data-theme="neon"] :is(.pcell.on.head, .pcell.start, .ar-slot.active, .scell.reveal) { box-shadow: 0 0 18px var(--accent), inset 0 0 0 2px var(--accent); }
+body[data-theme="neon"] .pcell.done { box-shadow: 0 0 18px var(--good); }
+body[data-theme="neon"] .ar-slot { background: var(--cell); }
+body[data-theme="neon"] :is(.hud .value, .big-count, .dr-total, .result-total, .calib-ring .num, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-kcal b, .alert-title) {
+  text-shadow: 0 0 10px currentColor, 0 0 28px color-mix(in srgb, currentColor 55%, transparent);
+}
+body[data-theme="neon"] .intro .name, body[data-theme="neon"] .att-main h1 { color: #fff; }
+body[data-theme="neon"] .perfect { color: var(--good); background: none; }
+body[data-theme="neon"] .hud .label, body[data-theme="neon"] .intro .tag { color: var(--accent); text-shadow: 0 0 8px var(--glow-a); }
+body[data-theme="neon"] .floater { text-shadow: 0 0 10px currentColor; }
+body[data-theme="neon"] #streak { box-shadow: 0 0 16px var(--good); }
+body[data-theme="neon"] .dr-id { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent), 0 0 14px var(--glow-a); }
+body[data-theme="neon"] .radar .rd-shape { filter: drop-shadow(0 0 8px var(--accent)); }
+body[data-theme="neon"] .calib-ring svg { filter: drop-shadow(0 0 10px var(--glow-a)); }
+body[data-theme="neon"] .qtimer i { box-shadow: 0 0 10px currentColor; color: var(--accent); }
+body[data-theme="neon"] .qtimer.warn i { color: var(--warn); }
+body[data-theme="neon"] .qtimer.low i { color: var(--bad); }
+body[data-theme="neon"] input, body[data-theme="neon"] select { background: var(--cell); color: var(--ink); border-color: var(--line); }
+
+/* ================= 스포츠 ================= */
+body[data-theme="sporty"] {
+  --bg: #eef1f7;
+  --panel: #ffffff;
+  --ink: #0d1321;
+  --ink-soft: #5b6476;
+  --line: #d3d8e3;
+  --cell: #e2e6ef;
+  --cell-hover: #d4d9e6;
+  --accent: #ff4f12;
+  --accent-soft: #ffe1d4;
+  --good: #00b36b;
+  --good-soft: #d2f5e4;
+  --bad: #e3173e;
+  --bad-soft: #ffd9e0;
+  --warn: #ffa600;
+  --beat: rgba(255, 79, 18, 0.5);
+  --ground: #0d1321;
+  --ground-mark: #b9c0cf;
+  --font-display: "Black Han Sans", var(--font);
+  --font-num: "Black Han Sans", var(--font);
+  background: repeating-linear-gradient(-55deg, transparent 0 26px, rgba(13, 19, 33, 0.028) 26px 52px), var(--bg);
+}
+/* 비스듬한 버튼과 각진 카드 모서리 */
+body[data-theme="sporty"] .btn { transform: skewX(-10deg); border-radius: 6px; box-shadow: 5px 5px 0 var(--ink); font-family: var(--font-display); font-weight: 400; letter-spacing: 0.02em; }
+body[data-theme="sporty"] .btn:active { transform: skewX(-10deg) translate(3px, 3px); box-shadow: 2px 2px 0 var(--ink); }
+body[data-theme="sporty"] .btn.secondary { box-shadow: 4px 4px 0 var(--line); }
+body[data-theme="sporty"] .btn:disabled { box-shadow: none; }
+body[data-theme="sporty"] :is(.panel, .dr-card, .op-box, .result-card) {
+  border-radius: 4px;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%);
+  border-top: 6px solid var(--accent);
+}
+body[data-theme="sporty"] .dr-card:nth-child(2) { border-top-color: var(--ink); }
+body[data-theme="sporty"] .dr-card:nth-child(3) { border-top-color: var(--good); }
+body[data-theme="sporty"] #band {
+  background:
+    linear-gradient(100deg, var(--accent) 0 14px, transparent 14px 22px, var(--accent) 22px 28px, transparent 28px) left / 60px 100% no-repeat,
+    linear-gradient(100deg, transparent 0 32px, var(--ink) 32px 46px, transparent 46px 52px, var(--ink) 52px 58px) right / 60px 100% no-repeat,
+    var(--panel);
+  border-bottom: 4px solid var(--ink);
+}
+body[data-theme="sporty"] #hud-time { left: 72px; }
+body[data-theme="sporty"] #hud-score { right: 72px; }
+body[data-theme="sporty"] #streak { right: 72px; transform: skewX(-10deg); border-radius: 4px; }
+body[data-theme="sporty"] :is(.hud .value, .big-count, .dr-total, .result-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-kcal b, .calib-ring .num) {
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+body[data-theme="sporty"] :is(.big-count, .dr-total, .intro .name, .perfect, .att-main h1) { text-shadow: 5px 5px 0 var(--accent-soft); }
+body[data-theme="sporty"] .ar-eq { font-family: var(--font); } /* Black Han Sans 의 '=' 는 네모로 뭉개진다 */
+body[data-theme="sporty"] .hud .label, body[data-theme="sporty"] .intro .tag, body[data-theme="sporty"] .dr-card h3 { font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
+body[data-theme="sporty"] .att-brand, body[data-theme="sporty"] .dr-id { transform: skewX(-10deg); border-radius: 4px; }
+body[data-theme="sporty"] :is(.pcell, .scell, .ar-cand, .ar-slot, .cnt-opt, .fit-cand) { border-radius: 6px; }
+body[data-theme="sporty"] .qtimer { transform: translateX(-50%) skewX(-20deg); border-radius: 2px; height: 12px; }
+body[data-theme="sporty"] :is(.pcell.on.head, .pcell.start) { box-shadow: 4px 4px 0 var(--ink); }
+
+/* ================= 카툰 ================= */
+body[data-theme="cartoon"] {
+  --bg: #fff3d1;
+  --panel: #fffdf6;
+  --ink: #3a2a4d;
+  --ink-soft: #7d6c8f;
+  --line: #3a2a4d;
+  --cell: #ffe2a8;
+  --cell-hover: #ffd685;
+  --accent: #7c5cff;
+  --accent-soft: #e5dcff;
+  --good: #22bb62;
+  --good-soft: #d4f7e2;
+  --bad: #ff5a5f;
+  --bad-soft: #ffe0e0;
+  --warn: #ffa61a;
+  --beat: rgba(124, 92, 255, 0.45);
+  --closed: #c9b8ff;
+  --gap: #f3d48f;
+  --piece: #fffdf6;
+  --halo: rgba(58, 42, 77, 0.6);
+  --ground: #3a2a4d;
+  --ground-mark: #e8c27a;
+  --radius: 22px;
+  --font: "Jua", "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+  --font-display: var(--font);  /* 변수 안의 var() 는 선언한 곳에서 풀리므로 다시 적는다 */
+  --font-num: var(--font);
+  --outline: 3px solid var(--ink);
+  background: radial-gradient(circle, rgba(124, 92, 255, 0.12) 2.5px, transparent 3.5px) 0 0 / 30px 30px, var(--bg);
+}
+/* 굵은 테두리 + 아래로 떨어지는 단단한 그림자 */
+body[data-theme="cartoon"] :is(.btn, .panel, .dr-card, .op-box, .alert-box, .pin-box, .result-card, .hold-btn, .att-brand, .dr-id, .pcell, .scell, .ar-cand, .seek-target, .att-steps b, #streak, .fit-board) {
+  border: var(--outline);
+  box-shadow: 0 5px 0 var(--ink);
+}
+body[data-theme="cartoon"] :is(.btn, .ar-cand, .pin-pad button) { border-radius: 18px; font-weight: 400; transition: transform 0.12s cubic-bezier(0.3, 1.8, 0.5, 1), box-shadow 0.12s; }
+body[data-theme="cartoon"] :is(.btn, .ar-cand):active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+body[data-theme="cartoon"] :is(.cnt-opt, .fit-cand) { border-color: var(--ink); box-shadow: 0 5px 0 var(--ink); }
+body[data-theme="cartoon"] .ar-slot { border-color: var(--ink); }
+body[data-theme="cartoon"] * { font-weight: 400 !important; } /* Jua 는 굵기가 하나뿐이라 가짜 굵게를 막는다 */
+body[data-theme="cartoon"] #band {
+  background: linear-gradient(180deg, #bfe8ff 0%, #e9f7ff 70%, var(--panel) 100%);
+  border-bottom: var(--outline);
+}
+body[data-theme="cartoon"] .qtimer { height: 16px; border-radius: 8px; border: var(--outline); box-shadow: 0 3px 0 var(--ink); top: 12px; }
+body[data-theme="cartoon"] .pcell.on.head:not(.done) { transform: scale(1.1) rotate(-3deg); transition: transform 0.25s cubic-bezier(0.3, 1.8, 0.5, 1); }
+body[data-theme="cartoon"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-kcal b, .hud .value, .result-total) {
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--ink);
+}
+body[data-theme="cartoon"] :is(.intro .name, .att-main h1, .dr-title, #shift-msg .name) { color: var(--panel); }
+body[data-theme="cartoon"] .hud .value { color: var(--panel); -webkit-text-stroke-width: 2px; text-shadow: 0 3px 0 var(--ink); }
+body[data-theme="cartoon"] .perfect { color: var(--warn); background: none; }
+body[data-theme="cartoon"] .intro { animation: boing 0.5s cubic-bezier(0.3, 1.8, 0.5, 1); }
+body[data-theme="cartoon"] .big-count { animation: boing 0.4s cubic-bezier(0.3, 1.8, 0.5, 1); color: var(--warn); }
+@keyframes boing { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+body[data-theme="cartoon"] .radar .rd-shape { stroke: var(--ink); stroke-width: 4; fill: color-mix(in srgb, var(--accent) 45%, transparent); }
+body[data-theme="cartoon"] .radar .rd-dot { fill: var(--warn); stroke: var(--ink); }
+body[data-theme="cartoon"] .radar .rd-grid, body[data-theme="cartoon"] .radar .rd-axis { stroke: color-mix(in srgb, var(--ink) 25%, transparent); }
+
+/* ================= 레트로 픽셀 ================= */
+body[data-theme="pixel"] {
+  color-scheme: dark;
+  --bg: #1a1c2c;
+  --panel: #262b44;
+  --ink: #f4f4f4;
+  --ink-soft: #94b0c2;
+  --line: #566c86;
+  --cell: #333c57;
+  --cell-hover: #3e4a6b;
+  --accent: #41a6f6;
+  --accent-soft: #29366f;
+  --good: #38b764;
+  --good-soft: #1f4a3a;
+  --bad: #e04358;
+  --bad-soft: #4a2033;
+  --warn: #ffcd75;
+  --beat: rgba(65, 166, 246, 0.5);
+  --on-accent: #1a1c2c;
+  --closed: #566c86;
+  --gap: #1a1c2c;
+  --piece: #f4f4f4;
+  --halo: rgba(0, 0, 0, 0.7);
+  --ground: #94b0c2;
+  --ground-mark: #566c86;
+  --scrim: rgba(10, 10, 20, 0.82);
+  --radius: 0;
+  --sym-ink: #f4f4f4;
+  --font: "Galmuri11", "Malgun Gothic", monospace;
+  --font-display: "Galmuri14", var(--font);
+  --font-num: var(--font);
+  --px: 4px;
+  -webkit-font-smoothing: none;
+  background: var(--bg);
+}
+body[data-theme="pixel"] *, body[data-theme="pixel"] *::before, body[data-theme="pixel"] *::after { border-radius: 0 !important; }
+/* CRT 주사선 */
+body[data-theme="pixel"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 500;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+}
+/* 계단식 픽셀 테두리 */
+body[data-theme="pixel"] :is(.btn, .panel, .dr-card, .op-box, .alert-box, .pin-box, .result-card, .hold-btn, .dr-id, .att-brand) {
+  box-shadow:
+    0 calc(-1 * var(--px)) 0 0 var(--ink), 0 var(--px) 0 0 var(--ink),
+    calc(-1 * var(--px)) 0 0 0 var(--ink), var(--px) 0 0 0 var(--ink);
+  border: none;
+}
+body[data-theme="pixel"] .btn { box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.35), 0 calc(-1 * var(--px)) 0 0 var(--ink), 0 var(--px) 0 0 var(--ink), calc(-1 * var(--px)) 0 0 0 var(--ink), var(--px) 0 0 0 var(--ink); }
+body[data-theme="pixel"] .btn:active { box-shadow: inset 0 6px 0 rgba(0, 0, 0, 0.35); }
+body[data-theme="pixel"] .att-start { animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { filter: brightness(1.35); } }
+body[data-theme="pixel"] #band { background: #10121f; border-bottom: var(--px) solid var(--line); }
+body[data-theme="pixel"] :is(.pcell, .scell, .ar-cand, .ccell, .cnt-opt, .fit-cand, .seek-target, .ar-slot) { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3); }
+body[data-theme="pixel"] .ar-slot { background: var(--cell); }
+body[data-theme="pixel"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-kcal b, .hud .value, .result-total, .dr-title) {
+  text-shadow: 4px 4px 0 #000;
+  font-weight: 400;
+}
+body[data-theme="pixel"] .perfect { color: var(--warn); background: none; }
+body[data-theme="pixel"] :is(.intro, .dr-card, .perfect) { animation-timing-function: steps(4) !important; }
+body[data-theme="pixel"] .hud .label, body[data-theme="pixel"] .intro .tag { color: var(--warn); }
+body[data-theme="pixel"] .radar .rd-shape { stroke-linejoin: miter; fill: color-mix(in srgb, var(--accent) 35%, transparent); }
+body[data-theme="pixel"] .radar .rd-dot { r: 7px; }
+body[data-theme="pixel"] input, body[data-theme="pixel"] select { background: var(--cell); color: var(--ink); border-color: var(--line); }
+body[data-theme="pixel"] .qtimer { height: 12px; box-shadow: 0 0 0 4px var(--line); }
+body[data-theme="pixel"] .qtimer i { transition: none; }
+body[data-theme="pixel"] .edge.flash { animation-timing-function: steps(3); }

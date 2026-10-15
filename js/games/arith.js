@@ -2,7 +2,7 @@
 // (?) ± (?) ± (?) = 답 에서 후보 숫자를 골라 빈칸을 모두 채워 식을 완성한다.
 // 난이도는 숫자를 키우지 않고 빈칸 수로 올린다. 숫자는 늘 한 자리라 계산 자체는 쉽고,
 // 빈칸이 늘수록 중간 합을 머릿속에 들고 여러 조합을 따져 보는 부담(작업 기억·계획)이 커진다.
-//   blanks  — 빈칸 수
+//   blanks  — 빈칸 수. 최대 3개 (4개는 다른 게임보다 지나치게 어려웠다)
 //   n       — 후보 숫자 수 (모두 서로 다른 한 자리 수)
 //   maxSols — 답이 되는 조합의 최대 개수. 순서만 다른 것은 같은 조합으로 센다.
 // '큰 수부터 넣고 나머지를 맞춰 보는' 요령이 통하지 않도록 문제를 고른다 (generate 참고).
@@ -15,8 +15,10 @@ class ArithGame {
     { blanks: 2, n: 5, maxSols: 1 },
     { blanks: 3, n: 5, maxSols: 3 },
     { blanks: 3, n: 6, maxSols: 3 },
-    { blanks: 4, n: 6, maxSols: 4 },
-    { blanks: 4, n: 6, maxSols: 2 },
+    // 빈칸이 3개에서 멈춘 뒤로는 답이 되는 조합을 줄이고(2개) 후보 숫자를 늘려(7개) 어렵게 한다.
+    // n 7 · maxSols 2 는 약 97% 조건을 맞추고, 못 맞추면 가장 가까운 문제를 쓴다 (generate 참고)
+    { blanks: 3, n: 6, maxSols: 2 },
+    { blanks: 3, n: 7, maxSols: 2 },
   ];
   static maxLevel = ArithGame.levels.length;
   static ROUNDS = 3;
@@ -74,12 +76,16 @@ class ArithGame {
     });
     this.phase = 'input';
     this.render();
+    this.h.question({ ops: p.ops, cands: p.cands, ans: p.ans, sol: p.sol, solutions: p.count });
+    this.h.timer(this.spec.blanks, () => this.judge(true));
   }
 
   // 고른 숫자는 비어 있는 가장 앞 칸에 들어간다
   pick(v, btn) {
     if (this.phase !== 'input' || btn.disabled) return;
-    this.fill[this.fill.indexOf(null)] = { v, btn };
+    const slot = this.fill.indexOf(null);
+    this.fill[slot] = { v, btn };
+    this.h.input({ put: v, slot });
     btn.disabled = true;
     this.h.sfx('tap');
     this.render();
@@ -89,6 +95,7 @@ class ArithGame {
 
   unpick(i) {
     if (this.phase !== 'input' || !this.fill[i]) return;
+    this.h.input({ remove: this.fill[i].v, slot: i });
     this.fill[i].btn.disabled = false;
     this.fill[i] = null;
     this.render();
@@ -104,11 +111,14 @@ class ArithGame {
     });
   }
 
-  // 정해 둔 답과 달라도 식만 맞으면 정답이다
-  judge() {
+  // 정해 둔 답과 달라도 식만 맞으면 정답이다. timedOut = 시간이 다 되어 채점하는 경우 (빈칸이 남아 있을 수 있다)
+  judge(timedOut = false) {
+    if (this.phase !== 'input') return;
     this.phase = 'wait';
+    this.h.stopTimer();
     this.render();
-    const ok = ArithGame.value(this.fill.map((f) => f.v), this.p.ops) === this.p.ans;
+    const ok = !timedOut && ArithGame.value(this.fill.map((f) => f.v), this.p.ops) === this.p.ans;
+    this.h.answer({ fill: this.fill.map((f) => (f ? f.v : null)), correct: ok, timedOut });
     this.slots.forEach((s) => s.classList.add(ok ? 'right' : 'wrong'));
     const d = this.progress.children[this.round];
     d.classList.remove('cur');
@@ -122,7 +132,7 @@ class ArithGame {
       this.h.sfx('good');
     } else {
       const { sol, ops } = this.p;
-      this.msg.textContent = `정답: ${sol.map((v, i) => (i ? `${ops[i - 1] === '+' ? '+' : '−'} ${v}` : v)).join(' ')}`;
+      this.msg.textContent = `${timedOut ? '시간 초과 · ' : ''}정답: ${sol.map((v, i) => (i ? `${ops[i - 1] === '+' ? '+' : '−'} ${v}` : v)).join(' ')}`;
       this.msg.className = 'stage-msg bad';
       this.btns.forEach((b) => {
         if (sol.includes(Number(b.textContent))) b.classList.add('answer');

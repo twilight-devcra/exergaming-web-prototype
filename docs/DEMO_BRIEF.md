@@ -44,6 +44,7 @@ Still open / to do:
 - `ABILITY_PACE` thresholds and the weight table are guesses, so tune them by playtesting.
 - Not yet tested on real tablets with the pedal. Check fullscreen, Wake Lock, and reconnect behaviour on the actual devices.
 - How results leave the tablet, branding, and staffing are still undecided (see below).
+- **Visual style is being chosen.** A style picker offers clean, arcade neon, sporty, cartoon and retro pixel. Each style sets colours, fonts, how the speed band is drawn, and effects. The pick is stored per tablet. Once one is chosen, fix it for every station, e.g. a `theme` field in `DEMO_CONFIG` that overrides the stored pick, and drop the unused styles if wanted. Fonts come from CDNs; the offline fallback is the system font.
 
 ## Why the current build isn't demo-ready (original assessment)
 
@@ -85,7 +86,9 @@ These are reasonable defaults. Confirm with the user before relying on them.
 ## Open questions
 
 - **RPM→watt curve (deferred).** Do we have enough recordings with non-zero `watt` across a range of cadences, at the event's resistance setting? This will be handled later. Until then, build the exercise-amount display around a placeholder conversion that can be swapped out.
-- **Long-running minigames (deferred).** Some games can take a long time at high levels, e.g. arith with many blanks. That eats into a 5-minute session and limits how many games, and therefore radar data, one player sees. The plan is to add per-game time limits later, not in the first polish pass.
+- **Session logs.** Each round records events, every question's content, inputs, answers (correct, timed out, time taken) and raw input: keystrokes, or the pedal's CAPD waveform and WORKOUT frames. It also records 10 Hz samples of the game's RPM and target. Test mode downloads the log from the result screen. Demo mode stores it in IndexedDB after every round, abandoned ones included, and the operator menu exports everything as JSONL. Format: `docs/SESSION_LOG.md`. The WORKOUT frames with non-zero watt are exactly the data needed for the RPM→watt curve.
+- **Arith difficulty capped at 3 blanks** (Lv5–6 previously had 4, which played much harder than the other games). Lv5–6 now get harder through fewer valid combinations and more candidate numbers instead.
+- **Long-running minigames: addressed.** Each question (each of the three instances in a batch, or the single path in 길 따라 그리기) now has a time limit. It runs on the game clock from the moment input is accepted, and is shown as a shrinking bar at the top of the game area. Running out counts as a wrong answer for that question. Limits are `base + per × load` seconds in `questionTime` in `js/config.js`, where load is cells to press, blanks, lit cells, candidate pieces or board cells. They are first guesses, so tune them by playtesting. The test page has a checkbox to switch the timer off.
 - **How results leave the tablet.** Does the participant just view the radar graph and exercise result, or take it with them (photo of the screen, QR code holding the result data, printout)?
 - **Language and branding.** UI is Korean. Are a logo, colours, sponsor marks, or a product name needed?
 - **Staffing.** Will one staff member watch each station, or will tablets run unattended between staff resets?

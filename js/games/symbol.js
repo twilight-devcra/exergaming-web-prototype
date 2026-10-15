@@ -14,7 +14,8 @@ const SYMBOLS = (() => {
     { id: 'star', svg: `<polygon points="${star}" fill="#f5b301"/>` },
     { id: 'plus', svg: '<path d="M37 6h26v31h31v26H63v31H37V63H6V37h31z" fill="#f76808"/>' },
     { id: 'diamond', svg: '<polygon points="50,3 93,50 50,97 7,50" fill="#8e4ec6"/>' },
-    { id: 'moon', svg: '<path d="M64 6 A45 45 0 1 0 94 72 A37 37 0 1 1 64 6 Z" fill="#2b2f38"/>' },
+    // 달은 어두운 색이라 어두운 스타일에서는 밝게 바꾼다 (css: --sym-ink)
+    { id: 'moon', svg: '<path class="sym-ink" d="M64 6 A45 45 0 1 0 94 72 A37 37 0 1 1 64 6 Z"/>' },
     { id: 'heart', svg: '<path d="M50 92 L12 54 A22 22 0 0 1 50 20 A22 22 0 0 1 88 54 Z" fill="#06aed5"/>' },
   ];
 })();
@@ -97,17 +98,29 @@ class SymbolGame {
       if (!c.classList.contains('closed')) c.classList.add('clickable');
     });
     this.phase = 'input';
+    this.h.question({
+      target: q.sym.id, slot: q.slot, n: this.answered + 1,
+      board: this.placed.map((p) => [p.slot, p.sym.id]), // 외울 때 보여 준 [칸, 심볼]
+    });
+    this.h.timer(1, () => this.pick(-1));
   }
 
+  // i = 고른 칸. -1 이면 시간이 다 된 것 (틀린 것으로 치고 정답 칸만 보여준다)
   pick(i) {
     if (this.phase !== 'input') return;
-    const cell = this.cells[i];
-    if (cell.classList.contains('closed')) return;
+    const cell = this.cells[i] || null;
+    if (cell && cell.classList.contains('closed')) return;
     this.phase = 'wait';
+    this.h.stopTimer();
     this.cells.forEach((c) => c.classList.remove('clickable'));
     const ok = i === this.current.slot;
-    cell.classList.add('closed', ok ? 'right' : 'wrong');
-    cell.append(U.el('span', 'mark', ok ? '✓' : '✕'));
+    this.h.answer({ picked: cell ? i : null, correct: ok, timedOut: !cell });
+    if (cell) {
+      cell.classList.add('closed', ok ? 'right' : 'wrong');
+      cell.append(U.el('span', 'mark', ok ? '✓' : '✕'));
+    } else {
+      this.question.textContent = '시간 초과!';
+    }
     if (ok) {
       this.correct++;
       // 점수는 맞힐 때마다 바로 지급한다

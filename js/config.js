@@ -18,6 +18,17 @@ const DEFAULT_CONFIG = {
   cogBasePoints: 100,        // 인지 게임 1회를 완벽히 했을 때의 기본 점수 (모든 유형 동일)
   startLevel: 1,             // 라운드를 시작할 난이도. 올리면 쉬운 단계를 건너뛰고 바로 어려운 문제부터 나온다
   multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv1 x1.0, Lv2 x1.2 ...)
+  questionTimer: true,       // 문제마다 제한 시간. 시간이 다 되면 그 문제는 틀린 것으로 친다
+  // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
+  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수
+  questionTime: {
+    path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
+    symbol: { base: 6, per: 0 },     // 6초
+    arith: { base: 6, per: 5 },      // 빈칸 2개 16초 ~ 3개 21초
+    count: { base: 5, per: 0.3 },    // 12칸 9초 ~ 25칸 13초
+    fit: { base: 5, per: 1.5 },      // 조각 3개 10초 ~ 6개 14초
+    seek: { base: 6, per: 0.25 },    // 19칸 11초 ~ 61칸 21초
+  },
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
   minRpm: 25,
 };
@@ -42,7 +53,8 @@ const Config = {
   load() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) {}
-    return Object.assign({}, DEFAULT_CONFIG, saved);
+    // 제한 시간 표는 화면에서 바꾸지 않으므로 늘 코드의 값을 쓴다 (예전에 저장된 표가 고친 값을 덮지 않게)
+    return Object.assign({}, DEFAULT_CONFIG, saved, { questionTime: DEFAULT_CONFIG.questionTime });
   },
   save(cfg) {
     try { localStorage.setItem('exergame.config', JSON.stringify(cfg)); } catch (e) {}

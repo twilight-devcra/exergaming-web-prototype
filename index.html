@@ -4,7 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>엑서게임 프로토타입</title>
+  <!-- 화면 스타일용 글꼴. 못 받아도 시스템 글꼴로 돌아간다 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Jua&family=Orbitron:wght@700;900&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.9/dist/galmuri.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/themes.css">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -30,6 +36,7 @@
     <div class="menu-side">
       <div class="panel">
         <h2>시연 설정</h2>
+        <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
         <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
         <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
         <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
@@ -37,6 +44,7 @@
         <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
         <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
         <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
+        <label class="setting">문제 제한 시간<input type="checkbox" id="cfg-qtimer"></label>
         <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
         <label class="setting">속도 측정 방식
           <select id="cfg-source">
@@ -65,12 +73,12 @@
     <p><span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span>를 번갈아 누르세요.</span> 이 속도가 게임의 기준 속도가 됩니다.</p>
     <div class="calib-ring">
       <svg viewBox="0 0 220 220">
-        <circle cx="110" cy="110" r="96" fill="none" stroke="#e4e7ec" stroke-width="14"/>
-        <circle id="calib-arc" cx="110" cy="110" r="96" fill="none" stroke="#2f6fed" stroke-width="14"
+        <circle class="track" cx="110" cy="110" r="96" fill="none" stroke-width="14"/>
+        <circle id="calib-arc" cx="110" cy="110" r="96" fill="none" stroke-width="14"
                 stroke-linecap="round" transform="rotate(-90 110 110)" stroke-dasharray="603.2" stroke-dashoffset="603.2"/>
         <g id="calib-crank">
-          <line x1="110" y1="110" x2="110" y2="52" stroke="#c3c8d0" stroke-width="8" stroke-linecap="round"/>
-          <circle cx="110" cy="52" r="10" fill="#2f6fed"/>
+          <line class="crank" x1="110" y1="110" x2="110" y2="52" stroke-width="8" stroke-linecap="round"/>
+          <circle class="pedal" cx="110" cy="52" r="10"/>
         </g>
       </svg>
       <div class="num" id="calib-num"></div>
@@ -123,6 +131,7 @@
     <div class="result-actions">
       <button class="btn" id="btn-again">다시 하기</button>
       <button class="btn secondary" id="btn-menu">메뉴로</button>
+      <button class="btn secondary" id="btn-log">세션 로그 저장</button>
     </div>
   </section>
 
@@ -177,7 +186,7 @@
         <div class="dr-fine">운동량은 페달 속도로 추정한 값입니다</div>
       </div>
     </div>
-    <button class="hold-btn" id="dr-next"><i></i><span>진행 요원: 길게 눌러 다음 참가자</span></button>
+    <button class="hold-btn" id="dr-next"><i></i><span>길게 눌러서 시작 화면으로</span></button>
   </section>
 
   <!-- 운영 메뉴 (처음 열 때, 또는 왼쪽 위 모서리 길게 누르기 + PIN) -->
@@ -190,6 +199,7 @@
           <span class="pedal-status"></span>
           <button class="btn secondary small" data-pedal-btn>페달 연결</button>
         </div>
+        <label class="setting">화면 스타일<select data-theme-picker></select></label>
         <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
         <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
         <p class="setting-note" id="op-cfg"></p>
@@ -205,6 +215,11 @@
         <h2>이 태블릿의 기록 <small id="op-log-count"></small></h2>
         <ol class="op-log" id="op-log"></ol>
         <button class="btn secondary small" id="op-csv">CSV 저장</button>
+        <div class="op-sessions">
+          <h2>세션 로그 <small id="op-sess-count"></small></h2>
+          <p class="setting-note">판마다 문제·답·걸린 시간과 페달 원시 파형(또는 키 입력)을 이 태블릿에 자동 저장합니다.</p>
+          <button class="btn secondary small" id="op-sess-export">전체 내보내기 (.jsonl)</button>
+        </div>
       </div>
     </div>
   </div>
@@ -230,6 +245,8 @@
     </div>
   </div>
   <div id="op-corner"></div>
+  <canvas id="fx"></canvas>
+  <div id="toast"></div>
 
   <div class="edge left"></div>
   <div class="edge right"></div>
@@ -251,6 +268,8 @@
   <script src="js/audio.js"></script>
   <script src="js/band.js"></script>
   <script src="js/exercise.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/themes.js"></script>
   <script src="js/games/path.js"></script>
   <script src="js/games/symbol.js"></script>
   <script src="js/games/arith.js"></script>
@@ -258,6 +277,7 @@
   <script src="js/games/fit.js"></script>
   <script src="js/games/seek.js"></script>
   <script src="js/abilities.js"></script>
+  <script src="js/session-log.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/main.js"></script>
 </body>

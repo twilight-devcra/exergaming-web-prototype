@@ -107,6 +107,8 @@ class SeekGame {
     this.wrap.style.setProperty('--len', len);
     this.layout();
     this.phase = 'input';
+    this.h.question({ radius, len, cells, syms, seq, answer: this.puzzle.answer });
+    this.h.timer(cells.length, () => this.pick(-1));
   }
 
   layout() {
@@ -124,18 +126,21 @@ class SeekGame {
     this.wrap.style.setProperty('--side', `${side}px`);
   }
 
+  // i = 누른 칸. -1 이면 시간이 다 된 것
   pick(i) {
     if (this.phase !== 'input') return;
     this.phase = 'wait';
+    this.h.stopTimer();
     const { answer } = this.puzzle;
     const ok = answer.includes(i);
+    this.h.answer({ cell: i >= 0 ? i : null, correct: ok, timedOut: i < 0 });
 
     this.cellEls.forEach((c, j) => {
       c.classList.remove('clickable');
       if (answer.includes(j)) c.classList.add(ok ? 'right' : 'reveal');
       else c.classList.add('dim');
     });
-    if (!ok) {
+    if (!ok && i >= 0) {
       this.cellEls[i].classList.remove('dim');
       this.cellEls[i].classList.add('wrong');
     }
@@ -161,7 +166,7 @@ class SeekGame {
       this.h.award((this.h.base * this.h.mult) / SeekGame.ROUNDS, this.cellEls[i]);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = '여기에 있었어요';
+      this.msg.textContent = i >= 0 ? '여기에 있었어요' : '시간 초과 · 여기에 있었어요';
       this.msg.className = 'stage-msg bad';
       this.h.sfx('bad');
     }

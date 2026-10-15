@@ -78,6 +78,8 @@ class PathGame {
     this.cells.flat().forEach((cell) => cell.classList.add('clickable'));
     this.msg.textContent = '같은 순서로 칸을 하나씩 누르세요';
     this.phase = 'input';
+    this.h.question({ grid: [this.rows, this.cols], path: this.path, free: !!this.spec.free });
+    this.h.timer(this.path.length - 1, () => this.fail(null));
   }
 
   // 경로의 i번째 칸을 켠다. 가장 최근에 켜진 칸만 진하게 두고 지나온 칸은 옅게 물러난다.
@@ -97,6 +99,7 @@ class PathGame {
     const [nr, nc] = this.path[this.k];
     const cell = this.cells[r][c];
     if (r === nr && c === nc) {
+      this.h.input({ cell: [r, c], ok: true, step: this.k });
       this.light(this.k);
       const per = (this.h.base * 0.6 * this.h.mult) / (this.path.length - 1);
       this.h.award(per, cell);
@@ -104,12 +107,13 @@ class PathGame {
       this.k++;
       if (this.k === this.path.length) this.complete();
     } else {
-      this.fail(cell);
+      this.fail(cell, [r, c]);
     }
   }
 
   complete() {
     this.phase = 'end';
+    this.h.stopTimer();
     this.path.forEach(([r, c]) => this.cells[r][c].classList.add('done'));
     this.svg.querySelectorAll('line').forEach((l) => l.classList.add('done'));
     const [lr, lc] = this.path[this.path.length - 1];
@@ -118,13 +122,18 @@ class PathGame {
     this.msg.className = 'stage-msg good';
     this.h.sfx('good');   // 다 맞혔을 때의 축하음은 host가 따로 울린다
     this.cleared = true;
+    this.h.answer({ correct: true, timedOut: false, reached: this.path.length - 1, of: this.path.length - 1 });
     this.h.after(1100, () => this.finish());
   }
 
-  fail(cell) {
+  // cell = 잘못 누른 칸 (rc 는 그 좌표). null 이면 시간이 다 된 것
+  fail(cell, rc = null) {
+    if (this.phase !== 'input') return;
     this.phase = 'end';
-    cell.classList.add('wrong');
-    this.msg.textContent = '틀렸어요';
+    this.h.stopTimer();
+    this.h.answer({ correct: false, timedOut: !cell, wrongCell: rc, reached: this.k - 1, of: this.path.length - 1 });
+    if (cell) cell.classList.add('wrong');
+    this.msg.textContent = cell ? '틀렸어요' : '시간 초과';
     this.msg.className = 'stage-msg bad';
     this.h.sfx('bad');
     // 남은 정답 경로를 흐리게 보여준다

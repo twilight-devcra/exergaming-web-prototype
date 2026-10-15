@@ -14,9 +14,27 @@
   --bad: #e5484d;
   --bad-soft: #fde2e2;
   --beat: rgba(47, 111, 237, 0.55);
+  --warn: #e08a00;
+  --on-accent: #fff;      /* 강조색 위의 글자 */
+  --closed: #c9ced6;      /* 심볼: 닫힌 칸 */
+  --gap: #c3c8d1;         /* 빈자리 채우기: 빈 칸 */
+  --piece: #fbfcfd;       /* 빈자리 채우기: 조각 */
+  --halo: rgba(28, 34, 48, 0.55);
+  --ground: #9aa1ad;      /* 속도 띠: 지면 */
+  --ground-mark: #c3c8d0;
+  --scrim: rgba(28, 34, 48, 0.55);
+  --sym-ink: #2b2f38;     /* 심볼 중 어두운 그림(달) */
   --radius: 14px;
-  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  /* 스타일(js/themes.js)마다 바꾸는 글꼴. display = 제목, num = 큰 숫자 */
+  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-display: var(--font);
+  --font-num: var(--font);
+  font-family: var(--font);
 }
+/* 스타일이 body 에서 글꼴 변수를 바꾸므로 body 에서 다시 읽는다 */
+body { font-family: var(--font); }
+h1, h2, .intro .name, #shift-msg .name, .perfect, .dr-title, .alert-title { font-family: var(--font-display); }
+.hud .value, .big-count, .result-total, .dr-total, .dr-kcal b, .calib-ring .num, .ar-eq, #streak, .floater { font-family: var(--font-num); }
 
 * { box-sizing: border-box; }
 
@@ -80,7 +98,7 @@ kbd {
   border-radius: 12px;
   padding: 16px 24px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 20px;
   font-weight: 700;
 }
@@ -220,7 +238,7 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   padding: 4px 12px;
   border-radius: 999px;
   background: var(--good);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 15px;
   font-weight: 800;
   opacity: 0;
@@ -242,7 +260,7 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   pointer-events: none;
 }
 #keyhint kbd { transition: background 0.08s, color 0.08s; }
-#keyhint kbd.hit { background: var(--accent); color: #fff; border-color: var(--accent); }
+#keyhint kbd.hit { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 #cog {
   position: relative;
@@ -286,6 +304,28 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   color: var(--ink-soft);
   font-weight: 600;
 }
+/* 문제 제한 시간 막대: 줄어들다가 끝무렵 노랑 → 빨강. 답을 고르면 그 자리에서 멈추고 흐려진다 */
+.qtimer {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  width: min(520px, 46%);
+  height: 10px;
+  transform: translateX(-50%);
+  border-radius: 5px;
+  background: var(--cell);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 5;
+}
+.qtimer.on { opacity: 1; }
+.qtimer.stopped { opacity: 0.4; }
+.qtimer i { display: block; height: 100%; background: var(--accent); transform-origin: left; border-radius: inherit; transition: background 0.3s; }
+.qtimer.warn i { background: var(--warn); }
+.qtimer.low i { background: var(--bad); }
+.qtimer.low:not(.stopped) { animation: qpulse 0.5s ease-in-out infinite alternate; }
+@keyframes qpulse { to { box-shadow: 0 0 0 3px var(--bad-soft); } }
 .stage-msg {
   height: 44px;
   font-size: 26px;
@@ -337,8 +377,8 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   pointer-events: none;
   z-index: 18;
   /* 글자가 뒤의 판 위에서도 읽히도록 가운데를 옅게 덮는다 */
-  background: radial-gradient(ellipse 42% 30% at center, rgba(243, 244, 246, 0.94) 0%, rgba(243, 244, 246, 0.8) 45%, rgba(243, 244, 246, 0) 72%);
-  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.95);
+  background: radial-gradient(ellipse 42% 30% at center, color-mix(in srgb, var(--bg) 94%, transparent) 0%, color-mix(in srgb, var(--bg) 80%, transparent) 45%, transparent 72%);
+  text-shadow: 0 2px 16px color-mix(in srgb, var(--bg) 95%, transparent);
   animation: perfectpop 0.95s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
 }
 @keyframes perfectpop {
@@ -426,7 +466,7 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 @media (hover: hover) {
   .scell.clickable:hover { background: var(--cell-hover); }
 }
-.scell.closed { background: #c9ced6; }
+.scell.closed { background: var(--closed); }
 .scell.closed.right { background: var(--good-soft); box-shadow: inset 0 0 0 4px var(--good); }
 .scell.closed.wrong { background: var(--bad-soft); box-shadow: inset 0 0 0 4px var(--bad); }
 .scell.reveal { box-shadow: inset 0 0 0 4px var(--accent); }
@@ -434,6 +474,9 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .scell.right .mark { color: var(--good); }
 .scell.wrong .mark { color: var(--bad); }
 .sym svg { width: 64%; height: 64%; display: block; }
+.sym-ink { fill: var(--sym-ink); }
+/* 어두운 스타일: 파랑·보라처럼 어두운 칸에 묻히는 그림에 옅은 빛 테두리 */
+body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.75)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.25)); }
 .sym { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; animation: pop 0.18s ease-out; }
 @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
 .memorize-banner {
@@ -445,7 +488,7 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   font-size: 54px;
   font-weight: 800;
   color: var(--accent);
-  background: rgba(243, 244, 246, 0.85);
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
   border-radius: 14px;
   animation: fadein 0.2s ease-out;
 }
@@ -502,7 +545,7 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   .ar-cand:hover:not(:disabled, .wrong) { background: var(--cell-hover); }
 }
 .ar-cand:disabled { opacity: 0.25; cursor: default; }
-.ar-cand.wrong { background: var(--bad); color: #fff; opacity: 1; }
+.ar-cand.wrong { background: var(--bad); color: var(--on-accent); opacity: 1; }
 .ar-cand.answer { box-shadow: inset 0 0 0 4px var(--good); opacity: 1; }
 
 /* 우세한 색 찾기 */
@@ -554,16 +597,16 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 }
 .fit-board svg, .fit-cand svg { width: 100%; height: 100%; display: block; }
 .fit-board .tile { fill: var(--cell); stroke: var(--panel); stroke-width: 3; }
-.fit-board .gap { fill: #c3c8d1; stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.fit-board .gap { fill: var(--gap); stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fit-board path, .fit-cand path { fill: none; stroke-linecap: round; }
-.fit-board .halo, .fit-cand .halo { stroke: rgba(28, 34, 48, 0.55); }
-.fit-cand .piece { fill: #fbfcfd; stroke: var(--line); stroke-width: 1.5; }
+.fit-board .halo, .fit-cand .halo { stroke: var(--halo); }
+.fit-cand .piece { fill: var(--piece); stroke: var(--line); stroke-width: 1.5; }
 /* 고른 조각이 빈자리로 돌아 들어가는 동작 */
 .fit-board .seat {
   transform-origin: 0 0;
   transition: transform 0.55s cubic-bezier(0.3, 0.8, 0.4, 1);
 }
-.fit-board .seat .piece { fill: #fbfcfd; stroke-width: 3; }
+.fit-board .seat .piece { fill: var(--piece); stroke-width: 3; }
 .fit-board .seat.right .piece { stroke: var(--good); }
 .fit-board .seat.wrong .piece { stroke: var(--bad); }
 /* 어긋난 변 표시는 조각이 다 돌아간 뒤에 나타난다 */
@@ -658,6 +701,10 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+.calib-ring .track { stroke: var(--cell); }
+.calib-ring #calib-arc { stroke: var(--accent); }
+.calib-ring .crank { stroke: var(--ground-mark); }
+.calib-ring .pedal { fill: var(--accent); }
 .calib-state { height: 28px; font-size: 18px; font-weight: 700; color: var(--accent); }
 
 /* ---------- 결과 ---------- */
@@ -683,11 +730,30 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 }
 .result-actions { display: flex; gap: 12px; }
 
+/* ---------- 연출 효과 / 스타일 알림 ---------- */
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--panel);
+  font-weight: 700;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 450;
+}
+#toast.show { animation: toast 1.6s ease-out; }
+@keyframes toast { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+
 /* ---------- 일시정지 / 디버그 ---------- */
 #pause {
   position: fixed;
   inset: 0;
-  background: rgba(28, 34, 48, 0.55);
+  background: var(--scrim);
   display: none;
   align-items: center;
   justify-content: center;
@@ -759,8 +825,8 @@ body.demo #op-corner {
   gap: clamp(24px, 6vw, 96px);
   padding: 32px clamp(24px, 5vw, 80px);
   background:
-    radial-gradient(ellipse 60% 70% at 78% 50%, rgba(47, 111, 237, 0.13), transparent 70%),
-    radial-gradient(ellipse 50% 60% at 10% 100%, rgba(31, 157, 85, 0.1), transparent 70%),
+    radial-gradient(ellipse 60% 70% at 78% 50%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 10% 100%, color-mix(in srgb, var(--good) 10%, transparent), transparent 70%),
     var(--bg);
   cursor: pointer;
 }
@@ -770,7 +836,7 @@ body.demo #op-corner {
   padding: 6px 14px;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 800;
   font-size: clamp(14px, 2.2vh, 18px);
   letter-spacing: 0.02em;
@@ -802,11 +868,11 @@ body.demo #op-corner {
   padding: clamp(16px, 2.8vh, 24px) clamp(40px, 6vw, 72px);
   font-size: clamp(22px, 4vh, 32px);
   border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(47, 111, 237, 0.32);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 32%, transparent);
   animation: breathe 2.4s ease-in-out infinite;
 }
 .att-start:disabled { animation: none; box-shadow: none; }
-@keyframes breathe { 50% { transform: scale(1.04); box-shadow: 0 14px 36px rgba(47, 111, 237, 0.42); } }
+@keyframes breathe { 50% { scale: 1.04; box-shadow: 0 14px 36px color-mix(in srgb, var(--accent) 42%, transparent); } }
 .att-hint { font-size: clamp(14px, 2.3vh, 18px); color: var(--ink-soft); }
 .att-hint.warn { color: var(--bad); font-weight: 700; }
 .att-visual { flex: 0 1 auto; width: min(44vw, 72vh); }
@@ -828,14 +894,14 @@ body.demo #op-corner {
 .radar .rd-grid { fill: none; stroke: var(--line); stroke-width: 1.5; }
 .radar .rd-grid.outer { fill: var(--panel); }
 .radar .rd-axis { stroke: var(--line); stroke-width: 1.5; }
-.radar .rd-shape { fill: rgba(47, 111, 237, 0.22); stroke: var(--accent); stroke-width: 4; stroke-linejoin: round; }
+.radar .rd-shape { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent); stroke-width: 4; stroke-linejoin: round; }
 .radar .rd-dot { fill: var(--accent); stroke: var(--panel); stroke-width: 3; }
 .radar .rd-label { font-size: 20px; font-weight: 700; fill: var(--ink); }
 .radar .rd-value { font-size: 22px; font-weight: 800; fill: var(--accent); font-variant-numeric: tabular-nums; }
 .radar .nodata { fill: var(--ink-soft); }
 #demo-result .radar .rd-shape { animation: radarin 0.9s cubic-bezier(0.2, 1.2, 0.4, 1) both; transform-origin: 200px 190px; }
 @keyframes radarin { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
-.radar.deco .rd-grid.outer { fill: rgba(255, 255, 255, 0.7); }
+.radar.deco .rd-grid.outer { fill: color-mix(in srgb, var(--panel) 70%, transparent); }
 
 /* ---------- 시연 결과 ---------- */
 #demo-result {
@@ -850,7 +916,7 @@ body.demo #op-corner {
   padding: 6px 16px;
   border-radius: 12px;
   background: var(--ink);
-  color: #fff;
+  color: var(--panel);
   font-size: clamp(18px, 3.4vh, 28px);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -943,7 +1009,7 @@ body.demo #op-corner {
 }
 
 /* ---------- 운영 메뉴 ---------- */
-#op { z-index: 400; background: rgba(28, 34, 48, 0.6); }
+#op { z-index: 400; background: var(--scrim); }
 .op-box {
   display: flex;
   gap: 24px;
@@ -967,6 +1033,9 @@ body.demo #op-corner {
 .op-log li span { color: var(--ink-soft); }
 .op-log li .sc { margin-left: auto; color: var(--ink); font-weight: 700; }
 .op-col .btn.small { align-self: flex-start; }
+.op-sessions { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--bg); }
+.op-sessions h2 { font-size: 16px; }
+.op-log { max-height: 34vh; }
 @media (max-width: 700px) { .op-box { flex-direction: column; overflow-y: auto; } }
 
 /* ---------- PIN ---------- */
@@ -983,7 +1052,7 @@ body.demo #op-corner {
 .pin-pad button:active { background: var(--cell-hover); }
 
 /* ---------- 페달 끊김 / 자리 비움 안내 ---------- */
-#alert { z-index: 300; background: rgba(28, 34, 48, 0.55); }
+#alert { z-index: 300; background: var(--scrim); }
 .alert-box {
   background: var(--panel);
   border-radius: 20px;

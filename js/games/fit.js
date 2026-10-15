@@ -98,6 +98,11 @@ class FitGame {
 
     this.layout();
     this.phase = 'input';
+    this.h.question({
+      gap: FitGame.str(this.gap),
+      shown: this.shown.map((s) => ({ piece: FitGame.str(s.p), rot: s.rot, answer: s.answer })),
+    });
+    this.h.timer(this.spec.cands, () => this.pick(-1, null));
   }
 
   layout() {
@@ -110,20 +115,27 @@ class FitGame {
     this.wrap.style.setProperty('--bsz', `${Math.round(cand / ratio)}px`);
   }
 
+  // i = 고른 조각. -1 이면 시간이 다 된 것 (끼워 보지 않고 정답 조각만 표시한다)
   pick(i, btn) {
     if (this.phase !== 'input') return;
     this.phase = 'wait';
+    this.h.stopTimer();
     const s = this.shown[i];
-    const ok = s.answer;
+    const ok = !!s && s.answer;
+    this.h.answer({ picked: s ? i : null, correct: ok, timedOut: !s });
 
     this.btns.forEach((b, j) => {
       b.disabled = true;
       if (this.shown[j].answer) b.classList.add('right');
     });
-    if (!ok) btn.classList.add('wrong');
+    if (!ok && btn) btn.classList.add('wrong');
+    if (s) this.seat(s, ok);
+    this.score(ok, s ? '선이 이어지지 않아요' : '시간 초과');
+  }
 
-    // 고른 조각을 빈자리로 돌려 끼워 본다. 오답은 가장 많이 이어지는 방향으로 끼우고,
-    // 그래도 어긋나는 변에 표시를 해서 왜 안 맞는지 보이게 한다.
+  // 고른 조각을 빈자리로 돌려 끼워 본다. 오답은 가장 많이 이어지는 방향으로 끼우고,
+  // 그래도 어긋나는 변에 표시를 해서 왜 안 맞는지 보이게 한다.
+  seat(s, ok) {
     const k = FitGame.bestTurn(s.p, this.gap);
     const seated = FitGame.turn(s.p, k);
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -136,7 +148,9 @@ class FitGame {
       this.boardSvg.insertAdjacentHTML('beforeend', `<g class="miss">${marks}</g>`);
     }
     requestAnimationFrame(() => requestAnimationFrame(() => (g.style.transform = 'rotate(0deg)')));
+  }
 
+  score(ok, failMsg) {
     const d = this.progress.children[this.round];
     d.classList.remove('cur');
     d.classList.add(ok ? 'right' : 'wrong');
@@ -148,7 +162,7 @@ class FitGame {
       this.h.award((this.h.base * this.h.mult) / FitGame.ROUNDS, this.board);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = '선이 이어지지 않아요';
+      this.msg.textContent = failMsg;
       this.msg.className = 'stage-msg bad';
       this.h.sfx('bad');
     }

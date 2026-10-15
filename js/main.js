@@ -27,7 +27,13 @@ const App = {
   init() {
     this.band = new Band($('#band-canvas'), this.cfg);
     // 큰 깃발을 지날 때만 소리를 낸다. 작은 깃발까지 울리면 박자 소리와 섞여 시끄럽다.
-    this.band.onMilestone = (m) => { if (m % Band.MARK_BIG === 0) this.audio.sfx('go'); };
+    this.band.onMilestone = (m) => {
+      if (m % Band.MARK_BIG !== 0) return;
+      this.audio.sfx('go');
+      Fx.confetti(0.35);
+    };
+    Fx.init();
+    Theme.init();
     this.renderGameToggles();
     if (!this.demo) this.bindMenu();
     else this.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
@@ -41,6 +47,11 @@ const App = {
     $('#btn-resume').onclick = () => this.setPaused(false);
     $('#btn-quit').onclick = () => this.quit();
     $('#btn-save').onclick = () => this.saveScore();
+    $('#btn-log').onclick = () => {
+      if (!this.log) return;
+      this.log.download();
+      $('#btn-log').textContent = '저장됨 · 다시 저장';
+    };
     $('#res-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.saveScore(); });
     this.renderBoard($('#menu-board'));
     this.last = performance.now();
@@ -85,6 +96,7 @@ const App = {
     $('#cfg-change').checked = c.rpmChange;
     $('#cfg-shift').value = c.shiftSec;
     $('#cfg-sound').checked = c.sound;
+    $('#cfg-qtimer').checked = c.questionTimer;
     $('#cfg-source').value = c.rpmSource;
     this.applySource();
     document.querySelectorAll('#cfg-games input').forEach((b) => {
@@ -118,6 +130,7 @@ const App = {
     c.rpmChange = $('#cfg-change').checked;
     c.shiftSec = num('#cfg-shift', 4, 30, 8);
     c.sound = $('#cfg-sound').checked;
+    c.questionTimer = $('#cfg-qtimer').checked;
     c.rpmSource = $('#cfg-source').value;
     c.games = [...document.querySelectorAll('#cfg-games input')].filter((b) => b.checked).map((b) => b.dataset.game);
     Config.save(c);
@@ -140,12 +153,17 @@ const App = {
   // ---------------- 입력 ----------------
   bindKeys() {
     window.addEventListener('keydown', (e) => {
+      if (this.log && !e.repeat) this.log.key(e.code);
       // 스테이션 모드에는 일시정지 메뉴와 디버그 표시가 없다 (운영 메뉴로만 멈춘다)
       if (e.code === 'Escape') {
         if (!this.demo && this.inRound) this.setPaused(!this.paused);
         return;
       }
       if (e.target.tagName === 'INPUT') return;
+      if (e.code === 'KeyT' && !this.demo && !e.repeat) {
+        Theme.next();
+        return;
+      }
       if (e.code === 'Backquote') {
         if (this.demo) return;
         $('#debug').classList.toggle('active');
@@ -170,7 +188,10 @@ const App = {
     const btns = document.querySelectorAll('[data-pedal-btn]');
     btns.forEach((b) => (b.onclick = () => (this.link.wantLink ? this.link.disconnect() : this.link.connect())));
     this.link.onState = (state, detail) => this.onLinkState(state, detail);
-    this.link.onWorkout = (w) => this.pedal.sensorFrame(w.rpm);
+    this.link.onWorkout = (w) => {
+      this.pedal.sensorFrame(w.rpm);
+      if (this.log) this.log.workoutFrame(w);
+    };
     this.link.onFrame = (raw, f) => this.onPedalFrame(f);
     $('#cfg-source').onchange = () => {
       this.cfg.rpmSource = $('#cfg-source').value;
@@ -190,6 +211,7 @@ const App = {
     if (!f || f.name !== 'CAPD' || f.values.length !== 21) return;
     const v = f.values.map(Number);
     if (v.some((x) => !Number.isFinite(x))) return;
+    if (this.log) this.log.capdFrame(v);
     const r = this.lz.capd(v);
     const src = this.cfg.rpmSource;
     // 추정이 아직 준비되지 않은 0(연결 직후·긴 유실 뒤 첫 바퀴)은 넣지 않는다. 진짜 정지(진폭이 정지 수준)만 0 으로 넣는다.
@@ -221,6 +243,7 @@ const App = {
       s.textContent = detail;
     });
     document.querySelectorAll('[data-pedal-btn]').forEach((b) => (b.textContent = this.link.wantLink ? '연결 해제' : '페달 연결'));
+    if (this.log) this.log.ev('link', { state, detail });
     if (this.demo) return Demo.onLink(state, detail);
 
     // 센서로 하던 라운드 도중 연결이 끊기면 '멈춤'으로 채점하지 않고 시계를 세운다
@@ -235,6 +258,7 @@ const App = {
   },
 
   setPaused(p) {
+    if (this.log && p !== this.paused) this.log.ev(p ? 'pause' : 'resume');
     this.paused = p;
     if (!p) {
       this.linkPaused = false;
@@ -245,7 +269,9 @@ const App = {
     else this.audio.resume();
   },
 
+  // 라운드를 버리고 나간다 (결과 없음). 기록은 'abandoned' 로 닫는다
   quit() {
+    this.closeLog('abandoned');
     this.setPaused(false);
     this.audio.stop();
     this.gen++;
@@ -282,12 +308,35 @@ const App = {
     this.calib = { elapsed: 0, started: false, samples: [], angle: 0 };
     this.show('calib');
     this.state = 'calib';
+    this.log = new SessionLog(this);
+    this.log.ev('calib_start');
+  },
+
+  // 세션 기록을 닫는다. 시연 모드에서 결과 없이 끝난 판은 여기서 바로 저장한다 (결과가 있으면 Demo.showResult 가 저장)
+  closeLog(ended) {
+    const log = this.log;
+    if (!log || log.done) return;
+    log.finish(ended, this.summary());
+    if (this.demo && ended === 'abandoned') Demo.storeLog(log);
+  },
+
+  summary() {
+    const m = this.meter;
+    return {
+      score: this.score ?? 0, exScore: this.exScore ?? 0, cogScore: this.cogScore ?? 0,
+      baseline: this.baseline ?? null, bestStreak: this.bestStreak ?? 0, elapsedSec: Math.round((this.elapsed ?? 0) * 10) / 10,
+      stats: this.stats || null,
+      exercise: { kcal: Math.round(m.kcal * 100) / 100, revs: Math.round(m.revs * 10) / 10, avgRpm: Math.round(m.avgRpm * 10) / 10, activeSec: Math.round(m.activeSec) },
+    };
   },
 
   updateCalib(dt, rpm) {
     const c = this.calib;
     const total = this.cfg.calibrationSec;
-    if (!c.started && rpm > 0) c.started = true;
+    if (!c.started && rpm > 0) {
+      c.started = true;
+      this.log.ev('calib_pedaling');
+    }
     if (c.started) {
       c.elapsed += dt;
       if (c.elapsed > Math.min(this.cfg.calibrationIgnoreSec, total * 0.3) && rpm > 0) c.samples.push(rpm);
@@ -306,7 +355,9 @@ const App = {
   finishCalib() {
     const s = this.calib.samples.slice().sort((a, b) => a - b);
     let base = s.length ? s[Math.floor(s.length / 2)] : 0;
+    const measured = base;
     if (base < this.cfg.minRpm) base = this.cfg.fallbackRpm;
+    this.log.ev('calib_end', { baseline: Math.round(base * 10) / 10, measured: Math.round(measured * 10) / 10, samples: s.length, fallback: base !== measured });
     this.baseline = base;
     this.target = base;
     this.beginCountdown();
@@ -359,8 +410,11 @@ const App = {
     this.after(2000, () => { num.textContent = '1'; this.audio.sfx('count'); }, gen);
     this.after(3000, () => {
       num.textContent = 'GO!';
+      num.classList.add('go');
       this.audio.sfx('go');
+      Fx.cleared(num);
       this.state = 'play';
+      this.log.ev('play_start');
     }, gen);
     this.after(3600, () => this.nextGame(), gen);
   },
@@ -374,6 +428,7 @@ const App = {
     const firstTime = cycle === 0;
     this.gameIndex++;
     this.current = null;
+    this.log.ev('game_start', { game: T.id, level, mult: Math.round(mult * 100) / 100 });
 
     const gen = ++this.gen;
     const cog = $('#cog');
@@ -403,6 +458,13 @@ const App = {
       t0,
       base: this.cfg.cogBasePoints,
       after: (ms, fn) => this.after(ms, fn, gen),
+      // 문제 하나의 제한 시간. load = 그 문제의 일의 양 (config.questionTime 참고). 다 되면 onOut 을 부른다
+      timer: (load, onOut) => this.startQTimer(T, stage, load, onOut, gen),
+      stopTimer: () => this.stopQTimer(),
+      // 세션 기록 (js/session-log.js). question = 입력을 받기 시작한 문제의 내용, input = 답 도중의 입력, answer = 최종 답
+      question: (data) => gen === this.gen && this.log.question(T.id, level, data),
+      input: (data) => gen === this.gen && this.log.input(T.id, data),
+      answer: (data) => gen === this.gen && this.log.answer(T.id, data),
       // 게임들은 정답에 'good', 오답에 'bad'를 울린다. 그 둘만 가로채 연속 정답을 세고 보상을 키운다.
       // (게임 쪽 코드를 건드리지 않고 한 곳에서 보상을 다룰 수 있다)
       sfx: (n) => {
@@ -416,20 +478,72 @@ const App = {
         if (pts <= 0) return;
         this.cogScore += pts;
         this.stats[T.id].points += pts;
+        this.log.ev('points', { game: T.id, pts });
         this.addScore(pts);
         this.floatAt(anchor, `${prefix}+${pts}`);
       },
       done: (res) => {
         if (gen !== this.gen || this.state !== 'play') return;
         this.record(T, res, level, this.clock - t0);
+        this.log.ev('game_end', { game: T.id, ...res });
         // 한 게임을 다 맞혔으면 따로 축하한다. 게임마다 넣지 않고 여기서 한 번에 처리한다.
         if (!res.cleared) return this.nextGame();
         this.audio.sfx('clear');
         const b = U.el('div', 'perfect', '완벽!');
         stage.append(b);
+        Fx.cleared(stage);
         this.after(950, () => this.nextGame(), gen);
       },
     };
+  },
+
+  // ---------------- 문제 제한 시간 ----------------
+  // 게임 시계로 재므로 일시정지·운영 메뉴 중에는 멈춘다. 막대는 게임 영역 맨 위에 붙는다.
+  startQTimer(T, stage, load, onOut, gen) {
+    this.qt = null;
+    if (!this.cfg.questionTimer || gen !== this.gen) return;
+    const spec = this.cfg.questionTime[T.id];
+    if (!spec) return;
+    let el = stage.querySelector('.qtimer');
+    if (!el) {
+      el = U.el('div', 'qtimer', '<i></i>');
+      stage.append(el);
+    }
+    el.className = 'qtimer on';
+    el.firstChild.style.transform = 'scaleX(1)';
+    this.qt = { t0: this.clock, ms: (spec.base + spec.per * load) * 1000, onOut, gen, el, tick: 3 };
+    this.log.ev('timer_start', { game: T.id, load, limitMs: this.qt.ms });
+  },
+
+  // 답을 고르면 멈춘다. 막대는 남은 만큼 멈춘 채로 둔다 (얼마나 빨랐는지 보인다)
+  stopQTimer() {
+    if (!this.qt) return;
+    this.qt.el.classList.add('stopped');
+    this.qt = null;
+  },
+
+  updateQTimer() {
+    const q = this.qt;
+    if (!q) return;
+    if (q.gen !== this.gen || this.state !== 'play') {
+      this.qt = null;
+      return;
+    }
+    const left = q.ms - (this.clock - q.t0);
+    const frac = U.clamp(left / q.ms, 0, 1);
+    q.el.firstChild.style.transform = `scaleX(${frac})`;
+    q.el.classList.toggle('warn', frac < 0.4);
+    q.el.classList.toggle('low', frac < 0.18);
+    // 마지막 3초는 초마다 작게 똑딱인다
+    if (left <= q.tick * 1000 && q.tick > 0) {
+      this.audio.sfx('tick');
+      q.tick--;
+    }
+    if (left > 0) return;
+    this.qt = null;
+    q.el.classList.add('out');
+    this.log.ev('timeout');
+    q.onOut();
   },
 
   // ---------------- 속도 전환 구간 ----------------
@@ -448,6 +562,7 @@ const App = {
     $('#cog').innerHTML = '';
     const to = SLOPE_PATTERN[++this.slopeStep % SLOPE_PATTERN.length];
     this.shift = { from: this.slopeLevel, to, t0: this.elapsed };
+    this.log.ev('shift_start', { from: this.slopeLevel, to });
     $('#shift-name').textContent = SLOPE_MSG[to];
     $('#game').classList.add('shift');
     this.audio.sfx('go');
@@ -455,6 +570,7 @@ const App = {
   },
 
   endShift() {
+    this.log.ev('shift_end', { slope: this.shift.to });
     this.slopeLevel = this.shift.to;
     this.clearShift();
     this.nextShiftAt = this.elapsed + this.cfg.rpmChangeSegmentSec;
@@ -486,8 +602,10 @@ const App = {
       this.audio.reward(this.streak);
       this.band.celebrate();
       this.flashGlow(this.streak);
+      Fx.hit(this.streak);
     } else {
       this.audio.sfx(this.streak >= 3 ? 'drop' : 'bad');
+      Fx.miss($('#cog'));
       this.streak = 0;
     }
     this.renderStreak();
@@ -507,7 +625,7 @@ const App = {
   flashGlow(streak) {
     const a = Math.min(0.1 + streak * 0.045, 0.34);
     const el = U.el('div', 'glow');
-    el.style.background = `radial-gradient(ellipse at 50% 55%, rgba(31,157,85,${a}) 0%, rgba(31,157,85,0) 62%)`;
+    el.style.background = `radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--good) ${Math.round(a * 100)}%, transparent) 0%, transparent 62%)`;
     $('#cog').append(el);
     setTimeout(() => el.remove(), 440);
   },
@@ -579,14 +697,15 @@ const App = {
       this.tickTime -= cfg.tickSec;
       this.exScore += pts;
       if (pts > 0) this.addScore(pts);
-      const color = pts >= cfg.tickMaxPoints ? '#1f9d55' : pts > 0 ? '#e08a00' : '#e5484d';
+      const color = pts >= cfg.tickMaxPoints ? 'good' : pts > 0 ? 'warn' : 'bad';
       this.band.addFloater(`+${pts}`, color);
     }
 
     if (this.elapsed >= cfg.durationSec) this.endRound();
   },
 
-  endRound() {
+  // ended: complete(시간 다 됨) | operator(운영 메뉴에서 끝냄) | idle(자리 비움)
+  endRound(ended = 'complete') {
     this.state = 'result';
     if (this.current) {
       // 중단된 게임: 부분 점수는 abort 안에서 지급될 수 있도록 상태를 잠깐 play로 둔다
@@ -595,7 +714,9 @@ const App = {
       this.state = 'result';
       const { host } = this.current;
       if (res.total > 0) this.record(this.current.T, res, host.level, this.clock - host.t0);
+      this.log.ev('game_abort', { game: this.current.T.id, ...res });
     }
+    this.closeLog(ended);
     this.gen++;
     this.timers = [];
     this.clearShift();
@@ -621,10 +742,13 @@ const App = {
     if (this.bestStreak >= 2) lines.push(`<b>최고 연속 정답 ${this.bestStreak}회</b>`);
     $('#res-cog-sub').innerHTML = lines.join('<br>');
     $('#save-row').style.display = '';
+    $('#btn-log').disabled = false;
+    $('#btn-log').textContent = '세션 로그 저장';
     $('#res-name').value = '';
     this.savedId = null;
     this.renderBoard($('#res-board'));
     this.show('result');
+    Fx.confetti(1);
     setTimeout(() => $('#res-name').focus(), 50);
   },
 
@@ -673,6 +797,7 @@ const App = {
         this.meter.add(dt, rpm);
       }
       if (this.demo) Demo.tick(dt, rpm);
+      if (this.log && (this.state === 'calib' || this.state === 'countdown' || this.state === 'play')) this.log.sample(dt, rpm);
 
       if (this.state === 'countdown' || this.state === 'play') {
         if (this.state === 'play') this.updatePlay(dt, rpm);
@@ -684,6 +809,7 @@ const App = {
         }
       }
       this.runTimers();
+      if (this.state === 'play') this.updateQTimer();
       this.updateDebug(rpm);
     }
     this.capTick(now);

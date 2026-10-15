@@ -10,7 +10,7 @@ const Demo = {
   ATTRACT_LOCK_SEC: 4,   // 대기 화면이 뜬 직후에는 페달로 시작하지 않는다 (앞 참가자가 아직 밟고 있을 수 있다)
   RPM_ACTIVE: 10,        // 이보다 빠르면 '밟고 있다'로 본다
   CORNER_HOLD_MS: 2000,  // 운영 메뉴: 왼쪽 위 모서리를 이만큼 누르고 있으면 PIN 입력
-  NEXT_HOLD_MS: 2000,    // 결과 화면의 '다음 참가자'를 이만큼 누르고 있어야 넘어간다 (참가자가 실수로 지우지 않게)
+  NEXT_HOLD_MS: 500,    // 결과 화면의 '다음 참가자'를 이만큼 누르고 있어야 넘어간다 (참가자가 실수로 지우지 않게)
   PIN_TIMEOUT_MS: 20000,
   LOG_MAX: 1000,
 
@@ -102,12 +102,15 @@ const Demo = {
     $('#att-hint').classList.toggle('warn', !ok || kbdOnly || this.simResult);
   },
 
-  start() {
+  // via: tap(화면을 눌러서) | pedal(페달을 밟아서)
+  start(via = 'tap') {
     const a = this.app;
     if (a.state !== 'attract' || this.opOpen || this.pinOpen || !this.canStart()) return;
     this.enterKiosk();
     if (this.simResult) return this.simulateRound();
     a.startRound();
+    a.log.meta.station = this.station;
+    a.log.ev('start', { via });
     this.activeAt = a.clock;
   },
 
@@ -167,7 +170,7 @@ const Demo = {
       this.animateDeco(dt);
       const ready = (a.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.opOpen && this.canStart();
       this.pedalHold = ready && rpm > this.RPM_ACTIVE ? this.pedalHold + dt : Math.max(0, this.pedalHold - dt);
-      if (this.pedalHold >= this.PEDAL_START_SEC) this.start();
+      if (this.pedalHold >= this.PEDAL_START_SEC) this.start('pedal');
     } else if (a.state === 'calib') {
       // 시작만 눌러 놓고 자리를 떠난 경우
       if (!a.calib.started && (a.clock - this.activeAt) / 1000 > this.CALIB_IDLE_SEC) a.quit();
@@ -179,14 +182,19 @@ const Demo = {
 
   // 라운드 도중 참가자가 자리를 떠났을 때: 안내 → 그래도 없으면 결과 화면으로 (점수는 남겨 둔다)
   checkIdle() {
-    const idle = (this.app.clock - this.activeAt) / 1000;
-    if (idle < this.IDLE_SEC) return this.hideAlert('idle');
+    const a = this.app;
+    const idle = (a.clock - this.activeAt) / 1000;
+    if (idle < this.IDLE_SEC) {
+      if (this.alertKind === 'idle') a.log.ev('idle_resumed');
+      return this.hideAlert('idle');
+    }
     const left = this.IDLE_SEC + this.IDLE_GRACE_SEC - idle;
     if (left <= 0) {
       this.hideAlert('idle');
-      this.app.endRound();
+      a.endRound('idle');
       return;
     }
+    if (this.alertKind !== 'idle') a.log.ev('idle_prompt');
     this.showAlert('idle', '아직 하고 계신가요?', `페달을 밟거나 화면을 누르면 계속합니다<br><b>${Math.ceil(left)}</b>초 뒤에 게임을 마칩니다`);
   },
 
@@ -256,7 +264,16 @@ const Demo = {
     $('#dr-time').textContent = U.fmtTime(m.activeSec);
     $('#dr-rpm').textContent = `${Math.round(m.avgRpm)} RPM`;
     $('#dr-keep').textContent = `${keep}%`;
+    Fx.confetti(1.2);
     if (sim) return a.show('demo-result');
+
+    // 세션 로그에 참가 번호와 능력 점수를 붙여 저장한다
+    if (a.log) {
+      a.log.meta.station = this.station;
+      a.log.meta.participant = this.label(no);
+      a.log.meta.summary.abilities = Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.value : null]));
+      this.storeLog(a.log);
+    }
 
     const log = this.load('log', []);
     log.push({
@@ -269,12 +286,32 @@ const Demo = {
     a.show('demo-result');
   },
 
+  // ---------------- 세션 로그 (js/session-log.js) ----------------
+  storeLog(log) {
+    SessionStore.put(log).catch((e) => (this.storeError = e.message || String(e)));
+  },
+
+  async renderSessions() {
+    const el = $('#op-sess-count');
+    try {
+      const n = await SessionStore.count();
+      let size = '';
+      if (navigator.storage && navigator.storage.estimate) {
+        const { usage } = await navigator.storage.estimate();
+        size = ` · 저장 공간 약 ${(usage / 1048576).toFixed(1)} MB`;
+      }
+      el.textContent = `${n}건${size}${this.storeError ? ` · 마지막 저장 실패: ${this.storeError}` : ''}`;
+    } catch (e) {
+      el.textContent = `읽을 수 없음: ${e.message || e}`;
+    }
+  },
+
   // ---------------- 운영 메뉴 ----------------
   bindOp() {
     $('#op-close').onclick = () => this.closeOp();
     $('#op-end').onclick = () => {
       this.hideOp();
-      if (this.app.state === 'play') this.app.endRound();
+      if (this.app.state === 'play') this.app.endRound('operator');
     };
     $('#op-abandon').onclick = () => {
       this.hideOp();
@@ -288,6 +325,16 @@ const Demo = {
       location.href = location.pathname;
     };
     $('#op-csv').onclick = () => this.downloadCsv();
+    $('#op-sess-export').onclick = async () => {
+      this.leaving = true; // 내려받기가 beforeunload 를 부를 수 있다
+      try {
+        const n = await SessionStore.exportAll(`exergame-sessions-station${this.station || ''}-${new Date().toISOString().slice(0, 10)}.jsonl`);
+        if (!n) $('#op-sess-count').textContent = '저장된 로그가 없습니다';
+      } catch (e) {
+        $('#op-sess-count').textContent = `내보내기 실패: ${e.message || e}`;
+      }
+      setTimeout(() => (this.leaving = false), 1000);
+    };
     $('#op-sim').onchange = () => {
       this.simResult = $('#op-sim').checked;
       this.updateAttract();
@@ -327,11 +374,14 @@ const Demo = {
     }
     $('#op-close').textContent = a.inRound ? '이어서 진행' : a.state === 'result' ? '결과 화면으로 돌아가기' : '대기 화면 열기';
     this.renderLog();
+    this.renderSessions();
+    if (a.inRound) a.log.ev('operator', { open: true });
     $('#op').classList.add('active');
     this.syncPause();
   },
 
   hideOp() {
+    if (this.app.inRound && this.opOpen) this.app.log.ev('operator', { open: false });
     this.opOpen = false;
     $('#op').classList.remove('active');
     this.syncPause();

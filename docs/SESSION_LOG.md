@@ -58,9 +58,10 @@
 | `baseline` | 측정한 기준 RPM (실패하면 `config.fallbackRpm`) |
 | `bestStreak` | 최고 연속 정답 |
 | `elapsedSec` | 플레이한 시간 (게임 시계) |
-| `stats` | 게임별 `{ plays, cleared, correct, total, points, level, ms }`. `level` 은 도달한 최고 난이도, `ms` 는 문제를 푼 시간 합 |
-| `exercise` | `{ kcal, revs, avgRpm, activeSec }` RPM 으로 추정한 운동량 (`js/exercise.js`, 임시 곡선) |
-| `abilities` | 시연 모드 결과만. 능력 축별 0~100, 데이터가 없는 축은 null (`js/abilities.js`) |
+| `stats` | 게임별 `{ plays, cleared, correct, total, points, level, runs, ms }`. `level` 은 도달한 최고 난이도, `runs` 는 판마다 `[레벨, 맞힌 수, 문제 수]`, `ms` 는 문제를 푼 시간 합 |
+| `exercise` | `{ kcal, distM, revs, avgRpm, activeSec }` RPM 으로 어림한 운동량 (`js/exercise.js`). `kcal` 은 MET 표·체중 65 kg 기준, `distM` 은 한 바퀴 6 m |
+| `abilities` | 시연 모드 결과만. 능력 축별 별 수 1~5 (0.5 단위), 데이터가 없는 축은 null (`js/abilities.js`) |
+| `abilitiesRaw` | 시연 모드 결과만. 별로 바꾸기 전 '해낸 레벨' (판마다 `레벨 − 1 + 정확도`, 게임 가중치 × 레벨로 가중 평균), 데이터가 없는 축은 null |
 
 ## `events`
 
@@ -75,7 +76,8 @@
 | `calib_pedaling` | | 측정 중 처음 밟음 (측정 시간이 여기서부터 흐른다) |
 | `calib_end` | `baseline`, `measured`, `samples`, `fallback` | 측정 끝. `measured` 가 `config.minRpm` 보다 낮으면 `fallback: true` 이고 `baseline` 은 대체값. 이어서 3초 카운트다운 |
 | `play_start` | | 카운트다운 끝 (GO) |
-| `game_start` | `game`, `level`, `mult` | 인지 게임 하나 시작 (소개 화면이 뜬 순간) |
+| `game_start` | `game`, `level`, `mult`, `diff` | 인지 게임 하나 시작 (소개 화면이 뜬 순간). `diff` 는 그때의 난이도 계기판 값 (`config.difficulty: 'adaptive'` 일 때 `level` = 그 정수 부분) |
+| `difficulty` | `ok`, `diff` | 답 하나에 따라 난이도 계기판이 움직임 (`adaptive` 일 때만) |
 | `game_end` | `game`, `cleared`, `correct`, `total` | 게임 하나 끝 |
 | `game_abort` | `game`, `cleared`, `correct`, `total` | 라운드가 끝나며 진행 중이던 게임이 중단됨. 이 게임의 마지막 `question` 에는 `answer` 가 없을 수 있다 |
 | `points` | `game`, `pts` | 인지 게임 점수 지급 |

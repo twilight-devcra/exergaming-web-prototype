@@ -62,7 +62,7 @@ body[data-theme="neon"] :is(.pcell, .scell, .ar-cand, .ccell, .fit-cand, .seek-t
 body[data-theme="neon"] :is(.pcell.on.head, .pcell.start, .ar-slot.active, .scell.reveal) { box-shadow: 0 0 18px var(--accent), inset 0 0 0 2px var(--accent); }
 body[data-theme="neon"] .pcell.done { box-shadow: 0 0 18px var(--good); }
 body[data-theme="neon"] .ar-slot { background: var(--cell); }
-body[data-theme="neon"] :is(.hud .value, .big-count, .dr-total, .result-total, .calib-ring .num, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-kcal b, .alert-title) {
+body[data-theme="neon"] :is(.hud .value, .big-count, .dr-total, .result-total, .calib-ring .num, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-stat b, .alert-title) {
   text-shadow: 0 0 10px currentColor, 0 0 28px color-mix(in srgb, currentColor 55%, transparent);
 }
 body[data-theme="neon"] .intro .name, body[data-theme="neon"] .att-main h1 { color: #fff; }
@@ -123,7 +123,7 @@ body[data-theme="sporty"] #band {
 body[data-theme="sporty"] #hud-time { left: 72px; }
 body[data-theme="sporty"] #hud-score { right: 72px; }
 body[data-theme="sporty"] #streak { right: 72px; transform: skewX(-10deg); border-radius: 4px; }
-body[data-theme="sporty"] :is(.hud .value, .big-count, .dr-total, .result-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-kcal b, .calib-ring .num) {
+body[data-theme="sporty"] :is(.hud .value, .big-count, .dr-total, .result-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-stat b, .calib-ring .num) {
   font-weight: 400;
   font-style: italic;
   letter-spacing: -0.01em;
@@ -182,7 +182,7 @@ body[data-theme="cartoon"] #band {
 }
 body[data-theme="cartoon"] .qtimer { height: 16px; border-radius: 8px; border: var(--outline); box-shadow: 0 3px 0 var(--ink); top: 12px; }
 body[data-theme="cartoon"] .pcell.on.head:not(.done) { transform: scale(1.1) rotate(-3deg); transition: transform 0.25s cubic-bezier(0.3, 1.8, 0.5, 1); }
-body[data-theme="cartoon"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-kcal b, .hud .value, .result-total) {
+body[data-theme="cartoon"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-stat b, .hud .value, .result-total) {
   -webkit-text-stroke: 3px var(--ink);
   paint-order: stroke fill;
   text-shadow: 0 5px 0 var(--ink);
@@ -256,7 +256,7 @@ body[data-theme="pixel"] .att-start { animation: blink 1s steps(1) infinite; }
 body[data-theme="pixel"] #band { background: #10121f; border-bottom: var(--px) solid var(--line); }
 body[data-theme="pixel"] :is(.pcell, .scell, .ar-cand, .ccell, .cnt-opt, .fit-cand, .seek-target, .ar-slot) { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3); }
 body[data-theme="pixel"] .ar-slot { background: var(--cell); }
-body[data-theme="pixel"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-kcal b, .hud .value, .result-total, .dr-title) {
+body[data-theme="pixel"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-stat b, .hud .value, .result-total, .dr-title) {
   text-shadow: 4px 4px 0 #000;
   font-weight: 400;
 }

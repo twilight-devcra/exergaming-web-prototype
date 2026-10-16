@@ -34,7 +34,7 @@
 /* 스타일이 body 에서 글꼴 변수를 바꾸므로 body 에서 다시 읽는다 */
 body { font-family: var(--font); }
 h1, h2, .intro .name, #shift-msg .name, .perfect, .dr-title, .alert-title { font-family: var(--font-display); }
-.hud .value, .big-count, .result-total, .dr-total, .dr-kcal b, .calib-ring .num, .ar-eq, #streak, .floater { font-family: var(--font-num); }
+.hud .value, .big-count, .result-total, .dr-total, .dr-stat b, .calib-ring .num, .ar-eq, #streak, .floater { font-family: var(--font-num); }
 
 * { box-sizing: border-box; }
 
@@ -899,6 +899,12 @@ body.demo #op-corner {
 .radar .rd-label { font-size: 20px; font-weight: 700; fill: var(--ink); }
 .radar .rd-value { font-size: 22px; font-weight: 800; fill: var(--accent); font-variant-numeric: tabular-nums; }
 .radar .nodata { fill: var(--ink-soft); }
+.radar .rd-star { stroke-linejoin: round; }
+.radar .rd-star.on { fill: var(--warn); }
+.radar .rd-star.off { fill: var(--line); }
+.radar .rd-star.half { fill: url(#rd-half); }
+.radar .rd-half-on { stop-color: var(--warn); }
+.radar .rd-half-off { stop-color: var(--line); }
 #demo-result .radar .rd-shape { animation: radarin 0.9s cubic-bezier(0.2, 1.2, 0.4, 1) both; transform-origin: 200px 190px; }
 @keyframes radarin { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
 .radar.deco .rd-grid.outer { fill: color-mix(in srgb, var(--panel) 70%, transparent); }
@@ -956,12 +962,16 @@ body.demo #op-corner {
 .dr-brain h3 { align-self: flex-start; }
 .dr-brain .radar { flex: 1; min-height: 0; width: 100%; }
 .dr-best { font-size: clamp(15px, 2.5vh, 20px); color: var(--ink-soft); }
+.dr-best { text-align: center; }
 .dr-best b { color: var(--accent); }
+.dr-best small { display: block; margin-top: 4px; font-size: 0.8em; }
 .dr-ex { gap: clamp(6px, 1.4vh, 12px); }
-.dr-kcal { display: flex; align-items: baseline; gap: 8px; margin-top: clamp(4px, 1.5vh, 16px); }
-.dr-kcal b { font-size: clamp(48px, 10vh, 96px); line-height: 1; color: var(--good); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
-.dr-kcal span { font-size: clamp(20px, 3.5vh, 30px); font-weight: 800; color: var(--good); }
-.dr-food { font-size: clamp(15px, 2.5vh, 20px); font-weight: 700; }
+.dr-stat { display: flex; align-items: baseline; gap: 8px; margin-top: clamp(4px, 1.5vh, 16px); }
+.dr-stat b { font-size: clamp(48px, 10vh, 96px); line-height: 1; color: var(--good); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.dr-stat span { font-size: clamp(20px, 3.5vh, 30px); font-weight: 800; color: var(--good); }
+.dr-sub { margin-top: 0; }
+.dr-sub b { font-size: clamp(32px, 6vh, 60px); }
+.dr-sub span { font-size: clamp(16px, 2.6vh, 22px); }
 .dr-facts {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1037,6 +1047,23 @@ body.demo #op-corner {
 .op-sessions h2 { font-size: 16px; }
 .op-log { max-height: 34vh; }
 @media (max-width: 700px) { .op-box { flex-direction: column; overflow-y: auto; } }
+#op-set { z-index: 410; background: var(--scrim); }
+.op-set-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 24px 28px;
+  width: min(560px, 100%);
+}
+.op-set-box h2 { margin: 0; font-size: 20px; }
+.op-set-box h2 small { font-size: 14px; color: var(--ink-soft); font-weight: 600; }
+.op-set-fields { display: flex; flex-direction: column; gap: 8px; }
+.op-set-fields .setting.changed { font-weight: 700; color: var(--accent); }
+.op-set-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 
 /* ---------- PIN ---------- */
 #pin { z-index: 420; background: rgba(28, 34, 48, 0.75); }

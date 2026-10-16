@@ -93,6 +93,7 @@ const App = {
     $('#cfg-start-level').max = this.maxStartLevel();
     $('#cfg-start-level').value = c.startLevel;
     $('#cfg-mult').value = c.multiplierStep;
+    $('#cfg-difficulty').value = c.difficulty;
     $('#cfg-change').checked = c.rpmChange;
     $('#cfg-shift').value = c.shiftSec;
     $('#cfg-sound').checked = c.sound;
@@ -127,6 +128,7 @@ const App = {
     c.tolerance = num('#cfg-tol', 3, 40, 12) / 100;
     c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), 1));
     c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
+    c.difficulty = $('#cfg-difficulty').value;
     c.rpmChange = $('#cfg-change').checked;
     c.shiftSec = num('#cfg-shift', 4, 30, 8);
     c.sound = $('#cfg-sound').checked;
@@ -326,7 +328,7 @@ const App = {
       score: this.score ?? 0, exScore: this.exScore ?? 0, cogScore: this.cogScore ?? 0,
       baseline: this.baseline ?? null, bestStreak: this.bestStreak ?? 0, elapsedSec: Math.round((this.elapsed ?? 0) * 10) / 10,
       stats: this.stats || null,
-      exercise: { kcal: Math.round(m.kcal * 100) / 100, revs: Math.round(m.revs * 10) / 10, avgRpm: Math.round(m.avgRpm * 10) / 10, activeSec: Math.round(m.activeSec) },
+      exercise: { kcal: Math.round(m.kcal * 100) / 100, distM: Math.round(m.distM), revs: Math.round(m.revs * 10) / 10, avgRpm: Math.round(m.avgRpm * 10) / 10, activeSec: Math.round(m.activeSec) },
     };
   },
 
@@ -377,14 +379,16 @@ const App = {
     this.nextShiftAt = this.cfg.rpmChangeSegmentSec;
     this.clearShift();
     this.gameIndex = 0;
+    this.diff = this.cfg.startLevel;    // adaptive 난이도 계기판 (cfg.difficulty 참고)
+    this.lastLevel = {};                // 게임별 지난번 레벨 (소개 문구용)
     this.current = null;
     this.streak = 0;
     this.bestStreak = 0;
     this.renderStreak();
     this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
     this.stats = {};
-    // level = 도달한 최고 난이도, ms = 게임을 푸는 데 쓴 시간 (능력 그래프에 쓴다)
-    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, ms: 0 }));
+    // level = 도달한 최고 난이도, runs = 판마다 [레벨, 맞힌 수, 문제 수], ms = 게임을 푸는 데 쓴 시간 (runs·ms 는 능력 그래프에 쓴다)
+    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0 }));
     this.band.cfg = this.cfg;
     this.band.setSlope(0);
     this.band.theta = 0;
@@ -423,19 +427,24 @@ const App = {
     if (this.shiftDue()) return this.beginShift();
     const T = this.types[this.gameIndex % this.types.length];
     const cycle = Math.floor(this.gameIndex / this.types.length);
-    const level = Math.min(cycle + this.cfg.startLevel, T.maxLevel);
+    const level = this.cfg.difficulty === 'adaptive'
+      ? U.clamp(Math.floor(this.diff), 1, T.maxLevel)
+      : Math.min(cycle + this.cfg.startLevel, T.maxLevel);
     const mult = 1 + this.cfg.multiplierStep * (level - 1);
-    const firstTime = cycle === 0;
+    const prev = this.lastLevel[T.id];
+    const firstTime = prev == null;
+    const tag = firstTime ? '새 게임' : level > prev ? '레벨 업' : level < prev ? '숨 고르기' : '한 번 더';
+    this.lastLevel[T.id] = level;
     this.gameIndex++;
     this.current = null;
-    this.log.ev('game_start', { game: T.id, level, mult: Math.round(mult * 100) / 100 });
+    this.log.ev('game_start', { game: T.id, level, mult: Math.round(mult * 100) / 100, diff: Math.round(this.diff * 100) / 100 });
 
     const gen = ++this.gen;
     const cog = $('#cog');
     cog.innerHTML = '';
     const intro = U.el('div', 'intro');
     intro.innerHTML = `
-      <div class="tag">${firstTime ? '새 게임' : '레벨 업'}${mult > 1 ? ` · x${mult.toFixed(1)}` : ''}</div>
+      <div class="tag">${tag}${mult > 1 ? ` · x${mult.toFixed(1)}` : ''}</div>
       <div class="name">${T.title}</div>
       <div class="hint">${T.hint}</div>`;
     cog.append(intro);
@@ -596,6 +605,7 @@ const App = {
   // 연속 정답은 점수에 손대지 않는다. 운동 점수와 인지 점수의 균형을 흔들지 않으면서
   // '지키고 싶은 것'만 하나 만들어 주는 게 목적이다.
   hit(ok) {
+    this.adjustDifficulty(ok);
     if (ok) {
       this.streak++;
       this.bestStreak = Math.max(this.bestStreak, this.streak);
@@ -609,6 +619,14 @@ const App = {
       this.streak = 0;
     }
     this.renderStreak();
+  },
+
+  // adaptive 난이도 계기판. 위는 가장 단계가 많은 게임의 최고 레벨 바로 아래까지 — 최고 레벨에서 한 번 틀려도 바로 내려가지 않는다
+  adjustDifficulty(ok) {
+    const c = this.cfg;
+    if (c.difficulty !== 'adaptive') return;
+    this.diff = U.clamp(this.diff + (ok ? c.diffUp : -c.diffDown), 1, this.maxStartLevel() + 0.99);
+    this.log.ev('difficulty', { ok, diff: Math.round(this.diff * 100) / 100 });
   },
 
   renderStreak() {
@@ -634,6 +652,7 @@ const App = {
     const s = this.stats[T.id];
     s.plays++;
     s.level = Math.max(s.level, level);
+    s.runs.push([level, res.correct, res.total]);
     s.ms += ms;
     if (res.cleared) s.cleared++;
     s.correct += res.correct;

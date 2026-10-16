@@ -40,6 +40,12 @@
         <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
         <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
         <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
+        <label class="setting">난이도 방식
+          <select id="cfg-difficulty">
+            <option value="adaptive">정답·오답에 따라 오르내림</option>
+            <option value="cycle">한 바퀴 돌 때마다 +1</option>
+          </select>
+        </label>
         <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
         <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
         <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
@@ -175,15 +181,15 @@
       </div>
       <div class="dr-card dr-ex">
         <h3>오늘의 운동량</h3>
-        <div class="dr-kcal"><b id="dr-kcal">0</b><span>kcal</span></div>
-        <div class="dr-food" id="dr-food"></div>
+        <div class="dr-stat"><b id="dr-dist">0</b><span id="dr-dist-unit">m</span></div>
+        <div class="dr-stat dr-sub"><b id="dr-kcal">0</b><span>kcal</span></div>
         <dl class="dr-facts">
           <dt>밟은 시간</dt><dd id="dr-time"></dd>
           <dt>페달 회전</dt><dd id="dr-revs"></dd>
           <dt>평균 속도</dt><dd id="dr-rpm"></dd>
           <dt>속도 유지</dt><dd id="dr-keep"></dd>
         </dl>
-        <div class="dr-fine">운동량은 페달 속도로 추정한 값입니다</div>
+        <div class="dr-fine">페달 속도로 어림한 값입니다. 거리는 한 바퀴 6 m, 열량은 운동 강도표(MET)와 체중 65 kg 기준</div>
       </div>
     </div>
     <button class="hold-btn" id="dr-next"><i></i><span>길게 눌러서 시작 화면으로</span></button>
@@ -203,6 +209,7 @@
         <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
         <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
         <p class="setting-note" id="op-cfg"></p>
+        <button class="btn secondary small" id="op-set-open">시간·점수 설정</button>
         <div class="op-round" id="op-round">
           <p class="op-round-note" id="op-round-note"></p>
           <button class="btn secondary" id="op-end">지금 끝내고 결과 보기</button>
@@ -220,6 +227,20 @@
           <p class="setting-note">판마다 문제·답·걸린 시간과 페달 원시 파형(또는 키 입력)을 이 태블릿에 자동 저장합니다.</p>
           <button class="btn secondary small" id="op-sess-export">전체 내보내기 (.jsonl)</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 운영 메뉴 > 시간·점수 설정 (DEMO_SETTINGS) -->
+  <div id="op-set" class="overlay">
+    <div class="op-set-box">
+      <h2>시간·점수 설정 <small id="op-set-code"></small></h2>
+      <p class="setting-note">이 태블릿에 저장되고 다음 판부터 적용됩니다. 점수를 비교하려면 모든 스테이션의 설정 코드가 같아야 합니다.</p>
+      <div class="op-set-fields" id="op-set-fields"></div>
+      <div class="op-set-btns">
+        <button class="btn" id="op-set-save">저장</button>
+        <button class="btn secondary" id="op-set-cancel">취소</button>
+        <button class="btn secondary" id="op-set-reset">기본값으로</button>
       </div>
     </div>
   </div>

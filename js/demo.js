@@ -1,7 +1,7 @@
 // 시연 행사 스테이션 모드 (index.html?demo). 배경은 docs/DEMO_BRIEF.md.
 // 흐름: 운영 메뉴(처음 한 번) → 대기 화면 → 속도 측정 → 라운드 → 결과 → 진행 요원이 길게 눌러 초기화 → 대기 화면
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
-// 설정은 js/config.js 의 DEMO_CONFIG 로 고정되고 화면에서 바꿀 수 없다.
+// 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '시간·점수 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
 const Demo = {
   IDLE_SEC: 40,          // 라운드 중 페달도 터치도 없이 이만큼 지나면 '아직 하고 계신가요?'
   IDLE_GRACE_SEC: 15,    // 그 안내 뒤 이만큼 더 지나면 라운드를 끝내고 결과를 보여준다
@@ -47,9 +47,7 @@ const Demo = {
       if (pressed) this.start();
       pressed = false;
     });
-    const c = app.cfg;
-    $('#att-calib').textContent = `${c.calibrationSec}초`;
-    $('#att-dur').textContent = c.durationSec % 60 ? U.fmtTime(c.durationSec) : `${c.durationSec / 60}분`;
+    this.renderCfg();
     app.show('attract');
     this.renderStation();
     this.updateAttract();
@@ -127,7 +125,9 @@ const Demo = {
       const correct = R(Math.floor(total * 0.3), total);
       const points = Math.round(correct * R(25, 45));
       cog += points;
-      a.stats[T.id] = { plays: total > 6 && T.id !== 'path' ? 2 : 1, cleared: 0, correct, total, points, level: R(1, 2), ms: total * R(4000, 12000) };
+      const level = R(1, 4);
+      const runs = level > 1 ? [[level - 1, Math.ceil(correct / 2), Math.ceil(total / 2)], [level, Math.floor(correct / 2), Math.floor(total / 2)]] : [[1, correct, total]];
+      a.stats[T.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * R(4000, 12000) };
     }
     a.exScore = Math.round(exMax * R(55, 95) / 100);
     a.cogScore = cog;
@@ -137,7 +137,7 @@ const Demo = {
     m.reset();
     m.activeSec = cfg.durationSec - R(0, 20);
     m.revs = (rpm / 60) * m.activeSec;
-    m.joules = Exercise.watts(rpm) * m.activeSec;
+    m.kcal = Exercise.kcalPerSec(rpm) * m.activeSec;
     a.state = 'result';
     this.showResult({ sim: true });
   },
@@ -257,9 +257,11 @@ const Demo = {
     $('#dr-total').textContent = a.score.toLocaleString('ko-KR');
     $('#dr-break').textContent = `운동 ${a.exScore.toLocaleString('ko-KR')} + 두뇌 게임 ${a.cogScore.toLocaleString('ko-KR')}`;
     Radar.render($('#dr-radar'), abil.map((x) => x.value), abil);
-    $('#dr-best').innerHTML = best ? `가장 돋보인 능력 <b>${best.name}</b>` : '';
+    $('#dr-best').innerHTML = best ? `가장 돋보인 능력 <b>${best.name}</b><small>${best.praise}</small>` : '';
+    const dist = Exercise.fmtDist(m.distM);
+    $('#dr-dist').textContent = dist.value;
+    $('#dr-dist-unit').textContent = dist.unit;
     $('#dr-kcal').textContent = kcal < 10 ? kcal.toFixed(1) : String(Math.round(kcal));
-    $('#dr-food').textContent = m.revs > 0 ? Exercise.compare(kcal) : '';
     $('#dr-revs').textContent = `${Math.round(m.revs).toLocaleString('ko-KR')}바퀴`;
     $('#dr-time').textContent = U.fmtTime(m.activeSec);
     $('#dr-rpm').textContent = `${Math.round(m.avgRpm)} RPM`;
@@ -271,7 +273,8 @@ const Demo = {
     if (a.log) {
       a.log.meta.station = this.station;
       a.log.meta.participant = this.label(no);
-      a.log.meta.summary.abilities = Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.value : null]));
+      a.log.meta.summary.abilities = Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.stars : null]));
+      a.log.meta.summary.abilitiesRaw = Object.fromEntries(abil.map((x) => [x.id, x.raw]));
       this.storeLog(a.log);
     }
 
@@ -279,8 +282,8 @@ const Demo = {
     log.push({
       station: this.station, no, at: new Date().toISOString(),
       score: a.score, ex: a.exScore, cog: a.cogScore,
-      kcal: Math.round(kcal * 10) / 10, revs: Math.round(m.revs),
-      abilities: Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.value : null])),
+      kcal: Math.round(kcal * 10) / 10, distM: Math.round(m.distM), revs: Math.round(m.revs), cfg: Config.demoCode(cfg),
+      abilities: Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.stars : null])),
     });
     this.save('log', log.slice(-this.LOG_MAX));
     a.show('demo-result');
@@ -344,9 +347,7 @@ const Demo = {
       this.updateAttract();
     };
     $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
-    const c = this.app.cfg;
-    $('#op-cfg').innerHTML = `고정 설정: 라운드 ${U.fmtTime(c.durationSec)} · 측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
-      '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.';
+    this.bindSettings();
     // 모서리 길게 누르기 → PIN
     const corner = $('#op-corner');
     let timer = null;
@@ -359,9 +360,88 @@ const Demo = {
     ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => corner.addEventListener(t, cancel));
   },
 
+  // 대기 화면 안내와 운영 메뉴의 설정 요약
+  renderCfg() {
+    const c = this.app.cfg;
+    $('#att-calib').textContent = `${c.calibrationSec}초`;
+    $('#att-dur').textContent = c.durationSec % 60 ? U.fmtTime(c.durationSec) : `${c.durationSec / 60}분`;
+    const changed = Object.keys(Config.demoSaved()).length;
+    $('#op-cfg').innerHTML = `설정 코드 <b>${Config.demoCode(c)}</b>${changed ? ` (기본값에서 ${changed}개 바꿈)` : ' (기본값)'} · ` +
+      `라운드 ${U.fmtTime(c.durationSec)} · 측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
+      '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.';
+  },
+
+  // ---------------- 시간·점수 설정 (DEMO_SETTINGS) ----------------
+  bindSettings() {
+    const box = $('#op-set-fields');
+    for (const s of DEMO_SETTINGS) {
+      const input = s.options
+        ? `<select data-key="${s.key}">${s.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`
+        : `<input type="number" data-key="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="decimal">`;
+      box.append(U.el('label', 'setting', `${s.label}${input}`));
+    }
+    box.addEventListener('input', () => this.markSettings());
+    box.addEventListener('change', () => this.markSettings());
+    $('#op-set-open').onclick = () => this.openSettings();
+    $('#op-set-cancel').onclick = () => $('#op-set').classList.remove('active');
+    $('#op-set-reset').onclick = () => this.fillSettings(Config.demoDefaults());
+    $('#op-set-save').onclick = () => this.saveSettings();
+  },
+
+  openSettings() {
+    if (this.app.inRound) return;
+    this.fillSettings(this.app.cfg);
+    $('#op-set').classList.add('active');
+  },
+
+  fillSettings(cfg) {
+    for (const s of DEMO_SETTINGS) {
+      const el = $(`#op-set-fields [data-key="${s.key}"]`);
+      const v = cfg[s.key];
+      el.value = s.options ? v : Math.round(v * (s.scale || 1) * 1000) / 1000;
+    }
+    this.markSettings();
+  },
+
+  readSettings() {
+    const out = {};
+    for (const s of DEMO_SETTINGS) {
+      const el = $(`#op-set-fields [data-key="${s.key}"]`);
+      if (s.options) {
+        out[s.key] = el.value;
+        continue;
+      }
+      const v = parseFloat(el.value);
+      const def = Config.demoDefaults()[s.key];
+      // 소수 단계(0.05 등)는 부동소수 찌꺼기 없이 저장한다
+      out[s.key] = Number.isFinite(v) ? Math.round((U.clamp(v, s.min, s.max) / (s.scale || 1)) * 10000) / 10000 : def;
+    }
+    return out;
+  },
+
+  // 기본값과 다른 항목을 표시하고, 저장하면 될 설정 코드를 미리 보여 준다
+  markSettings() {
+    const v = this.readSettings();
+    const def = Config.demoDefaults();
+    for (const s of DEMO_SETTINGS) {
+      $(`#op-set-fields [data-key="${s.key}"]`).parentElement.classList.toggle('changed', v[s.key] !== def[s.key]);
+    }
+    $('#op-set-code').textContent = `설정 코드 ${Config.demoCode(v)}`;
+  },
+
+  saveSettings() {
+    const v = this.readSettings();
+    Config.demoSave(v);
+    Object.assign(this.app.cfg, v);
+    this.renderCfg();
+    $('#op-set').classList.remove('active');
+  },
+
   openOp() {
     const a = this.app;
     this.opOpen = true;
+    $('#op-set-open').disabled = a.inRound;
+    $('#op-set-open').textContent = a.inRound ? '시간·점수 설정 (라운드 중에는 못 바꿈)' : '시간·점수 설정';
     $('#op-station').value = this.station;
     $('#op-kbd').checked = this.allowKbd;
     $('#op-sim').checked = this.simResult;
@@ -383,6 +463,7 @@ const Demo = {
   hideOp() {
     if (this.app.inRound && this.opOpen) this.app.log.ev('operator', { open: false });
     this.opOpen = false;
+    $('#op-set').classList.remove('active');
     $('#op').classList.remove('active');
     this.syncPause();
   },
@@ -418,8 +499,8 @@ const Demo = {
 
   downloadCsv() {
     const log = this.load('log', []);
-    const head = ['station', 'no', 'time', 'score', 'exercise', 'cognitive', 'kcal', 'revs', ...ABILITIES.map((x) => x.id)];
-    const rows = log.map((r) => [r.station, r.no, r.at, r.score, r.ex, r.cog, r.kcal, r.revs, ...ABILITIES.map((x) => r.abilities?.[x.id] ?? '')]);
+    const head = ['station', 'no', 'time', 'settings', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...ABILITIES.map((x) => x.id)];
+    const rows = log.map((r) => [r.station, r.no, r.at, r.cfg ?? '', r.score, r.ex, r.cog, r.kcal, r.distM ?? '', r.revs, ...ABILITIES.map((x) => r.abilities?.[x.id] ?? '')]);
     const csv = '﻿' + [head, ...rows].map((row) => row.join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));

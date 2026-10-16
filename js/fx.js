@@ -7,6 +7,7 @@
 const Fx = {
   style: {},
   parts: [],
+  sprites: {}, // 빛 입자 그림 (색마다 하나, glowSprite)
   running: false,
   x: 0, // 마지막 터치 위치 — 정답 파편이 여기서 터진다
   y: 0,
@@ -41,6 +42,34 @@ const Fx = {
     this.style = fx || {};
     this.parts = [];
     this.pal = this.palette();
+    this.sprites = {};
+  },
+
+  // 빛 입자 그림. 입자마다 shadowBlur 로 번지게 하면 태블릿에서 정답 때마다 프레임이 떨어져서(네온),
+  // 색마다 한 번 그라디언트로 그려 두고 drawImage 로 찍는다. GLOW_PAD = 예전 shadowBlur 만큼 번지는 폭
+  GLOW_PAD: 14,
+  GLOW_PX: 96,
+  glowSprite(color) {
+    let c = this.sprites[color];
+    if (c) return c;
+    const n = this.GLOW_PX;
+    c = document.createElement('canvas');
+    c.width = c.height = n;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+    // 흰색 알파 그라디언트를 그린 뒤 색을 입힌다 (팔레트 색이 어떤 CSS 형식이어도 된다)
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.2, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.3, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(0.55, 'rgba(255,255,255,0.1)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, n, n);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, n, n);
+    this.sprites[color] = c;
+    return c;
   },
 
   // ---------------- 게임에서 부르는 곳 ----------------
@@ -156,16 +185,13 @@ const Fx = {
         g.arc(p.x, p.y, p.size * (1 + k * 2.5), 0, Math.PI * 2);
         g.stroke();
         break;
-      case 'glow':
+      case 'glow': {
+        const r = Math.max(0.5, p.size * 0.6 * (1 - k * 0.7)) + this.GLOW_PAD;
         g.globalCompositeOperation = 'lighter';
-        g.shadowColor = p.color;
-        g.shadowBlur = 14;
-        g.beginPath();
-        g.arc(p.x, p.y, Math.max(0.5, p.size * 0.6 * (1 - k * 0.7)), 0, Math.PI * 2);
-        g.fill();
-        g.shadowBlur = 0;
+        g.drawImage(this.glowSprite(p.color), p.x - r, p.y - r, r * 2, r * 2);
         g.globalCompositeOperation = 'source-over';
         break;
+      }
       case 'streak': {
         const len = Math.hypot(p.vx, p.vy) * 0.06 + 4;
         const a = Math.atan2(p.vy, p.vx);

@@ -61,7 +61,7 @@ body[data-theme="neon"] #band {
 body[data-theme="neon"] :is(.pcell, .scell, .ar-cand, .ccell, .fit-cand, .seek-target) { box-shadow: inset 0 0 0 1px var(--line); }
 body[data-theme="neon"] :is(.pcell.on.head, .pcell.start, .ar-slot.active, .scell.reveal) { box-shadow: 0 0 18px var(--accent), inset 0 0 0 2px var(--accent); }
 body[data-theme="neon"] .pcell.done { box-shadow: 0 0 18px var(--good); }
-body[data-theme="neon"] .ar-slot { background: var(--cell); }
+body[data-theme="neon"] :is(.ar-slot, .cv-face, .cv-ans) { background: var(--cell); }
 body[data-theme="neon"] :is(.hud .value, .big-count, .dr-total, .result-total, .calib-ring .num, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-stat b, .alert-title) {
   text-shadow: 0 0 10px currentColor, 0 0 28px color-mix(in srgb, currentColor 55%, transparent);
 }
@@ -129,10 +129,10 @@ body[data-theme="sporty"] :is(.hud .value, .big-count, .dr-total, .result-total,
   letter-spacing: -0.01em;
 }
 body[data-theme="sporty"] :is(.big-count, .dr-total, .intro .name, .perfect, .att-main h1) { text-shadow: 5px 5px 0 var(--accent-soft); }
-body[data-theme="sporty"] .ar-eq { font-family: var(--font); } /* Black Han Sans 의 '=' 는 네모로 뭉개진다 */
+body[data-theme="sporty"] :is(.ar-eq, .cv-eq) { font-family: var(--font); } /* Black Han Sans 의 '=' 는 네모로 뭉개진다 */
 body[data-theme="sporty"] .hud .label, body[data-theme="sporty"] .intro .tag, body[data-theme="sporty"] .dr-card h3 { font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
 body[data-theme="sporty"] .att-brand, body[data-theme="sporty"] .dr-id { transform: skewX(-10deg); border-radius: 4px; }
-body[data-theme="sporty"] :is(.pcell, .scell, .ar-cand, .ar-slot, .cnt-opt, .fit-cand) { border-radius: 6px; }
+body[data-theme="sporty"] :is(.pcell, .scell, .ar-cand, .ar-slot, .cnt-opt, .fit-cand, .cv-face, .cv-lid, .cv-ans, .cv-slot, .cv-home) { border-radius: 6px; }
 body[data-theme="sporty"] .qtimer { transform: translateX(-50%) skewX(-20deg); border-radius: 2px; height: 12px; }
 body[data-theme="sporty"] :is(.pcell.on.head, .pcell.start) { box-shadow: 4px 4px 0 var(--ink); }
 
@@ -174,7 +174,7 @@ body[data-theme="cartoon"] :is(.btn, .panel, .dr-card, .op-box, .alert-box, .pin
 body[data-theme="cartoon"] :is(.btn, .ar-cand, .pin-pad button) { border-radius: 18px; font-weight: 400; transition: transform 0.12s cubic-bezier(0.3, 1.8, 0.5, 1), box-shadow 0.12s; }
 body[data-theme="cartoon"] :is(.btn, .ar-cand):active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
 body[data-theme="cartoon"] :is(.cnt-opt, .fit-cand) { border-color: var(--ink); box-shadow: 0 5px 0 var(--ink); }
-body[data-theme="cartoon"] .ar-slot { border-color: var(--ink); }
+body[data-theme="cartoon"] :is(.ar-slot, .cv-face, .cv-ans) { border-color: var(--ink); }
 body[data-theme="cartoon"] * { font-weight: 400 !important; } /* Jua 는 굵기가 하나뿐이라 가짜 굵게를 막는다 */
 body[data-theme="cartoon"] #band {
   background: linear-gradient(180deg, #bfe8ff 0%, #e9f7ff 70%, var(--panel) 100%);
@@ -254,8 +254,8 @@ body[data-theme="pixel"] .btn:active { box-shadow: inset 0 6px 0 rgba(0, 0, 0, 0
 body[data-theme="pixel"] .att-start { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { filter: brightness(1.35); } }
 body[data-theme="pixel"] #band { background: #10121f; border-bottom: var(--px) solid var(--line); }
-body[data-theme="pixel"] :is(.pcell, .scell, .ar-cand, .ccell, .cnt-opt, .fit-cand, .seek-target, .ar-slot) { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3); }
-body[data-theme="pixel"] .ar-slot { background: var(--cell); }
+body[data-theme="pixel"] :is(.pcell, .scell, .ar-cand, .ccell, .cnt-opt, .fit-cand, .seek-target, .ar-slot, .cv-face, .cv-ans) { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3); }
+body[data-theme="pixel"] :is(.ar-slot, .cv-face, .cv-ans) { background: var(--cell); }
 body[data-theme="pixel"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-stat b, .hud .value, .result-total, .dr-title) {
   text-shadow: 4px 4px 0 #000;
   font-weight: 400;

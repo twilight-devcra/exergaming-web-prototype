@@ -241,6 +241,8 @@ window.__targets = (wrong) => {
     case 'seek': els = [g.cellEls[g.puzzle.answer[Math.floor(g.puzzle.answer.length / 2)]]]; break;
     case 'symbol': els = [wrong ? g.cells.find((x, i) => i !== g.current.slot && !x.classList.contains('closed')) : g.cells[g.current.slot]]; break;
     case 'path': els = g.path.slice(g.k).map(([r, cc]) => g.cells[r][cc]); break;
+    case 'ladder': els = [g.startEls[wrong ? (g.p.answer + 1) % g.p.lanes : g.p.answer]]; break;
+    case 'cover': els = [g.btns.find((b) => (Number(b.textContent) === g.q.ans) !== !!wrong)]; break;
   }
   return { q: App.log.qn, game: c.T.id, pts: els.map(ctr) };
 }; true
@@ -249,7 +251,7 @@ window.__targets = (wrong) => {
 # 스타일 GIF 결과 화면용 연출 값
 STAGED_RESULT = """
 (() => {
-  const fill = { path: [9, 10, 2], symbol: [3, 3, 1], arith: [2, 3, 1], count: [3, 3, 1], fit: [2, 3, 1], seek: [3, 3, 2] };
+  const fill = { path: [9, 10, 2], symbol: [3, 3, 1], arith: [2, 3, 1], count: [3, 3, 1], fit: [2, 3, 1], seek: [3, 3, 2], cover: [2, 3, 1], ladder: [3, 3, 2] };
   for (const [id, [c, t, l]] of Object.entries(fill)) Object.assign(App.stats[id], { plays: 1, correct: c, total: t, level: l, ms: t * 6500 });
   App.exScore = 2614; App.cogScore = 1288; App.score = App.exScore + App.cogScore;
   const m = App.meter; m.activeSec = 292; m.revs = 61 / 60 * 292; m.joules = Exercise.watts(61) * 292;

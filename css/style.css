@@ -678,6 +678,138 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .seek-stroke.right { stroke: var(--good); }
 .seek-stroke.reveal { stroke: var(--accent); }
 
+/* 가린 숫자 더하기 — 위쪽 줄(.cv-row)에 숫자 자리, 그 아래 가운데(.cv-center)에 식과 보기.
+   숫자(.cv-tok)는 판 위에 절대 위치로 떠서 제자리와 식의 빈칸 사이를 날아다닌다 */
+.cv-board { position: relative; flex: 1; width: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* 위쪽 여백은 열린 뚜껑이 숫자 위로 젖혀질 자리 (숫자 높이의 3/4쯤) */
+.cv-row { display: flex; gap: calc(var(--tk) * 0.3); padding-top: calc(var(--tk) * 0.75); }
+.cv-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--tk) * 0.3);
+  padding-top: calc(var(--tk) * 0.75);
+}
+.cv-eq {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--tk) * 0.16);
+  font-family: var(--font-num);
+  font-size: calc(var(--tk) * 0.6);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.3s;
+}
+.cv-eq.idle { opacity: 0.35; }
+.cv-slot { width: var(--tk); height: var(--tk); border-radius: 14px; border: 3px dashed var(--line); }
+.cv-ans {
+  min-width: calc(var(--tk) * 1.15);
+  height: var(--tk);
+  padding: 0 0.15em;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 4px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cv-ans.active { border-color: var(--accent); box-shadow: 0 0 0 6px var(--accent-soft); color: var(--accent); }
+.cv-ans.right { border-color: var(--good); color: var(--good); }
+.cv-ans.wrong { border-color: var(--bad); color: var(--bad); }
+/* 보기는 한 줄로 늘어놓고, 보기가 없는 동안에도 크기를 잡아 두어 가운데 영역이 변하지 않게 한다 (숫자 자리는 이 크기로 비운다) */
+.cv-opts { display: flex; gap: calc(var(--tk) * 0.14); justify-content: center; min-height: calc(var(--tk) * 0.9); min-width: calc(var(--tk) * 5); }
+.cv-opt { width: calc(var(--tk) * 0.9); height: calc(var(--tk) * 0.9); font-size: calc(var(--tk) * 0.42); animation: pop 0.18s ease-out; }
+.cv-opt:disabled:not(.right, .wrong, .answer) { opacity: 0.25; }
+.cv-opt.right { background: var(--good); color: var(--on-accent); opacity: 1; }
+/* 숫자의 제자리. 숫자가 식으로 날아가면 테두리가 보인다 */
+.cv-home { flex: none; width: var(--tk); height: var(--tk); border-radius: 14px; border: 3px dashed transparent; transition: border-color 0.2s; }
+.cv-home.empty { border-color: var(--line); }
+.cv-tok {
+  position: absolute;
+  width: var(--tk);
+  height: var(--tk);
+  z-index: 1;
+  perspective: calc(var(--tk) * 5);
+  transition: left 0.52s cubic-bezier(0.5, 0, 0.25, 1), top 0.52s cubic-bezier(0.5, 0, 0.25, 1);
+  animation: pop 0.18s ease-out;
+}
+.cv-tok.away { z-index: 3; }
+.cv-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 4px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-num);
+  font-size: calc(var(--tk) * 0.6);
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+/* 상자 뚜껑: 위쪽 모서리를 축으로 뒤로 젖혀 열린다 */
+.cv-lid {
+  position: absolute;
+  inset: -3px;
+  border-radius: 16px;
+  transform-origin: 50% 0;
+  transition: transform 0.4s cubic-bezier(0.3, 1.3, 0.5, 1);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+}
+.cv-lid svg { display: block; width: 64%; height: 64%; margin: 18%; fill: rgba(255, 255, 255, 0.92); }
+.cv-tok.open .cv-lid { transform: rotateX(118deg); }
+
+/* 사다리 타기 */
+.lad-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; width: 100%; min-height: 0; }
+.lad-board { flex: 1; width: 100%; min-height: 0; }
+.lad-svg { display: block; width: 100%; height: 100%; }
+.lad-rail, .lad-rung { stroke: var(--ink-soft); stroke-linecap: round; }
+.lad-rail { stroke-width: 6; }
+.lad-rung { stroke-width: 5; }
+/* 출발점: 조각 뒤의 동그란 받침. 누르는 곳은 그보다 넓은 투명 사각형 */
+.lad-start { cursor: pointer; }
+.lad-start rect { fill: transparent; }
+.lad-halo { fill: var(--panel); stroke: var(--line); stroke-width: 3; transition: fill 0.12s; }
+@media (hover: hover) {
+  .lad-start:not(.done):hover .lad-halo { fill: var(--accent-soft); }
+}
+.lad-start.done { cursor: default; }
+/* 조각: 아래쪽 어두운 테두리로 도드라져 보이게 */
+.lad-peg-pos { pointer-events: none; }
+.lad-peg { stroke: rgba(0, 0, 0, 0.28); stroke-width: 3; stroke-linejoin: round; }
+.lad-peg, .lad-floor { transform-box: fill-box; transform-origin: center; }
+.lad-peg.seated { animation: lad-seat 0.35s ease-out forwards; }
+@keyframes lad-seat { 50% { scale: 0.72; } 100% { scale: 0.84; } }
+.lad-peg.bump { animation: lad-bump 0.4s ease-out; }
+@keyframes lad-bump { 30% { translate: 0 -14px; } 60% { translate: 0 0; } 80% { translate: 0 -5px; } }
+/* 구멍: 어두운 속 + 그 모양의 색 테두리 (stroke 는 js 에서) */
+.lad-hole { fill: color-mix(in srgb, var(--bg) 30%, #000); stroke-width: 4.5; stroke-linejoin: round; }
+.lad-end { fill: var(--line); }
+.lad-floor.fit { animation: lad-hit 0.35s ease-out; }
+.lad-hole.fit { stroke: var(--good); }
+.lad-hole.miss { stroke: var(--bad); }
+.lad-end.miss { fill: var(--bad); }
+@keyframes lad-hit { 50% { scale: 1.25; } }
+/* 고른 길: 강조색으로 위에서부터 그려 내려가고, 다 내려오면 초록·빨강으로 바뀐다 (polyline 의 pathLength = 1) */
+.lad-trace {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.85;
+  transition: stroke-dashoffset 0.8s linear, stroke 0.15s;
+}
+.lad-trace.go { stroke-dashoffset: 0; }
+.lad-trace.right { stroke: var(--good); }
+.lad-trace.wrong { stroke: var(--bad); }
+
 /* ---------- 측정 화면 ---------- */
 #calib, #result {
   align-items: center;

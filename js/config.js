@@ -27,7 +27,7 @@ const DEFAULT_CONFIG = {
   multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv1 x1.0, Lv2 x1.2 ...)
   questionTimer: true,       // 문제마다 제한 시간. 시간이 다 되면 그 문제는 틀린 것으로 친다
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
-  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수
+  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합
   questionTime: {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
     symbol: { base: 6, per: 0 },     // 6초
@@ -35,6 +35,8 @@ const DEFAULT_CONFIG = {
     count: { base: 5, per: 0.3 },    // 12칸 9초 ~ 25칸 13초
     fit: { base: 5, per: 1.5 },      // 조각 3개 10초 ~ 6개 14초
     seek: { base: 6, per: 0.25 },    // 19칸 11초 ~ 61칸 21초
+    cover: { base: 5, per: 2.5 },    // 덮인 숫자 하나 7.5초 · 둘 10초
+    ladder: { base: 4, per: 0.7 },   // 1단계 약 6초 ~ 6단계 (구멍 4개) 약 20초
   },
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
   minRpm: 25,

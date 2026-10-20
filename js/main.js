@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame];
+const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
 const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
 const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다

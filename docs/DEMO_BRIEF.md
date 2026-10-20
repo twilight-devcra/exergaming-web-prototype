@@ -21,7 +21,7 @@ It records the goal, what is already decided, and what is still open. Read `READ
 
 - **Core gameplay is validated.** Internal playtests passed: pedal to keep the ball in the green zone (target speed = the player's calibrated comfortable speed, with uphill/downhill shifts) while solving touch minigames underneath. Don't redesign it. This pass is about **presentation and polish**.
 - Pedal speed comes from the lz waveform zero-crossing estimator (`rpmSource: 'zc'`, see `js/cadence-est.js`). This was tuned on 2026-10-14 recordings. Leave it alone unless a station-specific problem comes up.
-- The six minigames (`js/games/`): path (길 따라 그리기), symbol (심볼 위치 외우기), arith (사칙연산 역산), count (우세한 색 찾기), fit (빈자리 채우기, hex line tiles), seek (숨은 순서 찾기).
+- The eight minigames (`js/games/`): path (길 따라 그리기), symbol (심볼 위치 외우기), arith (사칙연산 역산), count (우세한 색 찾기), fit (빈자리 채우기, hex line tiles), seek (숨은 순서 찾기), cover (가린 숫자 더하기, add two numbers when at least one is under a marked box; added 2026-10-20), ladder (사다리 타기, pick the peg whose ladder path drops it into the same-shaped hole; more holes and slanted rungs at higher levels, some of which change the path compared with reading them flat; added 2026-10-20).
 - **The calibrated target speed does not affect the score.** Players aren't expected to pedal flat out during warm-up, and the score only measures how well they hold *their own* target. Don't treat "sandbagging the warm-up" as a fairness problem.
 - **Exercise amount = virtual distance + MET-based kcal, from cadence only** (decided 2026-10-16). Pedal resistance can differ per player and can't be calibrated, and the pedal's `watt` is an uncalibrated vibration proxy (default coefficient, grows ~rpm³, reads 0 when slow). So don't use watts. Distance = revolutions × 6 m (the firmware's default bike gearing). kcal = MET × 3.5 × 65 kg / 200 per minute, with MET interpolated from RPM (1.3 at rest, 3.5 at 60 RPM, 4.8 at 90+; values from the Compendium of Physical Activities, RPM anchors are ours). No food or place comparisons.
   **It is display-only and does not count toward the prize score.** The prize score stays as it is now: speed-consistency points (운동 점수) plus minigame points.
@@ -77,6 +77,8 @@ These are reasonable defaults. Confirm with the user before relying on them.
   | count 우세한 색 찾기 | | | 0.5 | | 0.5 |
   | fit 빈자리 채우기 | | 0.6 | | 0.4 | |
   | seek 숨은 순서 찾기 | | 0.3 | 0.4 | | 0.3 |
+  | cover 가린 숫자 더하기 | 0.6 | | 0.1 | 0.3 | |
+  | ladder 사다리 타기 | | 0.3 | 0.5 | | 0.2 |
 
   Per-game performance comes from accuracy and level (now: stars, see Status above). Each axis is the weighted average of the games that touch it. Because each axis draws on two or more games, a short session that skips a game still fills every axis. If an axis gets no data, show a neutral default rather than 0.
   "Processing speed" would be better with timing, but the games don't record answer times today. Either add per-question timing through the host interface in `makeHost` (`js/main.js`), or use questions answered per minute as a proxy.

@@ -4,7 +4,7 @@
 // 설명 없이도 '어느 방향이든 된다'가 전해지도록:
 //   - 판이 육각형이라 가로줄이 따로 눈에 띄지 않고 여섯 방향이 똑같아 보인다.
 //   - 찾을 순서는 가로로 늘어놓지 않고 천천히 도는 사슬로 보여준다 (시작과 끝도 따로 없다).
-//   - 가장 쉬운 단계의 첫 문제는 일부러 비스듬한 줄에 숨긴다.
+//   - 쉬운 단계(slanted)의 첫 문제는 일부러 비스듬한 줄에 숨긴다.
 // 난이도는 판 크기(radius), 순서 길이(len), 그림 종류(symbols),
 // 그리고 한 칸만 다른 가짜 줄의 수(decoys)로 조절한다.
 const SEEK_SYMBOLS = [
@@ -21,8 +21,12 @@ class SeekGame {
   static id = 'seek';
   static title = '숨은 순서 찾기';
   static hint = '왼쪽의 그림 순서가 판 어딘가에 한 줄로 숨어 있습니다<br>그 줄에 있는 칸을 아무거나 하나 누르세요';
+  // slanted — 첫 문제를 비스듬한 줄에 숨긴다. 처음 하는 사람이 나올 법한 단계(Lv1~3)에 둔다
   static levels = [
-    { radius: 2, len: 3, symbols: 4, decoys: 0 },
+    // 쉬운 단계: 판이 작고(Lv1 은 7칸에 두 개짜리 순서), 그림 종류가 많아 찾는 순서가 눈에 잘 띈다
+    { radius: 1, len: 2, symbols: 4, decoys: 0, slanted: true },
+    { radius: 2, len: 3, symbols: 5, decoys: 0, slanted: true },
+    { radius: 2, len: 3, symbols: 4, decoys: 0, slanted: true },
     { radius: 2, len: 3, symbols: 4, decoys: 1 },
     { radius: 3, len: 3, symbols: 5, decoys: 2 },
     { radius: 3, len: 4, symbols: 5, decoys: 2 },
@@ -68,7 +72,7 @@ class SeekGame {
   next() {
     const { radius, len } = this.spec;
     // 설명을 대신하는 첫 문제: 가로줄이 아닌 곳에 숨겨 '가로만 보면 안 된다'를 바로 겪게 한다
-    const slanted = this.h.level === 1 && this.round === 0;
+    const slanted = !!this.spec.slanted && this.round === 0;
     this.puzzle = SeekGame.make(this.spec, slanted);
     const { cells, syms, seq } = this.puzzle;
     const glyphs = U.shuffle([...SEEK_SYMBOLS]);

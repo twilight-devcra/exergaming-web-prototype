@@ -1,4 +1,14 @@
 // 시연 환경에 맞춰 조절 가능한 설정값. 메뉴 화면의 '시연 설정'에서 바꾼 값은 localStorage에 저장된다.
+
+// 난이도 단계. Lv1·Lv2 는 50~60대에게 원래의 첫 단계도 버겁다는 의견을 받고 그 아래에 더한 쉬운 단계다 (2026-10-21).
+// 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이고, 점수 배율도 Lv3 부터 오른다.
+// 쉬운 단계는 문제를 줄이는 것과 함께 제한 시간도 EASY_TIME 배로 늘린다 (Lv1, Lv2 순).
+const EASY_LEVELS = 2;
+const BASE_LEVEL = EASY_LEVELS + 1;
+const EASY_TIME = [1.5, 1.25];
+// 저장해 둔 시작 난이도가 어느 번호 체계로 적힌 것인가. 1 = 쉬운 단계를 더하기 전 (그때의 Lv1 이 지금의 Lv3)
+const LEVEL_SCHEME = 2;
+
 const DEFAULT_CONFIG = {
   durationSec: 180,          // 라운드 길이 (인지 게임 진행과 무관하게 고정)
   calibrationSec: 15,        // 시작 전 편안한 속도 측정 시간
@@ -16,17 +26,20 @@ const DEFAULT_CONFIG = {
   rpmSource: 'zc',           // 페달 센서 속도 측정 방식: zc 파형 영교차 | comb 파형 결합 | teo 파형 모양 | pedal 페달 avg_rpm
   games: null,               // 라운드에 넣을 인지 게임 id 목록 (null = 전체). 메뉴의 '사용할 게임'에서 바뀐다.
   cogBasePoints: 100,        // 인지 게임 1회를 완벽히 했을 때의 기본 점수 (모든 유형 동일)
-  startLevel: 1,             // 라운드를 시작할 난이도. 올리면 쉬운 단계를 건너뛰고 바로 어려운 문제부터 나온다
+  startLevel: BASE_LEVEL,    // 라운드를 시작할 난이도. 노년층은 1 (쉬운 단계부터). 올리면 쉬운 단계를 건너뛰고 바로 어려운 문제부터 나온다
+  levelScheme: LEVEL_SCHEME,
   difficulty: 'adaptive',    // 난이도 방식: adaptive 정답·오답으로 오르내림 | cycle 게임을 한 바퀴 돌 때마다 +1
   // adaptive: 모든 게임이 함께 쓰는 난이도 계기판. 정답마다 diffUp 만큼 오르고 오답(시간 초과 포함)마다 diffDown 만큼 내려간다.
-  // 다음 게임의 레벨 = 계기판의 정수 부분. 세 문제를 다 맞히면 한 단계 넘게 오르고, 2/3 면 조금 오르고, 1/3 이하면 내려간다
+  // 다음 게임의 레벨 = 계기판의 정수 부분. 아래로는 Lv1 까지 내려가므로, Lv3 에서 시작해도 계속 틀리면 쉬운 단계가 나온다.
+  // 세 문제를 다 맞히면 한 단계 넘게 오르고, 2/3 면 조금 오르고, 1/3 이하면 내려간다
   // (맞히는 비율이 diffDown / (diffUp + diffDown) = 60% 근처에서 머문다). 5분 라운드는 답이 20개 남짓이라 빨리 올라야 한다.
   // 길 따라 그리기는 길 하나가 답 하나다.
   diffUp: 0.4,
   diffDown: 0.6,
-  multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv1 x1.0, Lv2 x1.2 ...)
+  multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv3 x1.0, Lv4 x1.2 ... 쉬운 단계 Lv1·Lv2 도 x1.0)
   questionTimer: true,       // 문제마다 제한 시간. 시간이 다 되면 그 문제는 틀린 것으로 친다
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
+  // 쉬운 단계(Lv1·Lv2)는 여기에 EASY_TIME 을 곱한다. 아래 범위는 Lv3~8 의 값이다.
   // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합
   questionTime: {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
@@ -36,7 +49,7 @@ const DEFAULT_CONFIG = {
     fit: { base: 5, per: 1.5 },      // 조각 3개 10초 ~ 6개 14초
     seek: { base: 6, per: 0.25 },    // 19칸 11초 ~ 61칸 21초
     cover: { base: 5, per: 2.5 },    // 덮인 숫자 하나 7.5초 · 둘 10초
-    ladder: { base: 4, per: 0.7 },   // 1단계 약 6초 ~ 6단계 (구멍 4개) 약 20초
+    ladder: { base: 4, per: 0.7 },   // Lv3 약 6초 ~ Lv8 (구멍 4개) 약 20초
   },
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
   minRpm: 25,
@@ -48,7 +61,7 @@ const DEFAULT_CONFIG = {
 const DEMO_CONFIG = {
   durationSec: 300,
   games: null,
-  startLevel: 1,
+  startLevel: BASE_LEVEL,
   difficulty: 'adaptive',
   sound: true,
   rpmSource: 'zc',
@@ -61,7 +74,7 @@ const DEMO_SETTINGS = [
   { key: 'cogBasePoints', label: '인지 게임 기본 점수 (한 판 다 맞히면)', min: 10, max: 1000, step: 10 },
   { key: 'multiplierStep', label: '난이도 1단계당 점수 배율 증가', min: 0, max: 1, step: 0.05 },
   { key: 'difficulty', label: '난이도 방식', options: [['adaptive', '정답·오답에 따라 오르내림'], ['cycle', '한 바퀴 돌 때마다 +1']] },
-  { key: 'startLevel', label: '시작 난이도', min: 1, max: 6, step: 1 },
+  { key: 'startLevel', label: '시작 난이도 (3 = 보통, 노년층은 1)', min: 1, max: 8, step: 1 },
   { key: 'diffUp', label: '정답 하나에 난이도 + (오르내림 방식)', min: 0.05, max: 2, step: 0.05 },
   { key: 'diffDown', label: '오답 하나에 난이도 − (오르내림 방식)', min: 0.05, max: 2, step: 0.05 },
 ];
@@ -82,6 +95,7 @@ const Config = {
   demoSaved() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(DEMO_SETTINGS_KEY) || '{}'); } catch (e) {}
+    this.migrateLevel(saved);
     return Object.fromEntries(DEMO_SETTINGS.filter((s) => s.key in saved).map((s) => [s.key, saved[s.key]]));
   },
   // 기본값과 같은 항목은 저장하지 않는다 (DEMO_CONFIG 를 고쳐 배포하면 바꾸지 않은 항목은 새 값을 따른다)
@@ -89,7 +103,7 @@ const Config = {
     const def = this.demoDefaults();
     const diff = Object.fromEntries(Object.entries(values).filter(([k, v]) => v !== def[k]));
     try {
-      if (Object.keys(diff).length) localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify(diff));
+      if (Object.keys(diff).length) localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify({ ...diff, levelScheme: LEVEL_SCHEME }));
       else localStorage.removeItem(DEMO_SETTINGS_KEY);
     } catch (e) {}
   },
@@ -103,8 +117,13 @@ const Config = {
   load() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) {}
+    this.migrateLevel(saved);
     // 제한 시간 표는 화면에서 바꾸지 않으므로 늘 코드의 값을 쓴다 (예전에 저장된 표가 고친 값을 덮지 않게)
-    return Object.assign({}, DEFAULT_CONFIG, saved, { questionTime: DEFAULT_CONFIG.questionTime });
+    return Object.assign({}, DEFAULT_CONFIG, saved, { questionTime: DEFAULT_CONFIG.questionTime, levelScheme: LEVEL_SCHEME });
+  },
+  // 쉬운 단계를 더하기 전에 저장한 시작 난이도는 같은 문제가 나오도록 번호를 옮긴다
+  migrateLevel(saved) {
+    if (saved.startLevel != null && saved.levelScheme !== LEVEL_SCHEME) saved.startLevel += EASY_LEVELS;
   },
   save(cfg) {
     try { localStorage.setItem('exergame.config', JSON.stringify(cfg)); } catch (e) {}

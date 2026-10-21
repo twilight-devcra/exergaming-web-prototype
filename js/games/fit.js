@@ -17,11 +17,14 @@
 //   lines — 선 수 (1~3). 많을수록 맞춰 볼 끝점이 늘어난다.
 //   cands — 조각 수.
 //   pick  — 오답을 고르는 방법. far = 정답과 셋 이상의 변에서 다른 것, near = 가장 적게 다른 것, any = 아무거나.
+//   upright — 조각을 돌려 놓지 않는다 (쉬운 단계). 정답 조각이 빈자리와 같은 방향이라 머릿속으로 돌려 볼 필요가 없다.
 class FitGame {
   static id = 'fit';
   static title = '빈자리 채우기';
   static hint = '빈자리에 끼웠을 때 선이 모두 이어지는<br>조각을 아래에서 고르세요';
   static levels = [
+    { lines: 1, cands: 2, pick: 'any', upright: true },
+    { lines: 1, cands: 3, pick: 'any', upright: true },
     { lines: 1, cands: 3, pick: 'any' },
     { lines: 2, cands: 3, pick: 'far' },
     { lines: 2, cands: 4, pick: 'near' },
@@ -68,7 +71,9 @@ class FitGame {
     const pieces = FitGame.makeRound(this.spec);
     this.gap = pieces[0];
     // 조각마다 놓인 방향을 따로 정한다. 정답은 빈자리와 같은 방향으로는 놓지 않는다 — 돌려 보지 않고도 맞힐 수 있다.
+    // upright 단계는 거꾸로 일부러 모두 빈자리와 같은 방향으로 둔다.
     this.shown = U.shuffle(pieces.map((p, i) => {
+      if (this.spec.upright) return { p, rot: 0, answer: i === 0 };
       let rot = U.rand(6);
       if (i === 0) {
         const turned = [1, 2, 3, 4, 5].filter((k) => FitGame.str(FitGame.turn(p, k)) !== FitGame.str(p));

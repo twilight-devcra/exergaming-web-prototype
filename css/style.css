@@ -525,6 +525,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .ar-eq.long { gap: 16px; font-size: clamp(40px, 7.5vh, 72px); }
 .ar-eq.long .ar-slot { min-width: 1.6em; }
 .ar-slot.filled { cursor: pointer; }
+.ar-slot.given { cursor: default; background: var(--cell); }
 .ar-slot.active { border-color: var(--accent); box-shadow: 0 0 0 6px var(--accent-soft); color: var(--accent); }
 .ar-slot.filled { color: var(--ink); }
 .ar-slot.right { border-color: var(--good); color: var(--good); }

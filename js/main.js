@@ -126,7 +126,7 @@ const App = {
     c.durationSec = num('#cfg-duration', 30, 900, 180);
     c.calibrationSec = num('#cfg-calib', 5, 60, 15);
     c.tolerance = num('#cfg-tol', 3, 40, 12) / 100;
-    c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), 1));
+    c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), BASE_LEVEL));
     c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
     c.difficulty = $('#cfg-difficulty').value;
     c.rpmChange = $('#cfg-change').checked;
@@ -430,7 +430,8 @@ const App = {
     const level = this.cfg.difficulty === 'adaptive'
       ? U.clamp(Math.floor(this.diff), 1, T.maxLevel)
       : Math.min(cycle + this.cfg.startLevel, T.maxLevel);
-    const mult = 1 + this.cfg.multiplierStep * (level - 1);
+    // 쉬운 단계(Lv1·Lv2)는 원래의 첫 단계(Lv3)와 같은 x1.0 이다
+    const mult = 1 + this.cfg.multiplierStep * Math.max(0, level - BASE_LEVEL);
     const prev = this.lastLevel[T.id];
     const firstTime = prev == null;
     const tag = firstTime ? '새 게임' : level > prev ? '레벨 업' : level < prev ? '숨 고르기' : '한 번 더';
@@ -468,7 +469,7 @@ const App = {
       base: this.cfg.cogBasePoints,
       after: (ms, fn) => this.after(ms, fn, gen),
       // 문제 하나의 제한 시간. load = 그 문제의 일의 양 (config.questionTime 참고). 다 되면 onOut 을 부른다
-      timer: (load, onOut) => this.startQTimer(T, stage, load, onOut, gen),
+      timer: (load, onOut) => this.startQTimer(T, stage, level, load, onOut, gen),
       stopTimer: () => this.stopQTimer(),
       // 세션 기록 (js/session-log.js). question = 입력을 받기 시작한 문제의 내용, input = 답 도중의 입력, answer = 최종 답
       question: (data) => gen === this.gen && this.log.question(T.id, level, data),
@@ -508,7 +509,8 @@ const App = {
 
   // ---------------- 문제 제한 시간 ----------------
   // 게임 시계로 재므로 일시정지·운영 메뉴 중에는 멈춘다. 막대는 게임 영역 맨 위에 붙는다.
-  startQTimer(T, stage, load, onOut, gen) {
+  // 쉬운 단계(Lv1·Lv2)는 EASY_TIME 배로 늘린다
+  startQTimer(T, stage, level, load, onOut, gen) {
     this.qt = null;
     if (!this.cfg.questionTimer || gen !== this.gen) return;
     const spec = this.cfg.questionTime[T.id];
@@ -520,7 +522,8 @@ const App = {
     }
     el.className = 'qtimer on';
     el.firstChild.style.transform = 'scaleX(1)';
-    this.qt = { t0: this.clock, ms: (spec.base + spec.per * load) * 1000, onOut, gen, el, tick: 3 };
+    const scale = EASY_TIME[level - 1] || 1;
+    this.qt = { t0: this.clock, ms: (spec.base + spec.per * load) * scale * 1000, onOut, gen, el, tick: 3 };
     this.log.ev('timer_start', { game: T.id, load, limitMs: this.qt.ms });
   },
 

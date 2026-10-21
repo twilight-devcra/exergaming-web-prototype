@@ -37,9 +37,15 @@ const Abilities = {
   STAR_BONUS: 0.5, // 별 = 해낸 레벨 + 이만큼
   PACE_MIN: 0.6,
 
-  // 판 하나에서 해낸 레벨 = (레벨 − 1) + 정확도: Lv3 을 다 맞히면 3, 절반이면 2.5, Lv1 을 다 틀리면 0.
+  // 별은 원래의 단계 체계로 센다: 원래의 첫 단계 Lv3(BASE_LEVEL)이 1이고, 그 아래 쉬운 단계 Lv1·Lv2 는 1/3·2/3 이다.
+  // (쉬운 단계를 더하기 전과 같은 판이면 같은 별이 나온다)
+  effLevel(lv) {
+    return lv >= BASE_LEVEL ? lv - BASE_LEVEL + 1 : lv / BASE_LEVEL;
+  },
+
+  // 판 하나에서 해낸 레벨 = (레벨 − 1) + 정확도 (레벨은 effLevel, 0 아래로는 내려가지 않는다): Lv5 를 다 맞히면 3, 절반이면 2.5, Lv3 을 다 틀리면 0.
   // 축 하나 = 관련 게임 판들의 가중 평균. 가중치 = 게임 가중치(ABILITY_WEIGHTS) × 레벨 — 높은 레벨에서 해낸(또는 놓친) 판이
-  // 몸풀기 Lv1 보다 크게 친다. 라운드 앞쪽 게임은 늘 Lv1 이라, 레벨로 가중하지 않으면 모두가 낮게 나온다.
+  // 몸풀기 첫 단계보다 크게 친다. 라운드 앞쪽 게임은 늘 시작 단계라, 레벨로 가중하지 않으면 모두가 낮게 나온다.
   // stats: App.stats ({ id: { runs: [[레벨, 맞힌 수, 문제 수]…], total, ms } })
   // → [{ id, name, praise, stars(1~5, 0.5 단위), value(그래프용 0~100), raw(해낸 레벨, 데이터 없으면 null), hasData }]
   compute(stats) {
@@ -57,9 +63,10 @@ const Abilities = {
         const f = U.clamp((pace.slow - per) / (pace.slow - pace.fast), 0, 1);
         paceK = this.PACE_MIN + (1 - this.PACE_MIN) * f;
       }
-      for (const [lv, correct, total] of s.runs) {
+      for (const [level, correct, total] of s.runs) {
         if (total <= 0) continue;
-        const d = lv - 1 + correct / total;
+        const lv = this.effLevel(level);
+        const d = Math.max(0, lv - 1 + correct / total);
         for (const [axis, k] of Object.entries(w)) {
           sum[axis] = (sum[axis] || 0) + k * lv * (axis === 'speed' ? d * paceK : d);
           wsum[axis] = (wsum[axis] || 0) + k * lv;

@@ -5,12 +5,18 @@
 //   blanks  — 빈칸 수. 최대 3개 (4개는 다른 게임보다 지나치게 어려웠다)
 //   n       — 후보 숫자 수 (모두 서로 다른 한 자리 수)
 //   maxSols — 답이 되는 조합의 최대 개수. 순서만 다른 것은 같은 조합으로 센다.
+//   plus    — 덧셈만 쓴다 (쉬운 단계). 빼는 칸은 '어느 쪽이 커야 하나'까지 따져야 해서 한결 어렵다.
+//   given   — 미리 채워 두는 칸 수 (가장 쉬운 단계). 채워 둔 숫자는 후보에서 빠지므로 n 은 그 숫자까지 센 수다.
+//             빈칸이 하나 남으면 '답 − 채워 둔 수'를 찾기만 하면 된다.
 // '큰 수부터 넣고 나머지를 맞춰 보는' 요령이 통하지 않도록 문제를 고른다 (generate 참고).
 class ArithGame {
   static id = 'arith';
   static title = '사칙연산 역산';
   static hint = '아래 숫자를 골라 빈칸을 모두 채워 식을 완성하세요<br>채운 칸을 누르면 숫자를 다시 뺄 수 있습니다';
   static levels = [
+    // 쉬운 단계: 덧셈만. Lv1 은 한 칸을 채워 두고 나머지 한 칸을 후보 3개에서 고른다
+    { blanks: 2, n: 4, maxSols: 1, plus: true, given: 1 },
+    { blanks: 2, n: 4, maxSols: 1, plus: true },
     { blanks: 2, n: 4, maxSols: 1 },
     { blanks: 2, n: 5, maxSols: 1 },
     { blanks: 3, n: 5, maxSols: 3 },
@@ -52,14 +58,17 @@ class ArithGame {
   next() {
     const p = ArithGame.generate(this.spec);
     this.p = p;
-    this.fill = p.sol.map(() => null); // 칸마다 { v, btn } 또는 null
+    this.fill = p.sol.map(() => null); // 칸마다 { v, btn } 또는 null. 채워 둔 칸은 { v, given: true }
+    const givenAt = U.shuffle([...p.sol.keys()]).slice(0, this.spec.given || 0);
+    givenAt.forEach((i) => (this.fill[i] = { v: p.sol[i], given: true }));
+    const shown = p.cands.filter((v) => !givenAt.some((i) => p.sol[i] === v));
     this.msg.textContent = '';
     this.msg.className = 'stage-msg';
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
 
     this.eq.innerHTML = '';
     this.slots = p.sol.map((_, i) => {
-      const s = U.el('div', 'ar-slot', '?');
+      const s = U.el('div', `ar-slot${this.fill[i] ? ' given' : ''}`, '?');
       s.addEventListener('pointerdown', () => this.unpick(i));
       if (i > 0) this.eq.append(U.el('div', '', p.ops[i - 1] === '+' ? '+' : '−'));
       this.eq.append(s);
@@ -68,7 +77,7 @@ class ArithGame {
     this.eq.append(U.el('div', '', '='), U.el('div', '', String(p.ans)));
 
     this.cands.innerHTML = '';
-    this.btns = p.cands.map((v) => {
+    this.btns = shown.map((v) => {
       const b = U.el('button', 'ar-cand', String(v));
       b.addEventListener('pointerdown', () => this.pick(v, b));
       this.cands.append(b);
@@ -76,8 +85,8 @@ class ArithGame {
     });
     this.phase = 'input';
     this.render();
-    this.h.question({ ops: p.ops, cands: p.cands, ans: p.ans, sol: p.sol, solutions: p.count });
-    this.h.timer(this.spec.blanks, () => this.judge(true));
+    this.h.question({ ops: p.ops, cands: shown, ans: p.ans, sol: p.sol, solutions: p.count, given: givenAt });
+    this.h.timer(this.spec.blanks - givenAt.length, () => this.judge(true));
   }
 
   // 고른 숫자는 비어 있는 가장 앞 칸에 들어간다
@@ -94,7 +103,7 @@ class ArithGame {
   }
 
   unpick(i) {
-    if (this.phase !== 'input' || !this.fill[i]) return;
+    if (this.phase !== 'input' || !this.fill[i] || this.fill[i].given) return;
     this.h.input({ remove: this.fill[i].v, slot: i });
     this.fill[i].btn.disabled = false;
     this.fill[i] = null;
@@ -168,14 +177,14 @@ class ArithGame {
   //   - 가장 큰 수들(또는 가장 작은 수들)을 빈칸 하나만 남기고 다 쓰는 풀이가 있으면 버린다.
   //   - 가장 큰 수가 답에 쓰이는 문제와 함정인 문제가 반반 나오게 한다.
   // 반환: ops, cands, ans, sol = 틀렸을 때 보여줄 풀이 하나, count = 답이 되는 조합 수
-  static generate({ blanks, n, maxSols }) {
+  static generate({ blanks, n, maxSols, plus = false }) {
     const pool = Array.from({ length: ArithGame.HI - ArithGame.LO + 1 }, (_, i) => ArithGame.LO + i);
     let best = null;
     // 이번 문제에서 가장 큰 수가 답에 쓰이게 할 것인가. 시도마다 다시 정하면 만들기 쉬운 쪽으로 쏠린다.
     const wantBig = Math.random() < 0.5;
     for (let tries = 0; tries < ArithGame.TRIES; tries++) {
-      const ops = Array.from({ length: blanks - 1 }, () => (Math.random() < 0.5 ? '+' : '-'));
-      if (blanks >= 3 && !ops.includes('-')) ops[U.rand(ops.length)] = '-';
+      const ops = Array.from({ length: blanks - 1 }, () => (plus || Math.random() < 0.5 ? '+' : '-'));
+      if (blanks >= 3 && !plus && !ops.includes('-')) ops[U.rand(ops.length)] = '-';
       const cands = U.shuffle([...pool]).slice(0, n);
       const sorted = [...cands].sort((a, b) => a - b);
       const top = sorted.slice(n - (blanks - 1));

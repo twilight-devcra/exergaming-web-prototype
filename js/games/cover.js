@@ -12,6 +12,7 @@
 //   hidden — 그중 덮는 수. 외워야 할 (표시, 숫자) 짝이 늘어난다
 //   both   — 두 숫자가 모두 덮인 것일 확률. 머릿속에서 둘을 다 꺼내 더해야 한다
 //   opts   — 보기 수
+//   show   — 외우는 시간의 기본 몫(ms). 쉬운 단계만 따로 정하고, 나머지는 SHOW_MS 다
 const COVER_MARKS = (() => {
   const star = Array.from({ length: 10 }, (_, i) => {
     const a = ((-90 + i * 36) * Math.PI) / 180;
@@ -34,6 +35,9 @@ class CoverGame {
   static title = '가린 숫자 더하기';
   static hint = '상자가 닫히기 전에 속에 든 숫자를 외워 두었다가<br>두 숫자를 더한 값을 고르세요';
   static levels = [
+    // 쉬운 단계: 숫자 셋, 덮는 것도 한두 개, 외울 시간을 넉넉히
+    { n: 3, hidden: 1, both: 0, opts: 3, show: 3000 },
+    { n: 3, hidden: 2, both: 0, opts: 3, show: 2500 },
     { n: 4, hidden: 2, both: 0, opts: 3 },
     { n: 5, hidden: 2, both: 0.35, opts: 4 },
     { n: 5, hidden: 3, both: 0.35, opts: 4 },
@@ -97,7 +101,7 @@ class CoverGame {
     this.h.sfx('blink');
 
     const hid = this.toks.filter((t) => t.mark);
-    const show = CoverGame.SHOW_MS + CoverGame.SHOW_PER * hid.length;
+    const show = (this.spec.show || CoverGame.SHOW_MS) + CoverGame.SHOW_PER * hid.length;
     hid.forEach((t, i) => this.h.after(show + i * CoverGame.LID_GAP, () => {
       t.el.classList.remove('open');
       this.h.sfx('blink');

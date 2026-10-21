@@ -125,8 +125,8 @@ const Demo = {
       const correct = R(Math.floor(total * 0.3), total);
       const points = Math.round(correct * R(25, 45));
       cog += points;
-      const level = R(1, 4);
-      const runs = level > 1 ? [[level - 1, Math.ceil(correct / 2), Math.ceil(total / 2)], [level, Math.floor(correct / 2), Math.floor(total / 2)]] : [[1, correct, total]];
+      const level = R(BASE_LEVEL, BASE_LEVEL + 3);
+      const runs = level > BASE_LEVEL ? [[level - 1, Math.ceil(correct / 2), Math.ceil(total / 2)], [level, Math.floor(correct / 2), Math.floor(total / 2)]] : [[level, correct, total]];
       a.stats[T.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * R(4000, 12000) };
     }
     a.exScore = Math.round(exMax * R(55, 95) / 100);

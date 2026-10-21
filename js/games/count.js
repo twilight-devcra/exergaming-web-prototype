@@ -21,6 +21,9 @@ class CountGame {
   static hint = '격자에 가장 많이 켜진 색을<br>아래 보기에서 고르세요';
   // cells = 켜는 칸 수의 상한 (격자를 가득 채우지 않는다)
   static levels = [
+    // 쉬운 단계: 작은 판, 두세 색, 같은 색끼리 늘 붙어 있다
+    { grid: [3, 3], colors: 2, cells: 7, margin: 3, spread: 3, clump: 1 },
+    { grid: [3, 4], colors: 3, cells: 10, margin: 4, spread: 3, clump: 1 },
     { grid: [4, 4], colors: 3, cells: 12, margin: 4, spread: 3, clump: 0.9 },
     { grid: [4, 4], colors: 3, cells: 14, margin: 3, spread: 3, clump: 0.7 },
     { grid: [4, 5], colors: 4, cells: 16, margin: 2, spread: 3, clump: 0.5 },

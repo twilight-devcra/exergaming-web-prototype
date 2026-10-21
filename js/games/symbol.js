@@ -1,5 +1,6 @@
 // 심볼 위치 외우기
-// 2x4 판의 몇 칸에 서로 다른 심볼을 잠깐 보여준 뒤, 위쪽 칸에 뜬 심볼이 어디 있었는지 3번 맞힌다.
+// 2x4 판의 몇 칸에 서로 다른 심볼을 잠깐 보여준 뒤, 위쪽 칸에 뜬 심볼이 어디 있었는지 3번 맞힌다
+// (심볼이 둘뿐인 가장 쉬운 단계는 2번).
 const SYMBOLS = (() => {
   const star = Array.from({ length: 10 }, (_, i) => {
     const a = ((-90 + i * 36) * Math.PI) / 180;
@@ -28,14 +29,21 @@ class SymbolGame {
   static id = 'symbol';
   static title = '심볼 위치 외우기';
   static hint = '잠깐 보이는 그림들의 위치를 외운 뒤<br>위에 나온 그림이 어디 있었는지 고르세요';
-  static counts = [3, 4, 5, 6, 7, 8]; // 심볼 수 = 난이도
-  static maxLevel = SymbolGame.counts.length;
-  static SHOW_MS = 3200;   // 심볼 노출 시간 (고정)
-  static QUESTIONS = 3;
+  // n = 심볼 수, show = 심볼 노출 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 SHOW_MS 로 고정이다.
+  static levels = [
+    { n: 2, show: 4500 },
+    { n: 3, show: 4500 },
+    { n: 3 }, { n: 4 }, { n: 5 }, { n: 6 }, { n: 7 }, { n: 8 },
+  ];
+  static maxLevel = SymbolGame.levels.length;
+  static SHOW_MS = 3200;
+  static QUESTIONS = 3;    // 심볼이 이보다 적으면 심볼 수만큼 묻는다
 
   constructor(host) {
     this.h = host;
-    this.n = SymbolGame.counts[host.level - 1];
+    this.spec = SymbolGame.levels[host.level - 1];
+    this.n = this.spec.n;
+    this.questions = Math.min(SymbolGame.QUESTIONS, this.n);
     this.phase = 'show';
     this.correct = 0;
     this.answered = 0;
@@ -65,7 +73,7 @@ class SymbolGame {
     const slots = U.shuffle([...Array(8).keys()]).slice(0, this.n);
     const syms = U.shuffle([...SYMBOLS]).slice(0, this.n);
     this.placed = slots.map((slot, i) => ({ slot, sym: syms[i] }));
-    this.asks = U.shuffle([...this.placed]).slice(0, SymbolGame.QUESTIONS);
+    this.asks = U.shuffle([...this.placed]).slice(0, this.questions);
 
     const banner = U.el('div', 'memorize-banner', '외우세요!');
     this.grid.append(banner);
@@ -74,7 +82,7 @@ class SymbolGame {
       this.placed.forEach(({ slot, sym }) => this.cells[slot].append(symbolEl(sym)));
       this.h.sfx('blink');
     });
-    this.h.after(1100 + SymbolGame.SHOW_MS, () => {
+    this.h.after(1100 + (this.spec.show || SymbolGame.SHOW_MS), () => {
       this.cells.forEach((c) => (c.innerHTML = ''));
       this.h.after(350, () => this.ask());
     });
@@ -124,7 +132,7 @@ class SymbolGame {
     if (ok) {
       this.correct++;
       // 점수는 맞힐 때마다 바로 지급한다
-      this.h.award((this.h.base * this.h.mult) / SymbolGame.QUESTIONS, cell);
+      this.h.award((this.h.base * this.h.mult) / this.questions, cell);
       this.h.sfx('good');
     } else {
       this.h.sfx('bad');
@@ -140,7 +148,7 @@ class SymbolGame {
     }
     this.answered++;
     this.h.after(ok ? 550 : 900, () => {
-      if (this.answered < SymbolGame.QUESTIONS) this.ask();
+      if (this.answered < this.questions) this.ask();
       else this.complete();
     });
   }
@@ -149,7 +157,7 @@ class SymbolGame {
     this.phase = 'end';
     this.target.classList.remove('active');
     this.target.innerHTML = '';
-    this.question.textContent = `${this.correct} / ${SymbolGame.QUESTIONS} 정답`;
+    this.question.textContent = `${this.correct} / ${this.questions} 정답`;
     // 문제마다 이미 정답/오답 소리를 들려줬다. 다 맞혔을 때의 축하음은 host가 울린다.
     this.h.after(1200, () => {
       this.ro.disconnect();
@@ -158,7 +166,7 @@ class SymbolGame {
   }
 
   result() {
-    return { cleared: this.correct === SymbolGame.QUESTIONS, correct: this.correct, total: SymbolGame.QUESTIONS };
+    return { cleared: this.correct === this.questions, correct: this.correct, total: this.questions };
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다

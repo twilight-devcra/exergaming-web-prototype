@@ -19,7 +19,8 @@
 //
 // 구멍마다 거꾸로 한 줄씩 따라 올라가 그 위의 조각 모양을 보면 답이 나온다. 그래서 어려움은 구멍 수로 올린다.
 // 눈으로만 걸러 낼 수 없도록, 구멍 모양마다 그 구멍에 닿지 않는 같은 모양 조각이 적어도 하나 있다.
-// 1단계는 조각이 모두 같고 구멍이 하나뿐이라 '★ 에 닿는 곳 찾기'와 같다. 2단계에서 다른 모양 조각이 섞이고, 3단계부터 구멍이 늘어난다.
+// Lv1~3 은 조각이 모두 같고 구멍이 하나뿐이라 '★ 에 닿는 곳 찾기'와 같다 (Lv1·Lv2 는 가로줄이 더 적다).
+// Lv4 에서 다른 모양 조각이 섞이고, Lv5 부터 구멍이 늘어난다.
 // 난이도:
 //   lanes    — 세로줄 수 = 보기 수
 //   rows     — 가로줄을 놓을 수 있는 칸 수
@@ -43,6 +44,8 @@ class LadderGame {
   static title = '사다리 타기';
   static hint = '사다리를 타고 내려가 같은 모양 구멍에<br>쏙 들어가는 조각을 위에서 고르세요';
   static levels = [
+    { lanes: 3, rows: 3, p: 0.5, minCross: 1, holes: 1, kinds: 1, slant: 0, tricks: 0 },
+    { lanes: 3, rows: 4, p: 0.45, minCross: 2, holes: 1, kinds: 1, slant: 0, tricks: 0 },
     { lanes: 3, rows: 5, p: 0.45, minCross: 2, holes: 1, kinds: 1, slant: 0, tricks: 0 },
     { lanes: 4, rows: 6, p: 0.45, minCross: 3, holes: 1, kinds: 2, slant: 0, tricks: 0 },
     { lanes: 4, rows: 7, p: 0.5, minCross: 3, holes: 2, kinds: 2, slant: 0.3, tricks: 1 },

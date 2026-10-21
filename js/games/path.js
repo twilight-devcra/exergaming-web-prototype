@@ -9,11 +9,15 @@
 //           이때는 길이 한쪽 구석에 뭉치지 않도록 격자의 거의 전체 폭과 높이에 걸치게 만든다.
 //   touch — 길이 자기 자신 바로 옆을 지나가도 되는 칸 수. 옆 칸이 다음 칸인지 헷갈리게 된다.
 //           제한 없이 두면 길이 한 덩어리로 뭉쳐 버리므로 몇 칸까지만 허용한다.
+//   step  — 한 칸을 보여주는 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 STEP_MS 로 고정이다.
 class PathGame {
   static id = 'path';
   static title = '길 따라 그리기';
   static hint = '불이 켜지며 만들어지는 길을 기억했다가<br>같은 순서대로 칸을 눌러 길을 완성하세요';
   static levels = [
+    // 쉬운 단계: 짧은 길을 천천히 보여준다
+    { grid: [3, 3], len: [4, 4], turns: 1, step: 560 },
+    { grid: [3, 4], len: [4, 5], turns: 1, step: 470 },
     { grid: [3, 4], len: [5, 6], turns: 1 },
     { grid: [3, 5], len: [6, 8], turns: 2 },
     { grid: [4, 5], len: [8, 9], turns: 4 },
@@ -22,7 +26,7 @@ class PathGame {
     { grid: [5, 7], len: [14, 15], turns: 9, free: true, touch: 3 },
   ];
   static maxLevel = PathGame.levels.length;
-  static STEP_MS = 380; // 경로 한 칸을 보여주는 시간 (난이도와 무관하게 고정)
+  static STEP_MS = 380; // 경로 한 칸을 보여주는 시간 (쉬운 단계 말고는 난이도와 무관하게 고정)
 
   constructor(host) {
     this.h = host;
@@ -60,13 +64,14 @@ class PathGame {
 
     const [sr, sc] = this.path[0];
     this.cells[sr][sc].classList.add('start');
+    const step = this.spec.step || PathGame.STEP_MS;
     for (let i = 1; i < this.path.length; i++) {
-      this.h.after(500 + i * PathGame.STEP_MS, () => {
+      this.h.after(500 + i * step, () => {
         this.light(i);
         this.h.sfx('blink');
       });
     }
-    this.h.after(500 + this.path.length * PathGame.STEP_MS + 600, () => this.beginInput());
+    this.h.after(500 + this.path.length * step + 600, () => this.beginInput());
   }
 
   beginInput() {

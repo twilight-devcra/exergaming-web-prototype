@@ -32,43 +32,57 @@
         <a class="debug-link" href="pedal-debug.html">센서 디버그 페이지</a>
       </div>
       <button class="btn" id="btn-start">시작하기</button>
-    </div>
-    <div class="menu-side">
-      <div class="panel">
-        <h2>시연 설정</h2>
-        <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
-        <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
-        <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
-        <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
-        <label class="setting">난이도 방식
-          <select id="cfg-difficulty">
-            <option value="adaptive">정답·오답에 따라 오르내림</option>
-            <option value="cycle">한 바퀴 돌 때마다 +1</option>
-          </select>
-        </label>
-        <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
-        <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
-        <label class="setting">목표 속도 변화<input type="checkbox" id="cfg-change"></label>
-        <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
-        <label class="setting">문제 제한 시간<input type="checkbox" id="cfg-qtimer"></label>
-        <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
-        <label class="setting">속도 측정 방식
-          <select id="cfg-source">
-            <option value="zc">파형 영교차 (권장)</option>
-            <option value="comb">파형 결합</option>
-            <option value="teo">파형 모양</option>
-            <option value="pedal">페달 avg_rpm</option>
-          </select>
-        </label>
-        <p class="setting-note" id="cfg-source-note"></p>
-      </div>
-      <div class="panel">
-        <h2>사용할 게임</h2>
-        <div id="cfg-games"></div>
-      </div>
       <div class="panel">
         <h2>순위</h2>
         <ol class="board-list" id="menu-board"></ol>
+      </div>
+    </div>
+    <!-- 넓은 화면에서는 두 열로 놓아 스크롤 없이 다 보이게 한다 (좁으면 한 열로 스크롤) -->
+    <div class="menu-side">
+      <div class="panel">
+        <h2>라운드 난이도</h2>
+        <label class="setting">프리셋<select id="cfg-preset"></select></label>
+        <p class="setting-note" id="cfg-preset-note"></p>
+        <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
+        <label class="setting">최고 난이도<input type="number" id="cfg-max-level" min="1" step="1"></label>
+        <label class="setting">난이도 방식
+          <select id="cfg-difficulty">
+            <option value="adaptive">정답·오답에 따라</option>
+            <option value="cycle">한 바퀴마다 +1</option>
+          </select>
+        </label>
+        <label class="setting">정답 하나에 난이도 +<input type="number" id="cfg-diff-up" min="0.05" max="2" step="0.05"></label>
+        <label class="setting">오답 하나에 난이도 −<input type="number" id="cfg-diff-down" min="0.05" max="2" step="0.05"></label>
+        <label class="setting">문제 제한 시간 배율<input type="number" id="cfg-qscale" min="0.5" max="3" step="0.05"></label>
+        <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
+        <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
+        <label class="setting" title="목표 속도에서 이만큼 벗어나면 공이 속도 막대 끝에 닿고 운동 점수가 0이 됩니다. 허용 구역 밖에서는 이 값까지 점수가 고르게 줄어듭니다.">편차 한계 (±%)<input type="number" id="cfg-maxdev" min="10" max="100" step="1"></label>
+        <label class="setting">오르막·내리막 속도 변화 (%)<input type="number" id="cfg-change-amt" min="0" max="40" step="1"></label>
+      </div>
+      <div class="menu-col">
+        <div class="panel">
+          <h2>시연 설정</h2>
+          <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
+          <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
+          <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
+          <label class="setting">오르막·내리막<input type="checkbox" id="cfg-change"></label>
+          <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
+          <label class="setting">문제 제한 시간<input type="checkbox" id="cfg-qtimer"></label>
+          <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
+          <label class="setting">속도 측정 방식
+            <select id="cfg-source">
+              <option value="zc">파형 영교차 (권장)</option>
+              <option value="comb">파형 결합</option>
+              <option value="teo">파형 모양</option>
+              <option value="pedal">페달 avg_rpm</option>
+            </select>
+          </label>
+          <p class="setting-note" id="cfg-source-note"></p>
+        </div>
+        <div class="panel">
+          <h2>사용할 게임</h2>
+          <div id="cfg-games"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -209,7 +223,7 @@
         <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
         <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
         <p class="setting-note" id="op-cfg"></p>
-        <button class="btn secondary small" id="op-set-open">시간·점수 설정</button>
+        <button class="btn secondary small" id="op-set-open">라운드 설정</button>
         <div class="op-round" id="op-round">
           <p class="op-round-note" id="op-round-note"></p>
           <button class="btn secondary" id="op-end">지금 끝내고 결과 보기</button>
@@ -231,10 +245,10 @@
     </div>
   </div>
 
-  <!-- 운영 메뉴 > 시간·점수 설정 (DEMO_SETTINGS) -->
+  <!-- 운영 메뉴 > 라운드 설정 (DEMO_SETTINGS) -->
   <div id="op-set" class="overlay">
     <div class="op-set-box">
-      <h2>시간·점수 설정 <small id="op-set-code"></small></h2>
+      <h2>라운드 설정 <small id="op-set-code"></small></h2>
       <p class="setting-note">이 태블릿에 저장되고 다음 판부터 적용됩니다. 점수를 비교하려면 모든 스테이션의 설정 코드가 같아야 합니다.</p>
       <div class="op-set-fields" id="op-set-fields"></div>
       <div class="op-set-btns">

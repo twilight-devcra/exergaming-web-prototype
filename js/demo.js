@@ -1,7 +1,7 @@
 // 시연 행사 스테이션 모드 (index.html?demo). 배경은 docs/DEMO_BRIEF.md.
 // 흐름: 운영 메뉴(처음 한 번) → 대기 화면 → 속도 측정 → 라운드 → 결과 → 진행 요원이 길게 눌러 초기화 → 대기 화면
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
-// 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '시간·점수 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
+// 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '라운드 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
 const Demo = {
   IDLE_SEC: 40,          // 라운드 중 페달도 터치도 없이 이만큼 지나면 '아직 하고 계신가요?'
   IDLE_GRACE_SEC: 15,    // 그 안내 뒤 이만큼 더 지나면 라운드를 끝내고 결과를 보여준다
@@ -366,22 +366,38 @@ const Demo = {
     $('#att-calib').textContent = `${c.calibrationSec}초`;
     $('#att-dur').textContent = c.durationSec % 60 ? U.fmtTime(c.durationSec) : `${c.durationSec / 60}분`;
     const changed = Object.keys(Config.demoSaved()).length;
+    const preset = Config.preset(Config.presetOf(c));
     $('#op-cfg').innerHTML = `설정 코드 <b>${Config.demoCode(c)}</b>${changed ? ` (기본값에서 ${changed}개 바꿈)` : ' (기본값)'} · ` +
+      `라운드 난이도 ${preset ? preset.label : '직접 설정'} · ` +
       `라운드 ${U.fmtTime(c.durationSec)} · 측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
       '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.';
   },
 
-  // ---------------- 시간·점수 설정 (DEMO_SETTINGS) ----------------
+  // ---------------- 라운드 설정 (DEMO_SETTINGS) ----------------
+  // 맨 위의 '라운드 난이도'는 저장하는 항목이 아니다. 고르면 프리셋에 든 칸(PRESET_KEYS)을 채우고, 칸을 고치면 맞는 프리셋을 다시 찾아 보여 준다.
   bindSettings() {
     const box = $('#op-set-fields');
+    const presets = ROUND_PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
+    box.append(U.el('label', 'setting', `라운드 난이도<select id="op-set-preset">${presets}<option value="custom" disabled>직접 설정</option></select>`));
+    box.append(U.el('p', 'setting-note', '<span id="op-set-preset-note"></span>'));
+    $('#op-set-preset').addEventListener('change', (e) => {
+      const p = Config.preset(e.target.value);
+      if (p) this.fillSettings({ ...this.readSettings(), ...p.values });
+    });
+    // 두 열로 나눠 놓는다. DEMO_SETTINGS 순서는 설정 코드(Config.demoCode)에 쓰이므로 바꾸지 않고 여기서만 가른다
+    const cols = [U.el('div', 'op-set-col', '<h3>시간·점수·페달</h3>'), U.el('div', 'op-set-col', '<h3>미니게임 난이도</h3>')];
+    box.append(...cols);
+    const right = ['difficulty', 'startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'multiplierStep'];
     for (const s of DEMO_SETTINGS) {
       const input = s.options
         ? `<select data-key="${s.key}">${s.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`
         : `<input type="number" data-key="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="decimal">`;
-      box.append(U.el('label', 'setting', `${s.label}${input}`));
+      cols[right.includes(s.key) ? 1 : 0].append(U.el('label', 'setting', `${s.label}${input}`));
     }
-    box.addEventListener('input', () => this.markSettings());
-    box.addEventListener('change', () => this.markSettings());
+    // 프리셋 선택은 위에서 따로 다룬다 (input 이 change 보다 먼저 와서, 여기서 다시 맞추면 고른 값이 되돌아간다)
+    const mark = (e) => e.target.id !== 'op-set-preset' && this.markSettings();
+    box.addEventListener('input', mark);
+    box.addEventListener('change', mark);
     $('#op-set-open').onclick = () => this.openSettings();
     $('#op-set-cancel').onclick = () => $('#op-set').classList.remove('active');
     $('#op-set-reset').onclick = () => this.fillSettings(Config.demoDefaults());
@@ -427,6 +443,10 @@ const Demo = {
       $(`#op-set-fields [data-key="${s.key}"]`).parentElement.classList.toggle('changed', v[s.key] !== def[s.key]);
     }
     $('#op-set-code').textContent = `설정 코드 ${Config.demoCode(v)}`;
+    const id = Config.presetOf(v);
+    $('#op-set-preset').value = id;
+    $('#op-set-preset-note').textContent = id === 'custom' ? '프리셋 값에서 하나 이상을 직접 바꾼 상태입니다.' : `${Config.preset(id).desc} ${PRESET_NOTE}`;
+    PRESET_KEYS.forEach((k) => $(`#op-set-fields [data-key="${k}"]`).parentElement.classList.toggle('preset', id !== 'custom'));
   },
 
   saveSettings() {
@@ -441,7 +461,7 @@ const Demo = {
     const a = this.app;
     this.opOpen = true;
     $('#op-set-open').disabled = a.inRound;
-    $('#op-set-open').textContent = a.inRound ? '시간·점수 설정 (라운드 중에는 못 바꿈)' : '시간·점수 설정';
+    $('#op-set-open').textContent = a.inRound ? '라운드 설정 (라운드 중에는 못 바꿈)' : '라운드 설정';
     $('#op-station').value = this.station;
     $('#op-kbd').checked = this.allowKbd;
     $('#op-sim').checked = this.simResult;
@@ -452,7 +472,7 @@ const Demo = {
       const left = a.state === 'play' ? a.cfg.durationSec - a.elapsed : a.cfg.durationSec;
       $('#op-round-note').textContent = `라운드 진행 중 · 멈춰 있음 (남은 시간 ${U.fmtTime(left)})`;
     }
-    $('#op-close').textContent = a.inRound ? '이어서 진행' : a.state === 'result' ? '결과 화면으로 돌아가기' : '대기 화면 열기';
+    $('#op-close').textContent = a.inRound ? '이어서 진행' : a.state === 'result' || a.state === 'ending' ? '결과 화면으로 돌아가기' : '대기 화면 열기';
     this.renderLog();
     this.renderSessions();
     if (a.inRound) a.log.ev('operator', { open: true });

@@ -22,7 +22,9 @@ class BeatAudio {
 
   setMuted(m) {
     this.muted = m;
-    if (this.master) this.master.gain.value = m ? 0 : 0.55;
+    if (!this.master) return;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime); // 진행 중인 페이드인을 끊는다
+    this.master.gain.value = m ? 0 : 0.55;
   }
 
   makeNoise() {
@@ -34,14 +36,28 @@ class BeatAudio {
   }
 
   // getBpm: 매 비트마다 현재 템포를 물어본다 (목표 RPM 변화에 따라 템포도 바뀜)
-  start(getBpm) {
+  // fadeIn: 이 시간(초) 동안 소리를 0에서 키운다
+  start(getBpm, { fadeIn = 0 } = {}) {
     this.ensure();
     this.stop();
+    if (fadeIn > 0 && !this.muted) {
+      const g = this.master.gain;
+      const t = this.ctx.currentTime;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(0.0001, t);
+      g.linearRampToValueAtTime(0.55, t + fadeIn);
+    }
     this.getBpm = getBpm;
     this.beat = 0;
     this.next = this.ctx.currentTime + 0.1;
     this.timer = setInterval(() => this.schedule(), 25);
     this.schedule();
+  }
+
+  // 끊지 않고 템포 정하는 방법만 바꾼다 (측정 → 라운드로 넘어갈 때). 멈춰 있으면 새로 시작한다
+  setTempo(getBpm) {
+    if (!this.timer) return this.start(getBpm);
+    this.getBpm = getBpm;
   }
 
   stop() {

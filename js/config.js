@@ -27,6 +27,7 @@ const DEFAULT_CONFIG = {
   games: null,               // 라운드에 넣을 인지 게임 id 목록 (null = 전체). 메뉴의 '사용할 게임'에서 바뀐다.
   cogBasePoints: 100,        // 인지 게임 1회를 완벽히 했을 때의 기본 점수 (모든 유형 동일)
   startLevel: BASE_LEVEL,    // 라운드를 시작할 난이도. 노년층은 1 (쉬운 단계부터). 올리면 쉬운 단계를 건너뛰고 바로 어려운 문제부터 나온다
+  maxLevel: 8,               // 이 라운드에서 미니게임이 오를 수 있는 최고 난이도
   levelScheme: LEVEL_SCHEME,
   difficulty: 'adaptive',    // 난이도 방식: adaptive 정답·오답으로 오르내림 | cycle 게임을 한 바퀴 돌 때마다 +1
   // adaptive: 모든 게임이 함께 쓰는 난이도 계기판. 정답마다 diffUp 만큼 오르고 오답(시간 초과 포함)마다 diffDown 만큼 내려간다.
@@ -36,8 +37,13 @@ const DEFAULT_CONFIG = {
   // 길 따라 그리기는 길 하나가 답 하나다.
   diffUp: 0.4,
   diffDown: 0.6,
+  // 켜 둔 게임이 이보다 많으면 diffUp·diffDown 을 diffGamesRef / 게임 수 로 줄인다 (둘 다 줄이므로 머무는 정답률은 같다).
+  // 게임 하나가 문제를 3개씩 내므로, 줄이지 않으면 8종을 켰을 때 잘하는 사람은 몇 종을 보기도 전에 최고 난이도에 닿는다.
+  // 2 이면 8종을 한 바퀴 다 맞혀도 약 2.4단계 오른다.
+  diffGamesRef: 2,
   multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv3 x1.0, Lv4 x1.2 ... 쉬운 단계 Lv1·Lv2 도 x1.0)
   questionTimer: true,       // 문제마다 제한 시간. 시간이 다 되면 그 문제는 틀린 것으로 친다
+  questionTimeScale: 1,      // 모든 문제 제한 시간에 곱하는 배율 (라운드 난이도 프리셋이 정한다)
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
   // 쉬운 단계(Lv1·Lv2)는 여기에 EASY_TIME 을 곱한다. 아래 범위는 Lv3~8 의 값이다.
   // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합
@@ -55,8 +61,36 @@ const DEFAULT_CONFIG = {
   minRpm: 25,
 };
 
+// 라운드 난이도 프리셋 (미니게임 난이도가 아니라 라운드 전체의 난이도). 고르면 PRESET_KEYS 값을 한꺼번에 채운다.
+// 그 뒤에 하나씩 고쳐도 되고, 그러면 화면에는 '직접 설정'으로 보인다 (Config.presetOf).
+//   startLevel·maxLevel — 미니게임 시작·최고 난이도
+//   diffUp·diffDown     — 정답·오답마다 계기판이 오르내리는 폭. 머무는 정답률 ≈ diffDown / (diffUp + diffDown)
+//   questionTimeScale   — 문제 제한 시간 배율 (쉬운 단계의 EASY_TIME 과 겹쳐 곱한다)
+//   tolerance·maxDeviation — 페달 속도 허용 구역, 공이 화면 끝까지 밀려나는 편차
+//   rpmChangeAmount     — 오르막·내리막에서 목표 속도가 바뀌는 폭
+// '보통'은 DEFAULT_CONFIG 의 값 그대로다. 나머지 둘은 첫 추정값이라 플레이해 보며 다듬는다.
+const PRESET_NOTE = '칠한 칸은 이 프리셋이 정한 값입니다. 하나라도 바꾸면 직접 설정이 됩니다.';
+const PRESET_KEYS = ['startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'tolerance', 'maxDeviation', 'rpmChangeAmount'];
+const ROUND_PRESETS = [
+  {
+    id: 'elderly', label: '가볍게',
+    desc: '쉬운 단계(Lv1)부터 Lv5까지. 정답률 75% 근처에 머물고, 제한 시간이 1.3배, 페달 허용 구역이 ±20%로 넓고, 오르막·내리막이 완만합니다.',
+    values: { startLevel: 1, maxLevel: 5, diffUp: 0.3, diffDown: 0.9, questionTimeScale: 1.3, tolerance: 0.2, maxDeviation: 0.6, rpmChangeAmount: 0.08 },
+  },
+  {
+    id: 'normal', label: '보통',
+    desc: 'Lv3부터 Lv8까지. 정답률 60% 근처에 머물고, 페달 허용 구역 ±12%.',
+    values: Object.fromEntries(PRESET_KEYS.map((k) => [k, DEFAULT_CONFIG[k]])),
+  },
+  {
+    id: 'challenge', label: '도전',
+    desc: 'Lv4부터 Lv8까지. 정답률 50% 근처까지 밀어붙이고, 제한 시간이 0.8배, 페달 허용 구역이 ±8%로 좁고, 오르막·내리막이 가파릅니다.',
+    values: { startLevel: 4, maxLevel: 8, diffUp: 0.5, diffDown: 0.5, questionTimeScale: 0.8, tolerance: 0.08, maxDeviation: 0.35, rpmChangeAmount: 0.16 },
+  },
+];
+
 // 시연 행사 스테이션 모드(index.html?demo)의 설정. 테스트 화면의 localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것을 덮는다.
-// 그 위에 운영 메뉴의 '시간·점수 설정'(DEMO_SETTINGS 의 항목만)을 태블릿마다 저장해 덮는다.
+// 그 위에 운영 메뉴의 '라운드 설정'(DEMO_SETTINGS 의 항목만)을 태블릿마다 저장해 덮는다.
 // 상품을 걸고 점수를 비교하므로 모든 스테이션이 같은 설정이어야 한다 — 운영 메뉴의 설정 코드(Config.demoCode)로 맞춰 본다.
 const DEMO_CONFIG = {
   durationSec: 300,
@@ -74,9 +108,13 @@ const DEMO_SETTINGS = [
   { key: 'cogBasePoints', label: '인지 게임 기본 점수 (한 판 다 맞히면)', min: 10, max: 1000, step: 10 },
   { key: 'multiplierStep', label: '난이도 1단계당 점수 배율 증가', min: 0, max: 1, step: 0.05 },
   { key: 'difficulty', label: '난이도 방식', options: [['adaptive', '정답·오답에 따라 오르내림'], ['cycle', '한 바퀴 돌 때마다 +1']] },
-  { key: 'startLevel', label: '시작 난이도 (3 = 보통, 노년층은 1)', min: 1, max: 8, step: 1 },
+  { key: 'startLevel', label: '시작 난이도', min: 1, max: 8, step: 1 },
   { key: 'diffUp', label: '정답 하나에 난이도 + (오르내림 방식)', min: 0.05, max: 2, step: 0.05 },
   { key: 'diffDown', label: '오답 하나에 난이도 − (오르내림 방식)', min: 0.05, max: 2, step: 0.05 },
+  { key: 'maxLevel', label: '최고 난이도', min: 1, max: 8, step: 1 },
+  { key: 'questionTimeScale', label: '문제 제한 시간 배율', min: 0.5, max: 3, step: 0.05 },
+  { key: 'maxDeviation', label: '편차 한계 (±%, 공이 끝에 닿고 운동 점수 0)', min: 10, max: 100, step: 1, scale: 100 },
+  { key: 'rpmChangeAmount', label: '오르막·내리막 목표 속도 변화 (%)', min: 0, max: 40, step: 1, scale: 100 },
 ];
 const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
 
@@ -94,7 +132,7 @@ const Config = {
   },
   demoSaved() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(DEMO_SETTINGS_KEY) || '{}'); } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem(DEMO_SETTINGS_KEY) || '{}'); } catch (e) { }
     this.migrateLevel(saved);
     return Object.fromEntries(DEMO_SETTINGS.filter((s) => s.key in saved).map((s) => [s.key, saved[s.key]]));
   },
@@ -105,7 +143,7 @@ const Config = {
     try {
       if (Object.keys(diff).length) localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify({ ...diff, levelScheme: LEVEL_SCHEME }));
       else localStorage.removeItem(DEMO_SETTINGS_KEY);
-    } catch (e) {}
+    } catch (e) { }
   },
   // 스테이션끼리 설정이 같은지 맞춰 보는 4자리 코드 (DEMO_SETTINGS 값으로 만든 해시)
   demoCode(cfg) {
@@ -116,17 +154,25 @@ const Config = {
   },
   load() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) { }
     this.migrateLevel(saved);
     // 제한 시간 표는 화면에서 바꾸지 않으므로 늘 코드의 값을 쓴다 (예전에 저장된 표가 고친 값을 덮지 않게)
     return Object.assign({}, DEFAULT_CONFIG, saved, { questionTime: DEFAULT_CONFIG.questionTime, levelScheme: LEVEL_SCHEME });
+  },
+  // cfg 의 값이 어느 라운드 난이도 프리셋과 꼭 맞는가. 하나라도 다르면 'custom'
+  presetOf(cfg) {
+    const p = ROUND_PRESETS.find((x) => PRESET_KEYS.every((k) => cfg[k] === x.values[k]));
+    return p ? p.id : 'custom';
+  },
+  preset(id) {
+    return ROUND_PRESETS.find((x) => x.id === id) || null;
   },
   // 쉬운 단계를 더하기 전에 저장한 시작 난이도는 같은 문제가 나오도록 번호를 옮긴다
   migrateLevel(saved) {
     if (saved.startLevel != null && saved.levelScheme !== LEVEL_SCHEME) saved.startLevel += EASY_LEVELS;
   },
   save(cfg) {
-    try { localStorage.setItem('exergame.config', JSON.stringify(cfg)); } catch (e) {}
+    try { localStorage.setItem('exergame.config', JSON.stringify(cfg)); } catch (e) { }
   },
 };
 

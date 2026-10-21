@@ -29,6 +29,7 @@ class SessionLog {
       userAgent: navigator.userAgent,
       screen: [window.innerWidth, window.innerHeight],
       config: JSON.parse(JSON.stringify(app.cfg)),
+      preset: Config.presetOf(app.cfg), // 라운드 난이도 프리셋 (값을 하나라도 고쳤으면 custom)
       formats: {
         t: 'ms since session start (wall clock)',
         clock: 'game clock ms (stops while paused)',

@@ -35,7 +35,10 @@ const App = {
     Fx.init();
     Theme.init();
     this.renderGameToggles();
-    if (!this.demo) this.bindMenu();
+    if (!this.demo) {
+      this.bindPresets();
+      this.bindMenu();
+    }
     else this.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
     this.bindKeys();
     this.bindLink();
@@ -77,6 +80,33 @@ const App = {
     return Math.max(...GAME_TYPES.map((T) => T.maxLevel));
   },
 
+  // 이번 라운드에서 오를 수 있는 최고 난이도 (cfg.maxLevel, 라운드 난이도 프리셋이 정한다)
+  levelCap() {
+    return Math.min(this.maxStartLevel(), this.cfg.maxLevel || Infinity);
+  },
+
+  // 프리셋이 채우는 값 → 테스트 화면의 칸
+  PRESET_FIELDS: {
+    startLevel: '#cfg-start-level', maxLevel: '#cfg-max-level', diffUp: '#cfg-diff-up', diffDown: '#cfg-diff-down',
+    questionTimeScale: '#cfg-qscale', tolerance: '#cfg-tol', maxDeviation: '#cfg-maxdev', rpmChangeAmount: '#cfg-change-amt',
+  },
+
+  // 라운드 난이도 프리셋: 고르면 프리셋 값을 채우고, 프리셋에 든 칸을 고치면 바로 반영해 '직접 설정'으로 바뀌는 것이 보이게 한다.
+  bindPresets() {
+    const sel = $('#cfg-preset');
+    sel.innerHTML = ROUND_PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join('') +
+      '<option value="custom" disabled>직접 설정</option>';
+    sel.addEventListener('change', () => {
+      const p = Config.preset(sel.value);
+      if (!p) return;
+      this.readMenu();
+      Object.assign(this.cfg, p.values);
+      Config.save(this.cfg);
+      this.bindMenu();
+    });
+    Object.values(this.PRESET_FIELDS).forEach((id) => $(id).addEventListener('change', () => this.readMenu()));
+  },
+
   // 설정에서 켜 둔 게임만, GAME_TYPES에 적힌 순서대로
   enabledTypes() {
     const ids = this.cfg.games;
@@ -90,8 +120,20 @@ const App = {
     $('#cfg-duration').value = c.durationSec;
     $('#cfg-calib').value = c.calibrationSec;
     $('#cfg-tol').value = Math.round(c.tolerance * 100);
+    $('#cfg-preset').value = Config.presetOf(c);
+    const p = Config.preset($('#cfg-preset').value);
+    $('#cfg-preset-note').textContent = p ? `${p.desc} ${PRESET_NOTE}` : '프리셋 값에서 하나 이상을 직접 바꾼 상태입니다.';
+    // 프리셋이 정한 칸을 칠한다
+    Object.values(this.PRESET_FIELDS).forEach((id) => $(id).parentElement.classList.toggle('preset', !!p));
     $('#cfg-start-level').max = this.maxStartLevel();
     $('#cfg-start-level').value = c.startLevel;
+    $('#cfg-max-level').max = this.maxStartLevel();
+    $('#cfg-max-level').value = c.maxLevel;
+    $('#cfg-qscale').value = c.questionTimeScale;
+    $('#cfg-diff-up').value = c.diffUp;
+    $('#cfg-diff-down').value = c.diffDown;
+    $('#cfg-maxdev').value = Math.round(c.maxDeviation * 100);
+    $('#cfg-change-amt').value = Math.round(c.rpmChangeAmount * 100);
     $('#cfg-mult').value = c.multiplierStep;
     $('#cfg-difficulty').value = c.difficulty;
     $('#cfg-change').checked = c.rpmChange;
@@ -127,6 +169,14 @@ const App = {
     c.calibrationSec = num('#cfg-calib', 5, 60, 15);
     c.tolerance = num('#cfg-tol', 3, 40, 12) / 100;
     c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), BASE_LEVEL));
+    c.maxLevel = Math.round(num('#cfg-max-level', 1, this.maxStartLevel(), this.maxStartLevel()));
+    c.questionTimeScale = num('#cfg-qscale', 0.5, 3, 1);
+    // 소수 단계는 부동소수 찌꺼기 없이 저장한다 (프리셋 값과 그대로 비교한다)
+    const r = (v) => Math.round(v * 10000) / 10000;
+    c.diffUp = r(num('#cfg-diff-up', 0.05, 2, 0.4));
+    c.diffDown = r(num('#cfg-diff-down', 0.05, 2, 0.6));
+    c.maxDeviation = r(num('#cfg-maxdev', 10, 100, 45) / 100);
+    c.rpmChangeAmount = r(num('#cfg-change-amt', 0, 40, 12) / 100);
     c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
     c.difficulty = $('#cfg-difficulty').value;
     c.rpmChange = $('#cfg-change').checked;
@@ -307,7 +357,10 @@ const App = {
     this.gen++;
     this.timers = [];
     this.clock = 0;
-    this.calib = { elapsed: 0, started: false, samples: [], angle: 0 };
+    // follow = 측정 중 비트 템포가 따라가는 속도 (RPM). 비트가 속도를 끌고 가면 '편안한 속도'가 비트 쪽으로 쏠리므로,
+    // 측정 중에는 밟는 속도를 천천히 따라가기만 한다. 비트는 밟기 시작할 때 그 속도로 시작한다 (updateCalib)
+    this.calib = { elapsed: 0, started: false, samples: [], angle: 0, follow: this.cfg.fallbackRpm };
+    document.querySelectorAll('.round-end').forEach((e) => e.remove()); // 마무리 화면 중에 운영 메뉴로 버린 판의 것
     this.show('calib');
     this.state = 'calib';
     this.log = new SessionLog(this);
@@ -338,11 +391,15 @@ const App = {
     if (!c.started && rpm > 0) {
       c.started = true;
       this.log.ev('calib_pedaling');
+      // 비트는 밟기 시작한 뒤에 그 속도로 서서히 들어온다
+      c.follow = rpm;
+      this.audio.start(() => U.clamp(this.calib.follow, 30, 110) * 2, { fadeIn: 2.5 });
     }
     if (c.started) {
       c.elapsed += dt;
       if (c.elapsed > Math.min(this.cfg.calibrationIgnoreSec, total * 0.3) && rpm > 0) c.samples.push(rpm);
     }
+    if (rpm > 0) c.follow += (rpm - c.follow) * (1 - Math.exp(-dt / 1.5)); // 멈추면 마지막 템포를 그대로 둔다
     c.angle += (rpm / 60) * 360 * dt;
     $('#calib-crank').setAttribute('transform', `rotate(${c.angle} 110 110)`);
     const frac = U.clamp(c.elapsed / total, 0, 1);
@@ -379,7 +436,7 @@ const App = {
     this.nextShiftAt = this.cfg.rpmChangeSegmentSec;
     this.clearShift();
     this.gameIndex = 0;
-    this.diff = this.cfg.startLevel;    // adaptive 난이도 계기판 (cfg.difficulty 참고)
+    this.diff = Math.min(this.cfg.startLevel, this.levelCap()); // adaptive 난이도 계기판 (cfg.difficulty 참고)
     this.lastLevel = {};                // 게임별 지난번 레벨 (소개 문구용)
     this.current = null;
     this.streak = 0;
@@ -396,7 +453,7 @@ const App = {
     this.show('game');
     this.band.resize();
     this.updateHud();
-    this.audio.start(() => this.target * 2);
+    this.audio.setTempo(() => this.target * 2);  // 측정 때부터 이어지는 비트를 끊지 않고 목표 속도로 넘긴다
 
     const cog = $('#cog');
     const gen = this.gen;
@@ -427,9 +484,10 @@ const App = {
     if (this.shiftDue()) return this.beginShift();
     const T = this.types[this.gameIndex % this.types.length];
     const cycle = Math.floor(this.gameIndex / this.types.length);
+    const top = Math.min(T.maxLevel, this.levelCap());
     const level = this.cfg.difficulty === 'adaptive'
-      ? U.clamp(Math.floor(this.diff), 1, T.maxLevel)
-      : Math.min(cycle + this.cfg.startLevel, T.maxLevel);
+      ? U.clamp(Math.floor(this.diff), 1, top)
+      : Math.min(cycle + this.cfg.startLevel, top);
     // 쉬운 단계(Lv1·Lv2)는 원래의 첫 단계(Lv3)와 같은 x1.0 이다
     const mult = 1 + this.cfg.multiplierStep * Math.max(0, level - BASE_LEVEL);
     const prev = this.lastLevel[T.id];
@@ -509,7 +567,7 @@ const App = {
 
   // ---------------- 문제 제한 시간 ----------------
   // 게임 시계로 재므로 일시정지·운영 메뉴 중에는 멈춘다. 막대는 게임 영역 맨 위에 붙는다.
-  // 쉬운 단계(Lv1·Lv2)는 EASY_TIME 배로 늘린다
+  // 쉬운 단계(Lv1·Lv2)는 EASY_TIME 배로 늘리고, 모든 문제에 라운드 난이도의 questionTimeScale 을 곱한다
   startQTimer(T, stage, level, load, onOut, gen) {
     this.qt = null;
     if (!this.cfg.questionTimer || gen !== this.gen) return;
@@ -522,7 +580,7 @@ const App = {
     }
     el.className = 'qtimer on';
     el.firstChild.style.transform = 'scaleX(1)';
-    const scale = EASY_TIME[level - 1] || 1;
+    const scale = (EASY_TIME[level - 1] || 1) * (this.cfg.questionTimeScale || 1);
     this.qt = { t0: this.clock, ms: (spec.base + spec.per * load) * scale * 1000, onOut, gen, el, tick: 3 };
     this.log.ev('timer_start', { game: T.id, load, limitMs: this.qt.ms });
   },
@@ -624,12 +682,18 @@ const App = {
     this.renderStreak();
   },
 
-  // adaptive 난이도 계기판. 위는 가장 단계가 많은 게임의 최고 레벨 바로 아래까지 — 최고 레벨에서 한 번 틀려도 바로 내려가지 않는다
+  // adaptive 난이도 계기판. 위는 최고 난이도(levelCap) 바로 아래까지 — 최고 레벨에서 한 번 틀려도 바로 내려가지 않는다
   adjustDifficulty(ok) {
     const c = this.cfg;
     if (c.difficulty !== 'adaptive') return;
-    this.diff = U.clamp(this.diff + (ok ? c.diffUp : -c.diffDown), 1, this.maxStartLevel() + 0.99);
-    this.log.ev('difficulty', { ok, diff: Math.round(this.diff * 100) / 100 });
+    const k = this.diffScale();
+    this.diff = U.clamp(this.diff + (ok ? c.diffUp : -c.diffDown) * k, 1, this.levelCap() + 0.99);
+    this.log.ev('difficulty', { ok, diff: Math.round(this.diff * 100) / 100, k: Math.round(k * 1000) / 1000 });
+  },
+
+  // 계기판 한 걸음의 배율: 켜 둔 게임이 많을수록 작게 (cfg.diffGamesRef 참고)
+  diffScale() {
+    return Math.min(1, (this.cfg.diffGamesRef || Infinity) / this.types.length);
   },
 
   renderStreak() {
@@ -694,7 +758,8 @@ const App = {
     const { tolerance, maxDeviation, tickMaxPoints } = this.cfg;
     const d = Math.abs(dev);
     if (d <= tolerance) return tickMaxPoints;
-    return tickMaxPoints * Math.max(0, 1 - (d - tolerance) / (maxDeviation - tolerance));
+    // 편차는 설정에서 허용 구역보다 작게도 넣을 수 있어 0 으로 나누지 않게 막는다
+    return tickMaxPoints * Math.max(0, 1 - (d - tolerance) / Math.max(0.01, maxDeviation - tolerance));
   },
 
   updatePlay(dt, rpm) {
@@ -727,6 +792,7 @@ const App = {
   },
 
   // ended: complete(시간 다 됨) | operator(운영 메뉴에서 끝냄) | idle(자리 비움)
+  // 점수와 기록은 여기서 바로 마무리하고, 마무리 화면(state 'ending')을 잠깐 보여 준 뒤 결과 화면으로 넘어간다
   endRound(ended = 'complete') {
     this.state = 'result';
     if (this.current) {
@@ -745,7 +811,45 @@ const App = {
     this.audio.stop();
     this.audio.sfx('end');
     $('#cog').innerHTML = '';
-    this.showResult();
+    this.showEnding(ended);
+  },
+
+  // ---------------- 마무리 화면 ----------------
+  // 게임 화면 위에 '수고하셨어요'와 총점(세어 올라간다)을 띄운다. ENDING_SKIP_MS 가 지나면 눌러서 바로 넘길 수 있다
+  ENDING_MS: 3200,
+  ENDING_SKIP_MS: 1200,
+  showEnding(ended) {
+    this.state = 'ending';
+    const gen = this.gen;
+    const el = U.el('div', 'round-end');
+    el.innerHTML = `
+      <div class="tag">${ended === 'idle' ? '자리를 비워 게임을 마쳤어요' : '라운드 종료'}</div>
+      <div class="name">수고하셨어요!</div>
+      <div class="score"><b>0</b>점</div>
+      <div class="hint">화면을 누르면 바로 결과를 봅니다</div>`;
+    $('#game').append(el);
+    Fx.confetti(0.5);
+
+    const num = el.querySelector('.score b');
+    const t0 = performance.now();
+    const count = (now) => {
+      const t = U.clamp((now - t0) / 1300, 0, 1);
+      num.textContent = Math.round(this.score * (1 - Math.pow(1 - t, 3))).toLocaleString('ko-KR');
+      if (t < 1 && el.isConnected) requestAnimationFrame(count);
+    };
+    requestAnimationFrame(count);
+
+    const go = () => {
+      if (gen !== this.gen || this.state !== 'ending') return;
+      el.remove();
+      this.state = 'result';
+      this.showResult();
+    };
+    this.after(this.ENDING_MS, go, gen);
+    this.after(this.ENDING_SKIP_MS, () => {
+      el.classList.add('skippable');
+      el.addEventListener('pointerdown', go);
+    }, gen);
   },
 
   showResult() {

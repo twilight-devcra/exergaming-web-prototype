@@ -354,18 +354,20 @@ class FitGame {
       `<path d="${d}" stroke="${color}" stroke-width="${FitGame.LINE}"/>`;
   }
 
-  // 변에서 곧게 안쪽으로 들어가 다른 변으로 나간다. 같은 변에서 시작하는 두 선은 처음에 나란히 간다.
+  // 변에서 곧게 INSET 만큼 들어가 꺾은 뒤, 다른 변 앞에서 다시 꺾어 곧게 나간다. 같은 변에서 시작하는 두 선은 처음에 나란히 간다.
+  // 곡선으로 그리면 이웃한 변·한 칸 건너 변·마주 보는 변을 잇는 선이 모두 비슷한 호로 보였다. 꺾인 선은 각이 또렷해서
+  // 갈고리(이웃) · 넓은 V(한 칸 건너) · 일자(마주 봄)로 한눈에 갈린다.
+  static INSET = FitGame.R * 0.38;
   static drawPiece(pattern) {
     const p = FitGame.arrange(pattern);
-    const bend = FitGame.R * 0.5;
+    const k = FitGame.INSET;
     const f = (n) => n.toFixed(2);
     let lines = '';
     for (let c = 0; c < FitGame.COLORS.length; c++) {
       const [a, b] = [0, 1, 2, 3, 4, 5].flatMap((e) => p[e].includes(c) ? [FitGame.port(p, e, p[e].indexOf(c))] : []);
       if (!b) continue;
-      const d = `M${f(a.x)},${f(a.y)} ` +
-        `C${f(a.x - a.nx * bend)},${f(a.y - a.ny * bend)} ${f(b.x - b.nx * bend)},${f(b.y - b.ny * bend)} ` +
-        `${f(b.x)},${f(b.y)}`;
+      const d = `M${f(a.x)},${f(a.y)} L${f(a.x - a.nx * k)},${f(a.y - a.ny * k)} ` +
+        `L${f(b.x - b.nx * k)},${f(b.y - b.ny * k)} L${f(b.x)},${f(b.y)}`;
       lines += FitGame.stroke(d, FitGame.COLORS[c]);
     }
     return `${FitGame.hex(0, 0, 'tile piece')}<g class="lines">${lines}</g>`;

@@ -379,7 +379,9 @@ const Demo = {
     const box = $('#op-set-fields');
     const presets = ROUND_PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
     box.append(U.el('label', 'setting', `라운드 난이도<select id="op-set-preset">${presets}<option value="custom" disabled>직접 설정</option></select>`));
-    box.append(U.el('p', 'setting-note', '<span id="op-set-preset-note"></span>'));
+    const note = U.el('p', 'setting-note');
+    note.id = 'op-set-preset-note';
+    box.append(note);
     $('#op-set-preset').addEventListener('change', (e) => {
       const p = Config.preset(e.target.value);
       if (p) this.fillSettings({ ...this.readSettings(), ...p.values });
@@ -408,6 +410,8 @@ const Demo = {
     if (this.app.inRound) return;
     this.fillSettings(this.app.cfg);
     $('#op-set').classList.add('active');
+    // 설명이 프리셋마다 길이가 달라 아래 칸들이 오르내리지 않게 가장 긴 설명만큼 자리를 잡아 둔다 (보이는 동안에만 잴 수 있다)
+    U.reserveHeight($('#op-set-preset-note'), Config.presetNotes());
   },
 
   fillSettings(cfg) {
@@ -445,7 +449,7 @@ const Demo = {
     $('#op-set-code').textContent = `설정 코드 ${Config.demoCode(v)}`;
     const id = Config.presetOf(v);
     $('#op-set-preset').value = id;
-    $('#op-set-preset-note').textContent = id === 'custom' ? '프리셋 값에서 하나 이상을 직접 바꾼 상태입니다.' : `${Config.preset(id).desc} ${PRESET_NOTE}`;
+    $('#op-set-preset-note').textContent = Config.presetNote(id);
     PRESET_KEYS.forEach((k) => $(`#op-set-fields [data-key="${k}"]`).parentElement.classList.toggle('preset', id !== 'custom'));
   },
 

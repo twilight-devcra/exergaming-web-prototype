@@ -74,6 +74,7 @@ const DEFAULT_CONFIG = {
 //   rpmChangeAmount     — 오르막·내리막에서 목표 속도가 바뀌는 폭
 // '보통'은 DEFAULT_CONFIG 의 값 그대로다. 나머지 둘은 첫 추정값이라 플레이해 보며 다듬는다.
 const PRESET_NOTE = '칠한 칸은 이 프리셋이 정한 값입니다. 하나라도 바꾸면 직접 설정이 됩니다.';
+const PRESET_CUSTOM_NOTE = '프리셋 값에서 하나 이상을 직접 바꾼 상태입니다.';
 const PRESET_KEYS = ['startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'tolerance', 'maxDeviation', 'rpmChangeAmount'];
 const ROUND_PRESETS = [
   {
@@ -171,6 +172,14 @@ const Config = {
   preset(id) {
     return ROUND_PRESETS.find((x) => x.id === id) || null;
   },
+  // 프리셋 고르기 아래의 설명 문구 (id 가 'custom' 이면 직접 바꾼 상태라는 안내)
+  presetNote(id) {
+    const p = this.preset(id);
+    return p ? `${p.desc} ${PRESET_NOTE}` : PRESET_CUSTOM_NOTE;
+  },
+  presetNotes() {
+    return [...ROUND_PRESETS.map((p) => this.presetNote(p.id)), PRESET_CUSTOM_NOTE];
+  },
   // 쉬운 단계를 더하기 전에 저장한 시작 난이도는 같은 문제가 나오도록 번호를 옮긴다
   migrateLevel(saved) {
     if (saved.startLevel != null && saved.levelScheme !== LEVEL_SCHEME) saved.startLevel += EASY_LEVELS;
@@ -198,6 +207,20 @@ const U = {
     if (cls) e.className = cls;
     if (html != null) e.innerHTML = html;
     return e;
+  },
+  // 글이 바뀌어도 아래 칸들이 밀리지 않도록, 들어갈 수 있는 글 가운데 가장 긴 것의 높이를 미리 잡아 둔다.
+  // 화면에 보이는 동안에만 잴 수 있다 (안 보이면 아무것도 하지 않는다)
+  reserveHeight(el, texts) {
+    if (!el.offsetParent) return;
+    const keep = el.textContent;
+    el.style.minHeight = '';
+    let h = 0;
+    for (const t of texts) {
+      el.textContent = t;
+      h = Math.max(h, el.offsetHeight);
+    }
+    el.textContent = keep;
+    el.style.minHeight = `${h}px`;
   },
   // 게임 안내 문구를 바꾼다. kind 에 따라 문구 앞 아이콘과 색이 정해진다 (css .stage-msg):
   //   look 보기 · act 누르기 · good 맞음 · bad 틀림 · '' 아이콘 없음

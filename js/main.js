@@ -107,6 +107,10 @@ const App = {
       this.bindMenu();
     });
     Object.values(this.PRESET_FIELDS).forEach((id) => $(id).addEventListener('change', () => this.readMenu()));
+    // 글꼴(화면 스타일마다 다르다)이 바뀌면 설명 높이를 다시 잰다
+    const remeasure = () => requestAnimationFrame(() => U.reserveHeight($('#cfg-preset-note'), Config.presetNotes()));
+    document.querySelector('[data-theme-picker]').addEventListener('change', remeasure);
+    if (document.fonts) document.fonts.addEventListener('loadingdone', remeasure);
   },
 
   // 설정에서 켜 둔 게임만, GAME_TYPES에 적힌 순서대로
@@ -124,7 +128,9 @@ const App = {
     $('#cfg-tol').value = Math.round(c.tolerance * 100);
     $('#cfg-preset').value = Config.presetOf(c);
     const p = Config.preset($('#cfg-preset').value);
-    $('#cfg-preset-note').textContent = p ? `${p.desc} ${PRESET_NOTE}` : '프리셋 값에서 하나 이상을 직접 바꾼 상태입니다.';
+    $('#cfg-preset-note').textContent = Config.presetNote($('#cfg-preset').value);
+    // 설명이 프리셋마다 길이가 달라 아래 칸들이 오르내리지 않게 가장 긴 설명만큼 자리를 잡아 둔다
+    U.reserveHeight($('#cfg-preset-note'), Config.presetNotes());
     // 프리셋이 정한 칸을 칠한다
     Object.values(this.PRESET_FIELDS).forEach((id) => $(id).parentElement.classList.toggle('preset', !!p));
     $('#cfg-start-level').max = this.maxStartLevel();

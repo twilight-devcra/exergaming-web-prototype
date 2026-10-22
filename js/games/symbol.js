@@ -27,6 +27,7 @@ function symbolEl(sym) {
 
 class SymbolGame {
   static id = 'symbol';
+  static tags = ['memory']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '심볼 위치 외우기';
   static hint = '잠깐 보이는 그림들의 위치를 외운 뒤<br>위에 나온 그림이 어디 있었는지 고르세요';
   // n = 심볼 수, show = 심볼 노출 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 SHOW_MS 로 고정이다.
@@ -38,6 +39,23 @@ class SymbolGame {
   static maxLevel = SymbolGame.levels.length;
   static SHOW_MS = 3200;
   static QUESTIONS = 3;    // 심볼이 이보다 적으면 심볼 수만큼 묻는다
+
+  // 소개 그림: ① 그림 자리를 외우고 ② 위에 나온 그림이 있던 칸을 누른다
+  static diagram() {
+    const S = 34, G = 8;
+    const at = (slot, y0) => [8 + (slot % 4) * (S + G), y0 + Math.floor(slot / 4) * (S + G)];
+    const sym = (id) => SYMBOLS.find((s) => s.id === id).svg;
+    const placed = [[1, 'star'], [4, 'circle'], [6, 'triangle']];
+    const grid = (y0) => [...Array(8).keys()].map((i) => Dg.rect(...at(i, y0), S, S)).join('');
+    const center = (slot, y0) => at(slot, y0).map((v) => v + S / 2);
+    return [
+      { svg: Dg.svg('0 0 176 140', grid(32) + placed.map(([slot, id]) => Dg.glyph(sym(id), ...center(slot, 32), 26)).join('')), caption: '그림 자리를 외우고' },
+      {
+        svg: Dg.svg('0 0 176 140', Dg.rect(66, 2, 44, 44, 'dg-slot active', 9) + Dg.glyph(sym('star'), 88, 24, 30) + grid(58) + Dg.tap(...center(1, 58))),
+        caption: '위 그림이 있던 칸 누르기',
+      },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

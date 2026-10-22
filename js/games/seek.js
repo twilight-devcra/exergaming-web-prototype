@@ -19,6 +19,7 @@ const SEEK_SYMBOLS = [
 
 class SeekGame {
   static id = 'seek';
+  static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '숨은 순서 찾기';
   static hint = '왼쪽의 그림 순서가 판 어딘가에 한 줄로 숨어 있습니다<br>그 줄에 있는 칸을 아무거나 하나 누르세요';
   // slanted — 첫 문제를 비스듬한 줄에 숨긴다. 처음 하는 사람이 나올 법한 단계(Lv1~3)에 둔다
@@ -37,6 +38,34 @@ class SeekGame {
   static ROUNDS = 3;
   static DIRS = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]]; // 축 좌표 (q, r)의 여섯 방향
   static UNIT = 50; // SVG 안에서 육각형 한 칸의 반지름
+
+  // 소개 그림: ① 이 순서를 ② 판에서 한 줄로 찾아 누른다 (어느 방향이든 된다 — 일부러 비스듬한 줄로 보여 준다)
+  static diagram() {
+    const vb = '-130 -125 260 250';
+    // 찾을 순서는 판에서처럼 비스듬히 늘어놓는다 (가로로만 찾는 게 아니라는 것도 함께 보인다)
+    const bead = (x, y, s) => `<polygon class="dg-cell" points="${SeekGame.hexPoints(x, y, 54)}"/>` +
+      `<g transform="translate(${x - 34} ${y - 34}) scale(0.68)">${SEEK_SYMBOLS[s]}</g>`;
+    const chain = '<line class="dg-chain" x1="-72" y1="-66" x2="72" y2="66"/>' +
+      [[-72, -66, 0], [0, 0, 1], [72, 66, 2]].map(([x, y, s]) => bead(x, y, s)).join('');
+    // [q, r, 그림]. q = 0 인 세 칸이 정답 줄이다
+    const cells = [[-1, 0, 4], [-1, 1, 0], [0, -1, 0], [0, 0, 1], [0, 1, 2], [1, -1, 3], [1, 0, 5]];
+    const S = SeekGame.UNIT;
+    let board = cells.map(([q, r]) => {
+      const [x, y] = SeekGame.center(q, r);
+      return `<polygon class="${q === 0 ? 'dg-soft' : 'dg-cell'}" points="${SeekGame.hexPoints(x, y, S * 0.93)}"/>`;
+    }).join('');
+    const [x1, y1] = SeekGame.center(0, -1);
+    const [x2, y2] = SeekGame.center(0, 1);
+    board += `<line class="dg-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    board += cells.map(([q, r, s]) => {
+      const [x, y] = SeekGame.center(q, r);
+      return `<g transform="translate(${x - 31} ${y - 31}) scale(0.62)">${SEEK_SYMBOLS[s]}</g>`;
+    }).join('');
+    return [
+      { svg: Dg.svg(vb, chain), caption: '이 순서가' },
+      { svg: Dg.svg(vb, board + Dg.tap(0, 0, 36)), caption: '한 줄로 놓인 곳 누르기' },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

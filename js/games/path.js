@@ -12,6 +12,7 @@
 //   step  — 한 칸을 보여주는 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 STEP_MS 로 고정이다.
 class PathGame {
   static id = 'path';
+  static tags = ['memory', 'trace']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '길 따라 그리기';
   static hint = '불이 켜지며 만들어지는 길을 기억했다가<br>같은 순서대로 칸을 눌러 길을 완성하세요';
   static levels = [
@@ -27,6 +28,46 @@ class PathGame {
   ];
   static maxLevel = PathGame.levels.length;
   static STEP_MS = 380; // 경로 한 칸을 보여주는 시간 (쉬운 단계 말고는 난이도와 무관하게 고정)
+
+  // 소개 그림: ① 켜지는 길을 보고 ② 같은 순서로 누른다
+  static diagram() {
+    const S = 34, G = 8;
+    const at = (r, c) => [8 + c * (S + G), 8 + r * (S + G)];
+    const mid = (r, c) => at(r, c).map((v) => v + S / 2);
+    const path = [[1, 0], [1, 1], [0, 1], [0, 2], [1, 2], [1, 3]];
+    const k = (r, c) => path.findIndex(([pr, pc]) => pr === r && pc === c);
+    const grid = (cls) => {
+      let s = '';
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) s += Dg.rect(...at(r, c), S, S, cls(k(r, c)));
+      return s;
+    };
+    const line = `<polyline class="dg-line" points="${path.map((p) => mid(...p).join(',')).join(' ')}"/>`;
+    const nums = (n, cls) => path.slice(0, n).map((p, i) => Dg.text(...mid(...p), i + 1, 17, cls)).join('');
+
+    // ②는 길의 칸을 1번부터 차례로 눌러 채우는 모습을 되풀이한다 (누를 칸 전부와 그 순서가 보이게).
+    // 한 바퀴 = 첫 칸까지 LEAD, 칸마다 STEP, 다 채운 뒤 HOLD 만큼 멈춤. SMIL 로 그림 안에서 돌린다
+    const LEAD = 0.4, STEP = 0.5, HOLD = 1.1;
+    const dur = LEAD + STEP * path.length + HOLD;
+    const t = (i) => ((LEAD + STEP * i) / dur).toFixed(4);   // i번째 칸을 누르는 순간 (한 바퀴 중 비율)
+    const end = ((dur - 0.15) / dur).toFixed(4);             // 바퀴 끝에서 모두 지운다
+    const show = (i) => `<animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;${t(i)};${t(i)};${end};1" dur="${dur}s" repeatCount="indefinite"/>`;
+    const pressed = path.map((p, i) => {
+      const [x, y] = at(...p);
+      return `<g opacity="0">${Dg.rect(x, y, S, S, 'dg-on')}${Dg.text(x + S / 2, y + S / 2, i + 1, 17, 'dg-txt on')}${show(i)}</g>`;
+    }).join('');
+    // 누르는 표시는 칸이 채워지기 반 박자 전에 그 칸으로 옮겨 간다 (같은 색으로 채워진 칸 위에서는 고리가 묻혀 보이지 않는다).
+    // 다 채운 뒤에는 사라진다
+    const pts = path.map((p) => mid(...p));
+    const keys = `0;${path.map((_, i) => ((LEAD - STEP / 2 + STEP * i) / dur).toFixed(4)).join(';')}`;
+    const ring = `<circle class="dg-tap" cx="${pts[0][0]}" cy="${pts[0][1]}" r="17">` +
+      `<animate attributeName="cx" values="${pts[0][0]};${pts.map((q) => q[0]).join(';')}" keyTimes="${keys}" calcMode="discrete" dur="${dur}s" repeatCount="indefinite"/>` +
+      `<animate attributeName="cy" values="${pts[0][1]};${pts.map((q) => q[1]).join(';')}" keyTimes="${keys}" calcMode="discrete" dur="${dur}s" repeatCount="indefinite"/>` +
+      `<animate attributeName="visibility" values="visible;hidden" keyTimes="0;${((LEAD + STEP * (path.length - 1) + 0.05) / dur).toFixed(4)}" calcMode="discrete" dur="${dur}s" repeatCount="indefinite"/></circle>`;
+    return [
+      { svg: Dg.svg('0 0 176 134', grid((i) => (i >= 0 ? 'dg-soft' : 'dg-cell')) + line + nums(path.length, 'dg-txt num')), caption: '켜지는 길을 보고' },
+      { svg: Dg.svg('0 0 176 134', grid(() => 'dg-cell') + pressed + ring), caption: '같은 순서로 하나씩 누르기' },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

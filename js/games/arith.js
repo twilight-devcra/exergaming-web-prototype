@@ -11,6 +11,7 @@
 // '큰 수부터 넣고 나머지를 맞춰 보는' 요령이 통하지 않도록 문제를 고른다 (generate 참고).
 class ArithGame {
   static id = 'arith';
+  static tags = ['number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '사칙연산 역산';
   static hint = '아래 숫자를 골라 빈칸을 모두 채워 식을 완성하세요<br>채운 칸을 누르면 숫자를 다시 뺄 수 있습니다';
   static levels = [
@@ -31,6 +32,21 @@ class ArithGame {
   static LO = 1;
   static HI = 9;
   static TRIES = 120; // 문제 하나를 만들 때 후보 묶음을 다시 뽑아 보는 횟수 (화면이 멈칫하지 않을 만큼만)
+
+  // 소개 그림: ① 빈칸에 들어갈 수를 찾아 ② 아래에서 골라 채운다
+  static diagram() {
+    const eq = (a) =>
+      Dg.rect(14, 14, 38, 38, a ? 'dg-slot good' : 'dg-slot active') + Dg.text(33, 33, a || '?', 22, a ? 'dg-txt' : 'dg-txt num') +
+      Dg.text(68, 33, '+', 22) +
+      Dg.rect(84, 14, 38, 38, a ? 'dg-slot active' : 'dg-slot') + Dg.text(103, 33, '?', 22, 'dg-txt num') +
+      Dg.text(140, 33, '=', 22) + Dg.text(170, 33, '9', 24);
+    const cands = (used) => [[4, 40], [7, 82], [5, 124]].map(([v, x]) =>
+      `<g class="${used.includes(v) ? 'dg-dim' : ''}">${Dg.rect(x, 84, 38, 38)}${Dg.text(x + 19, 103, v, 20)}</g>`).join('');
+    return [
+      { svg: Dg.svg('0 0 200 136', eq(null) + cands([])), caption: '빈칸에 들어갈 수를 찾아' },
+      { svg: Dg.svg('0 0 200 136', eq(4) + cands([4]) + Dg.tap(143, 103)), caption: '아래에서 골라 채우기' },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

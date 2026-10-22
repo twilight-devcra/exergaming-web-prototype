@@ -41,6 +41,7 @@ const LADDER_PEGS = [
 
 class LadderGame {
   static id = 'ladder';
+  static tags = ['trace']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '사다리 타기';
   static hint = '사다리를 타고 내려가 같은 모양 구멍에<br>쏙 들어가는 조각을 위에서 고르세요';
   static levels = [
@@ -68,6 +69,21 @@ class LadderGame {
   static GAP = 16;
   static TRICK = [0, 0.2];  // 속임 가로줄 끝이 옆 가로줄 끝을 넘어가는 거리 = GAP + 이 범위 (칸 높이 비율)
   static DRAW_MS = 800;     // css .lad-trace 의 transition 과 같게
+
+  // 소개 그림: ① 사다리를 타고 내려가 ② 같은 모양 구멍에 들어가는 조각을 고른다 (바로 위 조각이 답이 아니다)
+  static diagram() {
+    const X = [50, 100, 150];
+    const peg = (k, x, y, s = 0.5) => `<g transform="translate(${x} ${y}) scale(${s})" fill="${LADDER_PEGS[k].fill}">${LADDER_PEGS[k].svg}</g>`;
+    const frame = X.map((x) => `<line class="dg-rail" x1="${x}" y1="30" x2="${x}" y2="112"/>`).join('') +
+      [[0, 52], [1, 72], [0, 94]].map(([i, y]) => `<line class="dg-rail" x1="${X[i]}" y1="${y}" x2="${X[i + 1]}" y2="${y}"/>`).join('') +
+      `<g transform="translate(50 126) scale(0.62)" class="dg-hole" stroke="${LADDER_PEGS[2].fill}">${LADDER_PEGS[2].svg}</g>` +
+      [100, 150].map((x) => `<circle class="dg-end" cx="${x}" cy="126" r="4"/>`).join('');
+    const trace = '<polyline class="dg-trace" points="150,16 150,72 100,72 100,94 50,94 50,124"/>';
+    return [
+      { svg: Dg.svg('0 0 200 140', frame + peg(1, 50, 16) + peg(0, 100, 16) + peg(2, 150, 16)), caption: '사다리를 타고 내려가' },
+      { svg: Dg.svg('0 0 200 140', frame + trace + peg(1, 50, 16) + peg(0, 100, 16) + peg(2, 50, 126, 0.52) + Dg.tap(150, 16, 15)), caption: '같은 모양 구멍에 들어가는 조각' },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

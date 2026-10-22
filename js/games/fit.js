@@ -20,6 +20,7 @@
 //   upright — 조각을 돌려 놓지 않는다 (쉬운 단계). 정답 조각이 빈자리와 같은 방향이라 머릿속으로 돌려 볼 필요가 없다.
 class FitGame {
   static id = 'fit';
+  static tags = ['shape']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '빈자리 채우기';
   static hint = '빈자리에 끼웠을 때 선이 모두 이어지는<br>조각을 아래에서 고르세요';
   static levels = [
@@ -42,6 +43,17 @@ class FitGame {
   static BOARD_VIEW = 180;
   static LINE = 8;
   static GAP = 7;           // 한 변에 선 끝이 둘일 때 변의 한가운데에서 떨어진 거리
+
+  // 소개 그림: ① 선이 끊긴 빈자리에 ② 선이 모두 이어지는 조각을 끼운다
+  static diagram() {
+    const p = [[0], [], [0], [], [], []];
+    const v = FitGame.BOARD_VIEW;
+    const vb = `${-v / 2} ${-v / 2} ${v} ${v}`;
+    return [
+      { svg: Dg.svg(vb, `<g class="fit-board">${FitGame.drawBoard(p)}</g>`), caption: '선이 끊긴 빈자리에' },
+      { svg: Dg.svg(vb, `<g class="fit-board">${FitGame.drawBoard(p)}<g class="seat right">${FitGame.drawPiece(p)}</g></g>`), caption: '선이 이어지는 조각 고르기' },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

@@ -1,5 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame];
+// 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
+const OPENING_GAMES = ['count', 'ladder'];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
 const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
 const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다
@@ -436,6 +438,9 @@ const App = {
     this.nextShiftAt = this.cfg.rpmChangeSegmentSec;
     this.clearShift();
     this.gameIndex = 0;
+    this.pass = [];                     // 이번 바퀴에 남은 게임 (planPass)
+    this.inIntro = false;               // 게임 소개 중이면 라운드 시계·운동 점수가 멈춘다 (updatePlay)
+    this.prevType = null;
     this.diff = Math.min(this.cfg.startLevel, this.levelCap()); // adaptive 난이도 계기판 (cfg.difficulty 참고)
     this.lastLevel = {};                // 게임별 지난번 레벨 (소개 문구용)
     this.current = null;
@@ -482,7 +487,9 @@ const App = {
 
   nextGame() {
     if (this.shiftDue()) return this.beginShift();
-    const T = this.types[this.gameIndex % this.types.length];
+    if (!this.pass.length) this.pass = this.planPass(this.prevType, this.gameIndex === 0);
+    const T = this.pass.shift();
+    this.prevType = T;
     const cycle = Math.floor(this.gameIndex / this.types.length);
     const top = Math.min(T.maxLevel, this.levelCap());
     const level = this.cfg.difficulty === 'adaptive'
@@ -505,16 +512,63 @@ const App = {
     intro.innerHTML = `
       <div class="tag">${tag}${mult > 1 ? ` · x${mult.toFixed(1)}` : ''}</div>
       <div class="name">${T.title}</div>
-      <div class="hint">${T.hint}</div>`;
+      ${Dg.render(T)}
+      <div class="hint">${T.hint}</div>
+      <div class="skip">화면을 누르면 바로 시작합니다</div>`;
     cog.append(intro);
-    this.after(firstTime ? 2600 : 1500, () => {
+    this.inIntro = true;
+    // 소개는 처음 나올 때 길게, 다시 나올 때 짧게. 문제 제한 시간 배율(라운드 난이도)만큼 늘리고, 누르면 바로 넘어간다
+    const { first, again } = this.cfg.introMs;
+    const ms = (firstTime ? first : again) * (this.cfg.questionTimeScale || 1);
+    let begun = false;
+    const t0 = this.clock;
+    const begin = (skipped) => {
+      if (begun || gen !== this.gen) return;
+      begun = true;
+      this.inIntro = false;
+      this.log.ev('intro_end', { game: T.id, ms: Math.round(this.clock - t0), skipped: !!skipped });
       cog.innerHTML = '';
       const stage = U.el('div', 'stage');
       cog.append(stage);
       const host = this.makeHost(T, stage, level, mult, gen);
       this.current = { T, game: new T(host), host };
       this.current.game.start();
-    }, gen);
+    };
+    this.after(ms, () => begin(false), gen);
+    this.after(600, () => intro.addEventListener('pointerdown', () => begin(true)), gen);
+  },
+
+  // 한 바퀴 = 켜 둔 게임을 한 번씩. 바퀴마다 순서를 섞되, 바로 앞 게임과 같거나 비슷한(tags 가 겹치는) 게임이
+  // 이어지지 않게 한다 (바퀴가 바뀌는 자리 포함). 그런 순서가 없으면 같은 게임만 피한다.
+  // opening 이면 첫 게임을 OPENING_GAMES 중에서 고른다.
+  planPass(prev, opening) {
+    const types = this.types;
+    const near = (a, b) => a === b || a.tags.some((t) => b.tags.includes(t));
+    const plan = (strict) => {
+      const out = [];
+      const left = new Set(types);
+      let budget = 5000;
+      const dfs = () => {
+        if (!left.size) return true;
+        if (--budget < 0) return false;
+        const last = out.length ? out[out.length - 1] : prev;
+        let cands = U.shuffle([...left]).filter((T) => !last || types.length === 1 || (strict ? !near(last, T) : last !== T));
+        if (opening && !out.length) {
+          const first = cands.filter((T) => OPENING_GAMES.includes(T.id));
+          if (first.length) cands = first;
+        }
+        for (const T of cands) {
+          out.push(T);
+          left.delete(T);
+          if (dfs()) return true;
+          out.pop();
+          left.add(T);
+        }
+        return false;
+      };
+      return dfs() ? out : null;
+    };
+    return plan(true) || plan(false) || U.shuffle([...types]);
   },
 
   makeHost(T, stage, level, mult, gen) {
@@ -750,6 +804,7 @@ const App = {
     const left = this.state === 'play' ? this.cfg.durationSec - this.elapsed : this.cfg.durationSec;
     $('#hud-time .value').textContent = U.fmtTime(left);
     $('#hud-time').classList.toggle('warn', this.state === 'play' && left <= 10);
+    $('#hud-time').classList.toggle('held', this.state === 'play' && this.inIntro);
     $('#hud-score .value').textContent = this.score;
   },
 
@@ -762,14 +817,19 @@ const App = {
     return tickMaxPoints * Math.max(0, 1 - (d - tolerance) / Math.max(0.01, maxDeviation - tolerance));
   },
 
+  // 게임 소개(설명 화면) 중에는 라운드 시계와 운동 점수를 멈춘다 (inIntro). 공·목표 속도·비트는 그대로 움직이고,
+  // 거리·칼로리(meter)는 loop 에서 따로 세므로 계속 쌓인다. 운동 점수 만점(durationSec 기준)은 그대로다.
   updatePlay(dt, rpm) {
     const { cfg } = this;
-    this.elapsed += dt;
+    const held = this.inIntro;
+    if (!held) this.elapsed += dt;
 
     // 목표 RPM 변화 → 지면 각도. 속도 전환 구간에서만 움직인다.
     if (this.shift) this.updateShift();
     this.band.setSlope(this.slopeLevel);
     this.target = this.baseline * (1 + this.slopeLevel * cfg.rpmChangeAmount);
+
+    if (held) return;
 
     // 짧은 간격으로 운동 점수 지급. 화면의 공 위치(band)를 기준으로 채점해서 보이는 것과 점수가 어긋나지 않게 한다.
     this.tickAcc += this.frameScore(this.band.deviation) * dt;
@@ -795,6 +855,7 @@ const App = {
   // 점수와 기록은 여기서 바로 마무리하고, 마무리 화면(state 'ending')을 잠깐 보여 준 뒤 결과 화면으로 넘어간다
   endRound(ended = 'complete') {
     this.state = 'result';
+    this.inIntro = false;
     if (this.current) {
       // 중단된 게임: 부분 점수는 abort 안에서 지급될 수 있도록 상태를 잠깐 play로 둔다
       this.state = 'play';

@@ -241,6 +241,8 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 #hud-time { left: 32px; }
 #hud-score { right: 32px; text-align: right; }
 #hud-time.warn .value { color: var(--bad); }
+/* 게임 소개 중에는 라운드 시계가 멈춰 있다 */
+#hud-time.held .value { opacity: 0.4; transition: opacity 0.2s; }
 #hud-score .value.bump { animation: bump 0.25s ease-out; }
 @keyframes bump { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
@@ -355,13 +357,44 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  align-self: stretch;   /* 게임 영역 전체를 덮어 어디를 눌러도 소개를 넘길 수 있게 */
+  flex: 1;
   gap: 14px;
   text-align: center;
   animation: fadein 0.25s ease-out;
 }
-.intro .tag { font-size: 15px; color: var(--accent); font-weight: 700; letter-spacing: 0.06em; }
-.intro .name { font-size: 44px; font-weight: 800; }
-.intro .hint { font-size: 20px; color: var(--ink-soft); max-width: 640px; line-height: 1.5; }
+.intro .tag { font-size: 18px; color: var(--accent); font-weight: 700; letter-spacing: 0.06em; }
+.intro .name { font-size: clamp(40px, 6vh, 56px); font-weight: 800; }
+.intro .hint { font-size: clamp(21px, 3.1vh, 28px); color: var(--ink); max-width: 860px; line-height: 1.45; font-weight: 500; }
+.intro .skip { font-size: 15px; color: var(--ink-soft); }
+
+/* 게임 소개의 설명 그림 (js/diagram.js) */
+.dg { display: flex; align-items: center; gap: 16px; margin: 4px 0; }
+.dg-step { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.dg-step figcaption { font-size: clamp(17px, 2.5vh, 22px); font-weight: 700; color: var(--ink); }
+.dg-step figcaption b { color: var(--accent); }
+.dg-arrow { font-size: 34px; color: var(--ink-soft); padding-bottom: 36px; }
+.dg-svg { display: block; height: clamp(120px, 24vh, 220px); width: auto; padding: 10px; background: var(--panel); border-radius: 16px; overflow: hidden; }
+.dg-cell { fill: var(--cell); }
+.dg-soft { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+.dg-on { fill: var(--accent); }
+.dg-slot { fill: var(--panel); stroke: var(--line); stroke-width: 3; }
+.dg-slot.active { stroke: var(--accent); }
+.dg-slot.good { stroke: var(--good); }
+.dg-dim { opacity: 0.35; }
+.dg-txt { fill: var(--ink); font-weight: 800; font-family: var(--font-num); }
+.dg-txt.num { fill: var(--accent); }
+.dg-txt.on { fill: var(--on-accent); }
+.dg-line { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.45; }
+.dg-chain { stroke: var(--line); stroke-width: 8; }
+.dg-rail { stroke: var(--ink-soft); stroke-width: 4; stroke-linecap: round; }
+.dg-hole { fill: var(--ink); stroke-width: 6; }
+.dg-end { fill: var(--line); }
+.dg-trace { fill: none; stroke: var(--good); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.dg-tap { fill: none; stroke: var(--accent); stroke-width: 4; transform-box: fill-box; transform-origin: center; animation: dg-tap 1.4s ease-out infinite; }
+@keyframes dg-tap { from { transform: scale(0.7); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .dg-tap { animation: none; } }
 .big-count { font-size: 120px; font-weight: 800; color: var(--accent); }
 @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 

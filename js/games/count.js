@@ -17,6 +17,7 @@ const COUNT_COLORS = [
 
 class CountGame {
   static id = 'count';
+  static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '우세한 색 찾기';
   static hint = '격자에 가장 많이 켜진 색을<br>아래 보기에서 고르세요';
   // cells = 켜는 칸 수의 상한 (격자를 가득 채우지 않는다)
@@ -33,6 +34,21 @@ class CountGame {
   ];
   static maxLevel = CountGame.levels.length;
   static ROUNDS = 3;
+
+  // 소개 그림: ① 가장 많은 색을 찾아 ② 아래 보기에서 고른다
+  static diagram() {
+    const [red, blue] = COUNT_COLORS;
+    const cell = (col, x, y, s) => (col
+      ? `<rect fill="${col.fill}" x="${x}" y="${y}" width="${s}" height="${s}" rx="7"/>` + Dg.glyph(col.glyph, x + s / 2, y + s / 2, s, 'fill="rgba(255,255,255,0.7)"')
+      : Dg.rect(x, y, s, s));
+    const layout = [[red, red, blue], [red, red, null], [red, blue, null]];
+    let grid = '';
+    layout.forEach((row, r) => row.forEach((col, c) => (grid += cell(col, 30 + c * 40, 6 + r * 40, 36))));
+    return [
+      { svg: Dg.svg('0 0 180 130', grid), caption: '가장 많은 색을 찾아' },
+      { svg: Dg.svg('0 0 180 130', cell(blue, 36, 41, 48) + cell(red, 96, 41, 48) + Dg.tap(120, 65, 30)), caption: '아래 보기에서 고르기' },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

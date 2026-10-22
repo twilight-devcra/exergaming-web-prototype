@@ -32,6 +32,7 @@ const COVER_MARKS = (() => {
 
 class CoverGame {
   static id = 'cover';
+  static tags = ['memory', 'number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '가린 숫자 더하기';
   static hint = '상자가 닫히기 전에 속에 든 숫자를 외워 두었다가<br>두 숫자를 더한 값을 고르세요';
   static levels = [
@@ -53,6 +54,27 @@ class CoverGame {
   static SHOW_PER = 550;
   static LID_GAP = 130;   // 상자가 하나씩 닫히는 간격
   static FLY_MS = 520;    // css .cv-tok 의 transition 과 같게
+
+  // 소개 그림: ① 상자 속 숫자를 외워 두었다가 ② 두 수를 더한 값을 고른다
+  static diagram() {
+    const m = COVER_MARKS[0];
+    const tok = (x, y, s, v) => Dg.rect(x, y, s, s, 'dg-slot') + Dg.text(x + s / 2, y + s / 2, v, s * 0.55);
+    const box = (x, y, s) => `<rect fill="${m.fill}" x="${x}" y="${y}" width="${s}" height="${s}" rx="8"/>` +
+      Dg.glyph(m.glyph, x + s / 2, y + s / 2, s, 'fill="rgba(255,255,255,0.92)"');
+    // 열린 상자: 숫자가 보이고, 표시가 찍힌 뚜껑이 왼쪽 위 모서리를 축으로 젖혀져 있다
+    const open = (x, y, s, v) => `<rect class="dg-slot" style="stroke:${m.fill}" x="${x}" y="${y}" width="${s}" height="${s}" rx="7"/>` +
+      Dg.text(x + s / 2, y + s / 2, v, s * 0.55) +
+      `<g transform="rotate(-38 ${x} ${y})">${box(x, y - s * 0.62, s).replace(`height="${s}"`, `height="${s * 0.62}"`)}</g>`;
+    const opts = [[11, 40], [12, 82], [13, 124]].map(([v, x]) => Dg.rect(x, 82, 38, 38) + Dg.text(x + 19, 101, v, 19)).join('');
+    return [
+      { svg: Dg.svg('0 0 200 136', tok(22, 66, 44, 3) + open(78, 66, 44, 7) + tok(134, 66, 44, 5)), caption: '상자 속 숫자를 외워 두었다가' },
+      {
+        svg: Dg.svg('0 0 200 136', box(18, 10, 36) + Dg.text(70, 28, '+', 22) + tok(86, 10, 36, 5) + Dg.text(138, 28, '=', 22) +
+          Dg.text(170, 28, '?', 24, 'dg-txt num') + opts + Dg.tap(101, 101)),
+        caption: '두 수를 더한 값 고르기',
+      },
+    ];
+  }
 
   constructor(host) {
     this.h = host;

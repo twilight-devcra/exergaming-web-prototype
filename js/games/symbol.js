@@ -71,7 +71,7 @@ class SymbolGame {
     const { stage, level } = this.h;
     stage.append(U.el('div', 'stage-title', `${SymbolGame.title} · Lv.${level}`));
     this.wrap = U.el('div', 'sym-wrap');
-    this.question = U.el('div', 'sym-question', '');
+    this.question = U.el('div', 'stage-msg', '');
     this.target = U.el('div', 'sym-target');
     this.grid = U.el('div', 'sym-grid');
     this.wrap.append(this.question, this.target, this.grid);
@@ -97,18 +97,20 @@ class SymbolGame {
     this.grid.append(banner);
     this.h.after(1100, () => {
       banner.remove();
+      U.say(this.question, '그림 자리를 외우세요', 'look');
       this.placed.forEach(({ slot, sym }) => this.cells[slot].append(symbolEl(sym)));
       this.h.sfx('blink');
     });
     this.h.after(1100 + (this.spec.show || SymbolGame.SHOW_MS), () => {
       this.cells.forEach((c) => (c.innerHTML = ''));
+      U.say(this.question, '');
       this.h.after(350, () => this.ask());
     });
   }
 
   layout() {
     const s = this.h.stage;
-    const avail = s.clientHeight - 48 - 30 - 14 * 3;
+    const avail = s.clientHeight - 48 - 72 - 14 * 3;
     const sz = Math.max(48, Math.min(avail / 3, (s.clientWidth - 80) / 4.5, 140));
     this.wrap.style.setProperty('--sz', `${sz}px`);
   }
@@ -119,7 +121,7 @@ class SymbolGame {
     this.target.innerHTML = '';
     this.target.append(symbolEl(q.sym));
     this.target.classList.add('active');
-    this.question.textContent = '어디 있었나요?';
+    U.say(this.question, '이 그림은 어디 있었나요?', 'act');
     this.cells.forEach((c) => {
       if (!c.classList.contains('closed')) c.classList.add('clickable');
     });
@@ -145,7 +147,7 @@ class SymbolGame {
       cell.classList.add('closed', ok ? 'right' : 'wrong');
       cell.append(U.el('span', 'mark', ok ? '✓' : '✕'));
     } else {
-      this.question.textContent = '시간 초과!';
+      U.say(this.question, '시간 초과', 'bad');
     }
     if (ok) {
       this.correct++;
@@ -175,7 +177,7 @@ class SymbolGame {
     this.phase = 'end';
     this.target.classList.remove('active');
     this.target.innerHTML = '';
-    this.question.textContent = `${this.correct} / ${this.questions} 정답`;
+    U.say(this.question, `${this.questions}개 중 ${this.correct}개 정답`, this.correct === this.questions ? 'good' : '');
     // 문제마다 이미 정답/오답 소리를 들려줬다. 다 맞혔을 때의 축하음은 host가 울린다.
     this.h.after(1200, () => {
       this.ro.disconnect();

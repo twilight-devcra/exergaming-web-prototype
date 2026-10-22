@@ -66,8 +66,9 @@ class ArithGame {
     this.eq = U.el('div', 'ar-eq');
     this.eq.classList.toggle('long', this.spec.blanks > 2);
     this.cands = U.el('div', 'ar-cands');
-    this.wrap.append(this.progress, this.eq, this.cands);
-    stage.append(this.msg, this.wrap);
+    // 안내 문구는 식 바로 위에 둔다 (눈이 가 있는 곳)
+    this.wrap.append(this.progress, this.msg, this.eq, this.cands);
+    stage.append(this.wrap);
     this.next();
   }
 
@@ -78,8 +79,7 @@ class ArithGame {
     const givenAt = U.shuffle([...p.sol.keys()]).slice(0, this.spec.given || 0);
     givenAt.forEach((i) => (this.fill[i] = { v: p.sol[i], given: true }));
     const shown = p.cands.filter((v) => !givenAt.some((i) => p.sol[i] === v));
-    this.msg.textContent = '';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '빈칸에 들어갈 숫자를 고르세요', 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
 
     this.eq.innerHTML = '';
@@ -151,14 +151,12 @@ class ArithGame {
 
     if (ok) {
       this.correct++;
-      this.msg.textContent = '정답!';
-      this.msg.className = 'stage-msg good';
+      U.say(this.msg, '정답!', 'good');
       this.h.award((this.h.base * this.h.mult) / ArithGame.ROUNDS, this.eq);
       this.h.sfx('good');
     } else {
       const { sol, ops } = this.p;
-      this.msg.textContent = `${timedOut ? '시간 초과 · ' : ''}정답: ${sol.map((v, i) => (i ? `${ops[i - 1] === '+' ? '+' : '−'} ${v}` : v)).join(' ')}`;
-      this.msg.className = 'stage-msg bad';
+      U.say(this.msg, `${timedOut ? '시간 초과 · ' : ''}정답: ${sol.map((v, i) => (i ? `${ops[i - 1] === '+' ? '+' : '−'} ${v}` : v)).join(' ')}`, 'bad');
       this.btns.forEach((b) => {
         if (sol.includes(Number(b.textContent))) b.classList.add('answer');
       });

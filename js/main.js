@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame];
+const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame];
 // 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
 const OPENING_GAMES = ['count', 'ladder'];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
@@ -583,6 +583,8 @@ const App = {
       t0,
       base: this.cfg.cogBasePoints,
       after: (ms, fn) => this.after(ms, fn, gen),
+      // 게임 시계 (ms). 일시정지·운영 메뉴·소개 중에는 멈춘다 — 움직임을 그리는 게임은 벽시계 대신 이것으로 위치를 정한다
+      now: () => this.clock,
       // 문제 하나의 제한 시간. load = 그 문제의 일의 양 (config.questionTime 참고). 다 되면 onOut 을 부른다
       timer: (load, onOut) => this.startQTimer(T, stage, level, load, onOut, gen),
       stopTimer: () => this.stopQTimer(),
@@ -630,10 +632,14 @@ const App = {
     if (!this.cfg.questionTimer || gen !== this.gen) return;
     const spec = this.cfg.questionTime[T.id];
     if (!spec) return;
+    // 막대는 게임의 안내 문구 안, 글자 바로 아래에 붙인다 (눈이 가 있는 곳 · 문구를 바꿔도 남는다 — U.say).
+    // 문구가 없는 게임은 게임 영역 맨 위
     let el = stage.querySelector('.qtimer');
     if (!el) {
       el = U.el('div', 'qtimer', '<i></i>');
-      stage.append(el);
+      const msg = stage.querySelector('.stage-msg');
+      if (msg) msg.append(el);
+      else stage.append(el);
     }
     el.className = 'qtimer on';
     el.firstChild.style.transform = 'scaleX(1)';

@@ -320,20 +320,20 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
   color: var(--ink-soft);
   font-weight: 600;
 }
-/* 문제 제한 시간 막대: 줄어들다가 끝무렵 노랑 → 빨강. 답을 고르면 그 자리에서 멈추고 흐려진다 */
+/* 문제 제한 시간 막대: 안내 문구 안, 글자 바로 아래에 붙는다 (js startQTimer). 문구가 없는 게임은 게임 영역 맨 위.
+   줄어들다가 끝무렵 노랑 → 빨강. 답을 고르면 그 자리에서 멈추고 흐려진다 */
 .qtimer {
   position: absolute;
   top: 16px;
   left: 50%;
-  width: min(520px, 46%);
-  height: 10px;
   transform: translateX(-50%);
-  border-radius: 5px;
+  width: min(420px, 60vw);
+  height: 8px;
+  border-radius: 4px;
   background: var(--cell);
   overflow: hidden;
   opacity: 0;
   transition: opacity 0.2s;
-  z-index: 5;
 }
 .qtimer.on { opacity: 1; }
 .qtimer.stopped { opacity: 0.4; }
@@ -342,16 +342,44 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .qtimer.low i { background: var(--bad); }
 .qtimer.low:not(.stopped) { animation: qpulse 0.5s ease-in-out infinite alternate; }
 @keyframes qpulse { to { box-shadow: 0 0 0 3px var(--bad-soft); } }
+/* 게임 안내 문구 (U.say). 판 바로 위에 두고, 할 일의 종류를 아이콘으로 먼저 보여 준다:
+   look 👁 보기 · act ◎ 누르기 · good ✓ · bad ✕. 빈 문구도 자리는 지켜서 판이 위아래로 움직이지 않게 한다.
+   제한 시간 막대는 문구 안에 붙어 아래 여백에 놓인다 (막대가 생겨도 판이 밀리지 않는다) */
 .stage-msg {
-  height: 44px;
-  font-size: 26px;
-  font-weight: 700;
+  position: relative;
+  flex: none;
+  min-height: 46px;
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  justify-content: center;
+  gap: 10px;
+  padding: 2px 20px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  font-size: clamp(23px, 3.3vh, 31px);
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--ink);
 }
-.stage-msg.good { color: var(--good); }
-.stage-msg.bad { color: var(--bad); }
+.stage-msg .qtimer { top: auto; bottom: -15px; }
+.stage-msg:empty { visibility: hidden; }
+.stage-msg::before {
+  content: "";
+  display: none;
+  flex: none;
+  width: 1.05em;
+  height: 1.05em;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+.stage-msg:is(.look, .act, .good, .bad)::before { display: block; }
+.stage-msg.look { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 5C6.5 5 2.6 9.4 1 12c1.6 2.6 5.5 7 11 7s9.4-4.4 11-7c-1.6-2.6-5.5-7-11-7zm0 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 2.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4z'/%3E%3C/svg%3E"); }
+.stage-msg.act { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='4.5'/%3E%3Ccircle cx='12' cy='12' r='9.3' fill='none' stroke='black' stroke-width='2.6'/%3E%3C/svg%3E"); }
+.stage-msg:is(.look, .act)::before { background: var(--accent); }
+.stage-msg.good { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12.5l5 5L20 6.5' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); color: var(--good); background: var(--good-soft); }
+.stage-msg.bad { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 6l12 12M18 6L6 18' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E"); color: var(--bad); background: var(--bad-soft); }
 
 .intro {
   display: flex;
@@ -508,8 +536,7 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .path-board line.ghost { stroke: var(--accent); opacity: 0.35; stroke-dasharray: 2 12; }
 
 /* 심볼 위치 외우기 */
-.sym-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; justify-content: center; }
-.sym-question { font-size: 22px; font-weight: 700; height: 30px; color: var(--ink); }
+.sym-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; justify-content: center; }
 .sym-target {
   width: var(--sz);
   height: var(--sz);
@@ -569,7 +596,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 }
 
 /* 없던 그림 찾기 */
-.nv-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; justify-content: center; }
+.nv-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; justify-content: center; }
 .nv-grid { display: grid; grid-template-columns: repeat(var(--cols), var(--sz)); grid-template-rows: repeat(var(--rows), var(--sz)); gap: 12px; position: relative; }
 .nv-grid .sym { animation: none; }   /* 다시 그릴 때 그림이 튀면 새 그림처럼 보인다 */
 .nv-grid .sym svg { width: 76%; height: 76%; }
@@ -592,8 +619,25 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .nv-grid .scell.right { background: var(--good-soft); box-shadow: inset 0 0 0 4px var(--good); }
 .nv-grid .scell.wrong { background: var(--bad-soft); box-shadow: inset 0 0 0 4px var(--bad); }
 
+/* 공 따라가기 */
+.tr-wrap { display: flex; align-items: center; justify-content: center; }
+.tr-arena { display: block; touch-action: none; }
+.tr-arena.picking { cursor: pointer; }
+.tr-floor { fill: var(--panel); }
+.tr-ball { fill: var(--accent); stroke: color-mix(in srgb, var(--accent) 55%, #000); stroke-width: 1; }
+.tr-star { font-size: 9px; font-weight: 800; fill: var(--on-accent); opacity: 0; pointer-events: none; }
+.tr-halo { fill: none; stroke: var(--warn); stroke-width: 2.5; opacity: 0; }
+/* ★ 공: 별과 주황 고리 (색만이 아니라 별 모양으로도 가린다) */
+.tr-g.cue .tr-star, .tr-g.cue .tr-halo, .tr-halo.on { opacity: 1; }
+.tr-g.cue .tr-halo { animation: tr-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes tr-pulse { to { stroke-width: 4; } }
+.tr-g.right .tr-halo { stroke: var(--good); animation: none; stroke-width: 3.5; }
+.tr-g.missed .tr-halo { stroke-dasharray: 3 2.5; animation: none; }
+.tr-g.wrong .tr-ball { stroke: var(--bad); stroke-width: 3; opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .tr-g.cue .tr-halo { animation: none; } }
+
 /* 사칙연산 역산 */
-.ar-wrap { display: flex; flex-direction: column; align-items: center; gap: 36px; flex: 1; justify-content: center; }
+.ar-wrap { display: flex; flex-direction: column; align-items: center; gap: 36px; justify-content: center; }
 /* 라운드 진행 표시 (여러 게임 공용) */
 .dots { display: flex; gap: 10px; }
 .dots span { width: 14px; height: 14px; border-radius: 50%; background: var(--cell); }
@@ -649,7 +693,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .ar-cand.answer { box-shadow: inset 0 0 0 4px var(--good); opacity: 1; }
 
 /* 우세한 색 찾기 */
-.cnt-wrap { display: flex; flex-direction: column; align-items: center; gap: 26px; flex: 1; justify-content: center; }
+.cnt-wrap { display: flex; flex-direction: column; align-items: center; gap: 26px; justify-content: center; }
 .cnt-grid {
   display: grid;
   grid-template-columns: repeat(var(--cols), var(--csz));
@@ -687,7 +731,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .cnt-opt.wrong { border-color: var(--bad); }
 
 /* 빈자리 채우기 */
-.fit-wrap { display: flex; flex-direction: column; align-items: center; gap: 24px; flex: 1; justify-content: center; }
+.fit-wrap { display: flex; flex-direction: column; align-items: center; gap: 24px; justify-content: center; }
 .fit-board {
   width: var(--bsz);
   height: var(--bsz);
@@ -734,7 +778,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .fit-cand.wrong { border-color: var(--bad); }
 
 /* 숨은 순서 찾기 */
-.seek-wrap { display: flex; align-items: center; justify-content: center; gap: 48px; flex: 1; width: 100%; }
+.seek-wrap { display: flex; align-items: center; justify-content: center; gap: 48px; width: 100%; }
 .seek-side { display: flex; flex-direction: column; align-items: center; gap: 20px; flex: none; }
 .seek-target {
   width: var(--side);

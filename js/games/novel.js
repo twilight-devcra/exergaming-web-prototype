@@ -122,7 +122,7 @@ class NovelGame {
   start() {
     const { stage, level } = this.h;
     stage.append(U.el('div', 'stage-title', `${NovelGame.title} · Lv.${level}`));
-    this.msg = U.el('div', 'stage-msg', '잘 보세요');
+    this.msg = U.el('div', 'stage-msg look', '잘 보세요');
     this.wrap = U.el('div', 'nv-wrap');
     this.progress = U.el('div', 'dots');
     for (let i = 0; i < NovelGame.QUESTIONS; i++) this.progress.append(U.el('span'));
@@ -137,8 +137,9 @@ class NovelGame {
     });
     this.curtain = U.el('div', 'nv-curtain');
     this.grid.append(this.curtain);
-    this.wrap.append(this.progress, this.grid);
-    stage.append(this.msg, this.wrap);
+    // 안내 문구는 판 바로 위에 둔다
+    this.wrap.append(this.progress, this.msg, this.grid);
+    stage.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(stage);
     this.layout();
@@ -166,12 +167,11 @@ class NovelGame {
   // 지금 판을 ms 동안 보여 준 뒤 가림막을 내리고, 가려진 사이 판을 바꾼 다음 걷어 올린다
   look(ms) {
     this.phase = 'show';
-    this.msg.textContent = '잘 보세요';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '잘 보세요', 'look');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.answered));
     this.h.after(ms, () => {
       this.curtain.classList.add('closed');
-      this.msg.textContent = '';
+      U.say(this.msg, '');
       this.h.after(NovelGame.CLOSE_MS + NovelGame.HOLD_MS, () => {
         const before = this.change();
         this.curtain.classList.remove('closed');
@@ -196,7 +196,7 @@ class NovelGame {
   // 가림막이 다 걷힌 뒤 답을 받기 시작한다
   ask(before) {
     const q = this.q;
-    this.msg.textContent = '새로 나타난 그림을 누르세요';
+    U.say(this.msg, '새로 나타난 그림을 누르세요', 'act');
     this.cells.forEach((c, i) => c.classList.toggle('clickable', this.board.some((x) => x.at === i)));
     this.phase = 'input';
     const ids = (b) => b.map((x) => [x.at, NOVEL_SHAPES[x.s].id, NOVEL_MARKS[x.m].id]);
@@ -223,8 +223,7 @@ class NovelGame {
       answer.classList.add('right');
       answer.append(U.el('span', 'mark', '✓'));
       this.correct++;
-      this.msg.textContent = '정답!';
-      this.msg.className = 'stage-msg good';
+      U.say(this.msg, '정답!', 'good');
       this.h.award((this.h.base * this.h.mult) / NovelGame.QUESTIONS, answer);
       this.h.sfx('good');
     } else {
@@ -233,8 +232,7 @@ class NovelGame {
         this.cells[i].append(U.el('span', 'mark', '✕'));
       }
       answer.classList.add('reveal');
-      this.msg.textContent = i >= 0 ? '새 그림은 여기였어요' : '시간 초과 · 새 그림은 여기였어요';
-      this.msg.className = 'stage-msg bad';
+      U.say(this.msg, i >= 0 ? '새 그림은 여기였어요' : '시간 초과 · 새 그림은 여기였어요', 'bad');
       this.h.sfx('bad');
     }
     const d = this.progress.children[this.answered];

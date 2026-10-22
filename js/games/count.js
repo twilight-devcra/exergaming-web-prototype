@@ -67,8 +67,9 @@ class CountGame {
     for (let i = 0; i < CountGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.grid = U.el('div', 'cnt-grid');
     this.opts = U.el('div', 'cnt-opts');
-    this.wrap.append(this.progress, this.grid, this.opts);
-    stage.append(this.msg, this.wrap);
+    // 안내 문구는 격자 바로 위에 둔다
+    this.wrap.append(this.progress, this.msg, this.grid, this.opts);
+    stage.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(stage);
     this.next();
@@ -81,8 +82,7 @@ class CountGame {
     this.palette = U.shuffle([...COUNT_COLORS]).slice(0, this.spec.colors);
     const owner = CountGame.place(this.counts, rows, cols, this.spec.clump);
 
-    this.msg.textContent = '가장 우세한 색깔을 고르세요';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '가장 많은 색을 고르세요', 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
 
     this.grid.innerHTML = '';
@@ -119,7 +119,7 @@ class CountGame {
     const s = this.h.stage;
     const [rows, cols] = this.spec.grid;
     // 안내 문구·진행 점·보기 버튼이 쓰는 높이를 뺀 나머지에 격자를 맞춘다
-    const avail = s.clientHeight - 290;
+    const avail = s.clientHeight - 310;
     const sz = U.clamp(Math.min(avail / rows, (s.clientWidth - 120) / cols), 22, 92);
     this.wrap.style.setProperty('--csz', `${sz}px`);
   }
@@ -149,13 +149,11 @@ class CountGame {
 
     if (ok) {
       this.correct++;
-      this.msg.textContent = '정답!';
-      this.msg.className = 'stage-msg good';
+      U.say(this.msg, '정답!', 'good');
       this.h.award((this.h.base * this.h.mult) / CountGame.ROUNDS, this.grid);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = `${btn ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`;
-      this.msg.className = 'stage-msg bad';
+      U.say(this.msg, `${btn ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`, 'bad');
       this.h.sfx('bad');
     }
     this.h.after(ok ? 1000 : 1600, () => this.advance());

@@ -106,8 +106,7 @@ class SeekGame {
     const { cells, syms, seq } = this.puzzle;
     const glyphs = U.shuffle([...SEEK_SYMBOLS]);
 
-    this.msg.textContent = '이 순서가 놓인 줄을 찾아 누르세요';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '왼쪽 순서가 놓인 줄을 누르세요', 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
 
     // 찾을 순서: 천천히 도는 사슬. 그림은 판에서와 같은 방향으로 서 있도록 반대로 돌린다.
@@ -148,7 +147,7 @@ class SeekGame {
     const s = this.h.stage;
     const { radius, len } = this.spec;
     // 안내 문구가 쓰는 높이를 뺀 나머지에 판을 맞춘다. 왼쪽에는 사슬이 한 바퀴 돌 자리가 필요하다.
-    const availH = s.clientHeight - 130;
+    const availH = s.clientHeight - 150;
     const bead = U.clamp(s.clientWidth / 26, 30, 50);
     const side = len * bead + (len - 1) * 6 + 28;
     const availW = s.clientWidth - 80 - side - 48;
@@ -194,13 +193,11 @@ class SeekGame {
 
     if (ok) {
       this.correct++;
-      this.msg.textContent = '정답!';
-      this.msg.className = 'stage-msg good';
+      U.say(this.msg, '정답!', 'good');
       this.h.award((this.h.base * this.h.mult) / SeekGame.ROUNDS, this.cellEls[i]);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = i >= 0 ? '여기에 있었어요' : '시간 초과 · 여기에 있었어요';
-      this.msg.className = 'stage-msg bad';
+      U.say(this.msg, i >= 0 ? '여기에 있었어요' : '시간 초과 · 여기에 있었어요', 'bad');
       this.h.sfx('bad');
     }
     this.h.after(ok ? 1000 : 1700, () => this.advance());

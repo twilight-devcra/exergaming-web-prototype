@@ -48,7 +48,7 @@ const DEFAULT_CONFIG = {
   introMs: { first: 4500, again: 2200 }, // 게임 소개(설명 그림) 시간: 라운드에서 처음 나올 때 / 다시 나올 때. 누르면 바로 넘어간다
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
   // 쉬운 단계(Lv1·Lv2)는 여기에 EASY_TIME 을 곱한다. 아래 범위는 Lv3~8 의 값이다.
-  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수
+  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수 · track: 고를 공 수
   questionTime: {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
     symbol: { base: 6, per: 0 },     // 6초
@@ -59,6 +59,7 @@ const DEFAULT_CONFIG = {
     cover: { base: 5, per: 2.5 },    // 덮인 숫자 하나 7.5초 · 둘 10초
     ladder: { base: 4, per: 0.7 },   // Lv3 약 6초 ~ Lv8 (구멍 4개) 약 20초
     novel: { base: 5, per: 0.5 },    // 그림 3개 6.5초 ~ 9개 9.5초
+    track: { base: 4, per: 1.5 },    // 공이 멈춘 뒤부터: 1개 5.5초 ~ 4개 10초
   },
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
   minRpm: 25,
@@ -197,6 +198,15 @@ const U = {
     if (cls) e.className = cls;
     if (html != null) e.innerHTML = html;
     return e;
+  },
+  // 게임 안내 문구를 바꾼다. kind 에 따라 문구 앞 아이콘과 색이 정해진다 (css .stage-msg):
+  //   look 보기 · act 누르기 · good 맞음 · bad 틀림 · '' 아이콘 없음
+  // 문구 안에 붙은 제한 시간 막대(.qtimer)는 문구를 바꿔도 그대로 둔다
+  say(el, text, kind = '') {
+    const bar = el.querySelector('.qtimer');
+    el.textContent = text;
+    if (bar) el.append(bar);
+    el.className = `stage-msg${kind ? ` ${kind}` : ''}`;
   },
   fmtTime(sec) {
     sec = Math.max(0, Math.ceil(sec));

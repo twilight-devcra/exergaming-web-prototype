@@ -22,6 +22,7 @@ const ABILITY_WEIGHTS = {
   cover: { memory: 0.6, attention: 0.1, logic: 0.3 },
   ladder: { spatial: 0.3, attention: 0.5, speed: 0.2 },
   novel: { memory: 0.6, attention: 0.4 },
+  track: { attention: 0.6, spatial: 0.3, speed: 0.1 },
 };
 
 // 처리속도 축에 들어가는 게임은 문제당 걸린 시간도 본다 (정답 피드백·연출 시간 포함, 초).

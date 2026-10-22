@@ -101,16 +101,16 @@ class LadderGame {
     this.progress = U.el('div', 'dots');
     for (let i = 0; i < LadderGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.board = U.el('div', 'lad-board');
-    this.wrap.append(this.progress, this.board);
-    stage.append(this.msg, this.wrap);
+    // 안내 문구는 사다리 바로 위에 둔다
+    this.wrap.append(this.progress, this.msg, this.board);
+    stage.append(this.wrap);
     this.next();
   }
 
   next() {
     const p = LadderGame.generate(this.spec);
     this.p = p;
-    this.msg.textContent = '같은 모양 구멍에 들어가는 것은?';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '같은 모양 구멍에 들어갈 조각을 고르세요', 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
     this.render();
     this.phase = 'input';
@@ -250,13 +250,11 @@ class LadderGame {
       d.classList.add(ok ? 'right' : 'wrong');
       if (ok) {
         this.correct++;
-        this.msg.textContent = '정답!';
-        this.msg.className = 'stage-msg good';
+        U.say(this.msg, '정답!', 'good');
         this.h.award((this.h.base * this.h.mult) / LadderGame.ROUNDS, this.floorEls[ends[i].end]);
         this.h.sfx('good');
       } else {
-        this.msg.textContent = start ? '맞는 구멍이 아니에요' : '시간 초과';
-        this.msg.className = 'stage-msg bad';
+        U.say(this.msg, start ? '맞는 구멍이 아니에요' : '시간 초과', 'bad');
         this.h.sfx('bad');
       }
       this.h.after(ok ? 600 : 1000, () => this.advance());

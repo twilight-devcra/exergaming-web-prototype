@@ -1,6 +1,6 @@
 # New minigame briefs
 
-Four minigames to add next: **없던 그림 찾기** (built; planned as 바뀐 것 찾기), **장보기**, **공 따라가기**, **집 찾아가기**.
+Four minigames to add next: **없던 그림 찾기** (built; planned as 바뀐 것 찾기), **장보기**, **공 따라가기** (built), **집 찾아가기**.
 Each brief says what the player does, why the game is worth adding, how difficulty scales, and anything that needs care when building it.
 The shared rules for every new game come first. Read `DEMO_BRIEF.md` for the project itself.
 
@@ -15,9 +15,10 @@ These match the eight existing games (`js/games/*.js`), so a new game slots into
 - **Levels.** Eight levels. Lv1–2 are the easy levels for older players and Lv3 is the standard first level (see Easier levels for older players in `DEMO_BRIEF.md`). Easy levels may set their own longer show times, as 심볼 위치 외우기 and 가린 숫자 더하기 do. The host already stretches question timers on Lv1–2 (`EASY_TIME`).
 - **Input.** Taps only, with targets at least 56 px on a 1280×800 tablet. The player is pedalling, so nothing needs precise or rapid tapping, dragging, typing or reading more than a few words.
 - **Colour.** Never tell things apart by colour alone. Every colour gets a matching shape, as in the existing glyph sets (`SYMBOLS`, `COUNT_COLORS`, `COVER_MARKS`, `LADDER_PEGS`).
-- **Timing.** Use `host.after` (the game clock) for anything timed, so operator pauses, pedal disconnects and intros stop the game too. Do not use `setTimeout` or `performance.now()` for game logic.
+- **Timing.** Use `host.after` (the game clock) for anything timed, and `host.now()` for positions in a moving animation, so operator pauses, pedal disconnects and intros stop the game too. Do not use `setTimeout` or `performance.now()` for game logic.
 - **Self-explaining.** The intro shows a two-step diagram (`static diagram()`, drawn with `js/diagram.js`) and a two-line `hint`. The first question should teach the rule without more text.
 - **Feedback.** On a wrong answer or timeout, show the right answer for about a second, then move on.
+- **Instruction line.** Create one `stage-msg` element and place it **directly above the board**, inside the game's wrapper after the progress dots, so it sits where the player is looking. Change it only through `U.say(el, text, kind)`. Pick the kind that matches what to do: `look` (watch or remember), `act` (tap something), `good`, `bad`, or `''` for no icon. Keep the text short, like "새로 나타난 그림을 누르세요". The question timer attaches itself just under this line. Don't let the wrapper take all spare height (`flex: 1`); the instruction and board should centre together.
 
 ### Checklist for adding a game
 
@@ -133,46 +134,50 @@ Question time load: items on the list. Suggested `{ base: 4, per: 1.5 }`, about 
 
 ---
 
-## 3. 공 따라가기 (multiple object tracking)
+## 3. 공 따라가기 (built 2026-10-22, `js/games/track.js`)
 
-**Proposed id:** `track` · **tags:** `['track']` · **abilities:** attention 0.6, spatial 0.3, speed 0.1
+**id:** `track` · **tags:** `['track']` · **abilities:** attention 0.6, spatial 0.3, speed 0.1 · **question time:** `{ base: 4, per: 1.5 }`, where the load is the number of balls to pick, timed from when the balls stop
 
 ### The game
-Some balls light up, then all the balls move around. The player keeps their eyes on the lit ones and taps them when the balls stop.
+1. Identical balls appear. `t` of them show a ★ inside a pulsing orange ring ("★ 공을 잘 보세요").
+2. The stars vanish and the balls move ("눈으로 따라가세요"), bouncing off the walls.
+3. The balls stop. The player gets exactly `t` taps. **Each tap is scored at once:** a correct ball shows its ★ with a green ring and earns `1/t` of the points; a wrong one fades with a red ring. A tap can't be undone. (A first version let players untap a pick, which was hard to notice, and only scored the board as a whole.) The message counts down how many are left.
+4. After the last tap, or when time runs out, any missed ★ balls show with a dashed ring.
 
-1. `n` identical balls appear. `t` of them glow and show a ★ for 1.5 s (2 s on Lv1–2).
-2. The stars vanish and all balls move for `move` ms, bouncing off the walls.
-3. The balls stop. The player taps `t` balls; each tap adds a ring, and tapping again removes it. When `t` are ringed, the game judges.
-4. Feedback: the real targets show their ★ again, green where ringed, outlined where missed.
+**Each ball is one answer** for the difficulty meter and the streak, like a question in the other games. A timeout counts as one wrong answer.
 
-**One board per game,** scored per target like 장보기.
-
-### Why
-Multiple-object tracking is a well-studied attention task. BrainHQ's *Target Tracker* is built on it, and it was part of the DriveSharp driving programme for older adults. Nothing in the current set trains sustained attention on moving things. With one target at Lv1 it is as gentle as watching one ball, and it gets very hard at four targets.
+### Motion
+- **Precomputed:** `TrackGame.simulate` computes every position in advance at 120 steps per second, from random start points and velocities (each heading at least 15° off the axes, speed ±15% around the level's value).
+- **Game-clock drawing:** the drawing loop only picks the step for the current game time (`host.now()`, added to the host for this game). An operator pause, a pedal disconnect or an intro freezes the balls.
+- **Collisions:** balls bounce off the walls. On Lv1–6 they also bounce off each other (equal-mass elastic collisions), so they never overlap. On Lv7–8 they pass over each other, which is the hard part.
+- **Start and end:** balls start at least 2R + 8 apart and always end at least 2R + 4 apart. If a simulated board ends with balls too close, it is regenerated, so a ball is never hidden when it is time to tap.
+- **Log:** the simulation uses a seeded random generator, so the logged `seed` (with the level) replays the whole board through `TrackGame.simulate(spec, seed)`. Start positions and velocities are logged too.
 
 ### Levels
-| Lv | Balls | Targets | Speed | Moving time | Balls pass over each other |
-|---|---|---|---|---|---|
-| 1 | 4 | 1 | slow | 2.0 s | no (they bounce) |
-| 2 | 5 | 1 | slow | 2.5 s | no |
-| 3 | 6 | 2 | medium | 2.5 s | no |
-| 4 | 7 | 2 | medium | 3.0 s | no |
-| 5 | 8 | 3 | medium | 3.0 s | yes |
-| 6 | 8 | 3 | fast | 3.5 s | yes |
-| 7 | 9 | 4 | fast | 3.5 s | yes |
-| 8 | 10 | 4 | fast | 4.0 s | yes |
+Lv1–4 are gentler than first planned, after 없던 그림 찾기 turned out too hard. Lv5–8 were then made harder again because they played too easy: more balls, up to 4 targets, curving paths (`wander`) from Lv5 so a ball's heading no longer tells where it went, overlapping from Lv6, and faster Lv7–8.
 
-Question time load: number of targets, counted from when the balls stop. Suggested `{ base: 4, per: 1.5 }`.
+| Lv | Balls | Targets (★) | Speed (arena widths per s) | Moving time | Balls overlap | Curving | Star shown |
+|---|---|---|---|---|---|---|---|
+| 1 | 4 | 1 | 0.14 | 2.0 s | no | no | 2.0 s |
+| 2 | 5 | 1 | 0.16 | 2.5 s | no | no | 2.0 s |
+| 3 | 5 | 2 | 0.19 | 2.5 s | no | no | 1.8 s |
+| 4 | 6 | 2 | 0.21 | 3.0 s | no | no | 1.6 s |
+| 5 | 7 | 3 | 0.26 | 3.0 s | no | up to 30°/s | 1.5 s |
+| 6 | 8 | 3 | 0.31 | 3.5 s | yes | up to 50°/s | 1.5 s |
+| 7 | 9 | 4 | 0.39 | 4.0 s | yes | up to 75°/s | 1.4 s |
+| 8 | 10 | 4 | 0.44 | 4.0 s | yes | up to 100°/s | 1.3 s |
 
-### Build notes
-- **The host needs to give games the game clock.** Ball positions must come from the game clock, not wall time, so an operator pause, a pedal disconnect or an intro freezes the balls. No host function provides this yet. Add `host.now()` returning `App.clock`, and draw each frame from it.
-- **Precompute the paths.** Generate every ball's trajectory when the board is created, as a function of time. Drawing is then just a lookup, and the log can store the trajectories so a round can be replayed.
-- Balls about 56 px across with a larger tap area. Bounce off walls; at Lv1–4 also bounce off each other, so balls never overlap and the player never has to guess which ball came out.
-- Draw with SVG or a canvas inside the stage. 10 balls at 60 fps is light either way.
-- Log the ball count, target indices, trajectory seed, and the balls tapped.
+With curving, each ball picks a new turn rate about every 0.6 s.
+
+The arena is 160 × 100 units and balls have a radius of 7, about 59 px across on a 1280×800 tablet. Taps count within 1.5 ball radii.
+
+### Checks done
+- **Generator:** 500 boards per level in Node. No overlaps at the start or end, nothing leaving the arena, and no overlap in flight on the bouncing levels. The slowest Lv8 board takes about 37 ms to generate, which happens while the intro is showing.
+- **Browser:** played through at Lv1, Lv4 and Lv8 (neon theme), checking the scores.
+- **Pause:** pausing mid-motion froze the balls, and resuming continued them.
 
 ### Diagram
-① 반짝이는 공을 보고: four balls, one with a ★. ② 움직인 뒤 그 공 누르기: the balls moved, with motion trails and the tap ring on the former ★ ball. Step ② can loop with SMIL like 길 따라 그리기's diagram, the balls drifting then stopping.
+① ★ 공을 잘 보고: four balls, one with a ★ and ring. ② 멈추면 그 공 누르기: the balls glide to new places (SMIL loop), then the tap ring appears on the former ★ ball.
 
 ---
 
@@ -228,10 +233,10 @@ Question time load: route length. Suggested `{ base: 4, per: 1.5 }`.
 1. **없던 그림 찾기:** done.
 2. **집 찾아가기:** new drawing (streets, houses, walker) but simple logic, and it fills the spatial gap.
 3. **장보기:** mostly blocked on drawing about 20 grocery pictures.
-4. **공 따라가기:** needs the `host.now()` change and smooth animation; worth doing carefully.
+4. **공 따라가기:** done (added `host.now()`).
 
 ## Open questions
 
 - 장보기 pictures: draw them ourselves (consistent, themeable) or license an icon set in a matching style?
-- Should 장보기 and 공 따라가기 count as one answer each for the difficulty meter (like 길 따라 그리기) or one answer per pick? One answer each keeps the meter steady. One per pick reacts faster.
+- Should 장보기 count as one answer for the difficulty meter (like 길 따라 그리기) or one answer per pick (like 공 따라가기)? One answer keeps the meter steady. One per pick reacts faster.
 - 집 찾아가기 at high levels: hide the cards once the player starts, adding a memory load? That would change its tag to include `memory`, so it is left out for now.

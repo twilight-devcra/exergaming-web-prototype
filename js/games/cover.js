@@ -88,7 +88,7 @@ class CoverGame {
   start() {
     const { stage, level } = this.h;
     stage.append(U.el('div', 'stage-title', `${CoverGame.title} · Lv.${level}`));
-    this.msg = U.el('div', 'stage-msg', '외우세요!');
+    this.msg = U.el('div', 'stage-msg look', '상자 속 숫자를 외우세요');
     this.board = U.el('div', 'cv-board');
     this.row = U.el('div', 'cv-row');
     this.center = U.el('div', 'cv-center');
@@ -100,9 +100,10 @@ class CoverGame {
     this.ansBox = U.el('div', 'cv-ans', '?');
     this.eq.append(this.slots[0], U.el('div', '', '+'), this.slots[1], U.el('div', '', '='), this.ansBox);
     this.opts = U.el('div', 'cv-opts');
-    this.center.append(this.eq, this.opts, this.progress);
+    // 안내 문구는 식 바로 위에 둔다
+    this.center.append(this.msg, this.eq, this.opts, this.progress);
     this.board.append(this.row, this.center);
-    stage.append(this.msg, this.board);
+    stage.append(this.board);
 
     this.toks = CoverGame.deal(this.spec);
     this.toks.forEach((t) => {
@@ -137,7 +138,8 @@ class CoverGame {
     const W = b.clientWidth;
     const H = b.clientHeight;
     if (!W || !H) return;
-    const tk = Math.round(U.clamp(Math.min(H / 5.6, W / (this.toks.length * 1.3 + 0.5)), 36, 110));
+    // 안내 문구와 제한 시간 막대가 쓰는 높이(약 70px)를 빼고 맞춘다
+    const tk = Math.round(U.clamp(Math.min((H - 70) / 5.6, W / (this.toks.length * 1.3 + 0.5)), 36, 110));
     b.style.setProperty('--tk', `${tk}px`);
     const br = b.getBoundingClientRect();
     const er = this.slots.map((s) => s.getBoundingClientRect());
@@ -152,8 +154,7 @@ class CoverGame {
     const [a, b] = this.pickPair();
     const ans = a.v + b.v;
     this.q = { a, b, ans };
-    this.msg.textContent = '';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '두 수를 더한 값을 고르세요', 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
     this.eq.classList.remove('idle');
     this.ansBox.className = 'cv-ans';
@@ -238,13 +239,11 @@ class CoverGame {
 
     if (ok) {
       this.correct++;
-      this.msg.textContent = '정답!';
-      this.msg.className = 'stage-msg good';
+      U.say(this.msg, '정답!', 'good');
       this.h.award((this.h.base * this.h.mult) / CoverGame.ROUNDS, this.ansBox);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = `${btn ? '' : '시간 초과 · '}${a.v} + ${b.v} = ${ans}`;
-      this.msg.className = 'stage-msg bad';
+      U.say(this.msg, `${btn ? '' : '시간 초과 · '}${a.v} + ${b.v} = ${ans}`, 'bad');
       this.h.sfx('bad');
     }
     this.round++;
@@ -259,8 +258,7 @@ class CoverGame {
     this.opts.innerHTML = '';
     this.ansBox.className = 'cv-ans';
     this.ansBox.textContent = '?';
-    this.msg.textContent = '';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '', '');
     [a, b].forEach((t) => {
       t.at = null;
       t.el.classList.remove('open');

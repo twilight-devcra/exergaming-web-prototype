@@ -72,8 +72,9 @@ class FitGame {
     for (let i = 0; i < FitGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.board = U.el('div', 'fit-board');
     this.cands = U.el('div', 'fit-cands');
-    this.wrap.append(this.progress, this.board, this.cands);
-    stage.append(this.msg, this.wrap);
+    // 안내 문구는 판 바로 위에 둔다
+    this.wrap.append(this.progress, this.msg, this.board, this.cands);
+    stage.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(stage);
     this.next();
@@ -94,8 +95,7 @@ class FitGame {
       return { p, rot, answer: i === 0 };
     }));
 
-    this.msg.textContent = '선이 모두 이어지는 조각을 고르세요';
-    this.msg.className = 'stage-msg';
+    U.say(this.msg, '선이 모두 이어지는 조각을 고르세요', 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
 
     const v = FitGame.BOARD_VIEW;
@@ -174,13 +174,11 @@ class FitGame {
 
     if (ok) {
       this.correct++;
-      this.msg.textContent = '선이 모두 이어졌어요!';
-      this.msg.className = 'stage-msg good';
+      U.say(this.msg, '선이 모두 이어졌어요!', 'good');
       this.h.award((this.h.base * this.h.mult) / FitGame.ROUNDS, this.board);
       this.h.sfx('good');
     } else {
-      this.msg.textContent = failMsg;
-      this.msg.className = 'stage-msg bad';
+      U.say(this.msg, failMsg, 'bad');
       this.h.sfx('bad');
     }
     this.h.after(ok ? 1300 : 2200, () => this.advance());

@@ -81,9 +81,11 @@ class PathGame {
   start() {
     const { stage, level } = this.h;
     stage.append(U.el('div', 'stage-title', `${PathGame.title} · Lv.${level}`));
-    this.msg = U.el('div', 'stage-msg', '잘 보세요');
+    this.msg = U.el('div', 'stage-msg look', '길을 잘 보세요');
     stage.append(this.msg);
     this.board = U.el('div', 'path-board');
+    // 판을 격자가 차지할 만큼만 키워서 안내 문구가 격자 바로 위에 오게 한다 (칸 최대 120px · 틈 22%)
+    this.board.style.maxHeight = `${this.rows * 120 + (this.rows - 1) * 120 * 0.22}px`;
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.board.append(this.svg);
     stage.append(this.board);
@@ -122,7 +124,7 @@ class PathGame {
     }
     this.clearLines();
     this.cells.flat().forEach((cell) => cell.classList.add('clickable'));
-    this.msg.textContent = '같은 순서로 칸을 하나씩 누르세요';
+    U.say(this.msg, '같은 순서로 누르세요', 'act');
     this.phase = 'input';
     this.h.question({ grid: [this.rows, this.cols], path: this.path, free: !!this.spec.free });
     this.h.timer(this.path.length - 1, () => this.fail(null));
@@ -164,8 +166,7 @@ class PathGame {
     this.svg.querySelectorAll('line').forEach((l) => l.classList.add('done'));
     const [lr, lc] = this.path[this.path.length - 1];
     this.h.after(200, () => this.h.award(this.h.base * 0.4 * this.h.mult, this.cells[lr][lc], '완성 '));
-    this.msg.textContent = '완성!';
-    this.msg.className = 'stage-msg good';
+    U.say(this.msg, '완성!', 'good');
     this.h.sfx('good');   // 다 맞혔을 때의 축하음은 host가 따로 울린다
     this.cleared = true;
     this.h.answer({ correct: true, timedOut: false, reached: this.path.length - 1, of: this.path.length - 1 });
@@ -179,8 +180,7 @@ class PathGame {
     this.h.stopTimer();
     this.h.answer({ correct: false, timedOut: !cell, wrongCell: rc, reached: this.k - 1, of: this.path.length - 1 });
     if (cell) cell.classList.add('wrong');
-    this.msg.textContent = cell ? '틀렸어요' : '시간 초과';
-    this.msg.className = 'stage-msg bad';
+    U.say(this.msg, cell ? '틀렸어요' : '시간 초과', 'bad');
     this.h.sfx('bad');
     // 남은 정답 경로를 흐리게 보여준다
     for (let i = this.k; i < this.path.length; i++) {

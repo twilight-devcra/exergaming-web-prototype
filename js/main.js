@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame];
+const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame];
 // 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
 const OPENING_GAMES = ['count', 'ladder'];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
@@ -401,7 +401,10 @@ const App = {
       c.elapsed += dt;
       if (c.elapsed > Math.min(this.cfg.calibrationIgnoreSec, total * 0.3) && rpm > 0) c.samples.push(rpm);
     }
-    if (rpm > 0) c.follow += (rpm - c.follow) * (1 - Math.exp(-dt / 1.5)); // 멈추면 마지막 템포를 그대로 둔다
+    // 비트 템포가 밟는 속도를 따라가는 빠르기 (시간 상수, 초). 밟기 시작한 직후에는 첫 걸음의 느린 속도에서 금방 올라오도록 빠르게,
+    // 그 뒤에는 한 걸음씩의 흔들림을 걸러 낼 만큼만 늦춘다 (예전 1.5초는 굼떠 보였다). 멈추면 마지막 템포를 그대로 둔다
+    const tau = c.elapsed < 3 ? 0.25 : 0.6;
+    if (rpm > 0) c.follow += (rpm - c.follow) * (1 - Math.exp(-dt / tau));
     c.angle += (rpm / 60) * 360 * dt;
     $('#calib-crank').setAttribute('transform', `rotate(${c.angle} 110 110)`);
     const frac = U.clamp(c.elapsed / total, 0, 1);

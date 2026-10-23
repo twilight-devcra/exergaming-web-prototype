@@ -181,6 +181,9 @@ body[data-theme="cartoon"] #band {
   border-bottom: var(--outline);
 }
 body[data-theme="cartoon"] .qtimer { height: 16px; border-radius: 8px; border: var(--outline); box-shadow: 0 3px 0 var(--ink); top: 12px; }
+/* 안내 문구 안의 막대는 글자 아래로 (위의 top 이 .stage-msg .qtimer 보다 우선해서 글자를 덮던 것). 막대가 두꺼운 만큼 판과의 간격도 넓힌다 */
+body[data-theme="cartoon"] .stage-msg { margin-bottom: 30px; }
+body[data-theme="cartoon"] .stage-msg .qtimer { top: auto; bottom: -22px; }
 body[data-theme="cartoon"] .pcell.on.head:not(.done) { transform: scale(1.1) rotate(-3deg); transition: transform 0.25s cubic-bezier(0.3, 1.8, 0.5, 1); }
 body[data-theme="cartoon"] :is(.big-count, .dr-total, .intro .name, #shift-msg .name, .perfect, .att-main h1, .dr-title, .dr-stat b, .hud .value, .result-total) {
   -webkit-text-stroke: 3px var(--ink);

@@ -231,6 +231,20 @@ const U = {
     if (bar) el.append(bar);
     el.className = `stage-msg${kind ? ` ${kind}` : ''}`;
   },
+  // 게임 영역의 머리 (모든 게임 공용): 게임 이름·레벨과 진행 점, 그 아래 안내 문구. 게임이 바뀌어도 같은 자리에 두어
+  // 속도 띠를 보다가 돌아온 눈이 늘 같은 곳에서 할 일을 찾게 한다. 판은 돌려준 body (머리 아래 남은 자리의 가운데)에 넣는다.
+  // rounds = 진행 점 개수 (0 이면 점 없음)
+  frame(stage, title, msg, rounds = 0) {
+    const meta = U.el('div', 'stage-meta');
+    const dots = U.el('div', 'dots');
+    for (let i = 0; i < rounds; i++) dots.append(U.el('span'));
+    meta.append(U.el('span', 'stage-title', title), dots);
+    const head = U.el('div', 'stage-head');
+    head.append(meta, msg);
+    const body = U.el('div', 'stage-body');
+    stage.append(head, body);
+    return { body, dots };
+  },
   fmtTime(sec) {
     sec = Math.max(0, Math.ceil(sec));
     return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;

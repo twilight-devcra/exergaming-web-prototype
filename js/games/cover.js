@@ -87,23 +87,21 @@ class CoverGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${CoverGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg look', '상자 속 숫자를 외우세요');
+    const { body, dots } = U.frame(stage, `${CoverGame.title} · Lv.${level}`, this.msg, CoverGame.ROUNDS);
+    this.progress = dots;
     this.board = U.el('div', 'cv-board');
     this.row = U.el('div', 'cv-row');
     this.center = U.el('div', 'cv-center');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < CoverGame.ROUNDS; i++) this.progress.append(U.el('span'));
     // 처음부터 빈 식을 흐리게 보여 줘서 '두 숫자를 더하는 게임'이라는 것이 먼저 보이게 한다
     this.eq = U.el('div', 'cv-eq idle');
     this.slots = [U.el('div', 'cv-slot'), U.el('div', 'cv-slot')];
     this.ansBox = U.el('div', 'cv-ans', '?');
     this.eq.append(this.slots[0], U.el('div', '', '+'), this.slots[1], U.el('div', '', '='), this.ansBox);
     this.opts = U.el('div', 'cv-opts');
-    // 안내 문구는 식 바로 위에 둔다
-    this.center.append(this.msg, this.eq, this.opts, this.progress);
+    this.center.append(this.eq, this.opts);
     this.board.append(this.row, this.center);
-    stage.append(this.board);
+    body.append(this.board);
 
     this.toks = CoverGame.deal(this.spec);
     this.toks.forEach((t) => {

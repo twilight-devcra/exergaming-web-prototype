@@ -73,8 +73,8 @@ class TrackGame {
   start() {
     const { stage, level } = this.h;
     const { W, H, R } = TrackGame;
-    stage.append(U.el('div', 'stage-title', `${TrackGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg look', '★ 공을 잘 보세요');
+    this.body = U.frame(stage, `${TrackGame.title} · Lv.${level}`, this.msg).body;
     this.wrap = U.el('div', 'tr-wrap');
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.setAttribute('class', 'tr-arena');
@@ -84,9 +84,9 @@ class TrackGame {
     this.balls = [...this.svg.querySelectorAll('.tr-g')];
     this.svg.addEventListener('pointerdown', (e) => this.tap(e));
     this.wrap.append(this.svg);
-    stage.append(this.msg, this.wrap);
+    this.body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.ro.observe(this.body);
     this.layout();
 
     this.place(this.sim.frames[0]);
@@ -96,9 +96,9 @@ class TrackGame {
   }
 
   layout() {
-    const s = this.h.stage;
+    const s = this.body;
     const ar = (TrackGame.W + 2 * TrackGame.R) / (TrackGame.H + 2 * TrackGame.R);
-    const w = Math.max(240, Math.min(s.clientWidth - 120, (s.clientHeight - 140) * ar, 1000));
+    const w = Math.max(240, Math.min(s.clientWidth - 40, (s.clientHeight - 16) * ar, 1000));
     this.svg.style.width = `${w}px`;
     this.svg.style.height = `${w / ar}px`;
   }

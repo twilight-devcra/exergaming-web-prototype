@@ -60,18 +60,17 @@ class CountGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${CountGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${CountGame.title} · Lv.${level}`, this.msg, CountGame.ROUNDS);
+    this.body = body;
+    this.progress = dots;
     this.wrap = U.el('div', 'cnt-wrap');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < CountGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.grid = U.el('div', 'cnt-grid');
     this.opts = U.el('div', 'cnt-opts');
-    // 안내 문구는 격자 바로 위에 둔다
-    this.wrap.append(this.progress, this.msg, this.grid, this.opts);
-    stage.append(this.wrap);
+    this.wrap.append(this.grid, this.opts);
+    body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.ro.observe(body);
     this.next();
   }
 
@@ -116,11 +115,12 @@ class CountGame {
   }
 
   layout() {
-    const s = this.h.stage;
+    const s = this.body;
     const [rows, cols] = this.spec.grid;
-    // 안내 문구·진행 점·보기 버튼이 쓰는 높이를 뺀 나머지에 격자를 맞춘다
-    const avail = s.clientHeight - 310;
-    const sz = U.clamp(Math.min(avail / rows, (s.clientWidth - 120) / cols), 22, 92);
+    // 보기 버튼이 쓰는 높이를 뺀 나머지에 격자를 맞춘다
+    const avail = s.clientHeight - 150;
+    const gap = 6;   // css .cnt-grid gap
+    const sz = U.clamp(Math.min((avail - (rows - 1) * gap) / rows, (s.clientWidth - 40 - (cols - 1) * gap) / cols), 22, 92);
     this.wrap.style.setProperty('--csz', `${sz}px`);
   }
 

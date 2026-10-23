@@ -77,14 +77,14 @@ class SeekGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${SeekGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${SeekGame.title} · Lv.${level}`, this.msg, SeekGame.ROUNDS);
+    this.body = body;
+    this.progress = dots;
     this.wrap = U.el('div', 'seek-wrap');
     const side = U.el('div', 'seek-side');
     this.target = U.el('div', 'seek-target');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < SeekGame.ROUNDS; i++) this.progress.append(U.el('span'));
-    side.append(this.target, this.progress);
+    side.append(this.target);
     this.board = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.board.setAttribute('class', 'seek-board');
     this.board.addEventListener('pointerdown', (e) => {
@@ -92,9 +92,9 @@ class SeekGame {
       if (cell) this.pick(Number(cell.dataset.i));
     });
     this.wrap.append(side, this.board);
-    stage.append(this.msg, this.wrap);
+    body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.ro.observe(body);
     this.next();
   }
 
@@ -144,13 +144,13 @@ class SeekGame {
   }
 
   layout() {
-    const s = this.h.stage;
+    const s = this.body;
     const { radius, len } = this.spec;
-    // 안내 문구가 쓰는 높이를 뺀 나머지에 판을 맞춘다. 왼쪽에는 사슬이 한 바퀴 돌 자리가 필요하다.
-    const availH = s.clientHeight - 150;
-    const bead = U.clamp(s.clientWidth / 26, 30, 50);
+    // 머리 아래 남은 자리에 판을 맞춘다. 왼쪽에는 사슬이 한 바퀴 돌 자리가 필요하다.
+    const availH = s.clientHeight - 30;
+    const bead = U.clamp(s.clientWidth / 24, 30, 50);
     const side = len * bead + (len - 1) * 6 + 28;
-    const availW = s.clientWidth - 80 - side - 48;
+    const availW = s.clientWidth - side - 48;
     const hgt = U.clamp(Math.min(availH, availW / this.aspect), 140, 620);
     this.board.style.height = `${hgt}px`;
     this.board.style.width = `${hgt * this.aspect}px`;

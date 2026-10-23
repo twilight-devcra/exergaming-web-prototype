@@ -65,18 +65,17 @@ class FitGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${FitGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${FitGame.title} · Lv.${level}`, this.msg, FitGame.ROUNDS);
+    this.body = body;
+    this.progress = dots;
     this.wrap = U.el('div', 'fit-wrap');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < FitGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.board = U.el('div', 'fit-board');
     this.cands = U.el('div', 'fit-cands');
-    // 안내 문구는 판 바로 위에 둔다
-    this.wrap.append(this.progress, this.msg, this.board, this.cands);
-    stage.append(this.wrap);
+    this.wrap.append(this.board, this.cands);
+    body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.ro.observe(body);
     this.next();
   }
 
@@ -123,11 +122,11 @@ class FitGame {
   }
 
   layout() {
-    const s = this.h.stage;
+    const s = this.body;
     const n = this.spec.cands;
     const ratio = FitGame.PIECE_VIEW / FitGame.BOARD_VIEW;   // 버튼 크기 = 판 크기 * ratio
-    const avail = s.clientHeight - 290;
-    const cand = U.clamp(Math.min(avail / (1 / ratio + 1.1), (s.clientWidth - 120) / n - 16), 52, 132);
+    const avail = s.clientHeight - 112;
+    const cand = U.clamp(Math.min(avail / (1 / ratio + 1.1), (s.clientWidth - 40) / n - 16), 52, 132);
     this.wrap.style.setProperty('--psz', `${cand}px`);
     this.wrap.style.setProperty('--bsz', `${Math.round(cand / ratio)}px`);
   }

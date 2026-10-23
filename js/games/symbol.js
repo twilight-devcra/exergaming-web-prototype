@@ -69,13 +69,13 @@ class SymbolGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${SymbolGame.title} · Lv.${level}`));
-    this.wrap = U.el('div', 'sym-wrap');
     this.question = U.el('div', 'stage-msg', '');
+    this.body = U.frame(stage, `${SymbolGame.title} · Lv.${level}`, this.question).body;
+    this.wrap = U.el('div', 'sym-wrap');
     this.target = U.el('div', 'sym-target');
     this.grid = U.el('div', 'sym-grid');
-    this.wrap.append(this.question, this.target, this.grid);
-    stage.append(this.wrap);
+    this.wrap.append(this.target, this.grid);
+    this.body.append(this.wrap);
 
     this.cells = [];
     for (let i = 0; i < 8; i++) {
@@ -85,7 +85,7 @@ class SymbolGame {
       this.cells.push(cell);
     }
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.ro.observe(this.body);
     this.layout();
 
     const slots = U.shuffle([...Array(8).keys()]).slice(0, this.n);
@@ -109,9 +109,9 @@ class SymbolGame {
   }
 
   layout() {
-    const s = this.h.stage;
-    const avail = s.clientHeight - 48 - 72 - 14 * 3;
-    const sz = Math.max(48, Math.min(avail / 3, (s.clientWidth - 80) / 4.5, 140));
+    const s = this.body;
+    const avail = s.clientHeight - 14 * 2;
+    const sz = Math.max(48, Math.min(avail / 3, s.clientWidth / 4.5, 140));
     this.wrap.style.setProperty('--sz', `${sz}px`);
   }
 

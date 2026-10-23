@@ -80,15 +80,14 @@ class PathGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${PathGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg look', '길을 잘 보세요');
-    stage.append(this.msg);
+    const { body } = U.frame(stage, `${PathGame.title} · Lv.${level}`, this.msg);
     this.board = U.el('div', 'path-board');
-    // 판을 격자가 차지할 만큼만 키워서 안내 문구가 격자 바로 위에 오게 한다 (칸 최대 120px · 틈 22%)
+    // 판을 격자가 차지할 만큼만 키워서 남는 자리의 가운데에 오게 한다 (칸 최대 120px · 틈 22%)
     this.board.style.maxHeight = `${this.rows * 120 + (this.rows - 1) * 120 * 0.22}px`;
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.board.append(this.svg);
-    stage.append(this.board);
+    body.append(this.board);
 
     this.path = PathGame.genPath(this.spec);
     this.cells = [];

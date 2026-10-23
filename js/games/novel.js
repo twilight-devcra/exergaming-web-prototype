@@ -121,11 +121,11 @@ class NovelGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${NovelGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg look', '잘 보세요');
+    const { body, dots } = U.frame(stage, `${NovelGame.title} · Lv.${level}`, this.msg, NovelGame.QUESTIONS);
+    this.body = body;
+    this.progress = dots;
     this.wrap = U.el('div', 'nv-wrap');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < NovelGame.QUESTIONS; i++) this.progress.append(U.el('span'));
     this.grid = U.el('div', 'nv-grid');
     this.grid.style.setProperty('--cols', this.cols);
     this.grid.style.setProperty('--rows', this.rows);
@@ -137,11 +137,10 @@ class NovelGame {
     });
     this.curtain = U.el('div', 'nv-curtain');
     this.grid.append(this.curtain);
-    // 안내 문구는 판 바로 위에 둔다
-    this.wrap.append(this.progress, this.msg, this.grid);
-    stage.append(this.wrap);
+    this.wrap.append(this.grid);
+    body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.ro.observe(body);
     this.layout();
 
     this.render();
@@ -150,9 +149,9 @@ class NovelGame {
   }
 
   layout() {
-    const s = this.h.stage;
+    const s = this.body;
     const gap = 12;
-    const sz = U.clamp(Math.min((s.clientHeight - 150) / this.rows - gap, (s.clientWidth - 120) / this.cols - gap), 48, 130);
+    const sz = U.clamp(Math.min((s.clientHeight - 12) / this.rows - gap, (s.clientWidth - 40) / this.cols - gap), 48, 130);
     this.wrap.style.setProperty('--sz', `${sz}px`);
   }
 

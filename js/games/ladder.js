@@ -95,15 +95,13 @@ class LadderGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${LadderGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${LadderGame.title} · Lv.${level}`, this.msg, LadderGame.ROUNDS);
+    this.progress = dots;
     this.wrap = U.el('div', 'lad-wrap');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < LadderGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.board = U.el('div', 'lad-board');
-    // 안내 문구는 사다리 바로 위에 둔다
-    this.wrap.append(this.progress, this.msg, this.board);
-    stage.append(this.wrap);
+    this.wrap.append(this.board);
+    body.append(this.wrap);
     this.next();
   }
 

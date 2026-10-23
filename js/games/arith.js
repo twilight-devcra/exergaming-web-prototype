@@ -58,17 +58,15 @@ class ArithGame {
 
   start() {
     const { stage, level } = this.h;
-    stage.append(U.el('div', 'stage-title', `${ArithGame.title} · Lv.${level}`));
     this.msg = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${ArithGame.title} · Lv.${level}`, this.msg, ArithGame.ROUNDS);
+    this.progress = dots;
     this.wrap = U.el('div', 'ar-wrap');
-    this.progress = U.el('div', 'dots');
-    for (let i = 0; i < ArithGame.ROUNDS; i++) this.progress.append(U.el('span'));
     this.eq = U.el('div', 'ar-eq');
     this.eq.classList.toggle('long', this.spec.blanks > 2);
     this.cands = U.el('div', 'ar-cands');
-    // 안내 문구는 식 바로 위에 둔다 (눈이 가 있는 곳)
-    this.wrap.append(this.progress, this.msg, this.eq, this.cands);
-    stage.append(this.wrap);
+    this.wrap.append(this.eq, this.cands);
+    body.append(this.wrap);
     this.next();
   }
 

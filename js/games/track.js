@@ -21,24 +21,26 @@ class TrackGame {
   static title = '공 따라가기';
   static hint = '★ 이 뜬 공을 눈으로 따라가다가<br>공이 멈추면 그 공을 누르세요';
   // 높은 단계가 너무 쉬웠다 (2026-10-22): Lv5 부터 공·★·빠르기를 늘리고 휘어 가게 하고, Lv6 부터 겹쳐 지나간다
+  // Lv3 부터는 공이 너무 느려서 빠르기를 1.5배로 올렸다 (2026-10-23: 30·34·42·50·62·70 → 지금 값)
   static levels = [
     // 쉬운 단계: 공 하나만 느리게 따라간다
     { n: 4, t: 1, speed: 22, move: 2000, cue: 2000 },
     { n: 5, t: 1, speed: 26, move: 2500, cue: 2000 },
-    { n: 5, t: 2, speed: 30, move: 2500, cue: 1800 },
-    { n: 6, t: 2, speed: 34, move: 3000, cue: 1600 },
+    { n: 5, t: 2, speed: 45, move: 2500, cue: 1800 },
+    { n: 6, t: 2, speed: 51, move: 3000, cue: 1600 },
     // 공이 조금씩 휘어 간다
-    { n: 7, t: 3, speed: 42, move: 3000, cue: 1500, wander: 30 },
+    { n: 7, t: 3, speed: 63, move: 3000, cue: 1500, wander: 30 },
     // 공끼리 겹쳐 지나간다
-    { n: 8, t: 3, speed: 50, move: 3500, cue: 1500, pass: true, wander: 50 },
-    { n: 9, t: 4, speed: 62, move: 4000, cue: 1400, pass: true, wander: 75 },
-    { n: 10, t: 4, speed: 70, move: 4000, cue: 1300, pass: true, wander: 100 },
+    { n: 8, t: 3, speed: 75, move: 3500, cue: 1500, pass: true, wander: 50 },
+    { n: 9, t: 4, speed: 93, move: 4000, cue: 1400, pass: true, wander: 75 },
+    { n: 10, t: 4, speed: 105, move: 4000, cue: 1300, pass: true, wander: 100 },
   ];
   static maxLevel = TrackGame.levels.length;
   static W = 160;
   static H = 100;
   static R = 7;           // 공 반지름
   static DT = 1 / 120;    // 미리 계산하는 장면 간격(초)
+  static ACCEL = 0.5;     // 출발할 때 제 빠르기까지 붙는 시간(초). 처음부터 제 빠르기로 튀어 나가면 ★ 공을 놓치기 쉽다
 
   // 소개 그림: ① ★ 공을 보고 ② 공들이 움직인 뒤 그 공을 누른다 (②는 움직였다 멈추는 모습을 되풀이한다)
   static diagram() {
@@ -216,7 +218,7 @@ class TrackGame {
   // ---- 움직임 미리 계산 ----
   // 공을 서로 떨어뜨려 놓고 저마다 아무 방향(축에 너무 가깝지 않게)으로 비슷한 빠르기를 준 뒤 DT 간격으로 움직인다.
   // 벽에서는 튕기고, pass 가 아니면 공끼리도 튕긴다 (같은 무게의 탄성 충돌: 부딪친 방향의 속도를 맞바꾼다).
-  // wander 가 있으면 공마다 도는 빠르기를 0.6초쯤마다 새로 정해 휘어 가게 한다.
+  // wander 가 있으면 공마다 도는 빠르기를 0.6초쯤마다 새로 정해 휘어 가게 한다. 처음 ACCEL 초는 서서히 빨라진다.
   // 멈췄을 때 겹친 공이 있으면 처음부터 다시 만든다. 난수는 모두 seed 에서 나온다 (같은 seed = 같은 판).
   // 반환: { frames: [장면마다 [[x, y], ...]], vel: 처음 속도 [[vx, vy], ...] }
   static simulate({ n, speed, move, pass, wander = 0 }, seed = 1) {
@@ -258,9 +260,12 @@ class TrackGame {
             [v[0], v[1]] = [v[0] * c - v[1] * sn, v[0] * sn + v[1] * c];
           });
         }
+        // 출발 가속: 처음 ACCEL 초 동안 0 에서 제 빠르기까지 부드럽게 (smoothstep). 방향·튕김은 vel 그대로 쓴다
+        const k = Math.min(1, ((s + 0.5) * DT) / TrackGame.ACCEL);
+        const ramp = k * k * (3 - 2 * k);
         pos.forEach((p, i) => {
-          p[0] += vel[i][0] * DT;
-          p[1] += vel[i][1] * DT;
+          p[0] += vel[i][0] * ramp * DT;
+          p[1] += vel[i][1] * ramp * DT;
           if (p[0] < R) { p[0] = 2 * R - p[0]; vel[i][0] = Math.abs(vel[i][0]); }
           if (p[0] > W - R) { p[0] = 2 * (W - R) - p[0]; vel[i][0] = -Math.abs(vel[i][0]); }
           if (p[1] < R) { p[1] = 2 * R - p[1]; vel[i][1] = Math.abs(vel[i][1]); }

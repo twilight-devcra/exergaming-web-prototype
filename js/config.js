@@ -53,7 +53,7 @@ const DEFAULT_CONFIG = {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
     symbol: { base: 6, per: 0 },     // 6초
     arith: { base: 6, per: 5 },      // 빈칸 2개 16초 ~ 3개 21초
-    count: { base: 5, per: 0.3 },    // 12칸 9초 ~ 25칸 13초
+    count: { base: 4, per: 0.42 },   // 12칸 9초 ~ 38칸 20초
     fit: { base: 5, per: 1.5 },      // 조각 3개 10초 ~ 6개 14초
     seek: { base: 6, per: 0.25 },    // 19칸 11초 ~ 61칸 21초
     cover: { base: 5, per: 2.5 },    // 덮인 숫자 하나 7.5초 · 둘 10초

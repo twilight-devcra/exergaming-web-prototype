@@ -5,7 +5,8 @@
 //   colors — 색 수. 동시에 들고 있어야 하는 집계 수가 늘어난다.
 //   spread — 비우승 색들이 2위보다 얼마나 적어질 수 있는지. 좁을수록 어느 색도 눈으로 쳐낼 수 없다.
 //   clump  — 같은 색이 서로 붙어 놓일 확률. 뭉쳐 있으면 면적으로 바로 보이고, 흩어지면 하나씩 세야 한다.
-// 격자는 일부러 작게 유지한다. 칸 수를 늘리면 어려워지는 게 아니라 지루해지기만 한다.
+// 격자는 Lv5 까지 작게 유지하고, 네 가지를 다 조인 Lv6~8 에서만 칸을 늘린다 (2026-10-23 시험: 높은 단계가 쉬웠다).
+// 1·2위 차이가 1칸인 채로 칸이 늘면 눈대중이 더는 안 통하고 끝까지 세어야 한다.
 const COUNT_COLORS = [
   // 색만으로 구분하지 않도록 칸마다 색에 딸린 모양을 함께 찍는다 (색약 대응)
   { id: 'red', fill: '#e5484d', glyph: '<circle cx="50" cy="50" r="25"/>' },
@@ -28,9 +29,10 @@ class CountGame {
     { grid: [4, 4], colors: 3, cells: 12, margin: 4, spread: 3, clump: 0.9 },
     { grid: [4, 4], colors: 3, cells: 14, margin: 3, spread: 3, clump: 0.7 },
     { grid: [4, 5], colors: 4, cells: 16, margin: 2, spread: 3, clump: 0.5 },
-    { grid: [5, 5], colors: 4, cells: 20, margin: 2, spread: 2, clump: 0.3 },
-    { grid: [5, 5], colors: 5, cells: 22, margin: 1, spread: 2, clump: 0.15 },
-    { grid: [5, 6], colors: 5, cells: 25, margin: 1, spread: 1, clump: 0 },
+    // 높은 단계: 판을 키운다 (예전 값 5×5·20칸 / 5×5·22칸 / 5×6·25칸)
+    { grid: [5, 6], colors: 4, cells: 26, margin: 2, spread: 2, clump: 0.3 },
+    { grid: [6, 6], colors: 5, cells: 32, margin: 1, spread: 2, clump: 0.15 },
+    { grid: [6, 7], colors: 5, cells: 38, margin: 1, spread: 1, clump: 0 },
   ];
   static maxLevel = CountGame.levels.length;
   static ROUNDS = 3;

@@ -70,6 +70,8 @@ body[data-theme="neon"] .perfect { color: var(--good); background: none; }
 body[data-theme="neon"] .hud .label, body[data-theme="neon"] .intro .tag { color: var(--accent); text-shadow: 0 0 8px var(--glow-a); }
 body[data-theme="neon"] .floater { text-shadow: 0 0 10px currentColor; }
 body[data-theme="neon"] #streak { box-shadow: 0 0 16px var(--good); }
+body[data-theme="neon"] .score-pop span { box-shadow: 0 0 18px var(--good); }
+body[data-theme="neon"] .score-pop.hot span { box-shadow: 0 0 22px var(--warn); }
 body[data-theme="neon"] .dr-id { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent), 0 0 14px var(--glow-a); }
 body[data-theme="neon"] .radar .rd-shape { filter: drop-shadow(0 0 8px var(--accent)); }
 body[data-theme="neon"] .calib-ring svg { filter: drop-shadow(0 0 10px var(--glow-a)); }
@@ -193,6 +195,7 @@ body[data-theme="cartoon"] :is(.big-count, .dr-total, .intro .name, #shift-msg .
 body[data-theme="cartoon"] :is(.intro .name, .att-main h1, .dr-title, #shift-msg .name) { color: var(--panel); }
 body[data-theme="cartoon"] .hud .value { color: var(--panel); -webkit-text-stroke-width: 2px; text-shadow: 0 3px 0 var(--ink); }
 body[data-theme="cartoon"] .perfect { color: var(--warn); background: none; }
+body[data-theme="cartoon"] .score-pop span { border: var(--outline); box-shadow: 0 4px 0 var(--ink); }
 body[data-theme="cartoon"] .intro { animation: boing 0.5s cubic-bezier(0.3, 1.8, 0.5, 1); }
 body[data-theme="cartoon"] .big-count { animation: boing 0.4s cubic-bezier(0.3, 1.8, 0.5, 1); color: var(--warn); }
 @keyframes boing { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -264,6 +267,8 @@ body[data-theme="pixel"] :is(.big-count, .dr-total, .intro .name, #shift-msg .na
   font-weight: 400;
 }
 body[data-theme="pixel"] .perfect { color: var(--warn); background: none; }
+body[data-theme="pixel"] .score-pop span { border-radius: 0; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--px) var(--ink); }
+body[data-theme="pixel"] .score-ring { border-radius: 0; }
 body[data-theme="pixel"] :is(.intro, .dr-card, .perfect) { animation-timing-function: steps(4) !important; }
 body[data-theme="pixel"] .hud .label, body[data-theme="pixel"] .intro .tag { color: var(--warn); }
 body[data-theme="pixel"] .radar .rd-shape { stroke-linejoin: miter; fill: color-mix(in srgb, var(--accent) 35%, transparent); }

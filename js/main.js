@@ -446,6 +446,9 @@ const App = {
   beginCountdown() {
     this.state = 'countdown';
     this.score = 0;
+    this.hudScore = 0;                  // 점수판에 도착한 점수 (날아가는 중인 점수는 아직 빠져 있다 — addScore)
+    this.hudShown = 0;                  // 점수판에 지금 보이는 값 (hudScore 까지 굴러 올라간다)
+    this.scoreEpoch = (this.scoreEpoch || 0) + 1; // 지난 판에 날아가던 점수가 새 판 점수판에 내려앉지 않게
     this.exScore = 0;
     this.cogScore = 0;
     this.elapsed = 0;
@@ -629,8 +632,7 @@ const App = {
         this.cogScore += pts;
         this.stats[T.id].points += pts;
         this.log.ev('points', { game: T.id, pts });
-        this.addScore(pts);
-        this.floatAt(anchor, `${prefix}+${pts}`);
+        this.addScore(pts, anchor, `${prefix}+${pts}`);
       },
       done: (res) => {
         if (gen !== this.gen || this.state !== 'play') return;
@@ -823,21 +825,83 @@ const App = {
     setTimeout(() => f.remove(), 950);
   },
 
-  addScore(pts) {
+  // 점수는 바로 더하고(this.score), 화면의 점수판(hudScore)은 점수가 도착했을 때 올린다.
+  // anchor 가 있으면(인지 게임 정답) 그 자리에서 점수 배지가 튀어나와 점수판으로 날아간다
+  addScore(pts, anchor, text) {
     this.score += pts;
-    const v = $('#hud-score .value');
-    v.textContent = this.score;
-    v.classList.remove('bump');
-    void v.offsetWidth;
-    v.classList.add('bump');
+    if (!anchor || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (anchor) this.floatAt(anchor, text);
+      return this.landScore(pts, !!anchor);
+    }
+    const epoch = this.scoreEpoch;
+    this.flyScore(anchor, text, () => epoch === this.scoreEpoch && this.landScore(pts, true));
   },
 
-  updateHud() {
+  // 배지: 정답 자리에서 크게 튀어나와 잠깐 떠 있다가, 위로 솟으며 점수판 쪽으로 휘어 날아가 작아진다.
+  // 가로(바깥 상자)와 세로·크기(안쪽 글자)를 다른 곡선으로 움직여서 곧은 선이 아니라 호를 그린다. 연속 정답이 길수록 크다
+  flyScore(anchor, text, onLand) {
+    const a = anchor.getBoundingClientRect();
+    const d = $('#hud-score .value').getBoundingClientRect();
+    const x = a.left + a.width / 2, y = a.top + a.height / 2;
+    const dx = d.right - 30 - x, dy = d.top + d.height / 2 - y;
+    const f = U.el('div', 'score-pop', `<span>${text}</span>`);
+    f.classList.toggle('hot', this.streak >= 3);
+    f.style.left = `${x}px`;
+    f.style.top = `${y}px`;
+    f.style.setProperty('--k', String(1 + Math.min(this.streak, 6) * 0.06));
+    document.body.append(f);
+    const ms = 1150, flyAt = 0.42;
+    f.animate([
+      { transform: 'translateX(0)', offset: 0 },
+      { transform: 'translateX(0)', offset: flyAt, easing: 'cubic-bezier(0.55, 0, 0.9, 0.45)' },
+      { transform: `translateX(${dx}px)`, offset: 1 },
+    ], { duration: ms, fill: 'forwards' });
+    const anim = f.firstChild.animate([
+      { transform: 'translateY(0) scale(0.3)', opacity: 0, offset: 0, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1.3)' },
+      { transform: 'translateY(-6px) scale(1.25)', opacity: 1, offset: 0.12 },
+      { transform: 'translateY(-10px) scale(1)', offset: 0.22 },
+      { transform: 'translateY(-16px) scale(1)', offset: flyAt, easing: 'cubic-bezier(0.25, 0.7, 0.35, 1)' },
+      { transform: `translateY(${dy}px) scale(0.45)`, opacity: 0.9, offset: 1 },
+    ], { duration: ms, fill: 'forwards' });
+    anim.onfinish = () => {
+      f.remove();
+      onLand();
+    };
+  },
+
+  // 점수판이 점수를 받는다: 숫자가 굴러 올라가고(updateHud), 받은 순간 튀어 오른다.
+  // big = 날아온 인지 점수 — 더 크게 튀고 초록으로 번쩍이며 둘레에 고리가 퍼진다
+  landScore(pts, big) {
+    this.hudScore += pts;
+    const v = $('#hud-score .value');
+    v.classList.remove('bump', 'catch');
+    void v.offsetWidth;
+    v.classList.add(big ? 'catch' : 'bump');
+    if (!big) return;
+    const r = v.getBoundingClientRect();
+    const x = r.right - 30, y = r.top + r.height / 2;
+    const ring = U.el('div', 'score-ring');
+    ring.style.left = `${x}px`;
+    ring.style.top = `${y}px`;
+    document.body.append(ring);
+    setTimeout(() => ring.remove(), 600);
+    Fx.burst(x, y, 0.6);
+  },
+
+  updateHud(dt = 0) {
     const left = this.state === 'play' ? this.cfg.durationSec - this.elapsed : this.cfg.durationSec;
     $('#hud-time .value').textContent = U.fmtTime(left);
     $('#hud-time').classList.toggle('warn', this.state === 'play' && left <= 10);
     $('#hud-time').classList.toggle('held', this.state === 'play' && this.inIntro);
-    $('#hud-score .value').textContent = this.score;
+    // 점수판 숫자는 받은 점수까지 굴러 올라간다 (남은 차이의 비율만큼, 너무 느리지 않게 초당 최소 40점)
+    if (!dt || this.hudShown > this.hudScore) this.hudShown = this.hudScore;
+    else if (this.hudShown < this.hudScore) {
+      const gap = this.hudScore - this.hudShown;
+      this.hudShown = Math.min(this.hudScore, this.hudShown + Math.max(40 * dt, gap * (1 - Math.exp(-dt / 0.12))));
+    }
+    const n = String(Math.floor(this.hudShown));
+    const v = $('#hud-score .value');
+    if (v.textContent !== n) v.textContent = n;
   },
 
   // 목표 RPM 대비 편차로 이번 프레임의 운동 점수(0~max)를 계산
@@ -1024,7 +1088,7 @@ const App = {
           // 틱 사이에도 지면이 끊기지 않도록 진행 중인 틱에서 쌓인 몫까지 넘긴다
           this.band.update(dt, rpm, (rpm - this.target) / this.target, this.score + this.tickAcc / this.cfg.tickSec);
           this.band.draw();
-          this.updateHud();
+          this.updateHud(dt);
         }
       }
       this.runTimers();

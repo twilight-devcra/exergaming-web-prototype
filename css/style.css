@@ -243,8 +243,56 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 #hud-time.warn .value { color: var(--bad); }
 /* 게임 소개 중에는 라운드 시계가 멈춰 있다 */
 #hud-time.held .value { opacity: 0.4; transition: opacity 0.2s; }
+#hud-score .value { transform-origin: right center; }
 #hud-score .value.bump { animation: bump 0.25s ease-out; }
 @keyframes bump { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+/* 날아온 인지 점수를 받을 때 (js landScore): 크게 튀고 잠깐 초록으로 번쩍인다 */
+#hud-score .value.catch { animation: catch 0.5s cubic-bezier(0.2, 1.5, 0.4, 1); }
+@keyframes catch {
+  0% { transform: scale(1.4); color: var(--good); }
+  55% { color: var(--good); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { #hud-score .value.catch { animation: none; } }
+
+/* 인지 점수 배지 (js flyScore): 정답 자리에서 튀어나와 점수판으로 날아간다. 바깥이 가로, 안쪽 글자가 세로·크기를 맡는다 */
+.score-pop { position: fixed; z-index: 55; width: 0; height: 0; pointer-events: none; }
+.score-pop span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% -50%;
+  padding: 0.12em 0.5em;
+  border-radius: 999px;
+  background: var(--good);
+  color: var(--on-accent);
+  font-family: var(--font-num);
+  font-size: calc(30px * var(--k, 1));
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--good) 45%, transparent), inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+}
+/* 연속 3번 이상: 주황 배지에 빛 */
+.score-pop.hot span {
+  background: var(--warn);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 30%, transparent), 0 6px 22px color-mix(in srgb, var(--warn) 55%, transparent), inset 0 -3px 0 rgba(0, 0, 0, 0.12);
+}
+.score-ring {
+  position: fixed;
+  z-index: 55;
+  width: 110px;
+  height: 110px;
+  margin: -55px 0 0 -55px;
+  border-radius: 50%;
+  border: 4px solid var(--good);
+  pointer-events: none;
+  animation: scorering 0.55s ease-out forwards;
+}
+@keyframes scorering {
+  0% { transform: scale(0.3); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; border-width: 1px; }
+}
 
 /* 연속 정답 표시 — 점수 아래에 붙는다 */
 #streak {

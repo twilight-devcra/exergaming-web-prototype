@@ -334,11 +334,17 @@ class Band {
       const fx = f.x * trackHalf;
       // 처음에 튕겨 오르고 끝에서 느려지게. 일정한 속도로 올라가면 흘러가는 느낌이 난다.
       const fy = -r * 2 - 6 - (1 - Math.pow(1 - f.t, 3)) * 26;
-      g.globalAlpha = f.t < 0.15 ? f.t / 0.15 : 1 - (f.t - 0.15) / 0.85;
+      g.globalAlpha = f.t < 0.1 ? f.t / 0.1 : f.t < 0.5 ? 1 : 1 - (f.t - 0.5) / 0.5;
       g.fillStyle = pal[f.color] || f.color; // 'good' | 'warn' | 'bad' 또는 색 값
       glow(g.fillStyle);
+      // 톡 튀어나왔다가 제 크기로 (만점 틱은 조금 더 크게)
+      const s = (f.t < 0.1 ? 0.5 + 0.8 * (f.t / 0.1) : 1 + 0.3 * Math.max(0, 1 - (f.t - 0.1) / 0.15)) * (f.color === 'good' ? 1.05 : 0.9);
       g.font = `800 ${Math.round(r * 0.95)}px ${pal.font}`;
-      g.fillText(f.text, fx, fy);
+      g.save();
+      g.translate(fx, fy);
+      g.scale(s, s);
+      g.fillText(f.text, 0, 0);
+      g.restore();
     }
     noGlow();
     g.globalAlpha = 1;

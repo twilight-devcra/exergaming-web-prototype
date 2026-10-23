@@ -268,32 +268,50 @@ class Band {
       g.globalAlpha = 1;
       g.lineCap = 'butt';
     }
-    // 정답 직후에는 초록을 위에 겹쳐 물들인다
+    // 공은 바퀴 모양: 진한 타이어 안에 색 바퀴통. 게임 판의 색 동그라미(공 따라가기의 공, 길 칸)와 헷갈리지 않게 한다.
+    // 바퀴통 색이 구역 안/밖을 알리고, 정답 직후에는 초록을 위에 겹쳐 물들인다
     const ballColor = this.inZone ? pal.accent : pal.bad;
+    const hub = br * 0.72;
     glow(ballColor);
-    g.fillStyle = ballColor;
+    g.fillStyle = pal.ink;
     g.beginPath();
     g.arc(bx, by, br, 0, Math.PI * 2);
     g.fill();
     noGlow();
+    if (look.outline) {
+      g.strokeStyle = pal.ink;
+      g.lineWidth = look.outline;
+      g.stroke();
+    }
+    // 타이어 무늬 — 바퀴살과 함께 돌아서 굴러가는 것이 보인다
+    g.strokeStyle = pal.ground;
+    g.lineWidth = Math.max(1.5, br * 0.07);
+    g.lineCap = 'round';
+    g.beginPath();
+    for (let k = 0; k < 10; k++) {
+      const a = this.roll + (k * Math.PI) / 5;
+      g.moveTo(bx + Math.cos(a) * br * 0.8, by + Math.sin(a) * br * 0.8);
+      g.lineTo(bx + Math.cos(a) * br * 0.92, by + Math.sin(a) * br * 0.92);
+    }
+    g.stroke();
+    g.lineCap = 'butt';
+    g.fillStyle = ballColor;
+    g.beginPath();
+    g.arc(bx, by, hub, 0, Math.PI * 2);
+    g.fill();
     if (this.pop > 0) {
       g.globalAlpha = this.pop;
       g.fillStyle = pal.good;
       g.fill();
       g.globalAlpha = 1;
     }
-    if (look.outline) {
-      g.strokeStyle = pal.ink;
-      g.lineWidth = look.outline;
-      g.stroke();
-    }
     g.strokeStyle = pal.onAccent;
-    g.lineWidth = Math.max(2, br * 0.14);
+    g.lineWidth = Math.max(2, br * 0.13);
     g.beginPath();
     for (let k = 0; k < 2; k++) {
       const a = this.roll + (k * Math.PI) / 2;
-      g.moveTo(bx + Math.cos(a) * br * 0.62, by + Math.sin(a) * br * 0.62);
-      g.lineTo(bx - Math.cos(a) * br * 0.62, by - Math.sin(a) * br * 0.62);
+      g.moveTo(bx + Math.cos(a) * hub * 0.78, by + Math.sin(a) * hub * 0.78);
+      g.lineTo(bx - Math.cos(a) * hub * 0.78, by - Math.sin(a) * hub * 0.78);
     }
     g.stroke();
 

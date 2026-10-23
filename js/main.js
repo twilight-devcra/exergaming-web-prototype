@@ -405,12 +405,22 @@ const App = {
     }
     if (c.started) {
       c.elapsed += dt;
-      if (c.elapsed > Math.min(this.cfg.calibrationIgnoreSec, total * 0.3) && rpm > 0) c.samples.push(rpm);
+      if (c.elapsed > Math.min(this.cfg.calibrationIgnoreSec, total * 0.3) && rpm > 0) {
+        // 정렬된 채로 넣는다 (중앙값을 매 프레임 읽는다)
+        const s = c.samples;
+        let lo = 0, hi = s.length;
+        while (lo < hi) { const m = (lo + hi) >> 1; if (s[m] < rpm) lo = m + 1; else hi = m; }
+        s.splice(lo, 0, rpm);
+      }
     }
-    // 비트 템포가 밟는 속도를 따라가는 빠르기 (시간 상수, 초). 밟기 시작한 직후에는 첫 걸음의 느린 속도에서 금방 올라오도록 빠르게,
+    // 비트 템포가 따라가는 값. 기준 속도는 표본의 중앙값이라, 표본이 쌓이기 시작하면 비트도 지금 속도가 아니라 그 중앙값을 따라간다.
+    // 지금 속도를 따라가면 측정 끝 무렵에 빨라진 만큼 비트가 기준보다 빨라져 있다가 카운트다운에서 갑자기 느려지고,
+    // 그 빠른 박자를 이어 밟아 공이 오른쪽에 머문다 (2026-10-23 세션: 끝에서 77 BPM → 기준 72 BPM)
+    const aim = c.samples.length ? c.samples[c.samples.length >> 1] : rpm;
+    // 비트 템포가 따라가는 빠르기 (시간 상수, 초). 밟기 시작한 직후에는 첫 걸음의 느린 속도에서 금방 올라오도록 빠르게,
     // 그 뒤에는 한 걸음씩의 흔들림을 걸러 낼 만큼만 늦춘다 (예전 1.5초는 굼떠 보였다). 멈추면 마지막 템포를 그대로 둔다
     const tau = c.elapsed < 3 ? 0.25 : 0.6;
-    if (rpm > 0) c.follow += (rpm - c.follow) * (1 - Math.exp(-dt / tau));
+    if (rpm > 0) c.follow += (aim - c.follow) * (1 - Math.exp(-dt / tau));
     c.angle += (rpm / 60) * 360 * dt;
     $('#calib-crank').setAttribute('transform', `rotate(${c.angle} 110 110)`);
     const frac = U.clamp(c.elapsed / total, 0, 1);
@@ -467,7 +477,14 @@ const App = {
     this.show('game');
     this.band.resize();
     this.updateHud();
-    this.audio.setTempo(() => this.target * 2);  // 측정 때부터 이어지는 비트를 끊지 않고 목표 속도로 넘긴다
+    // 측정 때부터 이어지는 비트를 끊지 않고 목표 속도로 넘긴다. 템포가 남아 있던 차이는 카운트다운 3초에 걸쳐 들리게 옮긴다
+    // (오디오 시계 기준이라 일시정지 동안은 멈춘다)
+    const ctx = this.audio.ctx;
+    const from = U.clamp(this.calib.follow, 30, 110), at = ctx ? ctx.currentTime : 0;
+    this.audio.setTempo(() => {
+      const k = ctx ? U.clamp((ctx.currentTime - at) / 3, 0, 1) : 1;
+      return U.lerp(from, this.target, k * k * (3 - 2 * k)) * 2;
+    });
 
     const cog = $('#cog');
     const gen = this.gen;

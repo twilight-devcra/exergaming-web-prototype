@@ -697,6 +697,162 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .tr-g.wrong .tr-ball { stroke: var(--bad); stroke-width: 3; opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) { .tr-g.cue .tr-halo { animation: none; } }
 
+/* 지시 따르기: 기계 조작판. 실제 물건처럼 보이도록 화면 스타일과 상관없이 같은 색을 쓴다 */
+.cp-wrap { position: relative; flex: none; }
+.cp-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px 36px 30px;
+  border-radius: 26px;
+  color: #e8ecf2;
+  /* 네 귀퉁이 나사 */
+  background:
+    radial-gradient(circle at 16px 16px, #9aa3b1 4px, #59616f 5.5px, transparent 6.5px),
+    radial-gradient(circle at calc(100% - 16px) 16px, #9aa3b1 4px, #59616f 5.5px, transparent 6.5px),
+    radial-gradient(circle at 16px calc(100% - 16px), #9aa3b1 4px, #59616f 5.5px, transparent 6.5px),
+    radial-gradient(circle at calc(100% - 16px) calc(100% - 16px), #9aa3b1 4px, #59616f 5.5px, transparent 6.5px),
+    linear-gradient(180deg, #4b5567, #353d4b);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18), inset 0 -4px 0 rgba(0, 0, 0, 0.25), 0 14px 30px rgba(0, 0, 0, 0.28);
+}
+.cp-panel .sym-ink { fill: #2b2f38; }   /* 달은 늘 밝은 바탕(버튼·명패) 위에 있다 */
+/* 화면: 지시문. 두 줄 높이를 늘 잡아 두어 지시가 바뀌어도 아래가 밀리지 않는다 */
+.cp-screen {
+  min-height: 2.6em;
+  padding: 12px 24px;
+  border-radius: 14px;
+  background: #0f2a22;
+  box-shadow: inset 0 0 0 4px #1d2530, inset 0 6px 18px rgba(0, 0, 0, 0.55);
+  color: #c4ffdc;
+  text-shadow: 0 0 10px rgba(120, 255, 180, 0.45);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cp-screen { position: relative; }
+/* 이어진 지시: 몇 번째 단계인지 (화면 오른쪽 위) */
+.cp-step { position: absolute; top: 6px; right: 12px; font-size: 17px; font-weight: 700; color: #7fcfa0; text-shadow: none; font-variant-numeric: tabular-nums; }
+.cp-screen b { color: #ffe17a; font-weight: 800; text-shadow: 0 0 10px rgba(255, 210, 90, 0.5); }
+.cp-screen u { text-decoration-thickness: 3px; text-underline-offset: 6px; }
+.cp-screen.flash { animation: cp-flash 0.3s ease-out; }
+@keyframes cp-flash { from { filter: brightness(1.9); } }
+/* 맨 위 단계: 처음 조작하면 화면이 꺼진다 */
+.cp-screen.off { background: #0b0f14; color: transparent; text-shadow: none; }
+.cp-screen.off b { color: transparent; text-shadow: none; }
+.cp-row {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px 12px 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.cp-row > * { position: relative; }
+.cp-mid { display: flex; gap: 18px; }
+.cp-mid > .cp-row { flex: 1 1 auto; }
+.cp-mid > .cp-lamps { flex: none; align-items: center; padding-left: 24px; padding-right: 24px; }
+/* ✓ · ✕ · 순서 번호 (조작마다 오른쪽 위) */
+.cp-tag {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  z-index: 1;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.cp-tag:empty { display: none; }
+.cp-tag.right { background: #23a55a; }
+.cp-tag.wrong { background: #e5484d; }
+.cp-tag.reveal { background: #1d2530; color: #8ab8ff; box-shadow: inset 0 0 0 3px #8ab8ff; }
+/* 램프 */
+.cp-lamp { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cp-bulb {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #5b6370, #2a3039);
+  box-shadow: inset 0 0 0 4px #1e242c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.cp-bulb { font-size: 32px; font-weight: 800; color: #8f99a8; }
+/* 켜진 불: 흰빛에 가까운 바탕에 노란 테두리와 빛 번짐 */
+.cp-lamp.on .cp-bulb { background: radial-gradient(circle at 40% 35%, #ffffff, #fff6d6 70%, #ffe6a0); box-shadow: inset 0 0 0 4px #f0b400, 0 0 26px 8px rgba(255, 214, 80, 0.6); }
+.cp-lamp.on .cp-bulb { color: #6b4e00; }
+.cp-state { font-size: 17px; font-weight: 700; color: #8f99a8; }
+.cp-lamp.on .cp-state { color: #ffe17a; }
+/* 스위치: 누르면 손잡이가 위로 올라가고 ON 에 불이 들어온다 */
+.cp-switch { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cp-on { font-size: 16px; font-weight: 800; letter-spacing: 0.08em; color: #6f7988; }
+.cp-track { width: 50px; height: 86px; border-radius: 25px; background: #1b2028; box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.6); position: relative; }
+.cp-track i {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #f6f8fb, #b4bcc8);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  transition: bottom 0.14s ease-out;
+}
+.cp-switch.flipped .cp-track i { bottom: 41px; }
+.cp-switch.flipped .cp-on { color: #8dffb8; text-shadow: 0 0 8px rgba(120, 255, 180, 0.6); }
+/* 번호판: 버튼(밝은 바탕에 그림)과 헷갈리지 않게 어두운 바탕에 흰 숫자 */
+.cp-plate { width: 52px; height: 44px; border-radius: 8px; background: #161a21; border: 2px solid #6f7988; color: #f2f4f7; font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: center; }
+.cp-switch.right .cp-plate { box-shadow: 0 0 0 4px #23a55a; }
+.cp-switch.wrong .cp-plate { box-shadow: 0 0 0 4px #e5484d; }
+.cp-switch.reveal .cp-plate { box-shadow: 0 0 0 4px #8ab8ff; }
+/* 버튼: 누르면 쑥 들어간다 */
+.cp-btn { padding: 9px 9px 16px; }
+.cp-cap {
+  --ring: #5b6575;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 32%, #ffffff, #d9dfe7 70%, #b9c1cc);
+  box-shadow: 0 0 0 7px #232a33, 0 0 0 10px var(--ring), 0 7px 0 7px #1a1f26;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.cp-cap svg { width: 58%; height: 58%; }
+.cp-btn.pressed .cp-cap { transform: translateY(5px); box-shadow: 0 0 0 7px #232a33, 0 0 0 10px var(--ring), 0 2px 0 7px #1a1f26; }
+.cp-btn.right .cp-cap { --ring: #23a55a; }
+.cp-btn.wrong .cp-cap { --ring: #e5484d; }
+.cp-btn.reveal .cp-cap { --ring: #8ab8ff; }
+.cp-panel.live :is(.cp-btn, .cp-switch) { cursor: pointer; }
+@media (hover: hover) {
+  .cp-panel.live .cp-btn:hover .cp-cap { filter: brightness(1.06); }
+}
+/* 소개 그림 */
+.dg-cp { fill: #424b5a; }
+.dg-cp-screen { fill: #0f2a22; }
+.dg-cp-txt { fill: #c4ffdc; font-weight: 700; }
+.dg-cp-btn { fill: #e9edf2; stroke: #232a33; stroke-width: 3; }
+
 /* 사칙연산 역산 */
 .ar-wrap { display: flex; flex-direction: column; align-items: center; gap: 36px; justify-content: center; }
 /* 라운드 진행 표시 (여러 게임 공용) */

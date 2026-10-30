@@ -738,7 +738,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   align-items: center;
   justify-content: center;
 }
-.cp-screen { position: relative; }
+.cp-screen { position: relative; word-break: keep-all; }   /* 한글 낱말이 줄 끝에서 쪼개지지 않게 ('세 / 모') */
 /* 이어진 지시: 몇 번째 단계인지 (화면 오른쪽 위) */
 .cp-step { position: absolute; top: 6px; right: 12px; font-size: 17px; font-weight: 700; color: #7fcfa0; text-shadow: none; font-variant-numeric: tabular-nums; }
 .cp-screen b { color: #ffe17a; font-weight: 800; text-shadow: 0 0 10px rgba(255, 210, 90, 0.5); }
@@ -759,6 +759,24 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 }
 .cp-row > * { position: relative; }
 .cp-mid { display: flex; gap: 18px; }
+/* 덮개 (Lv7–8): 지시를 읽는 동안 램프·스위치·버튼 줄을 가린다. 화면이 꺼지면 걷힌다 */
+.cp-row { position: relative; }
+.cp-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: repeating-linear-gradient(0deg, #59616f 0 10px, #4b5361 10px 12px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.15), inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.2s ease-in;
+  pointer-events: none;
+}
+/* 내려올 때는 바로 (새 배치가 잠깐이라도 보이지 않게), 걷힐 때만 움직인다 */
+.cp-panel.covered .cp-row::after { transform: scaleY(1); transition: none; }
+@media (prefers-reduced-motion: reduce) { .cp-row::after { transition: none; } }
 .cp-mid > .cp-row { flex: 1 1 auto; }
 .cp-mid > .cp-lamps { flex: none; align-items: center; padding-left: 24px; padding-right: 24px; }
 /* ✓ · ✕ · 순서 번호 (조작마다 오른쪽 위) */

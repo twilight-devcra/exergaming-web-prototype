@@ -36,6 +36,10 @@ const App = {
     };
     Fx.init();
     Theme.init();
+    // 두뇌 그래프·운동량 카드를 두 결과 화면에 붙인다 (시연 결과는 최종 점수 카드 뒤, 테스트 결과는 점수와 순위 사이)
+    const report = () => $('#tpl-report').content.cloneNode(true);
+    $('#demo-result .dr-grid').append(report());
+    $('#result .rp-slot').replaceWith(report());
     this.renderGameToggles();
     if (!this.demo) {
       this.bindPresets();
@@ -1009,27 +1013,53 @@ const App = {
     }, gen);
   },
 
+  // 두뇌 그래프·운동량 카드 (#tpl-report) 를 root 안에서 채운다. 시연·테스트 결과 화면이 함께 쓴다.
+  // 반환: { abil(능력 점수), keep(속도 유지율 %), kcal } — 시연 결과가 기록에 쓴다
+  fillReport(root) {
+    const cfg = this.cfg;
+    const m = this.meter;
+    const $r = (cls) => root.querySelector(`.rp-${cls}`);
+    const abil = Abilities.compute(this.stats);
+    const best = Abilities.best(abil);
+    const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
+    const keep = Math.round((this.exScore / exMax) * 100);
+    const kcal = m.kcal;
+    Radar.render($r('radar'), abil.map((x) => x.value), abil);
+    $r('best').innerHTML = best ? `가장 돋보인 능력 <b>${best.name}</b><small>${best.praise}</small>` : '';
+    const dist = Exercise.fmtDist(m.distM);
+    $r('dist').textContent = dist.value;
+    $r('dist-unit').textContent = dist.unit;
+    $r('kcal').textContent = kcal < 10 ? kcal.toFixed(1) : String(Math.round(kcal));
+    $r('revs').textContent = `${Math.round(m.revs).toLocaleString('ko-KR')}바퀴`;
+    $r('time').textContent = U.fmtTime(m.activeSec);
+    $r('rpm').textContent = `${Math.round(m.avgRpm)} RPM`;
+    $r('keep').textContent = `${keep}%`;
+    return { abil, keep, kcal };
+  },
+
   showResult() {
     if (this.demo) return Demo.showResult();
     const cfg = this.cfg;
     const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
     $('#res-total').textContent = this.score;
-    $('#res-ex').textContent = `${this.exScore} / ${exMax}`;
-    $('#res-ex-sub').textContent = `일정 속도 유지율 ${Math.round((this.exScore / exMax) * 100)}%`;
+    $('#res-ex').textContent = this.exScore;
+    $('#res-ex-sub').textContent = ` / ${exMax}`;
     $('#res-cog').textContent = this.cogScore;
     // 이번 라운드에 실제로 나온 게임만 적는다
-    const lines = GAME_TYPES.filter((T) => this.stats[T.id].plays).map((T) => {
+    // 게임마다 한 줄 (이름 · 판 수 · 정답 · 점수). 줄바꿈 없이 표로 맞춰 11종이 다 나와도 카드에 들어간다
+    const rows = GAME_TYPES.filter((T) => this.stats[T.id].plays).map((T) => {
       const s = this.stats[T.id];
-      return `${T.title}: ${s.plays}회 · 정답 ${s.correct}/${s.total} · ${s.points}점`;
+      return `<span class="g">${T.title}</span><span>${s.plays}회</span><span>${s.correct}/${s.total}</span><span>${s.points}점</span>`;
     });
-    if (this.bestStreak >= 2) lines.push(`<b>최고 연속 정답 ${this.bestStreak}회</b>`);
-    $('#res-cog-sub').innerHTML = lines.join('<br>');
+    const streak = this.bestStreak >= 2 ? `<b>최고 연속 정답 ${this.bestStreak}회</b>` : '';
+    $('#res-cog-sub').innerHTML = `<div class="rs-table">${rows.join('')}</div>${streak}`;
     $('#save-row').style.display = '';
     $('#btn-log').disabled = false;
     $('#btn-log').textContent = '세션 로그 저장';
     $('#res-name').value = '';
     this.savedId = null;
     this.renderBoard($('#res-board'));
+    this.fillReport($('#result'));
     this.show('result');
     Fx.confetti(1);
     setTimeout(() => $('#res-name').focus(), 50);

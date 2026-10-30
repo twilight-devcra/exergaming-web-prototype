@@ -246,26 +246,12 @@ const Demo = {
     const cfg = a.cfg;
     const m = a.meter;
     const no = sim ? 0 : this.nextSeq();
-    const abil = Abilities.compute(a.stats);
-    const best = Abilities.best(abil);
-    const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
-    const keep = Math.round((a.exScore / exMax) * 100);
-    const kcal = m.kcal;
+    const { abil, kcal } = a.fillReport($('#demo-result'));
 
     $('#dr-id').textContent = sim ? '가상 결과 · 기록 안 됨' : `참가 번호 ${this.label(no)}`;
     $('#dr-id').classList.toggle('sim', sim);
     $('#dr-total').textContent = a.score.toLocaleString('ko-KR');
     $('#dr-break').textContent = `운동 ${a.exScore.toLocaleString('ko-KR')} + 두뇌 게임 ${a.cogScore.toLocaleString('ko-KR')}`;
-    Radar.render($('#dr-radar'), abil.map((x) => x.value), abil);
-    $('#dr-best').innerHTML = best ? `가장 돋보인 능력 <b>${best.name}</b><small>${best.praise}</small>` : '';
-    const dist = Exercise.fmtDist(m.distM);
-    $('#dr-dist').textContent = dist.value;
-    $('#dr-dist-unit').textContent = dist.unit;
-    $('#dr-kcal').textContent = kcal < 10 ? kcal.toFixed(1) : String(Math.round(kcal));
-    $('#dr-revs').textContent = `${Math.round(m.revs).toLocaleString('ko-KR')}바퀴`;
-    $('#dr-time').textContent = U.fmtTime(m.activeSec);
-    $('#dr-rpm').textContent = `${Math.round(m.avgRpm)} RPM`;
-    $('#dr-keep').textContent = `${keep}%`;
     Fx.confetti(1.2);
     if (sim) return a.show('demo-result');
 

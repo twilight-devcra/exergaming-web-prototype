@@ -1173,7 +1173,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .lad-trace.wrong { stroke: var(--bad); }
 
 /* ---------- 측정 화면 ---------- */
-#calib, #result {
+#calib {
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -1181,7 +1181,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   text-align: center;
   padding: 32px;
 }
-#calib > h2, #result > h2 { margin: 0; font-size: 34px; }
+#calib > h2 { margin: 0; font-size: 34px; }
 #calib p { margin: 0; font-size: 20px; color: var(--ink-soft); line-height: 1.6; }
 .calib-ring { position: relative; width: 220px; height: 220px; margin: 12px 0; }
 .calib-ring svg { width: 100%; height: 100%; }
@@ -1201,18 +1201,40 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .calib-ring .pedal { fill: var(--accent); }
 .calib-state { height: 28px; font-size: 18px; font-weight: 700; color: var(--accent); }
 
-/* ---------- 결과 ---------- */
-.result-total { font-size: 96px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(240px, 1fr));
-  gap: 14px;
-  margin: 8px 0;
+/* ---------- 결과 (테스트) ----------
+   시연 결과(#demo-result)의 머리 줄·카드(.dr-*)를 그대로 쓰고, 카드를 넷(점수 · 두뇌 그래프 · 운동량 · 순위)으로 늘린다.
+   카드 한 줄이 화면 높이에 맞춰 줄어들어 스크롤이 생기지 않는다 */
+#result {
+  flex-direction: column;
+  gap: clamp(10px, 2vh, 18px);
+  padding: clamp(14px, 3vh, 28px) clamp(16px, 3vw, 40px);
 }
-.result-card { background: var(--panel); border-radius: var(--radius); padding: 16px 20px; text-align: left; }
-.result-card h3 { margin: 0 0 8px; font-size: 15px; color: var(--ink-soft); font-weight: 600; }
-.result-card .v { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.result-card .sub { font-size: 14px; color: var(--ink-soft); margin-top: 4px; line-height: 1.6; }
+#result .dr-title { margin: 0; }
+#result .dr-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.95fr) minmax(0, 0.85fr); }
+#result :is(.rs-split dd, .dr-facts dd) { white-space: nowrap; }
+#result .dr-total { font-size: clamp(48px, 10vh, 96px); }
+.rs-score { gap: clamp(8px, 1.4vh, 12px); }
+.rs-split { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: clamp(14px, 2.2vh, 17px); }
+.rs-split dt { color: var(--ink-soft); }
+.rs-split dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.rs-split b { font-weight: 800; }
+.rs-split small { color: var(--ink-soft); }
+/* 이번 라운드에 나온 게임마다 한 줄. 게임이 많아도 카드 안에서 줄어들지 않게 글자를 작게 둔다 */
+.rs-games {
+  min-height: 0;
+  overflow: hidden;
+  padding-top: clamp(6px, 1.2vh, 10px);
+  border-top: 1px solid var(--bg);
+  font-size: clamp(11px, 1.65vh, 14px);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.rs-games b { display: block; margin-top: 4px; color: var(--accent); }
+.rs-table { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 0 8px; font-variant-numeric: tabular-nums; }
+.rs-table span { white-space: nowrap; text-align: right; }
+.rs-table .g { overflow: hidden; text-overflow: ellipsis; text-align: left; color: var(--ink); }
+.rs-rank { gap: clamp(8px, 1.4vh, 12px); }
+.rs-rank .board-list { min-height: 0; overflow: hidden; }
 .save-row { display: flex; gap: 10px; }
 .save-row input {
   padding: 12px 14px;
@@ -1222,7 +1244,14 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   font-size: 18px;
   width: 220px;
 }
+.rs-rank .save-row input { flex: 1; min-width: 0; width: auto; font-size: 16px; padding: 10px 12px; }
+.rs-rank .save-row .btn { padding-left: 16px; padding-right: 16px; }
+.rs-rank .board-list li small { display: none; }   /* 라운드 길이 (5:00) 는 메뉴의 순위에만. 여기서는 이름 자리를 남긴다 */
 .result-actions { display: flex; gap: 12px; }
+/* 세로로 세운 좁은 화면: 두 줄로 접는다 */
+@media (max-width: 900px) {
+  #result .dr-grid { grid-template-columns: 1fr 1fr; overflow-y: auto; }
+}
 
 /* ---------- 연출 효과 / 스타일 알림 ---------- */
 #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
@@ -1273,10 +1302,6 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   white-space: pre;
 }
 #debug.active { display: block; }
-
-#result { overflow-y: auto; justify-content: flex-start; }
-#result > :first-child { margin-top: auto; }
-#result > :last-child { margin-bottom: auto; }
 
 .menu-links { display: flex; justify-content: space-between; margin-top: -14px; }
 .menu-links .debug-link { margin-top: 0; }

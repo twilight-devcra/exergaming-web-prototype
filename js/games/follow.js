@@ -2,7 +2,8 @@
 // 기계의 조작판. 판의 화면에 짧은 지시가 뜨고, 그대로 버튼을 누르거나 스위치를 켠다. 한 게임에 지시 3개.
 // 조작판 (단계마다 줄이 늘어난다. 지시마다 그림 배치는 새로 섞는다):
 //   램프   — A·B·C 글자가 쓰인 불. 켜져 있으면 밝게 빛난다 (있으면·없으면 지시에서만 켜진다)
-//   스위치 — 1·2·3… 번호판이 붙은 스위치. 누르면 위로 올라가 켜진다 (ON). 한 번 켜면 끄지 않는다
+//   스위치 — 1·2·3… 번호판이 붙은 로커 스위치 (위 ON · 아래 OFF). 누르면 ON 쪽이 눌리고 불이 들어온다. 한 번 켜면 끄지 않는다
+//            (웹 토글처럼 생긴 스위치는 무엇을 봐야 할지 몰랐다: 실제 스위치처럼 그린다)
 //   버튼   — 그림이 그려진 둥근 버튼
 // 조작마다 이름 붙이는 방법이 다르다 (버튼은 그림 · 스위치는 번호 · 램프는 글자). 모두 그림이면
 // "별 스위치" 를 읽고 별 버튼을 누르는 식으로 헷갈린다 (2026-10-30 시연 의견).
@@ -140,7 +141,7 @@ class FollowGame {
       return { el, face: el.firstChild, state: el.querySelector('.cp-state') };
     }, mid);
     row('cp-switches', switches, 's', (i) => {
-      const el = U.el('div', 'cp-switch', `<span class="cp-on">ON</span><div class="cp-track"><i></i></div><div class="cp-plate">${i + 1}</div>`);
+      const el = U.el('div', 'cp-switch', `<div class="cp-rocker"><i><b>ON</b><b>OFF</b></i></div><div class="cp-plate">${i + 1}</div>`);
       return { el, face: el.querySelector('.cp-plate') };
     }, mid);
     if (mid.children.length) this.panel.append(mid);

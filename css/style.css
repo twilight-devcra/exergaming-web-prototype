@@ -923,6 +923,44 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .dg-cp-txt { fill: #c4ffdc; font-weight: 700; }
 .dg-cp-btn { fill: #e9edf2; stroke: #232a33; stroke-width: 3; }
 
+/* 상자 속 과일 세기: 테두리 두른 칸 가운데의 검은 상자. 과일은 한 줄로 칸 끝에서 밀려 들어와 상자 뒤로 사라지고, 나와서 칸 끝 밖으로 나간다.
+   상자가 열리면(.open) 속이 보인다 */
+.bx-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+.bx-arena { display: block; overflow: hidden; touch-action: none; }
+.bx-field { fill: var(--panel); }
+.bx-frame { fill: none; stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 2; }
+.bx-ground { stroke: var(--line); stroke-width: 1.5; }
+.bx-shell { fill: #23272f; stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 1.5; transition: fill-opacity 0.25s; }
+.bx-q { fill: rgba(255, 255, 255, 0.28); font-size: 40px; font-weight: 800; font-family: var(--font-num); transition: opacity 0.25s; }
+.bx-box.open .bx-shell { fill-opacity: 0.08; stroke-dasharray: 5 4; }
+.bx-box.open .bx-q { opacity: 0; }
+/* 과일이 들어가고 나올 때: 상자가 바닥을 딛고 살짝 눌렸다 돌아오고, 지나간 가장자리에서 옅은 고리가 퍼진다 */
+.bx-box { transform-box: fill-box; transform-origin: 50% 100%; }
+.bx-box.fx-in { animation: bx-gulp-in 0.26s ease-out; }
+.bx-box.fx-out { animation: bx-gulp-out 0.26s ease-out; }
+@keyframes bx-gulp-in { 35% { transform: scale(1.05, 0.95); } }
+@keyframes bx-gulp-out { 35% { transform: scale(0.96, 1.04); } }
+.bx-ring { fill: none; stroke: var(--accent); stroke-width: 2.5; transform-box: fill-box; transform-origin: center; animation: bx-ring 0.45s ease-out forwards; pointer-events: none; }
+@keyframes bx-ring { from { opacity: 0.55; transform: scale(0.6); } to { opacity: 0; transform: scale(1.5); } }
+@media (prefers-reduced-motion: reduce) {
+  .bx-box.fx-in, .bx-box.fx-out { animation: none; }
+}
+.bx-box.asked .bx-shell { stroke: var(--accent); stroke-width: 3; }
+/* 과일 그림의 자리는 transform 속성으로 정하므로 css transform 을 쓰는 pop 대신 흐려졌다 나타나게만 */
+.bx-in > g { animation: bx-in 0.2s ease-out both; }
+@keyframes bx-in { from { opacity: 0; } }
+.bx-opts { min-height: clamp(72px, 12vh, 104px); }
+.bx-opt { animation: pop 0.18s ease-out; }
+.bx-opt svg { width: 66%; height: 66%; display: block; margin: auto; }
+.bx-opt:disabled:not(.right, .wrong, .answer) { opacity: 0.25; }
+.bx-opt.right { background: var(--good); color: var(--on-accent); opacity: 1; }
+/* 질문 속 과일 그림 */
+.bx-ico { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: -0.4em; margin: 0 0.05em; }
+/* 소개 그림 */
+.dg-bx { fill: #23272f; stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 1.5; }
+.dg-bx-q { fill: rgba(255, 255, 255, 0.4); font-weight: 800; }
+.dg-bx-arrow { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+
 /* 짝 없는 것 찾기: 빨랫줄의 양말 */
 .pr-wrap { display: flex; align-items: center; justify-content: center; }
 .pr-board { display: block; touch-action: none; overflow: visible; }

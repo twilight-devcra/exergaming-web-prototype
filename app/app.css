@@ -225,3 +225,97 @@ body[data-theme="scenic"] {
   .att-visual { width: min(70vw, 40vh); }
   .att-main { flex: none; }
 }
+
+/* ================= 세션 설정 화면 ================= */
+/* 운동 시간 세 칸, 난이도 세 칸, 시작 버튼. 어르신이 누르기 쉽게 칸을 크게 */
+#setup {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: clamp(18px, 3.6vh, 34px);
+  padding: 32px clamp(32px, 7vw, 120px);
+  background:
+    radial-gradient(ellipse 60% 50% at 8% 108%, color-mix(in srgb, var(--hill-far) 45%, transparent), transparent 70%),
+    var(--bg);
+}
+.su-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.su-head h2 { margin: 0; font-size: clamp(28px, 5.4vh, 44px); font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.su-back {
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  font: 500 clamp(17px, 2.6vh, 20px) var(--font);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.su-group h3 { margin: 0 0 clamp(8px, 1.4vh, 12px); font-size: clamp(17px, 2.6vh, 20px); font-weight: 700; color: var(--ink-soft); }
+.su-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(12px, 1.6vw, 20px); }
+.su-opt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: clamp(16px, 3vh, 26px) clamp(18px, 2vw, 28px);
+  border: 3px solid transparent;
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
+  font-family: var(--font);
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.su-opt:active { transform: scale(0.98); }
+.su-opt b { font-size: clamp(26px, 5vh, 40px); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; }
+.su-opt small { font-size: clamp(15px, 2.4vh, 19px); font-weight: 500; color: var(--ink-soft); }
+.su-opt.on { border-color: var(--accent); background: var(--accent-soft); }
+.su-opt.on::after {
+  content: '✓';
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+/* 난이도 막대: 편안하게 1칸 · 보통 2칸 · 도전 3칸 */
+.su-bars { display: flex; align-items: flex-end; gap: 4px; height: 26px; margin-bottom: 6px; }
+.su-bars span { width: 9px; border-radius: 3px; background: var(--line); }
+.su-bars span:nth-child(1) { height: 40%; }
+.su-bars span:nth-child(2) { height: 70%; }
+.su-bars span:nth-child(3) { height: 100%; }
+.su-bars[data-n="1"] span:nth-child(-n+1),
+.su-bars[data-n="2"] span:nth-child(-n+2),
+.su-bars[data-n="3"] span:nth-child(-n+3) { background: var(--good); }
+.su-foot { display: flex; align-items: center; gap: 24px; margin-top: clamp(4px, 1vh, 10px); }
+.su-go {
+  padding: clamp(18px, 3vh, 24px) clamp(56px, 7vw, 88px);
+  font-size: clamp(22px, 4vh, 32px);
+  border-radius: 20px;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.su-sum { font-size: clamp(16px, 2.5vh, 19px); color: var(--ink-soft); }
+@media (max-width: 860px), (max-aspect-ratio: 1/1) {
+  .su-opt b { font-size: 26px; }
+  .su-foot { flex-direction: column; align-items: flex-start; }
+}
+
+/* 운영 메뉴: 라운드 길이와 미니게임 난이도는 참가자가 세션 설정에서 고르므로 라운드 설정에서 감춘다 */
+#op-set-fields label:has(#op-set-preset),
+#op-set-preset-note,
+#op-set-fields label:has(:is([data-key="durationSec"], [data-key="difficulty"], [data-key="startLevel"], [data-key="maxLevel"], [data-key="diffUp"], [data-key="diffDown"], [data-key="questionTimeScale"])) { display: none; }
+#op-set-fields .setting.preset > :is(input, select) { background: var(--panel); border-color: var(--line); }
+.op-upload { margin-top: 18px; display: flex; flex-direction: column; gap: 4px; }
+.op-upload h2 small { font-size: 14px; font-weight: 500; color: var(--ink-soft); }
+.op-upload .setting { flex-direction: column; align-items: stretch; gap: 4px; padding: 4px 0; }
+.op-upload input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font: 15px var(--font); }
+.op-upload .btn { align-self: flex-start; margin-top: 6px; }

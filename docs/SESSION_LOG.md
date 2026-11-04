@@ -1,7 +1,9 @@
 # 세션 로그 형식
 
 한 판(속도 측정 ~ 결과)의 기록 형식입니다. 만드는 코드는 `js/session-log.js`, 기록하는 곳은 `js/main.js`(판 흐름·입력 장치)와 `js/games/*.js`(문제·답)입니다.
-형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **1** 입니다.
+형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **2** 입니다 (2: `meta.edition` · `device` · `session` 을 더함).
+
+시연·운영 버전은 저장한 세션을 서버로 자동 업로드할 수도 있습니다 — 아래 [업로드](#업로드).
 
 ## 파일 얻기
 
@@ -34,8 +36,11 @@
 
 | 필드 | 내용 |
 |---|---|
-| `version` | 형식 버전 (지금 1) |
-| `id` | 기록 시작 시각 (epoch ms, 문자열). IndexedDB 의 키 |
+| `version` | 형식 버전 (지금 2) |
+| `id` | 기록 시작 시각 (epoch ms, 문자열). IndexedDB 의 키. 태블릿 안에서만 겹치지 않는다 |
+| `device` | 태블릿(브라우저)마다 처음 한 번 만드는 고유 번호 (UUID, localStorage `exergame.device`). 서버에서는 `device` + `id` 가 세션 하나 |
+| `edition` | `prototype` (index.html) \| `app` (운영 버전 app/) |
+| `session` | 운영 버전만. 참가자가 세션 설정 화면에서 고른 `{ min, difficulty }` (`difficulty`: `relax` · `normal` · `challenge`). 이것으로 정해진 값은 `config` 에 들어 있다 (`Config.session`) |
 | `mode` | `test` \| `demo` |
 | `station`, `participant` | 시연 모드의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |
 | `startedAt`, `endedAt` | ISO 시각 |
@@ -72,7 +77,7 @@
 | `type` | 추가 필드 | 언제 |
 |---|---|---|
 | `calib_start` | | 속도 측정 화면이 열림 (기록 시작) |
-| `start` | `via`: `tap` \| `pedal` | 시연 모드만. 대기 화면에서 무엇으로 시작했나 (`calib_start` 바로 뒤) |
+| `start` | `via`: `tap` \| `pedal`, 운영 버전은 `session` | 시연 모드만. 대기 화면에서 무엇으로 시작했나 (`calib_start` 바로 뒤) |
 | `calib_pedaling` | | 측정 중 처음 밟음 (측정 시간이 여기서부터 흐른다) |
 | `calib_end` | `baseline`, `measured`, `samples`, `fallback` | 측정 끝. `measured` 가 `config.minRpm` 보다 낮으면 `fallback: true` 이고 `baseline` 은 대체값. 이어서 3초 카운트다운 |
 | `play_start` | | 카운트다운 끝 (GO) |
@@ -241,3 +246,17 @@ for e in E:
 ```
 
 시연 모드 내보내기(`.jsonl`)는 한 줄씩 `json.loads` 하면 위와 같은 객체입니다.
+
+## 업로드
+
+시연·운영 버전은 판이 끝나 태블릿에 저장한 세션을 서버로도 보냅니다 (`js/session-upload.js`). 업로드 주소가 비어 있으면 보내지 않습니다.
+
+- **주소·키 정하기**: 운영 메뉴의 **자동 업로드** (태블릿마다 저장), 또는 `js/config.js` 의 `SESSION_UPLOAD` (모든 태블릿의 기본값)
+- **요청**: 세션 하나에 `POST <주소>` 한 번. 본문은 이 문서의 세션 객체 그대로 (`Content-Type: application/json`). 키를 적었으면 `Authorization: Bearer <키>`
+- **성공**: 서버가 2xx 로 답하면 태블릿에 '보냄'으로 적습니다 (IndexedDB `exergame-sessions` 의 `uploaded`). 태블릿의 세션 자체는 지우지 않으므로 전체 내보내기도 그대로 됩니다
+- **실패**: 2xx 가 아니거나 연결이 안 되면 멈췄다가 30초 → 1분 → 2분 … 최대 10분 간격으로 다시 시도합니다. 인터넷이 다시 연결될 때, 5분마다, 새 판이 끝날 때, 운영 메뉴의 **지금 보내기** 를 누를 때도 다시 봅니다. 오래된 세션부터 하나씩 보냅니다
+- **같은 세션이 두 번 올 수 있습니다**: 서버가 받고 답하기 전에 연결이 끊기면 다시 보냅니다. 서버는 `meta.device` + `meta.id` 를 키로 덮어써 주세요
+- **CORS**: 페이지가 `https://twilight-devcra.github.io` 에서 열리므로 서버는 그 출처의 `POST` 와 `Content-Type`·`Authorization` 헤더를 허락해야 합니다 (`OPTIONS` 사전 요청에 답해야 함)
+- **키**: 페이지 코드는 누구나 볼 수 있으므로 키는 '세션을 올리기만 할 수 있는' 것으로 만듭니다 (읽기·지우기 권한 없이)
+- **크기**: 페달로 5분 한 판에 약 0.6 MB, 15분이면 약 2 MB (대부분 `capd`)
+- 업로드 기능을 켜기 전에 태블릿에 쌓인 세션(같은 주소의 프로토타입 시연 모드 것 포함)도 함께 올라갑니다. 예전 세션에는 `device`·`edition` 이 없습니다

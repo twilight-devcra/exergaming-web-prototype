@@ -97,6 +97,27 @@ const ROUND_PRESETS = [
   },
 ];
 
+// ---------------- 운영 버전(app/): 참가자가 고르는 세션 설정 ----------------
+// 대기 화면 다음의 '세션 설정' 화면에서 운동 시간과 난이도를 고른다. 모두 Lv1 에서 시작하고,
+// 정답 하나에 오르는 폭(diffUp)은 고른 시간과 난이도로 정한다:
+//   다 맞히는 사람이 세션의 climb 비율만큼 지났을 때 그 난이도의 최고 레벨(maxLevel)에 닿도록
+//   diffUp = (maxLevel - 1) / (분당 답 수 × 분 × climb)
+// 그래서 15분 세션은 5분 세션보다 한 단계씩 천천히 오른다 (긴 세션이 앞부분에서 최고 난이도에 닿아 버리지 않게).
+// hold = 레벨이 제자리에 머무는 정답률. 이보다 잘 맞히면 오르고 못 맞히면 내려간다 (diffDown 을 여기서 정한다).
+// 다른 값(페달 허용 구역, 점수 등)은 운영 메뉴의 '라운드 설정'을 따른다.
+const SESSION_LENGTHS = [
+  { min: 5, label: '5분', desc: '가볍게 한 번' },
+  { min: 10, label: '10분', desc: '꾸준한 운동' },
+  { min: 15, label: '15분', desc: '충분한 운동' },
+];
+const SESSION_DIFFICULTIES = [
+  { id: 'relax', label: '편안하게', desc: '난이도가 천천히 올라요', maxLevel: 5, climb: 0.9, hold: 0.8, questionTimeScale: 1.3 },
+  { id: 'normal', label: '보통', desc: '알맞은 속도로 올라요', maxLevel: 7, climb: 0.7, hold: 0.67, questionTimeScale: 1.1 },
+  { id: 'challenge', label: '도전', desc: '난이도가 빠르게 올라요', maxLevel: 8, climb: 0.5, hold: 0.55, questionTimeScale: 1 },
+];
+const SESSION_DEFAULT = { min: 10, difficulty: 'normal' }; // 화면을 열 때 미리 골라 둔 것
+const SESSION_ANSWERS_PER_MIN = 10; // 분당 답 수 어림값 (게임 하나에 문제 3개, 대개 10초 안팎 — docs/DEMO_BRIEF.md 'Round pacing')
+
 // 시연 행사 스테이션 모드(index.html?demo)의 설정. 테스트 화면의 localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것을 덮는다.
 // 그 위에 운영 메뉴의 '라운드 설정'(DEMO_SETTINGS 의 항목만)을 태블릿마다 저장해 덮는다.
 // 상품을 걸고 점수를 비교하므로 모든 스테이션이 같은 설정이어야 한다 — 운영 메뉴의 설정 코드(Config.demoCode)로 맞춰 본다.
@@ -125,6 +146,11 @@ const DEMO_SETTINGS = [
   { key: 'rpmChangeAmount', label: '오르막·내리막 목표 속도 변화 (%)', min: 0, max: 40, step: 1, scale: 100 },
 ];
 const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
+
+// 끝난 세션을 보낼 서버 (js/session-upload.js). 여기에 적으면 모든 태블릿의 기본값이 되고,
+// 운영 메뉴의 '자동 업로드'에 적은 값이 태블릿마다 이것을 덮는다. url 이 비어 있으면 업로드하지 않는다.
+// 주의: 이 파일은 누구나 볼 수 있으므로 key 에는 '업로드만 할 수 있는' 키를 넣는다.
+const SESSION_UPLOAD = { url: '', key: '' };
 
 // 스테이션 모드에서 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력)
 const DEMO_OPERATOR_PIN = '2580';
@@ -182,6 +208,22 @@ const Config = {
   },
   presetNotes() {
     return [...ROUND_PRESETS.map((p) => this.presetNote(p.id)), PRESET_CUSTOM_NOTE];
+  },
+  // 운영 버전의 세션 설정(시간·난이도)으로 바뀌는 값. 운영 메뉴의 라운드 설정 위에 덮는다
+  session(min, difficultyId) {
+    const d = SESSION_DIFFICULTIES.find((x) => x.id === difficultyId) || SESSION_DIFFICULTIES[1];
+    const r4 = (v) => Math.round(v * 10000) / 10000;
+    const diffUp = r4((d.maxLevel - 1) / (SESSION_ANSWERS_PER_MIN * min * d.climb));
+    return {
+      durationSec: min * 60,
+      difficulty: 'adaptive',
+      startLevel: 1,
+      maxLevel: d.maxLevel,
+      diffUp,
+      diffDown: r4((diffUp * d.hold) / (1 - d.hold)),
+      diffGamesRef: 0, // 켜 둔 게임 수로 폭을 줄이지 않는다 (오르는 빠르기를 위 식이 이미 정한다)
+      questionTimeScale: d.questionTimeScale,
+    };
   },
   // 쉬운 단계를 더하기 전에 저장한 시작 난이도는 같은 문제가 나오도록 번호를 옮긴다
   migrateLevel(saved) {

@@ -9,7 +9,7 @@
 // 시각 t 는 기록 시작부터의 ms (실제 시간), clock 은 게임 시계 ms (일시정지 동안 멈춘다).
 // 테스트 화면은 결과 화면의 버튼으로 내려받고, 시연 모드는 판이 끝날 때마다 태블릿(IndexedDB)에 저장한다.
 class SessionLog {
-  static VERSION = 1;
+  static VERSION = 2;
   static SAMPLE_SEC = 0.1;
 
   constructor(app) {
@@ -28,6 +28,8 @@ class SessionLog {
       rpmSource: app.cfg.rpmSource,
       userAgent: navigator.userAgent,
       screen: [window.innerWidth, window.innerHeight],
+      edition: typeof EDITION !== 'undefined' ? EDITION : null, // prototype | app
+      device: SessionLog.deviceId(), // 태블릿마다 하나. id 는 태블릿 안에서만 겹치지 않으므로 서버에서는 device + id 로 구분한다
       config: JSON.parse(JSON.stringify(app.cfg)),
       preset: Config.presetOf(app.cfg), // 라운드 난이도 프리셋 (값을 하나라도 고쳤으면 custom)
       formats: {
@@ -48,6 +50,21 @@ class SessionLog {
     this.qn = 0;
     this.sampleAcc = 0;
     this.done = false;
+  }
+
+  // 이 태블릿(브라우저)의 고유 번호. 처음 한 번 만들어 저장한다
+  static deviceId() {
+    const KEY = 'exergame.device';
+    try {
+      let id = localStorage.getItem(KEY);
+      if (!id) {
+        id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+        localStorage.setItem(KEY, id);
+      }
+      return id;
+    } catch (e) {
+      return null;
+    }
   }
 
   now() {
@@ -147,8 +164,13 @@ const SessionStore = {
   open() {
     if (!this.db) {
       this.db = new Promise((res, rej) => {
-        const r = indexedDB.open('exergame-sessions', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('sessions', { keyPath: 'meta.id' });
+        // 2: 서버로 보낸 세션의 id 를 적어 두는 uploaded 를 더했다 (js/session-upload.js)
+        const r = indexedDB.open('exergame-sessions', 2);
+        r.onupgradeneeded = () => {
+          const db = r.result;
+          if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'meta.id' });
+          if (!db.objectStoreNames.contains('uploaded')) db.createObjectStore('uploaded', { keyPath: 'id' });
+        };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
       });
@@ -158,11 +180,11 @@ const SessionStore = {
     return this.db;
   },
 
-  async run(mode, fn) {
+  async run(mode, fn, store = 'sessions') {
     const db = await this.open();
     return new Promise((res, rej) => {
-      const tx = db.transaction('sessions', mode);
-      const req = fn(tx.objectStore('sessions'));
+      const tx = db.transaction(store, mode);
+      const req = fn(tx.objectStore(store));
       tx.oncomplete = () => res(req && req.result);
       tx.onerror = () => rej(tx.error);
     });
@@ -174,6 +196,23 @@ const SessionStore = {
 
   count() {
     return this.run('readonly', (s) => s.count());
+  },
+
+  get(id) {
+    return this.run('readonly', (s) => s.get(id));
+  },
+
+  keys() {
+    return this.run('readonly', (s) => s.getAllKeys());
+  },
+
+  // 업로드 (js/session-upload.js): 서버가 받았다고 답한 세션
+  uploadedKeys() {
+    return this.run('readonly', (s) => s.getAllKeys(), 'uploaded');
+  },
+
+  markUploaded(id) {
+    return this.run('readwrite', (s) => s.put({ id, at: new Date().toISOString() }), 'uploaded');
   },
 
   // 한 줄에 세션 하나 (JSON Lines). 큰 문자열 하나로 합치지 않고 조각째 Blob 으로 넘긴다

@@ -6,6 +6,7 @@ const Demo = {
   IDLE_SEC: 40,          // 라운드 중 페달도 터치도 없이 이만큼 지나면 '아직 하고 계신가요?'
   IDLE_GRACE_SEC: 15,    // 그 안내 뒤 이만큼 더 지나면 라운드를 끝내고 결과를 보여준다
   CALIB_IDLE_SEC: 60,    // 측정 화면에서 페달을 밟지 않고 이만큼 지나면 대기 화면으로 돌아간다
+  SETUP_IDLE_SEC: 60,    // 세션 설정 화면(운영 버전)에서 누르지도 밟지도 않고 이만큼 지나면 대기 화면으로 돌아간다
   PEDAL_START_SEC: 2.5,  // 대기 화면에서 이만큼 계속 밟으면 시작
   ATTRACT_LOCK_SEC: 4,   // 대기 화면이 뜬 직후에는 페달로 시작하지 않는다 (앞 참가자가 아직 밟고 있을 수 있다)
   RPM_ACTIVE: 10,        // 이보다 빠르면 '밟고 있다'로 본다
@@ -38,6 +39,8 @@ const Demo = {
     this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
     if (!this.preview && $('#att-radar')) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
+    this.bindSetup();
+    this.bindUpload();
     this.bindPin();
     this.bindHolds();
     this.bindGuards();
@@ -103,15 +106,93 @@ const Demo = {
   },
 
   // via: tap(화면을 눌러서) | pedal(페달을 밟아서)
+  // 운영 버전은 먼저 세션 설정 화면에서 시간과 난이도를 고른다
   start(via = 'tap') {
     const a = this.app;
     if (a.state !== 'attract' || this.opOpen || this.pinOpen || !this.canStart()) return;
     this.enterKiosk();
     if (this.simResult) return this.simulateRound();
+    if ($('#setup')) return this.openSetup(via);
+    this.beginRound(via);
+  },
+
+  beginRound(via, session = null) {
+    const a = this.app;
+    if (session) Object.assign(a.cfg, Config.session(session.min, session.difficulty));
     a.startRound();
     a.log.meta.station = this.station;
-    a.log.ev('start', { via });
+    if (session) a.log.meta.session = { ...session };
+    a.log.ev('start', { via, ...(session ? { session } : {}) });
     this.activeAt = a.clock;
+    this.renderCfg();
+  },
+
+  // ---------------- 세션 설정 (운영 버전) ----------------
+  bindSetup() {
+    if (!$('#setup')) return;
+    const tile = (attrs, title, desc, extra = '') =>
+      `<button class="su-opt" ${attrs}>${extra}<b>${title}</b><small>${desc}</small></button>`;
+    $('#su-len').innerHTML = SESSION_LENGTHS.map((l) => tile(`data-min="${l.min}"`, l.label, l.desc)).join('');
+    $('#su-diff').innerHTML = SESSION_DIFFICULTIES.map((d, i) =>
+      tile(`data-diff="${d.id}"`, d.label, d.desc, `<i class="su-bars" data-n="${i + 1}"><span></span><span></span><span></span></i>`)).join('');
+    $('#setup').addEventListener('pointerdown', () => (this.activeAt = this.app.clock));
+    $('#su-len').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-min]');
+      if (b) this.pickSetup({ min: +b.dataset.min });
+    });
+    $('#su-diff').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-diff]');
+      if (b) this.pickSetup({ difficulty: b.dataset.diff });
+    });
+    $('#su-back').onclick = () => this.app.show('attract');
+    $('#su-go').onclick = () => {
+      if (this.app.state !== 'setup' || this.opOpen || this.pinOpen) return;
+      this.beginRound(this.setupVia, this.setup);
+    };
+  },
+
+  openSetup(via) {
+    const a = this.app;
+    this.setupVia = via;
+    this.setup = { ...SESSION_DEFAULT };
+    this.pickSetup({});
+    a.show('setup');
+    a.state = 'setup';
+    this.activeAt = a.clock;
+  },
+
+  pickSetup(change) {
+    Object.assign(this.setup, change);
+    const { min, difficulty } = this.setup;
+    document.querySelectorAll('#su-len [data-min]').forEach((b) => b.classList.toggle('on', +b.dataset.min === min));
+    document.querySelectorAll('#su-diff [data-diff]').forEach((b) => b.classList.toggle('on', b.dataset.diff === difficulty));
+    const d = SESSION_DIFFICULTIES.find((x) => x.id === difficulty);
+    $('#su-sum').textContent = `${min}분 · ${d ? d.label : ''} · 페달 속도를 잰 뒤 시작합니다`;
+  },
+
+  // ---------------- 자동 업로드 (js/session-upload.js) ----------------
+  bindUpload() {
+    SessionUpload.onChange = (state, set) => {
+      const el = $('#op-up-state');
+      if (el) el.textContent = SessionUpload.describe(state, set);
+    };
+    SessionUpload.init();
+    if (!$('#op-up-url')) return;
+    const save = () => SessionUpload.setSettings({ url: $('#op-up-url').value, key: $('#op-up-key').value });
+    $('#op-up-url').addEventListener('change', save);
+    $('#op-up-key').addEventListener('change', save);
+    $('#op-up-now').onclick = () => {
+      save();
+      SessionUpload.kick();
+    };
+  },
+
+  renderUpload() {
+    if (!$('#op-up-url')) return;
+    const { url, key } = SessionUpload.settings();
+    $('#op-up-url').value = url;
+    $('#op-up-key').value = key;
+    SessionUpload.refresh();
   },
 
   // 라운드를 돌리지 않고 그럴듯한 성적을 채워 결과 화면을 연다. 참가 번호를 쓰지 않고 기록에도 남기지 않는다.
@@ -175,6 +256,8 @@ const Demo = {
       const ready = (a.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.opOpen && this.canStart();
       this.pedalHold = ready && rpm > this.RPM_ACTIVE ? this.pedalHold + dt : Math.max(0, this.pedalHold - dt);
       if (this.pedalHold >= this.PEDAL_START_SEC) this.start('pedal');
+    } else if (a.state === 'setup') {
+      if ((a.clock - this.activeAt) / 1000 > this.SETUP_IDLE_SEC) a.show('attract');
     } else if (a.state === 'calib') {
       // 시작만 눌러 놓고 자리를 떠난 경우
       if (!a.calib.started && (a.clock - this.activeAt) / 1000 > this.CALIB_IDLE_SEC) a.quit();
@@ -281,7 +364,9 @@ const Demo = {
 
   // ---------------- 세션 로그 (js/session-log.js) ----------------
   storeLog(log) {
-    SessionStore.put(log).catch((e) => (this.storeError = e.message || String(e)));
+    SessionStore.put(log)
+      .then(() => SessionUpload.kick())
+      .catch((e) => (this.storeError = e.message || String(e)));
   },
 
   async renderSessions() {
@@ -354,12 +439,17 @@ const Demo = {
   renderCfg() {
     const c = this.app.cfg;
     $('#att-calib').textContent = `${c.calibrationSec}초`;
-    $('#att-dur').textContent = c.durationSec % 60 ? U.fmtTime(c.durationSec) : `${c.durationSec / 60}분`;
+    // 운영 버전은 참가자가 시간을 고른다
+    $('#att-dur').textContent = $('#setup')
+      ? `${SESSION_LENGTHS[0].min}~${SESSION_LENGTHS[SESSION_LENGTHS.length - 1].min}분`
+      : c.durationSec % 60 ? U.fmtTime(c.durationSec) : `${c.durationSec / 60}분`;
     const changed = Object.keys(Config.demoSaved()).length;
     const preset = Config.preset(Config.presetOf(c));
     $('#op-cfg').innerHTML = `설정 코드 <b>${Config.demoCode(c)}</b>${changed ? ` (기본값에서 ${changed}개 바꿈)` : ' (기본값)'} · ` +
-      `라운드 난이도 ${preset ? preset.label : '직접 설정'} · ` +
-      `라운드 ${U.fmtTime(c.durationSec)} · 측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
+      ($('#setup')
+        ? `라운드 길이·난이도는 참가자가 고름 · `
+        : `라운드 난이도 ${preset ? preset.label : '직접 설정'} · 라운드 ${U.fmtTime(c.durationSec)} · `) +
+      `측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
       '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.';
   },
 
@@ -469,6 +559,7 @@ const Demo = {
     $('#op-close').textContent = a.inRound ? '이어서 진행' : a.state === 'result' || a.state === 'ending' ? '결과 화면으로 돌아가기' : '대기 화면 열기';
     this.renderLog();
     this.renderSessions();
+    this.renderUpload();
     if (a.inRound) a.log.ev('operator', { open: true });
     $('#op').classList.add('active');
     this.syncPause();

@@ -32,6 +32,14 @@ node server.js   # http://localhost:5173
 - 터치는 Edge·Chrome 에서 확인했습니다. Vivaldi 에서는 터치·펜이 게임에 들어가지 않았습니다
 - Android 태블릿은 Chrome 의 **화면 고정(앱 고정)** 을 켜 두면 홈·뒤로 버튼으로 나가는 것까지 막을 수 있습니다
 
+## 운영 버전 (체육관 설치용)
+
+`app/` — https://twilight-devcra.github.io/exergaming-web-prototype/app/
+
+- 체육관(어르신 운동 센터)에 설치할 다듬은 버전입니다. 열면 바로 시연 모드 흐름(운영 메뉴 → 대기 화면 → 라운드 → 결과)으로 시작하고, 테스트 화면으로 나가는 링크가 없습니다
+- 게임 코드(`js/`, `css/`)는 프로토타입과 같이 씁니다. 운영 버전에서만 바꿀 화면은 `app/index.html` 과 `app/app.css` 에서 다듬습니다. 스크립트에서는 `EDITION === 'app'` 으로 구분합니다
+- 같은 주소(github.io)에서 열리므로 운영 메뉴의 설정·기록은 지금은 프로토타입의 시연 모드와 같은 저장소를 씁니다
+
 ## 세션 로그
 
 한 판(속도 측정 ~ 결과) 동안 일어난 일과 입력 장치의 원시 입력을 기록합니다 (`js/session-log.js`). 형식은 **[docs/SESSION_LOG.md](docs/SESSION_LOG.md)**.

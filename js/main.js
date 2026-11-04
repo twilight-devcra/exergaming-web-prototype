@@ -8,7 +8,9 @@ const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 
 const SHIFT_OUT_MS = 650;    // 화면이 다시 줄어드는 시간. 그 뒤에 다음 인지 게임이 나온다
 
 // index.html?demo — 시연 행사용 스테이션 모드 (js/demo.js). 같은 라운드 흐름에 대기·결과·운영 화면만 바꿔 끼운다.
-const DEMO = new URLSearchParams(location.search).has('demo');
+// 운영 버전(app/index.html, <html data-edition="app">)은 주소에 ?demo 없이도 늘 이 흐름으로 연다.
+const EDITION = document.documentElement.dataset.edition || 'prototype';
+const DEMO = EDITION === 'app' || new URLSearchParams(location.search).has('demo');
 
 const App = {
   demo: DEMO,

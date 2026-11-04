@@ -6,7 +6,8 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const port = process.env.PORT || 5173;
 http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  const file = path.join(__dirname, url === '/' ? 'index.html' : url);
+  // GitHub Pages 처럼 폴더 주소(/, /app/)는 그 안의 index.html 을 연다
+  const file = path.join(__dirname, url.endsWith('/') ? url + 'index.html' : url);
   if (!file.startsWith(__dirname)) return res.writeHead(403).end();
   fs.readFile(file, (err, data) => {
     if (err) return res.writeHead(404).end('not found');

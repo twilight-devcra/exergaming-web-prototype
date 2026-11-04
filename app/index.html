@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko" data-edition="app">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
+  <title>페달 &amp; 브레인</title>
+  <!-- 화면 스타일용 글꼴. 못 받아도 시스템 글꼴로 돌아간다 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Jua&family=Orbitron:wght@700;900&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.9/dist/galmuri.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/themes.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- 메뉴 -->
+  <section id="menu" class="screen active">
+    <div class="menu-main">
+      <h1>페달 &amp; 브레인</h1>
+      <p>일정한 속도로 페달을 밟으면서, 화면 아래 인지 게임을 풀어 점수를 모으세요.</p>
+      <p>
+        페달링: <span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기</span><span class="sensor-only">연결된 페달 센서</span><br>
+        터치: 마우스 클릭<br>
+        일시정지: <kbd>Esc</kbd> · 디버그 표시: <kbd>`</kbd>
+      </p>
+      <div class="pedal-row">
+        <span class="pedal-status"></span>
+        <button class="btn secondary small" data-pedal-btn>페달 연결</button>
+      </div>
+      <div class="menu-links">
+        <a class="debug-link" href="?demo">시연 모드 (스테이션) →</a>
+        <a class="debug-link" href="../pedal-debug.html">센서 디버그 페이지</a>
+      </div>
+      <button class="btn" id="btn-start">시작하기</button>
+      <div class="panel">
+        <h2>순위</h2>
+        <ol class="board-list" id="menu-board"></ol>
+      </div>
+    </div>
+    <!-- 넓은 화면에서는 두 열로 놓아 스크롤 없이 다 보이게 한다 (좁으면 한 열로 스크롤) -->
+    <div class="menu-side">
+      <div class="panel">
+        <h2>라운드 난이도</h2>
+        <label class="setting">프리셋<select id="cfg-preset"></select></label>
+        <p class="setting-note" id="cfg-preset-note"></p>
+        <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
+        <label class="setting">최고 난이도<input type="number" id="cfg-max-level" min="1" step="1"></label>
+        <label class="setting">난이도 방식
+          <select id="cfg-difficulty">
+            <option value="adaptive">정답·오답에 따라</option>
+            <option value="cycle">한 바퀴마다 +1</option>
+          </select>
+        </label>
+        <label class="setting">정답 하나에 난이도 +<input type="number" id="cfg-diff-up" min="0.05" max="2" step="0.05"></label>
+        <label class="setting">오답 하나에 난이도 −<input type="number" id="cfg-diff-down" min="0.05" max="2" step="0.05"></label>
+        <label class="setting">문제 제한 시간 배율<input type="number" id="cfg-qscale" min="0.5" max="3" step="0.05"></label>
+        <label class="setting">난이도 배율 증가폭<input type="number" id="cfg-mult" min="0" max="1" step="0.05"></label>
+        <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
+        <label class="setting" title="목표 속도에서 이만큼 벗어나면 공이 속도 막대 끝에 닿고 운동 점수가 0이 됩니다. 허용 구역 밖에서는 이 값까지 점수가 고르게 줄어듭니다.">편차 한계 (±%)<input type="number" id="cfg-maxdev" min="10" max="100" step="1"></label>
+        <label class="setting">오르막·내리막 속도 변화 (%)<input type="number" id="cfg-change-amt" min="0" max="40" step="1"></label>
+      </div>
+      <div class="menu-col">
+        <div class="panel">
+          <h2>시연 설정</h2>
+          <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
+          <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
+          <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
+          <label class="setting">오르막·내리막<input type="checkbox" id="cfg-change"></label>
+          <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
+          <label class="setting">문제 제한 시간<input type="checkbox" id="cfg-qtimer"></label>
+          <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
+          <label class="setting">속도 측정 방식
+            <select id="cfg-source">
+              <option value="zc">파형 영교차 (권장)</option>
+              <option value="comb">파형 결합</option>
+              <option value="teo">파형 모양</option>
+              <option value="pedal">페달 avg_rpm</option>
+            </select>
+          </label>
+          <p class="setting-note" id="cfg-source-note"></p>
+        </div>
+        <div class="panel">
+          <h2>사용할 게임</h2>
+          <div id="cfg-games"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 편안한 속도 측정 -->
+  <section id="calib" class="screen">
+    <h2>편안한 속도로 페달을 밟아주세요</h2>
+    <p><span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span>를 번갈아 누르세요.</span> 이 속도가 게임의 기준 속도가 됩니다.</p>
+    <div class="calib-ring">
+      <svg viewBox="0 0 220 220">
+        <circle class="track" cx="110" cy="110" r="96" fill="none" stroke-width="14"/>
+        <circle id="calib-arc" cx="110" cy="110" r="96" fill="none" stroke-width="14"
+                stroke-linecap="round" transform="rotate(-90 110 110)" stroke-dasharray="603.2" stroke-dashoffset="603.2"/>
+        <g id="calib-crank">
+          <line class="crank" x1="110" y1="110" x2="110" y2="52" stroke-width="8" stroke-linecap="round"/>
+          <circle class="pedal" cx="110" cy="52" r="10"/>
+        </g>
+      </svg>
+      <div class="num" id="calib-num"></div>
+    </div>
+    <div class="calib-state" id="calib-state"></div>
+  </section>
+
+  <!-- 게임 -->
+  <section id="game" class="screen">
+    <div id="band">
+      <canvas id="band-canvas"></canvas>
+      <div id="shift-msg">
+        <div class="tag">속도 전환</div>
+        <div class="name" id="shift-name"></div>
+        <div class="hint">공이 <b style="color:var(--good)">초록 구역</b>에 들어오도록 페달 속도를 맞추세요</div>
+        <div class="shift-bar"><i id="shift-bar"></i></div>
+      </div>
+      <div id="keyhint"><kbd data-k="KeyA">A</kbd><kbd data-k="KeyD">D</kbd></div>
+    </div>
+    <!-- 속도 전환 구간에 #band가 화면 전체로 커져도 제자리에 있도록 #band 밖에 둔다 -->
+    <div id="band-ui">
+      <div class="hud" id="hud-time"><div class="label">TIME</div><div class="value">0:00</div></div>
+      <div class="hud" id="hud-score"><div class="label">SCORE</div><div class="value">0</div></div>
+      <div id="streak"></div>
+    </div>
+    <div id="cog"></div>
+  </section>
+
+  <!-- 결과 -->
+  <!-- 시연 결과와 같은 짜임: 머리 줄 + 한 화면에 들어가는 카드 한 줄 (넘쳐서 스크롤되지 않게) -->
+  <section id="result" class="screen">
+    <header class="dr-head">
+      <h2 class="dr-title">라운드 종료</h2>
+      <div class="result-actions">
+        <button class="btn" id="btn-again">다시 하기</button>
+        <button class="btn secondary" id="btn-menu">메뉴로</button>
+        <button class="btn secondary" id="btn-log">세션 로그 저장</button>
+      </div>
+    </header>
+    <div class="dr-grid">
+      <div class="dr-card rs-score">
+        <h3>최종 점수</h3>
+        <div class="dr-total" id="res-total">0</div>
+        <dl class="rs-split">
+          <dt>운동</dt><dd><b id="res-ex"></b><small id="res-ex-sub"></small></dd>
+          <dt>인지 게임</dt><dd><b id="res-cog"></b></dd>
+        </dl>
+        <div class="rs-games" id="res-cog-sub"></div>
+      </div>
+      <!-- 두뇌 그래프·운동량 (#tpl-report) -->
+      <div class="rp-slot"></div>
+      <div class="dr-card rs-rank">
+        <h3>순위</h3>
+        <div class="save-row" id="save-row">
+          <input id="res-name" maxlength="12" placeholder="이름">
+          <button class="btn" id="btn-save">등록</button>
+        </div>
+        <ol class="board-list" id="res-board"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 시연(스테이션) 모드 전용: index.html?demo ===== -->
+  <!-- 대기 화면 -->
+  <section id="attract" class="screen">
+    <div class="att-main">
+      <div class="att-brand">페달 &amp; 브레인</div>
+      <h1>페달을 밟으며<br>두뇌를 깨워 보세요</h1>
+      <ol class="att-steps">
+        <li><b>1</b><span>편안한 속도 찾기</span><small id="att-calib"></small></li>
+        <li><b>2</b><span>페달 + 두뇌 게임</span><small id="att-dur"></small></li>
+        <li><b>3</b><span>나의 두뇌 그래프와 점수</span></li>
+      </ol>
+      <button class="btn att-start" id="att-start">시작하기</button>
+      <div class="att-hint" id="att-hint">화면을 누르거나 페달을 밟으면 시작합니다</div>
+    </div>
+    <div class="att-visual">
+      <svg class="radar deco" id="att-radar"></svg>
+    </div>
+    <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span></div>
+  </section>
+
+  <!-- 시연 결과 -->
+  <section id="demo-result" class="screen">
+    <header class="dr-head">
+      <div class="dr-title">수고하셨습니다!</div>
+      <div class="dr-id" id="dr-id"></div>
+    </header>
+    <div class="dr-grid">
+      <div class="dr-card dr-score">
+        <h3>최종 점수</h3>
+        <div class="dr-total" id="dr-total">0</div>
+        <div class="dr-break" id="dr-break"></div>
+        <div class="dr-note">진행 요원에게 이 화면을 보여주세요<br>점수로 행사 마지막에 시상합니다</div>
+      </div>
+      <!-- 두뇌 그래프·운동량 (#tpl-report) -->
+    </div>
+    <button class="hold-btn" id="dr-next"><i></i><span>길게 눌러서 시작 화면으로</span></button>
+  </section>
+
+  <!-- 두뇌 그래프·운동량 카드: 시연 결과와 테스트 결과 화면이 함께 쓴다 (App.fillReport 가 채운다) -->
+  <template id="tpl-report">
+    <div class="dr-card dr-brain">
+      <h3>나의 두뇌 그래프</h3>
+      <svg class="radar rp-radar"></svg>
+      <div class="dr-best rp-best"></div>
+    </div>
+    <div class="dr-card dr-ex">
+      <h3>오늘의 운동량</h3>
+      <div class="dr-stat"><b class="rp-dist">0</b><span class="rp-dist-unit">m</span></div>
+      <div class="dr-stat dr-sub"><b class="rp-kcal">0</b><span>kcal</span></div>
+      <dl class="dr-facts">
+        <dt>밟은 시간</dt><dd class="rp-time"></dd>
+        <dt>페달 회전</dt><dd class="rp-revs"></dd>
+        <dt>평균 속도</dt><dd class="rp-rpm"></dd>
+        <dt>속도 유지</dt><dd class="rp-keep"></dd>
+      </dl>
+      <div class="dr-fine">페달 속도로 어림한 값입니다. 거리는 한 바퀴 6 m, 열량은 운동 강도표(MET)와 체중 65 kg 기준</div>
+    </div>
+  </template>
+
+  <!-- 운영 메뉴 (처음 열 때, 또는 왼쪽 위 모서리 길게 누르기 + PIN) -->
+  <div id="op" class="overlay">
+    <div class="op-box">
+      <div class="op-col">
+        <h2>시연 스테이션</h2>
+        <label class="setting">스테이션 번호<input type="number" id="op-station" min="1" max="99" inputmode="numeric"></label>
+        <div class="pedal-row">
+          <span class="pedal-status"></span>
+          <button class="btn secondary small" data-pedal-btn>페달 연결</button>
+        </div>
+        <label class="setting">화면 스타일<select data-theme-picker></select></label>
+        <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
+        <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
+        <p class="setting-note" id="op-cfg"></p>
+        <button class="btn secondary small" id="op-set-open">라운드 설정</button>
+        <div class="op-round" id="op-round">
+          <p class="op-round-note" id="op-round-note"></p>
+          <button class="btn secondary" id="op-end">지금 끝내고 결과 보기</button>
+          <button class="btn secondary" id="op-abandon">중단하고 대기 화면으로 (기록 안 함)</button>
+        </div>
+        <button class="btn" id="op-close">대기 화면 열기</button>
+        <a class="debug-link" href="#" id="op-exit" hidden>테스트 화면으로 나가기</a>
+      </div>
+      <div class="op-col">
+        <h2>이 태블릿의 기록 <small id="op-log-count"></small></h2>
+        <ol class="op-log" id="op-log"></ol>
+        <button class="btn secondary small" id="op-csv">CSV 저장</button>
+        <div class="op-sessions">
+          <h2>세션 로그 <small id="op-sess-count"></small></h2>
+          <p class="setting-note">판마다 문제·답·걸린 시간과 페달 원시 파형(또는 키 입력)을 이 태블릿에 자동 저장합니다.</p>
+          <button class="btn secondary small" id="op-sess-export">전체 내보내기 (.jsonl)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 운영 메뉴 > 라운드 설정 (DEMO_SETTINGS) -->
+  <div id="op-set" class="overlay">
+    <div class="op-set-box">
+      <h2>라운드 설정 <small id="op-set-code"></small></h2>
+      <p class="setting-note">이 태블릿에 저장되고 다음 판부터 적용됩니다. 점수를 비교하려면 모든 스테이션의 설정 코드가 같아야 합니다.</p>
+      <div class="op-set-fields" id="op-set-fields"></div>
+      <div class="op-set-btns">
+        <button class="btn" id="op-set-save">저장</button>
+        <button class="btn secondary" id="op-set-cancel">취소</button>
+        <button class="btn secondary" id="op-set-reset">기본값으로</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 운영 메뉴 PIN -->
+  <div id="pin" class="overlay">
+    <div class="pin-box">
+      <div class="pin-dots" id="pin-dots"><i></i><i></i><i></i><i></i></div>
+      <div class="pin-pad" id="pin-pad">
+        <button>1</button><button>2</button><button>3</button>
+        <button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button>
+        <button data-k="cancel">취소</button><button>0</button><button data-k="del">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 페달 끊김 / 자리 비움 안내 -->
+  <div id="alert" class="overlay">
+    <div class="alert-box">
+      <div class="alert-title" id="alert-title"></div>
+      <div class="alert-text" id="alert-text"></div>
+    </div>
+  </div>
+  <div id="op-corner"></div>
+  <canvas id="fx"></canvas>
+  <div id="toast"></div>
+
+  <div class="edge left"></div>
+  <div class="edge right"></div>
+
+  <div id="pause">
+    <div class="panel">
+      <h2>일시정지</h2>
+      <div id="pause-note"></div>
+      <button class="btn" id="btn-resume">계속하기</button>
+      <button class="btn secondary" id="btn-quit">메뉴로 나가기</button>
+    </div>
+  </div>
+  <div id="debug"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/pedal.js"></script>
+  <script src="../js/pedal-link.js"></script>
+  <script src="../js/cadence-est.js"></script>
+  <script src="../js/audio.js"></script>
+  <script src="../js/band.js"></script>
+  <script src="../js/exercise.js"></script>
+  <script src="../js/fx.js"></script>
+  <script src="../js/themes.js"></script>
+  <script src="../js/diagram.js"></script>
+  <script src="../js/games/path.js"></script>
+  <script src="../js/games/symbol.js"></script>
+  <script src="../js/games/arith.js"></script>
+  <script src="../js/games/count.js"></script>
+  <script src="../js/games/fit.js"></script>
+  <script src="../js/games/seek.js"></script>
+  <script src="../js/games/cover.js"></script>
+  <script src="../js/games/ladder.js"></script>
+  <script src="../js/games/novel.js"></script>
+  <script src="../js/games/track.js"></script>
+  <script src="../js/games/follow.js"></script>
+  <script src="../js/games/pair.js"></script>
+  <script src="../js/games/box.js"></script>
+  <script src="../js/abilities.js"></script>
+  <script src="../js/session-log.js"></script>
+  <script src="../js/demo.js"></script>
+  <script src="../js/main.js"></script>
+</body>
+</html>

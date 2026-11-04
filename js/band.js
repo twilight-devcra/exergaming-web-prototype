@@ -8,6 +8,7 @@ class Band {
   static MARK_EVERY = 200;   // 깃발 간격 (점)
   static MARK_BIG = 1000;     // 큰 깃발 간격 (점)
   static POP_SEC = 0.5;      // 깃발을 지난 직후 깃발이 커졌다 돌아오는 시간
+  static REGION_SLOTS = 24;  // 풍경 라이딩: 한 풍경 구간의 나무 칸 수 (한 라운드에 서너 구간을 지난다)
 
   constructor(canvas, cfg) {
     this.canvas = canvas;
@@ -25,6 +26,8 @@ class Band {
     this.pop = 0;         // 정답 직후 공이 커졌다 돌아오는 정도 1→0
     this.outAmount = 0;   // 구역 이탈 정도 0~1
     this.rpm = 0;
+    this.time = 0;        // 흐른 시간 (s). 구름·풍차처럼 점수와 상관없이 움직이는 것에 쓴다
+    this.dayT = 0;        // 라운드 진행 0~1. 풍경 라이딩에서 아침 → 해 질 녘 (main.js 가 넣는다)
     // 화면 스타일(js/themes.js)에 따른 색과 그리는 방식. glow = 빛 번짐, pixel = 픽셀 크기, outline = 테두리 두께, speedLines = 공 뒤 속도선
     this.look = {};
     this.pal = Band.readPalette();
@@ -46,6 +49,11 @@ class Band {
       panel: v('--panel'), fontText: v('--font') || 'system-ui, sans-serif',
       // 풍경 라이딩(look.scenic)에서만 쓴다
       sky: v('--sky'), sun: v('--sun'), hillFar: v('--hill-far'), hillNear: v('--hill-near'), tree: v('--tree'), grass: v('--grass'),
+      skyDawn: v('--sky-dawn'), skyGolden: v('--sky-golden'), skyDusk: v('--sky-dusk'),
+      skyLow: v('--sky-low'), skyDawnLow: v('--sky-dawn-low'), skyGoldenLow: v('--sky-golden-low'), skyDuskLow: v('--sky-dusk-low'), sunDusk: v('--sun-dusk'), duskTint: v('--dusk-tint'),
+      cloud: v('--cloud'), cloudDusk: v('--cloud-dusk'), trunk: v('--trunk'), treeRound: v('--tree-round'), fruit: v('--fruit'),
+      wall: v('--wall'), roof: v('--roof'), roofAlt: v('--roof-alt'), window: v('--window'), mill: v('--mill'), blade: v('--blade'), bush: v('--bush'),
+      flowerA: v('--flower-a'), flowerB: v('--flower-b'), flowerC: v('--flower-c'), flowerD: v('--flower-d'),
       zone: v('--zone') || v('--good'), road: v('--road'), roadEdge: v('--road-edge'), roadMark: v('--road-mark'), tipGood: v('--tip-good'), tipWarn: v('--tip-warn'),
     };
   }
@@ -122,6 +130,7 @@ class Band {
     this.rings.forEach((r) => (r.t += dt));
     this.rings = this.rings.filter((r) => r.t < Band.RING_SEC);
     this.pop = Math.max(0, this.pop - dt / 0.4);
+    this.time += dt;
   }
 
   // 화면에 그려진 공 위치에 해당하는 편차
@@ -383,25 +392,83 @@ class Band {
     return s - Math.floor(s);
   }
 
+  // '#rrggbb' 두 색을 t 만큼 섞는다
+  static mix(a, b, t) {
+    const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const [x, y] = [p(a), p(b)];
+    return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`;
+  }
+
+  // 라운드가 흐르는 동안 하루가 지나간다: 아침 → 한낮 → 늦은 오후 → 해 질 녘 (dayT 0~1).
+  // 하늘은 위와 지평선 두 색. 파랑에서 주황으로 바로 섞으면 중간이 잿빛이 되어서, 위는 파랑 계열로 두고 지평선만 물든다
+  skyAt(p) {
+    const { pal } = this;
+    const keys = [[0, pal.skyDawn, pal.skyDawnLow], [0.35, pal.sky, pal.skyLow], [0.72, pal.skyGolden, pal.skyGoldenLow], [1, pal.skyDusk, pal.skyDuskLow]];
+    for (let i = 1; i < keys.length; i++) {
+      if (p <= keys[i][0]) {
+        const [p0, top0, low0] = keys[i - 1];
+        const t = (p - p0) / (keys[i][0] - p0);
+        return [Band.mix(top0, keys[i][1], t), Band.mix(low0, keys[i][2], t)];
+      }
+    }
+    return [pal.skyDusk, pal.skyDuskLow];
+  }
+
+  // 가까운 언덕의 구간 (나무 칸 i 기준). 숲 → 과수원 → 마을 → 풍차 들판을 돈다.
+  // 경계에서는 칸마다 조금씩 섞여서 다음 풍경이 오른쪽에서부터 차츰 들어온다
+  static region(i) {
+    const n = Math.floor((i + Band.hash(i + 3) * 8) / Band.REGION_SLOTS);
+    return ((n % 4) + 4) % 4;
+  }
+
   drawScenic() {
     const { g, W, H, pal } = this;
     const { tolerance, maxDeviation } = this.cfg;
     g.clearRect(0, 0, W, H);
     const scroll = this.dist * Band.PX_PER_POINT;
-    const roadH = U.clamp(H * 0.2, 44, 96);
-    const gy = H - roadH / 2 - Math.min(10, H * 0.03); // 길 한가운데 높이
+    // tall: 속도 전환 구간에 카드가 화면 전체로 커지면 1. 카메라를 낮춰 길을 넓고 높게, 길 아래 풀밭을 보여 준다
+    const tall = U.clamp((H - 340) / 320, 0, 1);
+    const roadH = U.lerp(U.clamp(H * 0.2, 44, 96), H * 0.17, tall);
+    const gy = U.lerp(H - roadH / 2 - Math.min(10, H * 0.03), H * 0.68, tall); // 길 한가운데 높이
     const roadTop = gy - roadH / 2;
     const r = U.clamp(H * 0.12, 14, 30 + Math.max(0, H - 320) * 0.035);
+    const day = U.clamp(this.dayT || 0, 0, 1);
+    const dusk = U.clamp((day - 0.6) / 0.4, 0, 1);
 
-    // 하늘과 해
-    g.fillStyle = pal.sky;
+    // 하늘
+    const [skyTop, skyLow] = this.skyAt(day);
+    const sky = g.createLinearGradient(0, 0, 0, roadTop - H * 0.08);
+    sky.addColorStop(0, skyTop);
+    sky.addColorStop(1, skyLow);
+    g.fillStyle = sky;
     g.fillRect(0, 0, W, H);
-    g.fillStyle = pal.sun;
+    // 해: 낮은 곳에서 떠서 높이 지나 오른쪽 언덕 뒤로 진다. 왼쪽 위 시간 칩과 오른쪽 위 점수 칩 사이로 다닌다
+    const sunR = U.clamp(H * 0.11, 18, 64) * (1 + 0.3 * dusk);
+    const sx = W * U.lerp(0.46, 0.84, day);
+    const sy = roadTop - U.lerp(H * 0.2, H * 0.62, Math.sin(Math.PI * U.lerp(0.12, 0.92, day)));
+    g.fillStyle = Band.mix(pal.sun, pal.sunDusk, dusk);
     g.beginPath();
-    g.arc(W * 0.8, H * 0.36, U.clamp(H * 0.11, 18, 64), 0, Math.PI * 2);
+    g.arc(sx, Math.max(sunR + 6, sy), sunR, 0, Math.PI * 2);
     g.fill();
+    // 구름: 바람에 천천히 흐르고, 달릴수록 조금 더 빨리 지나간다
+    const cloud = Band.mix(pal.cloud, pal.cloudDusk, dusk);
+    g.fillStyle = cloud;
+    for (let k = 0; k < 4; k++) {
+      const span = W + 360;
+      const cxk = W + 180 - ((k * 397 + Band.hash(k) * 200 + this.time * 7 + scroll * 0.05) % span);
+      const cyk = H * (0.1 + 0.16 * Band.hash(k + 11)) + roadTop * 0.1;
+      const cs = U.clamp(H * 0.07, 12, 40) * (0.8 + 0.5 * Band.hash(k + 5));
+      g.globalAlpha = 0.85;
+      g.beginPath();
+      g.arc(cxk - cs, cyk, cs * 0.7, 0, Math.PI * 2);
+      g.arc(cxk, cyk - cs * 0.35, cs, 0, Math.PI * 2);
+      g.arc(cxk + cs * 1.1, cyk, cs * 0.75, 0, Math.PI * 2);
+      g.roundRect(cxk - cs * 1.7, cyk - cs * 0.1, cs * 3.6, cs * 0.75, cs * 0.37);
+      g.fill();
+    }
+    g.globalAlpha = 1;
 
-    // 언덕: 사인 둘을 겹친 능선. off 만큼 흘러간다
+    // 언덕: 사인 둘을 겹친 능선. off 만큼 흘러간다 (먼 것일수록 느리게)
     const ridge = (base, amp, off, k1, k2) => (x) => base + amp * (0.6 * Math.sin((x + off) * k1) + 0.4 * Math.sin((x + off) * k2 + 1.3));
     const hill = (fy, color) => {
       g.fillStyle = color;
@@ -416,20 +483,29 @@ class Band {
     const nearOff = scroll * 0.35;
     const near = ridge(roadTop - H * 0.08, H * 0.045, nearOff, 0.006, 0.017);
     hill(near, pal.hillNear);
-    // 가까운 언덕 위의 나무 (자리마다 정해진 무작위로 있거나 없다)
+    // 가까운 언덕 위의 풍경 (칸마다 정해진 무작위로 있거나 없고, 구간에 따라 종류가 바뀐다)
     const sp = 150;
-    g.fillStyle = pal.tree;
-    for (let i = Math.floor((nearOff - 120) / sp); i * sp - nearOff < W + 60; i++) {
-      if (Band.hash(i) < 0.45) continue;
+    const size = U.clamp(H * 0.1, 14, 60);
+    for (let i = Math.floor((nearOff - 160) / sp); i * sp - nearOff < W + 100; i++) {
+      const reg = Band.region(i);
+      if (Band.hash(i) < [0.45, 0.22, 0.28, 0.35][reg]) continue; // 구간마다 빽빽한 정도가 다르다
       const x = i * sp - nearOff + Band.hash(i + 99) * 60;
-      const th = U.clamp(H * 0.1, 14, 60) * (0.75 + 0.5 * Band.hash(i + 7));
+      const th = size * (0.75 + 0.5 * Band.hash(i + 7));
       const y = near(x) + th * 0.15;
-      g.beginPath();
-      g.moveTo(x - th * 0.32, y);
-      g.lineTo(x, y - th);
-      g.lineTo(x + th * 0.32, y);
-      g.closePath();
-      g.fill();
+      const pick = Band.hash(i + 31);
+      if (reg === 0) this.drawPine(x, y, th);
+      else if (reg === 1) this.drawRoundTree(x, y, th, pick > 0.5);
+      else if (reg === 2) pick > 0.35 ? this.drawHouse(x, y, th, pick) : this.drawRoundTree(x, y, th, false);
+      else pick > 0.45 ? this.drawWindmill(x, y, th * 1.35, i) : this.drawFlowerPatch(x, y, th, i);
+    }
+    // 해 질 녘에는 풍경 전체가 노을빛으로 물든다 (길과 자전거는 그대로 또렷하게)
+    if (dusk > 0) {
+      g.globalCompositeOperation = 'multiply';
+      g.globalAlpha = 0.4 * dusk;
+      g.fillStyle = pal.duskTint;
+      g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 1;
     }
 
     const cx = W / 2;
@@ -443,10 +519,14 @@ class Band {
     // 길과 그 아래 풀밭 (기울어도 아래가 비지 않게 넉넉히)
     g.fillStyle = pal.grass;
     g.fillRect(-ext, roadH / 2, ext * 2, H);
+    // 길 아래에 자리가 넉넉하면(속도 전환 구간) 길가의 꽃과 덤불이 가장 빨리 지나간다
+    const below = H - gy - roadH / 2;
+    if (below > 40) this.drawRoadside(ext, roadH / 2, below, scroll * 1.25, U.clamp((below - 40) / 80, 0, 1));
     g.fillStyle = pal.road;
     g.fillRect(-ext, -roadH / 2, ext * 2, roadH);
     g.fillStyle = pal.roadEdge;
     g.fillRect(-ext, -roadH / 2, ext * 2, Math.max(2, roadH * 0.06));
+    g.fillRect(-ext, roadH / 2 - Math.max(2, roadH * 0.06), ext * 2, Math.max(2, roadH * 0.06) * tall);
     // 흘러가는 차선
     const dash = U.clamp(roadH * 0.6, 24, 44);
     const period = dash * 1.7;
@@ -526,8 +606,9 @@ class Band {
     g.font = `700 ${fs}px ${pal.fontText}`;
     g.fillText(tip, px - pw / 2 + padX + w1 + gapX, pyTop + ph / 2 + 1);
 
-    // 구역 밖에 있을 때만 구역 위에 '여기에 맞춰 달려요' 표지 (말풍선보다 위에 두어 겹치지 않게)
-    const la = U.clamp(this.outAmount * 2, 0, 1);
+    // 구역 밖에 있을 때만 구역 위에 '여기에 맞춰 달려요' 표지 (말풍선보다 위에 두어 겹치지 않게).
+    // 속도 전환 구간에는 안내 카드가 같은 말을 하므로 숨긴다
+    const la = U.clamp(this.outAmount * 2, 0, 1) * (1 - tall);
     if (la > 0) {
       const text = '여기에 맞춰 달려요';
       g.font = `700 ${fs}px ${pal.fontText}`;
@@ -547,6 +628,130 @@ class Band {
 
     this.drawFloaters(trackHalf, pyTop - 4, r);
     g.restore();
+  }
+
+  // ----- 풍경 소품. (x, y) = 밑동, h = 크기 -----
+  drawPine(x, y, h) {
+    const { g, pal } = this;
+    g.fillStyle = pal.tree;
+    g.beginPath();
+    g.moveTo(x - h * 0.32, y);
+    g.lineTo(x, y - h);
+    g.lineTo(x + h * 0.32, y);
+    g.closePath();
+    g.fill();
+  }
+
+  drawRoundTree(x, y, h, fruit) {
+    const { g, pal } = this;
+    g.fillStyle = pal.trunk;
+    g.fillRect(x - h * 0.06, y - h * 0.5, h * 0.12, h * 0.5);
+    g.fillStyle = pal.treeRound;
+    g.beginPath();
+    g.arc(x, y - h * 0.66, h * 0.34, 0, Math.PI * 2);
+    g.fill();
+    if (!fruit) return;
+    g.fillStyle = pal.fruit;
+    for (const [dx, dy] of [[-0.14, -0.7], [0.12, -0.6], [0.02, -0.82], [0.17, -0.8]]) {
+      g.beginPath();
+      g.arc(x + dx * h, y + dy * h, Math.max(1.5, h * 0.05), 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+
+  drawHouse(x, y, h, pick) {
+    const { g, pal } = this;
+    const w = h * 0.95;
+    const bh = h * 0.55;
+    g.fillStyle = pal.wall;
+    g.fillRect(x - w / 2, y - bh, w, bh);
+    g.fillStyle = pick > 0.7 ? pal.roofAlt : pal.roof;
+    g.beginPath();
+    g.moveTo(x - w * 0.62, y - bh);
+    g.lineTo(x, y - bh - h * 0.42);
+    g.lineTo(x + w * 0.62, y - bh);
+    g.closePath();
+    g.fill();
+    g.fillStyle = pal.window;
+    g.fillRect(x - w * 0.3, y - bh * 0.72, w * 0.22, bh * 0.3);
+    g.fillRect(x + w * 0.1, y - bh * 0.72, w * 0.22, bh * 0.3);
+  }
+
+  // 풍차 날개는 시간에 따라 돈다
+  drawWindmill(x, y, h, i) {
+    const { g, pal } = this;
+    const top = y - h * 1.15;
+    g.fillStyle = pal.mill;
+    g.beginPath();
+    g.moveTo(x - h * 0.2, y);
+    g.lineTo(x - h * 0.09, top);
+    g.lineTo(x + h * 0.09, top);
+    g.lineTo(x + h * 0.2, y);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = pal.blade;
+    g.lineWidth = Math.max(2, h * 0.07);
+    g.lineCap = 'round';
+    g.beginPath();
+    const a0 = this.time * 1.4 + i;
+    for (let k = 0; k < 4; k++) {
+      const a = a0 + (k * Math.PI) / 2;
+      g.moveTo(x, top);
+      g.lineTo(x + Math.cos(a) * h * 0.6, top + Math.sin(a) * h * 0.6);
+    }
+    g.stroke();
+    g.lineCap = 'butt';
+    g.fillStyle = pal.blade;
+    g.beginPath();
+    g.arc(x, top, Math.max(2, h * 0.07), 0, Math.PI * 2);
+    g.fill();
+  }
+
+  drawFlowerPatch(x, y, h, i) {
+    const { g, pal } = this;
+    const colors = [pal.flowerA, pal.flowerB, pal.flowerC, pal.flowerD];
+    const c = colors[Math.floor(Band.hash(i + 17) * colors.length)];
+    g.fillStyle = c;
+    for (let k = 0; k < 7; k++) {
+      g.beginPath();
+      g.arc(x + (Band.hash(i * 7 + k) - 0.5) * h * 1.6, y - Band.hash(i * 5 + k) * h * 0.35, Math.max(2.5, h * 0.1), 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+
+  // 길 아래 풀밭의 꽃과 덤불 (길과 같이 기운 좌표에서 그린다). off = 흘러간 거리, a = 보이는 정도
+  drawRoadside(ext, top, below, off, a) {
+    const { g, pal } = this;
+    const sp = 64;
+    const s = U.clamp(below * 0.12, 6, 26);
+    const colors = [pal.flowerA, pal.flowerB, pal.flowerC, pal.flowerD];
+    g.globalAlpha = a;
+    for (let j = Math.floor((off - ext) / sp); j * sp - off < ext + sp; j++) {
+      const h = Band.hash(j + 501);
+      if (h < 0.35) continue;
+      const x = j * sp - off + Band.hash(j + 77) * 30;
+      const y = top + below * (0.22 + 0.45 * Band.hash(j + 13));
+      if (h > 0.82) {
+        g.fillStyle = pal.bush;
+        g.beginPath();
+        g.arc(x, y, s * 1.3, Math.PI, 0);
+        g.arc(x + s * 1.2, y, s * 0.95, Math.PI, 0);
+        g.closePath();
+        g.fill();
+        continue;
+      }
+      g.strokeStyle = pal.tree;
+      g.lineWidth = Math.max(1.5, s * 0.14);
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x, y - s * 1.1);
+      g.stroke();
+      g.fillStyle = colors[Math.floor(Band.hash(j + 9) * colors.length)];
+      g.beginPath();
+      g.arc(x, y - s * 1.2, s * 0.42, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
   }
 
   // 배지 안의 자전거 (s = 배지 반지름). 바퀴는 페달보다 빨리 돌고, 크랭크는 페달 속도 그대로 돈다

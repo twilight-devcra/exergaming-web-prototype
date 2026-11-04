@@ -23,9 +23,31 @@ body[data-theme="scenic"] {
   --ground: #6b7a70;       /* 점수 깃발 */
   --ground-mark: #c9d1c6;
   --scrim: rgba(29, 43, 36, 0.55);
-  /* 풍경 (속도 카드) */
-  --sky: #cfe6f2;
+  /* 풍경 (속도 카드). 하늘은 라운드 동안 아침 → 한낮 → 늦은 오후 → 해 질 녘으로 바뀐다 */
+  --sky-dawn: #cfe3ee;      --sky-dawn-low: #f2e8d8;   /* 위 / 지평선 */
+  --sky: #b9dcf2;           --sky-low: #dff0f6;
+  --sky-golden: #c4d9ea;    --sky-golden-low: #f8deb5;
+  --sky-dusk: #b9c0e0;      --sky-dusk-low: #f7b98f;
   --sun: #fbe3a2;
+  --sun-dusk: #f7a660;
+  --dusk-tint: #f6c9a2;   /* 해 질 녘에 풍경 위에 곱해지는 노을빛 */
+  --cloud: #ffffff;
+  --cloud-dusk: #fbe1d6;
+  /* 지나가는 풍경: 숲 → 과수원 → 마을 → 풍차 들판 */
+  --trunk: #7a5a3c;
+  --tree-round: #5b9f5f;
+  --fruit: #e2574c;
+  --wall: #f6efe3;
+  --roof: #c8664b;
+  --roof-alt: #4f7cac;
+  --window: #7fa7c9;
+  --mill: #efe8dc;
+  --blade: #8c7b6a;
+  --bush: #4f9a5a;
+  --flower-a: #f2c14e;
+  --flower-b: #e9738d;
+  --flower-c: #ffffff;
+  --flower-d: #b48ce0;
   --hill-far: #b3d8a8;
   --hill-near: #86c087;
   --tree: #4e8f5b;
@@ -100,13 +122,13 @@ body[data-theme="scenic"] {
 /* 연속 정답: 점수 칩 바로 아래 */
 #streak { right: 0; top: calc(100% + 10px); padding: 6px 14px; font-size: 18px; }
 
-/* 속도 전환 안내: 하늘 위의 흰 카드 */
+/* 속도 전환 안내: 하늘 위의 흰 카드. 시간 칩 바로 아래에 두어 자전거 말풍선과 겹치지 않게 한다 */
 #shift-msg {
   left: 50%;
   right: auto;
-  top: 22%;
+  top: 120px;
   transform: translateX(-50%);
-  padding: 26px 44px 30px;
+  padding: 22px 44px 26px;
   border-radius: 28px;
   background: var(--panel);
   box-shadow: var(--card-shadow);

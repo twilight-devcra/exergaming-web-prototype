@@ -900,8 +900,10 @@ const App = {
     $('#hud-time').classList.toggle('warn', this.state === 'play' && left <= 10);
     $('#hud-time').classList.toggle('held', this.state === 'play' && this.inIntro);
     // 운영 버전(app/)에만 있는 표시: 라운드 진행 막대와 달린 거리
+    const done = U.clamp(1 - left / this.cfg.durationSec, 0, 1);
+    this.band.dayT = done; // 풍경 라이딩: 라운드가 흐르는 동안 아침에서 해 질 녘으로
     const prog = $('#hud-progress');
-    if (prog) prog.style.transform = `scaleX(${U.clamp(1 - left / this.cfg.durationSec, 0, 1)})`;
+    if (prog) prog.style.transform = `scaleX(${done})`;
     const dist = $('#hud-dist .value');
     if (dist) {
       const d = Exercise.fmtDist(this.meter.distM);

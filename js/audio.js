@@ -140,6 +140,18 @@ class BeatAudio {
     [28, 69, 3],
   ];
 
+  // 신나는 댄스의 신스 가락 (두 마디 = 8분음표 16개): [8분음표 자리, 음, 길이(8분음표)]. 0 = Am F 위, 1 = C G 위
+  static DISCO_RIFF = [
+    [[0, 76, 1], [2, 76, 1], [3, 74, 1], [4, 72, 2], [6, 69, 1], [7, 72, 1], [8, 72, 2], [10, 69, 1], [11, 72, 1], [12, 74, 2], [14, 72, 2]],
+    [[0, 76, 1], [2, 79, 1], [3, 76, 1], [4, 74, 2], [6, 72, 1], [7, 74, 1], [8, 74, 2], [10, 71, 1], [11, 74, 1], [12, 74, 4]],
+  ];
+
+  // 속도 전환(두뇌 쉬는 시간) 동안 음악을 가라앉힌다 (신나는 댄스만 따른다). 끝나면 다음 마디 첫 박에 심벌
+  setRest(on, crash = true) {
+    if (this.rest && !on && crash) this.crashNext = true;
+    this.rest = on;
+  }
+
   static STYLES = {
     // 기본 비트: 킥·스네어·하이햇과 베이스 (예전 그대로)
     beat(i, t, spb) {
@@ -189,17 +201,61 @@ class BeatAudio {
       }
     },
 
-    // 신나는 댄스: 비트마다 킥, 엇박 하이햇, 옥타브 베이스와 깔리는 화음. Am F C G
+    // 신나는 댄스: 비트마다 킥(페달 박자), 라운드가 흐르며 소리가 하나씩 더해진다. 마디 = 비트 4개 = 페달 두 바퀴 (60 RPM 이면 2초)
+    //   0~7마디    들어가기: 킥 + 베이스 (대개 속도 측정 동안)
+    //   8~15마디   + 박수 · 하이햇
+    //   16~23마디  + 엇박 오픈 하이햇 · 옥타브 베이스 · 깔리는 화음
+    //   24마디~   48마디(60 RPM 이면 약 1분 36초)씩 되풀이:
+    //             본 그루브 24 (16~23마디에 신스 가락) → 다른 화음의 그루브 12 → 쉬어 가기 6 → 끌어올리기 6
+    //   속도 전환(두뇌 쉬는 시간) 동안은 킥 · 베이스 · 화음만 남기고, 끝나면 심벌과 함께 돌아온다 (setRest)
     disco(i, t, spb) {
-      const C = BeatAudio.CHORDS[['Am', 'F', 'C', 'G'][Math.floor(i / 4) % 4]];
+      const bar = Math.floor(i / 4);
       const pos = i % 4;
-      this.kick(t, 0.62);
-      if (pos % 2 === 1) this.clap(t, 0.22);
-      this.openHat(t + spb / 2, 0.07);
+      const c = (bar - 24) % 48;
+      const sec = this.rest ? 'rest' : bar < 8 ? 'intro' : bar < 16 ? 'build1' : bar < 24 ? 'build2'
+        : c < 24 ? 'full' : c < 36 ? 'groove' : c < 42 ? 'break' : 'rise';
+      const C = BeatAudio.CHORDS[(sec === 'groove' ? ['F', 'G', 'Am', 'Am'] : ['Am', 'F', 'C', 'G'])[bar % 4]];
+      const chord = C.slice(1).map((n) => BeatAudio.m2f(n));
       const root = BeatAudio.m2f(C[0] - 12);
-      this.bass(t, root / 2, spb * 0.42, 0.22);
-      this.bass(t + spb / 2, root, spb * 0.42, 0.16);
-      if (pos === 0) this.pad(t, C.slice(1).map((n) => BeatAudio.m2f(n)), spb * 4, 0.03);
+      const calm = sec === 'rest' || sec === 'break';
+
+      if (pos === 0 && (this.crashNext || (!this.rest && (bar === 16 || (bar >= 24 && c === 0))))) {
+        this.crash(t, 0.1);
+        this.crashNext = false;
+      }
+      this.kick(t, calm ? 0.45 : sec === 'intro' ? 0.55 : 0.62);
+
+      // 박수
+      if (!calm && sec !== 'intro') {
+        if (pos % 2 === 1) this.clap(t, 0.22);
+        if (sec === 'rise' && c >= 46 && pos % 2 === 0) this.clap(t, 0.16);
+        if (sec === 'rise' && c === 47) this.clap(t + spb / 2, 0.14);
+      }
+      // 하이햇
+      if (sec === 'build1' || sec === 'rise') this.hat(t + spb / 2, 0.07);
+      else if (sec === 'build2' || sec === 'full') this.openHat(t + spb / 2, 0.07);
+      else if (sec === 'groove') for (const k of [1, 2, 3]) this.hat(t + (k * spb) / 4, k === 2 ? 0.08 : 0.045);
+      // 베이스
+      if (calm || sec === 'intro') {
+        if (pos % 2 === 0) this.bass(t, root / 2, spb * 1.6, 0.2);
+      } else if (sec === 'build1') {
+        this.bass(t, root / 2, spb * 0.42, 0.22);
+      } else {
+        this.bass(t, root / 2, spb * 0.42, 0.22);
+        this.bass(t + spb / 2, root, spb * 0.42, 0.16);
+      }
+      // 화음
+      if (pos === 0 && sec !== 'intro' && sec !== 'build1') this.pad(t, chord, spb * 4, calm ? 0.045 : 0.03);
+      // 신스 가락: 본 그루브 16~23마디, 두 마디씩 (Am F 위에서 A, C G 위에서 B)
+      if (sec === 'full' && c >= 16) {
+        const riff = BeatAudio.DISCO_RIFF[bar % 4 < 2 ? 0 : 1];
+        const at = (bar % 2) * 8 + pos * 2;
+        for (const [e, n, len] of riff) {
+          if (e === at || e === at + 1) this.lead(t + ((e - at) * spb) / 2, BeatAudio.m2f(n), (len * spb) / 2, 0.045);
+        }
+      }
+      // 끌어올리기: 6마디 동안 올라가는 쉿 소리
+      if (sec === 'rise' && c === 42 && pos === 0) this.riser(t, spb * 24);
     },
 
     // 잔잔하게: 드럼 없이 똑딱 나무 소리가 박자를 짚고, 화음과 종소리가 천천히 흐른다. C Am F G (두 마디씩)
@@ -428,6 +484,54 @@ class BeatAudio {
     s.connect(f).connect(g).connect(this.master);
     s.start(t);
     s.stop(t + len + 0.02);
+  }
+
+  crash(t, vol) {
+    this.noiseHit(t, 'highpass', 5000, vol, 1.4, 0.7);
+  }
+
+  // 점점 커지며 높아지는 쉿 소리 (끌어올리기)
+  riser(t, dur) {
+    const c = this.ctx;
+    const s = c.createBufferSource();
+    s.buffer = this.noise;
+    s.loop = true;
+    const f = c.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 1.2;
+    f.frequency.setValueAtTime(500, t);
+    f.frequency.exponentialRampToValueAtTime(7000, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09, t + dur);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.05);
+    s.connect(f).connect(g).connect(this.master);
+    s.start(t);
+    s.stop(t + dur + 0.1);
+  }
+
+  // 신스 가락: 살짝 어긋난 두 사각파
+  lead(t, f, dur, vol) {
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(3200, t);
+    lp.frequency.exponentialRampToValueAtTime(1400, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.setValueAtTime(vol, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    lp.connect(g).connect(this.master);
+    for (const d of [-6, 6]) {
+      const o = c.createOscillator();
+      o.type = 'square';
+      o.frequency.value = f;
+      o.detune.value = d;
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    }
   }
 
   shaker(t, vol) {

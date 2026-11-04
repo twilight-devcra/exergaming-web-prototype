@@ -496,7 +496,7 @@ const App = {
     this.tickOut = false;
     this.slopeStep = 0;                 // SLOPE_PATTERN에서 지금 몇 번째인가
     this.slopeLevel = 0;                // 현재 지면 기울기 -1 ~ 1 (목표 RPM 배율과 지면 각도를 함께 정한다)
-    this.nextShiftAt = this.cfg.rpmChangeSegmentSec;
+    this.nextShiftAt = this.shiftGap();
     this.clearShift();
     this.gameIndex = 0;
     this.pass = [];                     // 이번 바퀴에 남은 게임 (planPass)
@@ -763,6 +763,7 @@ const App = {
     $('#shift-name').textContent = SLOPE_MSG[to];
     $('#game').classList.add('shift');
     this.audio.sfx('go');
+    this.audio.setRest(true);
     this.after(this.cfg.shiftSec * 1000, () => this.endShift(), gen);
   },
 
@@ -770,11 +771,19 @@ const App = {
     this.log.ev('shift_end', { slope: this.shift.to });
     this.slopeLevel = this.shift.to;
     this.clearShift();
-    this.nextShiftAt = this.elapsed + this.cfg.rpmChangeSegmentSec;
+    this.nextShiftAt = this.elapsed + this.shiftGap();
+    this.audio.setRest(false);
     this.after(SHIFT_OUT_MS, () => this.nextGame());
   },
 
+  // 다음 속도 전환까지의 시간 (cfg.rpmChangeSegmentSec ~ rpmChangeSegmentMaxSec 사이 무작위)
+  shiftGap() {
+    const { rpmChangeSegmentSec: lo, rpmChangeSegmentMaxSec: hi } = this.cfg;
+    return hi > lo ? U.lerp(lo, hi, Math.random()) : lo;
+  },
+
   clearShift() {
+    this.audio.setRest(false, false);
     this.shift = null;
     $('#game').classList.remove('shift');
   },

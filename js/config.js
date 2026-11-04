@@ -18,9 +18,12 @@ const DEFAULT_CONFIG = {
   tickSec: 1,                // 운동 점수 취득 간격
   tickMaxPoints: 10,         // 틱당 최대 운동 점수
   rpmChange: true,           // 라운드 중 목표 RPM 변화 여부
-  rpmChangeSegmentSec: 40,   // 속도 전환 구간 사이의 최소 간격. 지나면 진행 중인 인지 게임이 끝난 뒤 전환한다
+  // 속도 전환 구간 사이의 간격: 이 둘 사이에서 매번 무작위로 (라운드 시작 → 첫 전환, 전환이 끝난 뒤 → 다음 전환).
+  // 지나면 진행 중인 인지 게임이 끝난 뒤 전환한다. 전환 구간은 인지 게임이 없는 '두뇌 쉬는 시간'이기도 하다
+  rpmChangeSegmentSec: 120,
+  rpmChangeSegmentMaxSec: 180,
   rpmChangeAmount: 0.12,     // 목표 RPM 변화폭
-  shiftSec: 8,               // 속도 전환 구간 길이. 이 동안은 인지 게임 없이 새 속도에 맞추기만 한다
+  shiftSec: 30,              // 속도 전환 구간 길이. 이 동안은 인지 게임 없이 새 속도에 맞추기만 한다 (두뇌 쉬는 시간)
   shiftRampSec: 3,           // 그중 목표 RPM이 새 값까지 서서히 바뀌는 시간 (나머지는 적응 시간)
   sound: true,
   rpmSource: 'zc',           // 페달 센서 속도 측정 방식: zc 파형 영교차 | comb 파형 결합 | teo 파형 모양 | pedal 페달 avg_rpm

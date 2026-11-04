@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>페달 &amp; 브레인</title>
-  <!-- 화면 스타일용 글꼴. 못 받아도 시스템 글꼴로 돌아간다 -->
+  <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Jua&family=Orbitron:wght@700;900&display=swap">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.9/dist/galmuri.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="../css/themes.css">
   <link rel="stylesheet" href="app.css">
@@ -115,15 +114,18 @@
       <div id="shift-msg">
         <div class="tag">속도 전환</div>
         <div class="name" id="shift-name"></div>
-        <div class="hint">공이 <b style="color:var(--good)">초록 구역</b>에 들어오도록 페달 속도를 맞추세요</div>
+        <div class="hint">자전거가 <b style="color:var(--good)">초록 구간</b>에 들어오도록 페달 속도를 맞추세요</div>
         <div class="shift-bar"><i id="shift-bar"></i></div>
       </div>
       <div id="keyhint"><kbd data-k="KeyA">A</kbd><kbd data-k="KeyD">D</kbd></div>
     </div>
     <!-- 속도 전환 구간에 #band가 화면 전체로 커져도 제자리에 있도록 #band 밖에 둔다 -->
     <div id="band-ui">
-      <div class="hud" id="hud-time"><div class="label">TIME</div><div class="value">0:00</div></div>
-      <div class="hud" id="hud-score"><div class="label">SCORE</div><div class="value">0</div></div>
+      <div class="hud-row">
+        <div class="hud" id="hud-time"><div class="label">남은 시간</div><div class="value">0:00</div><div class="hud-bar"><i id="hud-progress"></i></div></div>
+        <div class="hud" id="hud-dist"><div class="label">달린 거리</div><div class="value">0 m</div></div>
+      </div>
+      <div class="hud" id="hud-score"><div class="label">점수</div><div class="value">0</div></div>
       <div id="streak"></div>
     </div>
     <div id="cog"></div>
@@ -232,7 +234,6 @@
           <span class="pedal-status"></span>
           <button class="btn secondary small" data-pedal-btn>페달 연결</button>
         </div>
-        <label class="setting">화면 스타일<select data-theme-picker></select></label>
         <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
         <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
         <p class="setting-note" id="op-cfg"></p>

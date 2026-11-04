@@ -1,1 +1,122 @@
-/* 운영 버전(app/) 전용 스타일. 프로토타입(../css)을 덮어쓴다 */
+/* 운영 버전(app/) 전용 스타일. 프로토타입(../css)을 덮어쓴다.
+   스타일은 '풍경 라이딩' 하나뿐이다 (js/themes.js 의 scenic, 속도 띠 그림은 js/band.js drawScenic).
+   게임 화면: 위는 풍경 속을 자전거가 달리는 속도 카드, 아래는 인지 게임 카드 */
+
+/* ================= 색과 글꼴 ================= */
+body[data-theme="scenic"] {
+  --bg: #f2f4ee;
+  --panel: #ffffff;
+  --ink: #1d2b24;
+  --ink-soft: #4a5a52;
+  --line: #dde3da;
+  --cell: #eef1ea;
+  --cell-hover: #e3e8de;
+  --accent: #2563eb;
+  --accent-soft: #dce7fd;
+  --good: #15803d;
+  --good-soft: #dcf3e3;
+  --bad: #dc2626;
+  --bad-soft: #fde4e4;
+  --warn: #d97706;
+  --beat: rgba(37, 99, 235, 0.3);
+  --on-accent: #ffffff;
+  --ground: #6b7a70;       /* 점수 깃발 */
+  --ground-mark: #c9d1c6;
+  --scrim: rgba(29, 43, 36, 0.55);
+  /* 풍경 (속도 카드) */
+  --sky: #cfe6f2;
+  --sun: #fbe3a2;
+  --hill-far: #b3d8a8;
+  --hill-near: #86c087;
+  --tree: #4e8f5b;
+  --grass: #6faf73;
+  --road: #5e6a70;
+  --road-edge: #8a959b;
+  --road-mark: #eef0e6;
+  --zone: #3fd08f;
+  --tip-good: #9be8be;
+  --tip-warn: #fcd38a;
+  --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-display: var(--font);
+  --font-num: "Nunito", var(--font);
+  --card-shadow: 0 1px 2px rgba(29, 43, 36, 0.05), 0 6px 20px rgba(29, 43, 36, 0.06);
+}
+
+/* ================= 게임 화면 ================= */
+#game { padding: 20px; }
+
+/* 풍경 카드. 속도 전환 구간에는 아래 게임 카드 자리까지 커진다 */
+#band {
+  height: 38%;
+  margin-bottom: 16px;
+  border: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--sky);
+  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1), margin 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#game.shift #band { height: 100%; margin-bottom: 0; }
+
+#cog {
+  background: var(--panel);
+  border-radius: 28px;
+  box-shadow: var(--card-shadow);
+  transition: opacity 0.3s;
+}
+#game.shift #cog { opacity: 0; }
+
+/* 풍경 위에 얹는 표시: 왼쪽 위 남은 시간·달린 거리, 오른쪽 위 점수 */
+#band-ui {
+  left: 40px;
+  right: 40px;
+  top: 38px;
+  height: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.hud-row { display: flex; gap: 12px; align-items: flex-start; }
+.hud {
+  position: relative;
+  top: auto;
+  transform: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+  padding: 10px 20px 12px;
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 2px 10px rgba(29, 43, 36, 0.1);
+}
+.hud .label { font-size: 17px; font-weight: 500; color: var(--ink-soft); letter-spacing: 0; }
+.hud .value { font-size: clamp(28px, 4.6vh, 38px); font-weight: 900; line-height: 1.1; }
+#hud-time, #hud-score { left: auto; right: auto; }
+#hud-time { width: 236px; }
+.hud-bar { flex-basis: 100%; height: 8px; margin-top: 6px; border-radius: 4px; background: var(--cell); overflow: hidden; }
+.hud-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+#hud-dist .value { min-width: 3.6em; }
+
+/* 연속 정답: 점수 칩 바로 아래 */
+#streak { right: 0; top: calc(100% + 10px); padding: 6px 14px; font-size: 18px; }
+
+/* 속도 전환 안내: 하늘 위의 흰 카드 */
+#shift-msg {
+  left: 50%;
+  right: auto;
+  top: 22%;
+  transform: translateX(-50%);
+  padding: 26px 44px 30px;
+  border-radius: 28px;
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
+  white-space: nowrap;
+}
+#shift-msg .tag { font-size: 18px; }
+#shift-msg .hint { font-size: 22px; color: var(--ink-soft); }
+
+/* 키보드 테스트 때만 보이는 A·D 표시: 자전거를 가리지 않게 왼쪽 아래 구석으로 */
+#keyhint { left: 20px; bottom: 14px; transform: none; opacity: 0.9; }
+
+/* 게임 카드의 머리: 게임 이름을 또렷하게 */
+.stage-title { font-size: clamp(18px, 2.6vh, 22px); color: var(--ink); }

@@ -500,7 +500,7 @@ const App = {
     const intro = U.el('div', 'intro');
     intro.innerHTML = `
       <div class="tag">준비</div>
-      <div class="hint">비트에 맞춰 ${this.pedal.sensorOn ? '<b>페달</b>을' : '<b>A · D</b>를'} 밟아 공을 <b style="color:var(--good)">초록 구역</b> 안에 두세요.<br>
+      <div class="hint">비트에 맞춰 ${this.pedal.sensorOn ? '<b>페달</b>을' : '<b>A · D</b>를'} 밟아 ${EDITION === 'app' ? '자전거를 <b style="color:var(--good)">초록 구간</b>' : '공을 <b style="color:var(--good)">초록 구역</b>'} 안에 두세요.<br>
       그러면서 아래에 나오는 게임을 풀면 됩니다.</div>
       <div class="big-count">3</div>`;
     cog.innerHTML = '';
@@ -899,6 +899,15 @@ const App = {
     $('#hud-time .value').textContent = U.fmtTime(left);
     $('#hud-time').classList.toggle('warn', this.state === 'play' && left <= 10);
     $('#hud-time').classList.toggle('held', this.state === 'play' && this.inIntro);
+    // 운영 버전(app/)에만 있는 표시: 라운드 진행 막대와 달린 거리
+    const prog = $('#hud-progress');
+    if (prog) prog.style.transform = `scaleX(${U.clamp(1 - left / this.cfg.durationSec, 0, 1)})`;
+    const dist = $('#hud-dist .value');
+    if (dist) {
+      const d = Exercise.fmtDist(this.meter.distM);
+      const txt = `${d.value} ${d.unit}`;
+      if (dist.textContent !== txt) dist.textContent = txt;
+    }
     // 점수판 숫자는 받은 점수까지 굴러 올라간다 (남은 차이의 비율만큼, 너무 느리지 않게 초당 최소 40점)
     if (!dt || this.hudShown > this.hudScore) this.hudShown = this.hudScore;
     else if (this.hudShown < this.hudScore) {

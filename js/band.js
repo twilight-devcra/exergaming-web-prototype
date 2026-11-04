@@ -43,6 +43,10 @@ class Band {
     return {
       good: v('--good'), goodSoft: v('--good-soft'), bad: v('--bad'), badSoft: v('--bad-soft'), warn: v('--warn'),
       accent: v('--accent'), ink: v('--ink'), font: v('--font-num') || 'system-ui, sans-serif', onAccent: v('--on-accent'), ground: v('--ground'), groundMark: v('--ground-mark'),
+      panel: v('--panel'), fontText: v('--font') || 'system-ui, sans-serif',
+      // 풍경 라이딩(look.scenic)에서만 쓴다
+      sky: v('--sky'), sun: v('--sun'), hillFar: v('--hill-far'), hillNear: v('--hill-near'), tree: v('--tree'), grass: v('--grass'),
+      zone: v('--zone') || v('--good'), road: v('--road'), roadEdge: v('--road-edge'), roadMark: v('--road-mark'), tipGood: v('--tip-good'), tipWarn: v('--tip-warn'),
     };
   }
 
@@ -131,6 +135,7 @@ class Band {
   }
 
   draw() {
+    if (this.look.scenic) return this.drawScenic();
     const { g, W, H, pal, look } = this;
     const { tolerance, maxDeviation } = this.cfg;
     g.clearRect(0, 0, W, H);
@@ -200,51 +205,10 @@ class Band {
     }
     g.stroke();
 
-    // 점수 깃발 — 구역 한가운데를 지나는 순간이 그 점수에 닿은 때다
-    g.textAlign = 'left';
-    g.textBaseline = 'middle';
-    const first = Math.max(Band.MARK_EVERY, Math.ceil((this.dist - ext / Band.PX_PER_POINT) / Band.MARK_EVERY) * Band.MARK_EVERY);
-    for (let m = first; (m - this.dist) * Band.PX_PER_POINT < ext; m += Band.MARK_EVERY) {
-      const x = (m - this.dist) * Band.PX_PER_POINT;
-      // 양옆의 시간·점수 표시와 겹치지 않게 가장자리에서는 사라진다
-      const alpha = U.clamp((W / 2 - 170 - Math.abs(x)) / 100, 0, 1);
-      if (alpha <= 0) continue;
-      const big = m % Band.MARK_BIG === 0;
-      const done = m <= this.dist;
-      const pop = this.passed && this.passed.m === m ? Math.max(0, 1 - this.passed.t / Band.POP_SEC) : 0;
-      const top = -(zoneH + (big ? r * 0.75 : r * 0.3));
-      const fw = r * (big ? 1.25 : 0.9) * (1 + 0.5 * pop);
-      const fh = fw * 0.8;
-      g.globalAlpha = alpha;
-      g.strokeStyle = g.fillStyle = done ? pal.good : big ? pal.accent : pal.ground;
-      glow(g.fillStyle);
-      g.lineWidth = big ? 4 : 3;
-      g.beginPath();
-      g.moveTo(x, 0);
-      g.lineTo(x, top);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(x, top);
-      g.lineTo(x + fw, top + fh / 2);
-      g.lineTo(x, top + fh);
-      g.fill();
-      g.font = `800 ${Math.round(r * (big ? 0.7 : 0.55))}px ${pal.font}`;
-      g.fillText(String(m), x + fw + 5, top + fh / 2);
-    }
-    g.globalAlpha = 1;
-    noGlow();
+    this.drawFlags(ext, r, 0, (big) => -(zoneH + (big ? r * 0.75 : r * 0.3)), glow, noGlow);
 
     // 정답 고리 — 공 뒤에서 퍼져 나간다
-    for (const ring of this.rings) {
-      const p = ring.t / Band.RING_SEC;
-      g.globalAlpha = (1 - p) * 0.6;
-      g.strokeStyle = pal.good;
-      g.lineWidth = Math.max(1.5, r * 0.2 * (1 - p));
-      g.beginPath();
-      g.arc(ring.x * trackHalf, -r - 2, r * (1 + p * 2.8), 0, Math.PI * 2);
-      g.stroke();
-    }
-    g.globalAlpha = 1;
+    this.drawRings(trackHalf, -r - 2, r);
 
     // 공 (정답 직후에는 잠깐 커지면서 초록으로 물든다)
     const bx = this.ballX * trackHalf;
@@ -328,12 +292,73 @@ class Band {
     }
 
     // 점수 피드백
+    this.drawFloaters(trackHalf, -r * 2 - 6, r, glow);
+    noGlow();
+    g.globalAlpha = 1;
+    g.restore();
+  }
+
+  // 점수 깃발 — 구역 한가운데를 지나는 순간이 그 점수에 닿은 때다. baseY = 깃대 아래 끝, topFor(big) = 깃대 위 끝
+  drawFlags(ext, r, baseY, topFor, glow = () => {}, noGlow = () => {}) {
+    const { g, W, pal } = this;
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    const first = Math.max(Band.MARK_EVERY, Math.ceil((this.dist - ext / Band.PX_PER_POINT) / Band.MARK_EVERY) * Band.MARK_EVERY);
+    for (let m = first; (m - this.dist) * Band.PX_PER_POINT < ext; m += Band.MARK_EVERY) {
+      const x = (m - this.dist) * Band.PX_PER_POINT;
+      // 양옆의 시간·점수 표시와 겹치지 않게 가장자리에서는 사라진다
+      const alpha = U.clamp((W / 2 - 170 - Math.abs(x)) / 100, 0, 1);
+      if (alpha <= 0) continue;
+      const big = m % Band.MARK_BIG === 0;
+      const done = m <= this.dist;
+      const pop = this.passed && this.passed.m === m ? Math.max(0, 1 - this.passed.t / Band.POP_SEC) : 0;
+      const top = topFor(big);
+      const fw = r * (big ? 1.25 : 0.9) * (1 + 0.5 * pop);
+      const fh = fw * 0.8;
+      g.globalAlpha = alpha;
+      g.strokeStyle = g.fillStyle = done ? pal.good : big ? pal.accent : pal.ground;
+      glow(g.fillStyle);
+      g.lineWidth = big ? 4 : 3;
+      g.beginPath();
+      g.moveTo(x, baseY);
+      g.lineTo(x, top);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(x, top);
+      g.lineTo(x + fw, top + fh / 2);
+      g.lineTo(x, top + fh);
+      g.fill();
+      g.font = `800 ${Math.round(r * (big ? 0.7 : 0.55))}px ${pal.font}`;
+      g.fillText(String(m), x + fw + 5, top + fh / 2);
+    }
+    g.globalAlpha = 1;
+    noGlow();
+  }
+
+  // 정답 고리 — 공 뒤에서 퍼져 나간다 (y = 고리 중심 높이)
+  drawRings(trackHalf, y, r) {
+    const { g, pal } = this;
+    for (const ring of this.rings) {
+      const p = ring.t / Band.RING_SEC;
+      g.globalAlpha = (1 - p) * 0.6;
+      g.strokeStyle = pal.good;
+      g.lineWidth = Math.max(1.5, r * 0.2 * (1 - p));
+      g.beginPath();
+      g.arc(ring.x * trackHalf, y, r * (1 + p * 2.8), 0, Math.PI * 2);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+
+  // 점수 피드백 — baseY 에서 튀어 올랐다가 사라진다
+  drawFloaters(trackHalf, baseY, r, glow = () => {}) {
+    const { g, pal } = this;
     g.textAlign = 'center';
     g.textBaseline = 'bottom';
     for (const f of this.floaters) {
       const fx = f.x * trackHalf;
       // 처음에 튕겨 오르고 끝에서 느려지게. 일정한 속도로 올라가면 흘러가는 느낌이 난다.
-      const fy = -r * 2 - 6 - (1 - Math.pow(1 - f.t, 3)) * 26;
+      const fy = baseY - (1 - Math.pow(1 - f.t, 3)) * 26;
       g.globalAlpha = f.t < 0.1 ? f.t / 0.1 : f.t < 0.5 ? 1 : 1 - (f.t - 0.5) / 0.5;
       g.fillStyle = pal[f.color] || f.color; // 'good' | 'warn' | 'bad' 또는 색 값
       glow(g.fillStyle);
@@ -346,8 +371,234 @@ class Band {
       g.fillText(f.text, 0, 0);
       g.restore();
     }
-    noGlow();
+    g.shadowBlur = 0;
     g.globalAlpha = 1;
+  }
+
+  // ---------- 풍경 라이딩 (운영 버전 app/ 의 화면 스타일, look.scenic) ----------
+  // 하늘과 언덕이 점수만큼 흘러가고(먼 것일수록 느리게) 길 위에서 자전거가 달린다. 공 대신 자전거 배지,
+  // 허용 구역은 길 위의 초록 구간이다. 배지 위 말풍선이 RPM 과 할 일을 글로 알려 준다 (색만으로 알리지 않는다).
+  static hash(i) {
+    const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  }
+
+  drawScenic() {
+    const { g, W, H, pal } = this;
+    const { tolerance, maxDeviation } = this.cfg;
+    g.clearRect(0, 0, W, H);
+    const scroll = this.dist * Band.PX_PER_POINT;
+    const roadH = U.clamp(H * 0.2, 44, 96);
+    const gy = H - roadH / 2 - Math.min(10, H * 0.03); // 길 한가운데 높이
+    const roadTop = gy - roadH / 2;
+    const r = U.clamp(H * 0.12, 14, 30 + Math.max(0, H - 320) * 0.035);
+
+    // 하늘과 해
+    g.fillStyle = pal.sky;
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = pal.sun;
+    g.beginPath();
+    g.arc(W * 0.8, H * 0.36, U.clamp(H * 0.11, 18, 64), 0, Math.PI * 2);
+    g.fill();
+
+    // 언덕: 사인 둘을 겹친 능선. off 만큼 흘러간다
+    const ridge = (base, amp, off, k1, k2) => (x) => base + amp * (0.6 * Math.sin((x + off) * k1) + 0.4 * Math.sin((x + off) * k2 + 1.3));
+    const hill = (fy, color) => {
+      g.fillStyle = color;
+      g.beginPath();
+      g.moveTo(0, H);
+      for (let x = 0; x <= W + 8; x += 8) g.lineTo(x, fy(x));
+      g.lineTo(W + 8, H);
+      g.closePath();
+      g.fill();
+    };
+    hill(ridge(roadTop - H * 0.24, H * 0.07, scroll * 0.12, 0.0042, 0.011), pal.hillFar);
+    const nearOff = scroll * 0.35;
+    const near = ridge(roadTop - H * 0.08, H * 0.045, nearOff, 0.006, 0.017);
+    hill(near, pal.hillNear);
+    // 가까운 언덕 위의 나무 (자리마다 정해진 무작위로 있거나 없다)
+    const sp = 150;
+    g.fillStyle = pal.tree;
+    for (let i = Math.floor((nearOff - 120) / sp); i * sp - nearOff < W + 60; i++) {
+      if (Band.hash(i) < 0.45) continue;
+      const x = i * sp - nearOff + Band.hash(i + 99) * 60;
+      const th = U.clamp(H * 0.1, 14, 60) * (0.75 + 0.5 * Band.hash(i + 7));
+      const y = near(x) + th * 0.15;
+      g.beginPath();
+      g.moveTo(x - th * 0.32, y);
+      g.lineTo(x, y - th);
+      g.lineTo(x + th * 0.32, y);
+      g.closePath();
+      g.fill();
+    }
+
+    const cx = W / 2;
+    const ext = W;
+    const trackHalf = Math.max(120, W / 2 - 230);
+    const zoneHalf = trackHalf * (tolerance / maxDeviation);
+    g.save();
+    g.translate(cx, gy);
+    g.rotate(-this.theta);
+
+    // 길과 그 아래 풀밭 (기울어도 아래가 비지 않게 넉넉히)
+    g.fillStyle = pal.grass;
+    g.fillRect(-ext, roadH / 2, ext * 2, H);
+    g.fillStyle = pal.road;
+    g.fillRect(-ext, -roadH / 2, ext * 2, roadH);
+    g.fillStyle = pal.roadEdge;
+    g.fillRect(-ext, -roadH / 2, ext * 2, Math.max(2, roadH * 0.06));
+    // 흘러가는 차선
+    const dash = U.clamp(roadH * 0.6, 24, 44);
+    const period = dash * 1.7;
+    const lh = Math.max(3, roadH * 0.07);
+    g.fillStyle = pal.roadMark;
+    for (let x = -ext - (scroll % period); x < ext; x += period) g.fillRect(x, roadH * 0.24 - lh / 2, dash, lh);
+
+    // 허용 구역: 길 위의 초록 구간과 양옆 점선 기둥
+    const gateTop = -roadH / 2 - r * 1.3;
+    g.globalAlpha = 0.6;
+    g.fillStyle = pal.zone;
+    g.fillRect(-zoneHalf, -roadH / 2, zoneHalf * 2, roadH);
+    g.globalAlpha = 1;
+    g.strokeStyle = pal.panel;
+    g.lineWidth = Math.max(3, r * 0.12);
+    g.setLineDash([8, 6]);
+    g.beginPath();
+    g.moveTo(-zoneHalf, gateTop);
+    g.lineTo(-zoneHalf, roadH / 2);
+    g.moveTo(zoneHalf, gateTop);
+    g.lineTo(zoneHalf, roadH / 2);
+    g.stroke();
+    g.setLineDash([]);
+
+    this.drawFlags(ext, r, -roadH / 2, (big) => -roadH / 2 - r * (big ? 2.3 : 1.7));
+
+    // 자전거 배지 (정답 직후에는 잠깐 커지면서 초록으로 물든다)
+    const bx = this.ballX * trackHalf;
+    const br = r * (1 + 0.25 * this.pop);
+    const by = -roadH * 0.12;
+    this.drawRings(trackHalf, by, r);
+    g.fillStyle = pal.panel;
+    g.beginPath();
+    g.arc(bx, by, br, 0, Math.PI * 2);
+    g.fill();
+    if (this.pop > 0) {
+      g.globalAlpha = this.pop;
+      g.fillStyle = pal.goodSoft;
+      g.fill();
+      g.globalAlpha = 1;
+    }
+    g.lineWidth = Math.max(3, br * 0.15);
+    g.strokeStyle = this.inZone ? pal.accent : pal.warn;
+    g.stroke();
+    this.drawBike(bx, by, br);
+
+    // 말풍선: RPM 과 할 일
+    const fs = Math.round(U.clamp(r * 0.62, 13, 30));
+    const tip = this.inZone ? '좋아요' : this.slowSide ? '더 빠르게 ›' : '‹ 조금 천천히';
+    const t1 = `${Math.round(this.rpm)} rpm`;
+    g.font = `900 ${fs}px ${pal.font}`;
+    const w1 = g.measureText(t1).width;
+    g.font = `700 ${fs}px ${pal.fontText}`;
+    const w2 = g.measureText(tip).width;
+    const padX = fs * 0.8;
+    const gapX = fs * 0.55;
+    const ph = Math.round(fs * 1.9);
+    const pw = padX * 2 + w1 + gapX + w2;
+    const px = U.clamp(bx, -W / 2 + pw / 2 + 12, W / 2 - pw / 2 - 12);
+    const pyTop = by - r - fs * 0.6 - ph; // 배지가 커져도 말풍선은 제자리
+    g.fillStyle = pal.ink;
+    g.beginPath();
+    g.roundRect(px - pw / 2, pyTop, pw, ph, ph / 2);
+    g.fill();
+    const tx = U.clamp(bx, px - pw / 2 + ph / 2, px + pw / 2 - ph / 2);
+    g.beginPath();
+    g.moveTo(tx - fs * 0.45, pyTop + ph - 1);
+    g.lineTo(tx, pyTop + ph + fs * 0.45);
+    g.lineTo(tx + fs * 0.45, pyTop + ph - 1);
+    g.fill();
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.fillStyle = pal.onAccent;
+    g.font = `900 ${fs}px ${pal.font}`;
+    g.fillText(t1, px - pw / 2 + padX, pyTop + ph / 2 + 1);
+    g.fillStyle = this.inZone ? pal.tipGood : pal.tipWarn;
+    g.font = `700 ${fs}px ${pal.fontText}`;
+    g.fillText(tip, px - pw / 2 + padX + w1 + gapX, pyTop + ph / 2 + 1);
+
+    // 구역 밖에 있을 때만 구역 위에 '여기에 맞춰 달려요' 표지 (말풍선보다 위에 두어 겹치지 않게)
+    const la = U.clamp(this.outAmount * 2, 0, 1);
+    if (la > 0) {
+      const text = '여기에 맞춰 달려요';
+      g.font = `700 ${fs}px ${pal.fontText}`;
+      const lw = g.measureText(text).width + fs * 1.4;
+      const lh2 = Math.round(fs * 1.7);
+      const ly = pyTop - lh2 - 8;
+      g.globalAlpha = la;
+      g.fillStyle = pal.panel;
+      g.beginPath();
+      g.roundRect(-lw / 2, ly, lw, lh2, lh2 / 2);
+      g.fill();
+      g.fillStyle = pal.ink;
+      g.textAlign = 'center';
+      g.fillText(text, 0, ly + lh2 / 2 + 1);
+      g.globalAlpha = 1;
+    }
+
+    this.drawFloaters(trackHalf, pyTop - 4, r);
     g.restore();
+  }
+
+  // 배지 안의 자전거 (s = 배지 반지름). 바퀴는 페달보다 빨리 돌고, 크랭크는 페달 속도 그대로 돈다
+  drawBike(x, y, s) {
+    const { g, pal } = this;
+    const P = (px, py) => [x + px * s, y + py * s];
+    const wr = s * 0.27;
+    const R = P(-0.4, 0.22), F = P(0.4, 0.22), C = P(-0.02, 0.22), S = P(-0.15, -0.18), Hd = P(0.27, -0.18);
+    g.strokeStyle = pal.ink;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.lineWidth = Math.max(2, s * 0.085);
+    g.beginPath();
+    g.arc(R[0], R[1], wr, 0, Math.PI * 2);
+    g.moveTo(F[0] + wr, F[1]);
+    g.arc(F[0], F[1], wr, 0, Math.PI * 2);
+    g.moveTo(...R);
+    g.lineTo(...S);
+    g.lineTo(...C);
+    g.lineTo(...R);
+    g.moveTo(...S);
+    g.lineTo(...Hd);
+    g.lineTo(...C);
+    g.moveTo(...Hd);
+    g.lineTo(...F);
+    const seat = P(-0.17, -0.31);
+    g.moveTo(...S);
+    g.lineTo(...seat);
+    g.moveTo(seat[0] - s * 0.1, seat[1]);
+    g.lineTo(seat[0] + s * 0.08, seat[1]);
+    const bar = P(0.3, -0.33);
+    g.moveTo(...Hd);
+    g.lineTo(...bar);
+    g.lineTo(bar[0] + s * 0.1, bar[1] + s * 0.02);
+    g.stroke();
+    g.lineWidth = Math.max(1.2, s * 0.045);
+    g.beginPath();
+    for (const wh of [R, F]) {
+      for (let k = 0; k < 3; k++) {
+        const a = this.roll * 2 + (k * Math.PI) / 3;
+        g.moveTo(wh[0] + Math.cos(a) * wr, wh[1] + Math.sin(a) * wr);
+        g.lineTo(wh[0] - Math.cos(a) * wr, wh[1] - Math.sin(a) * wr);
+      }
+    }
+    g.stroke();
+    g.lineWidth = Math.max(2, s * 0.07);
+    g.beginPath();
+    const ca = this.roll;
+    g.moveTo(C[0] + Math.cos(ca) * s * 0.13, C[1] + Math.sin(ca) * s * 0.13);
+    g.lineTo(C[0] - Math.cos(ca) * s * 0.13, C[1] - Math.sin(ca) * s * 0.13);
+    g.stroke();
+    g.lineCap = 'butt';
+    g.lineJoin = 'miter';
   }
 }

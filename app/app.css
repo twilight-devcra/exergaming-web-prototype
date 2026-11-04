@@ -144,7 +144,7 @@ body[data-theme="scenic"] {
 .stage-title { font-size: clamp(18px, 2.6vh, 22px); color: var(--ink); }
 
 /* ================= 대기(시작) 화면 ================= */
-/* 왼쪽: 로고와 이름, 한 줄 소개, 세 단계, 시작 버튼. 오른쪽: 게임 화면 미리보기 (app/preview.js) */
+/* 왼쪽: 로고와 이름, 소개, 세 단계, 시작 버튼. 오른쪽: 바퀴 안의 두뇌 */
 #attract {
   gap: clamp(32px, 6vw, 88px);
   padding: 40px clamp(32px, 6vw, 96px);
@@ -153,7 +153,7 @@ body[data-theme="scenic"] {
     radial-gradient(ellipse 60% 50% at 8% 108%, color-mix(in srgb, var(--hill-far) 45%, transparent), transparent 70%),
     var(--bg);
 }
-.att-main { gap: 0; max-width: 580px; flex: 0 1 580px; }
+.att-main { gap: 0; max-width: 600px; flex: 0 1 600px; }
 .att-logo { display: flex; align-items: center; gap: clamp(16px, 2.4vh, 22px); }
 .att-logo img {
   width: clamp(64px, 11vh, 92px);
@@ -169,7 +169,7 @@ body[data-theme="scenic"] {
   letter-spacing: -0.04em;
   white-space: nowrap;
 }
-.att-logo h1 span:last-child { color: var(--good); }
+.att-logo h1 span { color: var(--good); font-family: var(--font-num); font-weight: 900; letter-spacing: -0.02em; }
 .att-tagline {
   margin: clamp(14px, 2.4vh, 22px) 0 0;
   font-size: clamp(19px, 3.2vh, 26px);
@@ -190,7 +190,7 @@ body[data-theme="scenic"] {
   flex: 1 1 0;
   align-items: flex-start;
   gap: 10px;
-  padding: 0 14px;
+  padding: 0 12px;
   font-size: clamp(16px, 2.5vh, 19px);
   font-weight: 700;
   line-height: 1.3;
@@ -216,67 +216,12 @@ body[data-theme="scenic"] {
 }
 .att-hint { margin-top: clamp(12px, 2vh, 16px); }
 
-/* 게임 화면 미리보기: 위는 풍경 속 자전거, 아래는 두뇌 게임 카드 */
-.att-visual { flex: 0 1 auto; width: min(44vw, 74vh); }
-.pv {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  aspect-ratio: 1 / 1;
-  padding: 10px;
-  border-radius: 34px;
-  background: var(--panel);
-  box-shadow: 0 2px 6px rgba(29, 43, 36, 0.06), 0 24px 60px rgba(29, 43, 36, 0.14);
-}
-.pv-scene { position: relative; flex: 1 1 62%; min-height: 0; border-radius: 26px; overflow: hidden; background: var(--sky); }
-.pv-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.pv-chip {
-  position: absolute;
-  top: 12px;
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 5px 12px 6px;
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: 0 2px 8px rgba(29, 43, 36, 0.1);
-}
-.pv-time { left: 12px; }
-.pv-score { right: 12px; }
-.pv-chip small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
-.pv-chip b { font-family: var(--font-num); font-size: 19px; font-weight: 900; color: var(--ink); min-width: 2.4em; }
-.pv-game {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(8px, 1.6vh, 12px);
-  padding: clamp(10px, 2vh, 18px) 16px clamp(14px, 2.4vh, 20px);
-  border-radius: 26px;
-  background: var(--cell);
-}
-.pv-tag { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; }
-.pv-q { font-size: clamp(20px, 3.4vh, 28px); font-weight: 700; color: var(--ink); white-space: nowrap; }
-.pv-opts { display: flex; gap: 10px; width: 100%; max-width: 380px; }
-.pv-opts span {
-  flex: 1 1 0;
-  padding: clamp(8px, 1.4vh, 12px) 0;
-  border-radius: 14px;
-  background: var(--panel);
-  box-shadow: 0 1px 2px rgba(29, 43, 36, 0.08);
-  text-align: center;
-  font-size: clamp(17px, 2.8vh, 22px);
-  font-weight: 700;
-  color: var(--ink);
-  transition: background 0.25s, color 0.25s, opacity 0.25s, transform 0.25s;
-}
-.pv-opts span.ok { background: var(--good); color: #fff; transform: scale(1.06); }
-.pv-opts span.dim { opacity: 0.45; }
-.pv.pv-new :is(.pv-q, .pv-opts) { animation: pv-in 0.4s ease-out; }
-@keyframes pv-in { from { opacity: 0; transform: translateY(6px); } }
+/* 바퀴 안의 두뇌 (app/attract-visual.js) */
+.att-visual { flex: 0 1 auto; width: min(42vw, 76vh); }
+#att-brain { display: block; width: 100%; aspect-ratio: 1 / 1; }
 
-/* 세로로 긴 화면: 미리보기를 위에, 소개를 아래에 */
+/* 세로로 긴 화면: 그림을 위에, 소개를 아래에 */
 @media (max-width: 860px), (max-aspect-ratio: 1/1) {
-  .att-visual { width: min(80vw, 46vh); }
+  .att-visual { width: min(70vw, 40vh); }
   .att-main { flex: none; }
 }

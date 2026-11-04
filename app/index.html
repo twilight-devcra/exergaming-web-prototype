@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
-  <title>페달 산책</title>
+  <title>두뇌 PT</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,7 @@
   <!-- 메뉴 -->
   <section id="menu" class="screen active">
     <div class="menu-main">
-      <h1>페달 산책</h1>
+      <h1>두뇌 PT</h1>
       <p>일정한 속도로 페달을 밟으면서, 화면 아래 인지 게임을 풀어 점수를 모으세요.</p>
       <p>
         페달링: <span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기</span><span class="sensor-only">연결된 페달 센서</span><br>
@@ -172,31 +172,20 @@
     <div class="att-main">
       <div class="att-logo">
         <img src="logo.svg" alt="">
-        <h1><span>페달</span> <span>산책</span></h1>
+        <h1>두뇌 <span>PT</span></h1>
       </div>
-      <p class="att-tagline">페달을 밟으며 두뇌를 깨우는 풍경 여행</p>
+      <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
       <ol class="att-steps">
-        <li><b>1</b><span>속도 찾기<small>편안하게 · <i id="att-calib"></i></small></span></li>
-        <li><b>2</b><span>두뇌 게임<small>달리며 · <i id="att-dur"></i></small></span></li>
-        <li><b>3</b><span>기록 보기<small>그래프와 점수</small></span></li>
+        <li><b>1</b><span>준비 운동<small>내 속도 찾기 · <i id="att-calib"></i></small></span></li>
+        <li><b>2</b><span>두뇌 트레이닝<small>페달+두뇌 게임 · <i id="att-dur"></i></small></span></li>
+        <li><b>3</b><span>오늘의 리포트<small>그래프와 운동량</small></span></li>
       </ol>
-      <button class="btn att-start" id="att-start">시작하기</button>
+      <button class="btn att-start" id="att-start">트레이닝 시작</button>
       <div class="att-hint" id="att-hint">화면을 누르거나 페달을 밟으면 시작합니다</div>
     </div>
-    <!-- 게임 화면 미리보기: 실제 풍경 그림(js/band.js)으로 자전거가 달리고, 아래 카드에서 문제를 푼다 (app/preview.js) -->
+    <!-- 바퀴 안의 두뇌: 바퀴가 돌 때마다 두뇌 신경망이 밝아진다 (app/attract-visual.js) -->
     <div class="att-visual">
-      <div class="pv" id="att-preview">
-        <div class="pv-scene">
-          <canvas></canvas>
-          <div class="pv-chip pv-time"><small>남은 시간</small><b>4:30</b></div>
-          <div class="pv-chip pv-score"><small>점수</small><b>0</b></div>
-        </div>
-        <div class="pv-game">
-          <div class="pv-tag">두뇌 게임</div>
-          <div class="pv-q"></div>
-          <div class="pv-opts"><span></span><span></span><span></span></div>
-        </div>
-      </div>
+      <canvas id="att-brain"></canvas>
     </div>
     <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span></div>
   </section>
@@ -352,7 +341,7 @@
   <script src="../js/abilities.js"></script>
   <script src="../js/session-log.js"></script>
   <script src="../js/demo.js"></script>
-  <script src="preview.js"></script>
+  <script src="attract-visual.js"></script>
   <script src="../js/main.js"></script>
 </body>
 </html>

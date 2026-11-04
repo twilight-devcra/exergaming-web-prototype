@@ -33,8 +33,8 @@ const Demo = {
     document.body.classList.add('demo');
     this.allowKbd = new URLSearchParams(location.search).has('kbd');
     this.station = this.load('station', '');
-    // 대기 화면 오른쪽 그림: 운영 버전은 게임 화면 미리보기(app/preview.js), 프로토타입은 모양이 바뀌는 두뇌 그래프
-    this.preview = typeof AttractPreview !== 'undefined' ? AttractPreview.init(app) : null;
+    // 대기 화면 오른쪽 그림: 운영 버전은 바퀴 안의 두뇌(app/attract-visual.js), 프로토타입은 모양이 바뀌는 두뇌 그래프
+    this.preview = typeof AttractVisual !== 'undefined' ? AttractVisual.init(app) : null;
     this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
     if (!this.preview) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
@@ -145,8 +145,8 @@ const Demo = {
   },
 
   // 장식용 그래프가 천천히 모양을 바꾼다
-  animateDeco(dt) {
-    if (this.preview) return this.preview.tick(dt);
+  animateDeco(dt, rpm) {
+    if (this.preview) return this.preview.tick(dt, rpm);
     const d = this.deco;
     d.t -= dt;
     if (d.t <= 0) {
@@ -170,7 +170,7 @@ const Demo = {
         this.attractAt = a.clock;
         this.pedalHold = 0;
       }
-      this.animateDeco(dt);
+      this.animateDeco(dt, rpm);
       const ready = (a.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.opOpen && this.canStart();
       this.pedalHold = ready && rpm > this.RPM_ACTIVE ? this.pedalHold + dt : Math.max(0, this.pedalHold - dt);
       if (this.pedalHold >= this.PEDAL_START_SEC) this.start('pedal');

@@ -36,6 +36,8 @@ const Demo = {
     this.station = this.load('station', '');
     // 대기 화면 오른쪽 그림: 운영 버전은 바퀴 안의 두뇌(app/attract-visual.js), 프로토타입은 모양이 바뀌는 두뇌 그래프
     this.preview = typeof AttractVisual !== 'undefined' ? AttractVisual.init(app) : null;
+    // 운영 버전: 속도 측정 화면의 둥근 길과 자전거 (app/calib-visual.js)
+    this.calibVisual = typeof CalibVisual !== 'undefined' ? CalibVisual.init() : null;
     this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
     if (!this.preview && $('#att-radar')) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
@@ -272,6 +274,10 @@ const Demo = {
     } else if (a.state === 'setup') {
       if ((a.clock - this.activeAt) / 1000 > this.SETUP_IDLE_SEC) a.show('attract');
     } else if (a.state === 'calib') {
+      if (this.calibVisual) {
+        if (entered) this.calibVisual.reset();
+        this.calibVisual.tick(dt, a.calib.started ? rpm : 0, a.calib, a.cfg.calibrationSec);
+      }
       // 시작만 눌러 놓고 자리를 떠난 경우
       if (!a.calib.started && (a.clock - this.activeAt) / 1000 > this.CALIB_IDLE_SEC) a.quit();
     } else if (a.state === 'play') {

@@ -338,3 +338,12 @@ body[data-theme="scenic"] {
 .pin-title { font-size: 18px; font-weight: 700; color: var(--ink); }
 .att-pedal { align-self: flex-start; margin-top: 12px; }
 .att-pedal[hidden] { display: none; }
+
+/* ================= 속도 측정 (준비 운동) ================= */
+/* 둥근 길을 도는 자전거 (app/calib-visual.js). 프로토타입의 크랭크 그림(svg)은 감춘다 */
+#calib .calib-ring { width: min(380px, 52vh); height: min(380px, 52vh); margin: 4px 0; }
+#calib .calib-ring svg { display: none; }
+#calib-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#calib .calib-ring .num { font-size: clamp(56px, 10vh, 84px); color: var(--ink); }
+#calib > h2 { font-size: clamp(28px, 4.6vh, 38px); color: var(--ink); }
+.calib-state { font-size: 20px; }

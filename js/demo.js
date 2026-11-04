@@ -56,8 +56,12 @@ const Demo = {
     app.show('attract');
     this.renderStation();
     this.updateAttract();
-    // 처음에는 운영 메뉴부터. 페달 연결(기기 선택)과 전체 화면은 사람이 화면을 눌러야만 요청할 수 있다.
-    this.openOp();
+    // 시연(프로토타입)은 운영 메뉴부터 연다. 페달 연결(기기 선택)과 전체 화면은 사람이 화면을 눌러야만 요청할 수 있다.
+    // 운영 버전은 바로 대기 화면. 페달은 대기 화면의 '페달 연결' 버튼으로, 전체 화면은 시작을 누를 때 요청한다
+    if (EDITION === 'app') {
+      if (!this.station) this.station = '1'; // 운영 메뉴에서 바꿀 수 있다 (저장은 그때)
+      this.renderStation();
+    } else this.openOp();
   },
 
   // ---------------- 저장 (태블릿마다 따로) ----------------
@@ -103,6 +107,9 @@ const Demo = {
       : ok ? '화면을 누르거나 페달을 밟으면 시작합니다'
       : '페달 연결을 기다리는 중입니다 · 진행 요원에게 알려주세요';
     $('#att-hint').classList.toggle('warn', !ok || kbdOnly || this.simResult);
+    // 운영 버전: 페달이 연결돼 있지 않으면 대기 화면에서 바로 연결한다 (운영 메뉴를 열지 않고)
+    const pb = $('#att-pedal');
+    if (pb) pb.hidden = this.app.link.state === 'ready';
   },
 
   // via: tap(화면을 눌러서) | pedal(페달을 밟아서)
@@ -424,6 +431,9 @@ const Demo = {
     $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
     this.bindSettings();
     // 운영 버전: 대기 화면 오른쪽 아래의 '운영' 버튼 → PIN. 대기 화면을 눌러 시작하는 것과 겹치지 않게 막는다
+    const pb = $('#att-pedal');
+    if (pb) pb.addEventListener('pointerdown', (e) => e.stopPropagation());
+    if (pb) pb.addEventListener('click', (e) => e.stopPropagation());
     const ob = $('#op-open');
     if (ob) {
       ob.addEventListener('pointerdown', (e) => e.stopPropagation());

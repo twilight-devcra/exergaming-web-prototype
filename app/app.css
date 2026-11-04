@@ -336,3 +336,5 @@ body[data-theme="scenic"] {
 }
 .op-open:active { background: var(--cell); }
 .pin-title { font-size: 18px; font-weight: 700; color: var(--ink); }
+.att-pedal { align-self: flex-start; margin-top: 12px; }
+.att-pedal[hidden] { display: none; }

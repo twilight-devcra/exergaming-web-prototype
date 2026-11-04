@@ -6,14 +6,14 @@
   <!-- 파일 주소 끝의 ?v= 는 고칠 때마다 바꾼다. 브라우저가 예전 파일과 새 파일을 섞어 쓰다 멈추는 일을 막는다 -->
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>두뇌 PT</title>
-  <link rel="icon" href="logo.svg?v=20261104c" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=20261104d" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
-  <link rel="stylesheet" href="../css/style.css?v=20261104c">
-  <link rel="stylesheet" href="../css/themes.css?v=20261104c">
-  <link rel="stylesheet" href="app.css?v=20261104c">
+  <link rel="stylesheet" href="../css/style.css?v=20261104d">
+  <link rel="stylesheet" href="../css/themes.css?v=20261104d">
+  <link rel="stylesheet" href="app.css?v=20261104d">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -172,7 +172,7 @@
   <section id="attract" class="screen">
     <div class="att-main">
       <div class="att-logo">
-        <img src="logo.svg?v=20261104c" alt="">
+        <img src="logo.svg?v=20261104d" alt="">
         <h1>두뇌 <span>PT</span></h1>
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
@@ -188,7 +188,10 @@
     <div class="att-visual">
       <canvas id="att-brain"></canvas>
     </div>
-    <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span></div>
+    <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span>
+      <!-- 운영 메뉴 열기 (PIN). 게임 중에는 왼쪽 위 모서리 2초 길게 누르기 -->
+      <button class="op-open" id="op-open" aria-label="운영 메뉴"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>운영</button>
+    </div>
   </section>
 
   <!-- 세션 설정: 대기 화면 다음. 운동 시간과 난이도를 고른다 (js/config.js SESSION_LENGTHS·SESSION_DIFFICULTIES, js/demo.js openSetup) -->
@@ -309,6 +312,7 @@
   <!-- 운영 메뉴 PIN -->
   <div id="pin" class="overlay">
     <div class="pin-box">
+      <div class="pin-title">운영 메뉴 PIN</div>
       <div class="pin-dots" id="pin-dots"><i></i><i></i><i></i><i></i></div>
       <div class="pin-pad" id="pin-pad">
         <button>1</button><button>2</button><button>3</button>
@@ -343,34 +347,34 @@
   </div>
   <div id="debug"></div>
 
-  <script src="../js/config.js?v=20261104c"></script>
-  <script src="../js/pedal.js?v=20261104c"></script>
-  <script src="../js/pedal-link.js?v=20261104c"></script>
-  <script src="../js/cadence-est.js?v=20261104c"></script>
-  <script src="../js/audio.js?v=20261104c"></script>
-  <script src="../js/band.js?v=20261104c"></script>
-  <script src="../js/exercise.js?v=20261104c"></script>
-  <script src="../js/fx.js?v=20261104c"></script>
-  <script src="../js/themes.js?v=20261104c"></script>
-  <script src="../js/diagram.js?v=20261104c"></script>
-  <script src="../js/games/path.js?v=20261104c"></script>
-  <script src="../js/games/symbol.js?v=20261104c"></script>
-  <script src="../js/games/arith.js?v=20261104c"></script>
-  <script src="../js/games/count.js?v=20261104c"></script>
-  <script src="../js/games/fit.js?v=20261104c"></script>
-  <script src="../js/games/seek.js?v=20261104c"></script>
-  <script src="../js/games/cover.js?v=20261104c"></script>
-  <script src="../js/games/ladder.js?v=20261104c"></script>
-  <script src="../js/games/novel.js?v=20261104c"></script>
-  <script src="../js/games/track.js?v=20261104c"></script>
-  <script src="../js/games/follow.js?v=20261104c"></script>
-  <script src="../js/games/pair.js?v=20261104c"></script>
-  <script src="../js/games/box.js?v=20261104c"></script>
-  <script src="../js/abilities.js?v=20261104c"></script>
-  <script src="../js/session-log.js?v=20261104c"></script>
-  <script src="../js/session-upload.js?v=20261104c"></script>
-  <script src="../js/demo.js?v=20261104c"></script>
-  <script src="attract-visual.js?v=20261104c"></script>
-  <script src="../js/main.js?v=20261104c"></script>
+  <script src="../js/config.js?v=20261104d"></script>
+  <script src="../js/pedal.js?v=20261104d"></script>
+  <script src="../js/pedal-link.js?v=20261104d"></script>
+  <script src="../js/cadence-est.js?v=20261104d"></script>
+  <script src="../js/audio.js?v=20261104d"></script>
+  <script src="../js/band.js?v=20261104d"></script>
+  <script src="../js/exercise.js?v=20261104d"></script>
+  <script src="../js/fx.js?v=20261104d"></script>
+  <script src="../js/themes.js?v=20261104d"></script>
+  <script src="../js/diagram.js?v=20261104d"></script>
+  <script src="../js/games/path.js?v=20261104d"></script>
+  <script src="../js/games/symbol.js?v=20261104d"></script>
+  <script src="../js/games/arith.js?v=20261104d"></script>
+  <script src="../js/games/count.js?v=20261104d"></script>
+  <script src="../js/games/fit.js?v=20261104d"></script>
+  <script src="../js/games/seek.js?v=20261104d"></script>
+  <script src="../js/games/cover.js?v=20261104d"></script>
+  <script src="../js/games/ladder.js?v=20261104d"></script>
+  <script src="../js/games/novel.js?v=20261104d"></script>
+  <script src="../js/games/track.js?v=20261104d"></script>
+  <script src="../js/games/follow.js?v=20261104d"></script>
+  <script src="../js/games/pair.js?v=20261104d"></script>
+  <script src="../js/games/box.js?v=20261104d"></script>
+  <script src="../js/abilities.js?v=20261104d"></script>
+  <script src="../js/session-log.js?v=20261104d"></script>
+  <script src="../js/session-upload.js?v=20261104d"></script>
+  <script src="../js/demo.js?v=20261104d"></script>
+  <script src="attract-visual.js?v=20261104d"></script>
+  <script src="../js/main.js?v=20261104d"></script>
 </body>
 </html>

@@ -423,6 +423,15 @@ const Demo = {
     };
     $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
     this.bindSettings();
+    // 운영 버전: 대기 화면 오른쪽 아래의 '운영' 버튼 → PIN. 대기 화면을 눌러 시작하는 것과 겹치지 않게 막는다
+    const ob = $('#op-open');
+    if (ob) {
+      ob.addEventListener('pointerdown', (e) => e.stopPropagation());
+      ob.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openPin();
+      });
+    }
     // 모서리 길게 누르기 → PIN
     const corner = $('#op-corner');
     let timer = null;

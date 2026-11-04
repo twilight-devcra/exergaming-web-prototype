@@ -150,13 +150,13 @@ const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
 // 게임 중 음악 스타일 (js/audio.js 의 BeatAudio.STYLES). 모두 비트 하나 = 페달 반 바퀴로 박자를 이끈다.
 // 태블릿마다 운영 메뉴(테스트 화면은 '시연 설정')의 '음악'에서 고르고, 주소에 ?music=trot 처럼 붙여도 된다.
 const MUSIC_STYLES = [
+  { id: 'disco', label: '신나는 댄스' },
   { id: 'acoustic', label: '산책 기타 (가볍고 밝게)' },
   { id: 'trot', label: '트로트 (쿵짝 + 아코디언)' },
-  { id: 'disco', label: '신나는 댄스' },
   { id: 'calm', label: '잔잔하게 (드럼 없음)' },
   { id: 'beat', label: '기본 비트 (프로토타입)' },
 ];
-const MUSIC_DEFAULT = { app: 'acoustic', prototype: 'beat' };
+const MUSIC_DEFAULT = { app: 'disco', prototype: 'beat' };
 const MUSIC_KEY = 'exergame.music';
 
 // 끝난 세션을 보낼 서버 (js/session-upload.js). 여기에 적으면 모든 태블릿의 기본값이 되고,

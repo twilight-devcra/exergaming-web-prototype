@@ -33,8 +33,10 @@ const Demo = {
     document.body.classList.add('demo');
     this.allowKbd = new URLSearchParams(location.search).has('kbd');
     this.station = this.load('station', '');
+    // 대기 화면 오른쪽 그림: 운영 버전은 게임 화면 미리보기(app/preview.js), 프로토타입은 모양이 바뀌는 두뇌 그래프
+    this.preview = typeof AttractPreview !== 'undefined' ? AttractPreview.init(app) : null;
     this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
-    Radar.render($('#att-radar'), this.deco.v, null);
+    if (!this.preview) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
     this.bindPin();
     this.bindHolds();
@@ -144,6 +146,7 @@ const Demo = {
 
   // 장식용 그래프가 천천히 모양을 바꾼다
   animateDeco(dt) {
+    if (this.preview) return this.preview.tick(dt);
     const d = this.deco;
     d.t -= dt;
     if (d.t <= 0) {

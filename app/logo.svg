@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <!-- 페달 산책 로고: 해 뜬 언덕길을 달리는 자전거. 탭 아이콘으로도 쓴다 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3cb87e"/>
+      <stop offset="1" stop-color="#1f6fd1"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="26" fill="url(#bg)"/>
+  <circle cx="68" cy="27" r="11" fill="#fde7a6"/>
+  <path d="M0 70 Q24 54 48 62 T96 56 V96 H0 Z" fill="#fff" fill-opacity="0.16"/>
+  <g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="26" cy="64" r="13"/>
+    <circle cx="70" cy="64" r="13"/>
+    <path d="M26 64 L44 64 L37 44 Z M44 64 L61 45 L37 45 M61 45 L70 64 M61 45 L58 37 L65 36"/>
+    <path d="M32 40 H42"/>
+  </g>
+</svg>

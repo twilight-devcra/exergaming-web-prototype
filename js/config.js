@@ -148,7 +148,7 @@ const DEMO_SETTINGS = [
 const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
 
 // 끝난 세션을 보낼 서버 (js/session-upload.js). 여기에 적으면 모든 태블릿의 기본값이 되고,
-// 운영 메뉴의 '자동 업로드'에 적은 값이 태블릿마다 이것을 덮는다. url 이 비어 있으면 업로드하지 않는다.
+// 운영 메뉴의 '자동 업로드'에 적은 값이 칸마다 이것을 덮는다 (운영 메뉴 칸이 비어 있으면 여기 값). 둘 다 url 이 없으면 업로드하지 않는다.
 // 주의: 이 파일은 누구나 볼 수 있으므로 key 에는 '업로드만 할 수 있는' 키를 넣는다.
 const SESSION_UPLOAD = { url: '', key: '' };
 

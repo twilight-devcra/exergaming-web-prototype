@@ -147,6 +147,18 @@ const DEMO_SETTINGS = [
 ];
 const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
 
+// 게임 중 음악 스타일 (js/audio.js 의 BeatAudio.STYLES). 모두 비트 하나 = 페달 반 바퀴로 박자를 이끈다.
+// 태블릿마다 운영 메뉴(테스트 화면은 '시연 설정')의 '음악'에서 고르고, 주소에 ?music=trot 처럼 붙여도 된다.
+const MUSIC_STYLES = [
+  { id: 'acoustic', label: '산책 기타 (가볍고 밝게)' },
+  { id: 'trot', label: '트로트 (쿵짝 + 아코디언)' },
+  { id: 'disco', label: '신나는 댄스' },
+  { id: 'calm', label: '잔잔하게 (드럼 없음)' },
+  { id: 'beat', label: '기본 비트 (프로토타입)' },
+];
+const MUSIC_DEFAULT = { app: 'acoustic', prototype: 'beat' };
+const MUSIC_KEY = 'exergame.music';
+
 // 끝난 세션을 보낼 서버 (js/session-upload.js). 여기에 적으면 모든 태블릿의 기본값이 되고,
 // 운영 메뉴의 '자동 업로드'에 적은 값이 칸마다 이것을 덮는다 (운영 메뉴 칸이 비어 있으면 여기 값). 둘 다 url 이 없으면 업로드하지 않는다.
 // 주의: 이 파일은 누구나 볼 수 있으므로 key 에는 '업로드만 할 수 있는' 키를 넣는다.
@@ -208,6 +220,19 @@ const Config = {
   },
   presetNotes() {
     return [...ROUND_PRESETS.map((p) => this.presetNote(p.id)), PRESET_CUSTOM_NOTE];
+  },
+  // 게임 중 음악 스타일: 주소의 ?music= → 이 태블릿에서 고른 것 → 판(edition)별 기본값
+  music() {
+    const ok = (id) => MUSIC_STYLES.some((m) => m.id === id);
+    const q = new URLSearchParams(location.search).get('music');
+    if (ok(q)) return q;
+    let saved = null;
+    try { saved = localStorage.getItem(MUSIC_KEY); } catch (e) { }
+    if (ok(saved)) return saved;
+    return MUSIC_DEFAULT[typeof EDITION !== 'undefined' ? EDITION : 'prototype'] || 'beat';
+  },
+  setMusic(id) {
+    try { localStorage.setItem(MUSIC_KEY, id); } catch (e) { }
   },
   // 운영 버전의 세션 설정(시간·난이도)으로 바뀌는 값. 운영 메뉴의 라운드 설정 위에 덮는다
   session(min, difficultyId) {

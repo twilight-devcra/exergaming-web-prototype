@@ -23,6 +23,7 @@ class SessionLog {
       mode: app.demo ? 'demo' : 'test',
       startedAt: d.toISOString(),
       theme: Theme.current.id,
+      music: Config.music(), // 음악 스타일 (js/audio.js STYLES)
       input: app.pedal.sensorOn ? 'pedal' : 'keyboard',
       firmware: app.link.firmware || null,
       rpmSource: app.cfg.rpmSource,

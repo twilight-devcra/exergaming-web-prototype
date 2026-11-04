@@ -142,7 +142,10 @@ const Demo = {
     $('#su-len').innerHTML = SESSION_LENGTHS.map((l) => tile(`data-min="${l.min}"`, l.label, l.desc)).join('');
     $('#su-diff').innerHTML = SESSION_DIFFICULTIES.map((d, i) =>
       tile(`data-diff="${d.id}"`, d.label, d.desc, `<i class="su-bars" data-n="${i + 1}"><span></span><span></span><span></span></i>`)).join('');
-    $('#setup').addEventListener('pointerdown', () => (this.activeAt = this.app.clock));
+    $('#setup').addEventListener('pointerdown', () => {
+      this.activeAt = this.app.clock;
+      this.app.audio.ensure(); // 페달로 들어와 소리가 막혀 있었으면 누를 때 풀린다
+    });
     $('#su-len').addEventListener('click', (e) => {
       const b = e.target.closest('[data-min]');
       if (b) this.pickSetup({ min: +b.dataset.min });
@@ -166,6 +169,8 @@ const Demo = {
     a.show('setup');
     a.state = 'setup';
     this.activeAt = a.clock;
+    // 고르는 동안 잔잔한 음악 (화면을 떠나면 tick 이 끈다)
+    if (a.cfg.sound) a.audio.ambient(true);
   },
 
   pickSetup(change) {
@@ -251,6 +256,7 @@ const Demo = {
   tick(dt, rpm) {
     const a = this.app;
     if (rpm > this.RPM_ACTIVE) this.activeAt = a.clock;
+    if (a.state !== 'setup') a.audio.ambient(false);
     const entered = a.state !== this.prevState;
     this.prevState = a.state;
 
@@ -579,12 +585,15 @@ const Demo = {
     this.renderLog();
     this.renderSessions();
     this.renderUpload();
+    this.app.renderMusicTry();
     if (a.inRound) a.log.ev('operator', { open: true });
     $('#op').classList.add('active');
     this.syncPause();
   },
 
   hideOp() {
+    this.app.audio.endPreview();
+    this.app.renderMusicTry();
     if (this.app.inRound && this.opOpen) this.app.log.ev('operator', { open: false });
     this.opOpen = false;
     $('#op-set').classList.remove('active');

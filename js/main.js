@@ -38,6 +38,7 @@ const App = {
     };
     Fx.init();
     Theme.init();
+    this.bindMusic();
     // 두뇌 그래프·운동량 카드를 두 결과 화면에 붙인다 (시연 결과는 최종 점수 카드 뒤, 테스트 결과는 점수와 순위 사이)
     const report = () => $('#tpl-report').content.cloneNode(true);
     $('#demo-result .dr-grid').append(report());
@@ -249,6 +250,37 @@ const App = {
   },
 
   // ---------------- 페달 센서 ----------------
+  // 음악 스타일 고르기와 미리 듣기 (테스트 화면 '시연 설정', 운영 메뉴). 고른 것은 이 태블릿에 저장되고 다음 판부터 쓴다
+  bindMusic() {
+    const pickers = document.querySelectorAll('select[data-music-picker]');
+    pickers.forEach((sel) => {
+      sel.innerHTML = MUSIC_STYLES.map((m) => `<option value="${m.id}">${m.label}</option>`).join('');
+      sel.value = Config.music();
+      sel.onchange = () => {
+        Config.setMusic(sel.value);
+        pickers.forEach((o) => (o.value = sel.value));
+        // 듣는 중이었으면 새 스타일로 이어 듣는다
+        if (this.audio.previewing) this.audio.preview(sel.value, 12);
+        this.renderMusicTry();
+      };
+    });
+    document.querySelectorAll('[data-music-try]').forEach((b) => (b.onclick = () => {
+      if (this.audio.previewing) this.audio.endPreview();
+      else if (!this.inRound) this.audio.preview(Config.music(), 12);
+      this.renderMusicTry();
+    }));
+  },
+
+  renderMusicTry() {
+    const on = !!this.audio.previewing;
+    document.querySelectorAll('[data-music-try]').forEach((b) => {
+      b.textContent = on ? '그만 듣기' : '미리 듣기';
+      b.disabled = this.inRound;
+    });
+    clearTimeout(this.musicTryTimer);
+    if (on) this.musicTryTimer = setTimeout(() => this.renderMusicTry(), 500);
+  },
+
   bindLink() {
     // 연결 버튼과 상태 표시는 메뉴·운영 메뉴·대기 화면에 여러 개 있다
     const btns = document.querySelectorAll('[data-pedal-btn]');
@@ -366,6 +398,7 @@ const App = {
     this.meter.reset();
     this.audio.ensure();
     this.audio.setMuted(!this.cfg.sound);
+    this.audio.setStyle(Config.music());
     this.pedal.reset();
     this.roundSensor = this.pedal.sensorOn;
     this.gen++;

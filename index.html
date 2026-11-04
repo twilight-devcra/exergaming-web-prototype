@@ -64,6 +64,8 @@
         <div class="panel">
           <h2>시연 설정</h2>
           <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
+          <label class="setting">음악<select data-music-picker></select></label>
+          <button class="btn secondary small" data-music-try>미리 듣기</button>
           <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
           <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
           <label class="setting">오르막·내리막<input type="checkbox" id="cfg-change"></label>
@@ -232,6 +234,8 @@
           <button class="btn secondary small" data-pedal-btn>페달 연결</button>
         </div>
         <label class="setting">화면 스타일<select data-theme-picker></select></label>
+        <label class="setting">음악<select data-music-picker></select></label>
+        <button class="btn secondary small" data-music-try>미리 듣기</button>
         <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
         <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
         <p class="setting-note" id="op-cfg"></p>

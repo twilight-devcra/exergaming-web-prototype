@@ -6,14 +6,14 @@
   <!-- 파일 주소 끝의 ?v= 는 고칠 때마다 바꾼다. 브라우저가 예전 파일과 새 파일을 섞어 쓰다 멈추는 일을 막는다 -->
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>두뇌 PT</title>
-  <link rel="icon" href="logo.svg?v=20261104f" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=20261104g" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
-  <link rel="stylesheet" href="../css/style.css?v=20261104f">
-  <link rel="stylesheet" href="../css/themes.css?v=20261104f">
-  <link rel="stylesheet" href="app.css?v=20261104f">
+  <link rel="stylesheet" href="../css/style.css?v=20261104g">
+  <link rel="stylesheet" href="../css/themes.css?v=20261104g">
+  <link rel="stylesheet" href="app.css?v=20261104g">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -172,7 +172,7 @@
   <section id="attract" class="screen">
     <div class="att-main">
       <div class="att-logo">
-        <img src="logo.svg?v=20261104f" alt="">
+        <img src="logo.svg?v=20261104g" alt="">
         <h1>두뇌 <span>PT</span></h1>
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
@@ -266,6 +266,8 @@
         </div>
         <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
         <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
+        <label class="setting">음악<select data-music-picker></select></label>
+        <button class="btn secondary small" data-music-try>미리 듣기</button>
         <p class="setting-note" id="op-cfg"></p>
         <button class="btn secondary small" id="op-set-open">라운드 설정</button>
         <div class="op-round" id="op-round">
@@ -348,34 +350,34 @@
   </div>
   <div id="debug"></div>
 
-  <script src="../js/config.js?v=20261104f"></script>
-  <script src="../js/pedal.js?v=20261104f"></script>
-  <script src="../js/pedal-link.js?v=20261104f"></script>
-  <script src="../js/cadence-est.js?v=20261104f"></script>
-  <script src="../js/audio.js?v=20261104f"></script>
-  <script src="../js/band.js?v=20261104f"></script>
-  <script src="../js/exercise.js?v=20261104f"></script>
-  <script src="../js/fx.js?v=20261104f"></script>
-  <script src="../js/themes.js?v=20261104f"></script>
-  <script src="../js/diagram.js?v=20261104f"></script>
-  <script src="../js/games/path.js?v=20261104f"></script>
-  <script src="../js/games/symbol.js?v=20261104f"></script>
-  <script src="../js/games/arith.js?v=20261104f"></script>
-  <script src="../js/games/count.js?v=20261104f"></script>
-  <script src="../js/games/fit.js?v=20261104f"></script>
-  <script src="../js/games/seek.js?v=20261104f"></script>
-  <script src="../js/games/cover.js?v=20261104f"></script>
-  <script src="../js/games/ladder.js?v=20261104f"></script>
-  <script src="../js/games/novel.js?v=20261104f"></script>
-  <script src="../js/games/track.js?v=20261104f"></script>
-  <script src="../js/games/follow.js?v=20261104f"></script>
-  <script src="../js/games/pair.js?v=20261104f"></script>
-  <script src="../js/games/box.js?v=20261104f"></script>
-  <script src="../js/abilities.js?v=20261104f"></script>
-  <script src="../js/session-log.js?v=20261104f"></script>
-  <script src="../js/session-upload.js?v=20261104f"></script>
-  <script src="../js/demo.js?v=20261104f"></script>
-  <script src="attract-visual.js?v=20261104f"></script>
-  <script src="../js/main.js?v=20261104f"></script>
+  <script src="../js/config.js?v=20261104g"></script>
+  <script src="../js/pedal.js?v=20261104g"></script>
+  <script src="../js/pedal-link.js?v=20261104g"></script>
+  <script src="../js/cadence-est.js?v=20261104g"></script>
+  <script src="../js/audio.js?v=20261104g"></script>
+  <script src="../js/band.js?v=20261104g"></script>
+  <script src="../js/exercise.js?v=20261104g"></script>
+  <script src="../js/fx.js?v=20261104g"></script>
+  <script src="../js/themes.js?v=20261104g"></script>
+  <script src="../js/diagram.js?v=20261104g"></script>
+  <script src="../js/games/path.js?v=20261104g"></script>
+  <script src="../js/games/symbol.js?v=20261104g"></script>
+  <script src="../js/games/arith.js?v=20261104g"></script>
+  <script src="../js/games/count.js?v=20261104g"></script>
+  <script src="../js/games/fit.js?v=20261104g"></script>
+  <script src="../js/games/seek.js?v=20261104g"></script>
+  <script src="../js/games/cover.js?v=20261104g"></script>
+  <script src="../js/games/ladder.js?v=20261104g"></script>
+  <script src="../js/games/novel.js?v=20261104g"></script>
+  <script src="../js/games/track.js?v=20261104g"></script>
+  <script src="../js/games/follow.js?v=20261104g"></script>
+  <script src="../js/games/pair.js?v=20261104g"></script>
+  <script src="../js/games/box.js?v=20261104g"></script>
+  <script src="../js/abilities.js?v=20261104g"></script>
+  <script src="../js/session-log.js?v=20261104g"></script>
+  <script src="../js/session-upload.js?v=20261104g"></script>
+  <script src="../js/demo.js?v=20261104g"></script>
+  <script src="attract-visual.js?v=20261104g"></script>
+  <script src="../js/main.js?v=20261104g"></script>
 </body>
 </html>

@@ -47,6 +47,7 @@
 | `durationMs` | 기록 길이 (실제 시간) |
 | `ended` | 끝난 방식. `complete`(시간이 다 됨) · `operator`(운영 메뉴에서 끝냄) · `idle`(자리 비움으로 끝남) · `abandoned`(결과 없이 버림: 중단, 측정 중 자리 비움, 테스트 화면에서 메뉴로) |
 | `theme` | 화면 스타일 id |
+| `music` | 음악 스타일 id (`js/audio.js` 의 `STYLES`: `acoustic` · `trot` · `disco` · `calm` · `beat`). 이 필드가 없는 예전 기록은 `beat` |
 | `input` | 판을 시작할 때의 입력 장치. `pedal` \| `keyboard` |
 | `firmware` | 페달 펌웨어 (`VER`), 모르면 null |
 | `rpmSource` | 속도 측정 방식 (`zc` · `comb` · `teo` · `pedal`) |

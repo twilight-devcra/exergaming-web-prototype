@@ -7,6 +7,7 @@ class BeatAudio {
     this.timer = null;
     this.queue = [];
     this.muted = false;
+    this.style = 'beat'; // 음악 스타일 (STYLES)
   }
 
   ensure() {
@@ -40,6 +41,12 @@ class BeatAudio {
   start(getBpm, { fadeIn = 0 } = {}) {
     this.ensure();
     this.stop();
+    if (this.previewing) {
+      this.previewing = false;
+      clearTimeout(this.previewTimer);
+      this.style = this.previewKeep;
+      this.muted = this.previewMuted;
+    }
     if (fadeIn > 0 && !this.muted) {
       const g = this.master.gain;
       const t = this.ctx.currentTime;
@@ -94,24 +101,355 @@ class BeatAudio {
     return out;
   }
 
-  playBeat(i, t, spb) {
-    const bassLine = [55, 55, 65.41, 49];
-    if (i % 2 === 0) {
-      this.kick(t);
-      this.bass(t, bassLine[Math.floor(i / 8) % 4], spb * 0.9);
-    } else {
-      this.snare(t);
-    }
-    this.hat(t + spb / 2);
+  // ---------------- 음악 스타일 ----------------
+  // 모든 스타일이 같은 박자 틀을 쓴다: 비트 하나 = 페달 반 바퀴, 마디 하나 = 비트 4개 (페달 두 바퀴).
+  // 어느 스타일이든 비트마다 또렷한 소리가 나서 페달 박자를 이끈다. 음은 모두 다장조/가단조 안에 있어
+  // 연속 정답 보상음(LADDER, 가단조 5음)과 어울린다. 고르는 곳: 운영 메뉴 '음악' (MUSIC_STYLES, js/config.js)
+  static m2f(n) {
+    return 440 * Math.pow(2, (n - 69) / 12);
   }
 
-  kick(t) {
+  static hash(i) {
+    const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  setStyle(id) {
+    this.style = BeatAudio.STYLES[id] ? id : 'beat';
+  }
+
+  playBeat(i, t, spb) {
+    (BeatAudio.STYLES[this.style] || BeatAudio.STYLES.beat).call(this, i, t, spb);
+  }
+
+  // 화음: 낮은 근음부터 쌓은 MIDI 번호
+  static CHORDS = {
+    C: [48, 55, 60, 64, 67], G: [43, 50, 55, 59, 62], Am: [45, 52, 57, 60, 64], F: [41, 48, 53, 57, 60],
+    Dm: [50, 57, 62, 65, 69], E: [40, 47, 56, 59, 64], Cmaj7: [48, 55, 59, 64, 67], Am7: [45, 52, 55, 60, 64], Fmaj7: [41, 48, 52, 57, 60],
+  };
+
+  // 트로트 가락 (8마디, 한 바퀴 32비트): [시작 비트, 음, 길이(비트)]. 화음은 Am Am Dm Dm E E Am Am
+  static TROT_TUNE = [
+    [0, 76, 1], [1, 76, 0.5], [1.5, 74, 0.5], [2, 72, 1], [3, 71, 1],
+    [4, 69, 2], [6, 72, 1], [7, 76, 1],
+    [8, 77, 1.5], [9.5, 76, 0.5], [10, 74, 1], [11, 77, 1],
+    [12, 76, 2], [14, 74, 1], [15, 72, 1],
+    [16, 71, 1], [17, 72, 0.5], [17.5, 71, 0.5], [18, 68, 1], [19, 71, 1],
+    [20, 76, 2], [22, 74, 1], [23, 71, 1],
+    [24, 72, 1], [25, 71, 0.5], [25.5, 69, 0.5], [26, 72, 1], [27, 76, 1],
+    [28, 69, 3],
+  ];
+
+  static STYLES = {
+    // 기본 비트: 킥·스네어·하이햇과 베이스 (예전 그대로)
+    beat(i, t, spb) {
+      const bassLine = [55, 55, 65.41, 49];
+      if (i % 2 === 0) {
+        this.kick(t);
+        this.bass(t, bassLine[Math.floor(i / 8) % 4], spb * 0.9);
+      } else {
+        this.snare(t);
+      }
+      this.hat(t + spb / 2);
+    },
+
+    // 산책 기타: 부드러운 킥과 셰이커 위에 기타처럼 뜯는 화음. C G Am F
+    acoustic(i, t, spb) {
+      const C = BeatAudio.CHORDS[['C', 'G', 'Am', 'F'][Math.floor(i / 4) % 4]];
+      const pos = i % 4;
+      if (pos % 2 === 0) this.kick(t, 0.45, 110);
+      else this.shaker(t, 0.12);
+      this.shaker(t + spb / 2, 0.05);
+      const arp = [0, 1, 2, 3, 4, 3, 2, 1];
+      for (const h of [0, 1]) {
+        const n = C[arp[pos * 2 + h]];
+        this.pluck(t + (h * spb) / 2, BeatAudio.m2f(n + 12), spb * 1.6, pos * 2 + h === 0 ? 0.16 : 0.11);
+      }
+      if (pos === 0) this.bass(t, BeatAudio.m2f(C[0] - 12) / 2, spb * 1.8, 0.2);
+    },
+
+    // 트로트: 쿵(베이스·킥) 짝(화음·박수)과 아코디언 가락. 가락은 한 바퀴(8마디) 걸러 한 번씩 나온다
+    trot(i, t, spb) {
+      const bar = Math.floor(i / 4);
+      const C = BeatAudio.CHORDS[['Am', 'Am', 'Dm', 'Dm', 'E', 'E', 'Am', 'Am'][bar % 8]];
+      const pos = i % 4;
+      if (pos % 2 === 0) {
+        this.kick(t, 0.7);
+        this.bass(t, BeatAudio.m2f((pos === 0 ? C[0] : C[1]) - 12) / 2, spb * 0.8, 0.24);
+      } else {
+        this.clap(t, 0.22);
+        this.stab(t, C.slice(2).map((n) => BeatAudio.m2f(n)), 0.05);
+      }
+      this.hat(t + spb / 2, 0.06);
+      if (Math.floor(bar / 8) % 2 === 1) {
+        const at = i % 32;
+        for (const [s, n, len] of BeatAudio.TROT_TUNE) {
+          if (s >= at && s < at + 1) this.accordion(t + (s - at) * spb, BeatAudio.m2f(n), len * spb * 0.92, 0.07);
+        }
+      }
+    },
+
+    // 신나는 댄스: 비트마다 킥, 엇박 하이햇, 옥타브 베이스와 깔리는 화음. Am F C G
+    disco(i, t, spb) {
+      const C = BeatAudio.CHORDS[['Am', 'F', 'C', 'G'][Math.floor(i / 4) % 4]];
+      const pos = i % 4;
+      this.kick(t, 0.62);
+      if (pos % 2 === 1) this.clap(t, 0.22);
+      this.openHat(t + spb / 2, 0.07);
+      const root = BeatAudio.m2f(C[0] - 12);
+      this.bass(t, root / 2, spb * 0.42, 0.22);
+      this.bass(t + spb / 2, root, spb * 0.42, 0.16);
+      if (pos === 0) this.pad(t, C.slice(1).map((n) => BeatAudio.m2f(n)), spb * 4, 0.03);
+    },
+
+    // 잔잔하게: 드럼 없이 똑딱 나무 소리가 박자를 짚고, 화음과 종소리가 천천히 흐른다. C Am F G (두 마디씩)
+    calm(i, t, spb) {
+      const C = BeatAudio.CHORDS[['C', 'Am', 'F', 'G'][Math.floor(i / 8) % 4]];
+      this.woodblock(t, i % 2 === 0 ? 1050 : 790, i % 2 === 0 ? 0.2 : 0.14);
+      if (i % 8 === 0) this.pad(t, C.slice(1).map((n) => BeatAudio.m2f(n)), spb * 8, 0.035);
+      if (i % 4 === 0) this.bass(t, BeatAudio.m2f(C[0] - 12) / 2, spb * 3, 0.14);
+      if (BeatAudio.hash(i) < 0.35) {
+        const penta = [72, 74, 76, 79, 81];
+        this.bell(t + (BeatAudio.hash(i + 7) < 0.5 ? 0 : spb / 2), BeatAudio.m2f(penta[Math.floor(BeatAudio.hash(i + 3) * 5)]), 0.05);
+      }
+    },
+  };
+
+  // 미리 듣기 (운영 메뉴): 이 스타일을 120 BPM(페달 60 RPM)으로 sec 초 들려준다. 라운드가 시작되면 그쪽이 이긴다
+  preview(style, sec = 10) {
+    this.ensure();
+    const keep = this.previewing ? this.previewKeep : this.style;
+    this.setStyle(style);
+    if (!this.previewing) this.previewMuted = this.muted;
+    this.previewing = false;
+    this.setMuted(false); // 소리를 꺼 둔 설정이어도 미리 듣기는 들린다
+    this.start(() => 120, { fadeIn: 0.3 });
+    this.previewing = true;
+    this.previewKeep = keep;
+    clearTimeout(this.previewTimer);
+    this.previewTimer = setTimeout(() => this.endPreview(), sec * 1000);
+  }
+
+  endPreview() {
+    if (!this.previewing) return;
+    this.previewing = false;
+    clearTimeout(this.previewTimer);
+    this.stop();
+    this.style = this.previewKeep;
+    this.setMuted(this.previewMuted);
+  }
+
+  // ---------------- 세션 설정 화면의 잔잔한 음악 ----------------
+  // 페달과 상관없이 느린 빠르기(76 BPM)로 흐른다. 드럼 없이 화음과 종소리만. 화면을 떠나면 천천히 줄어든다
+  ambient(on) {
+    if (on) {
+      this.ensure();
+      if (this.ambTimer) return;
+      this.amb = this.ctx.createGain();
+      this.amb.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+      this.amb.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 1.2);
+      this.amb.connect(this.master);
+      this.ambBeat = 0;
+      this.ambNext = this.ctx.currentTime + 0.1;
+      this.ambTimer = setInterval(() => this.ambientSchedule(), 50);
+      this.ambientSchedule();
+      return;
+    }
+    if (!this.ambTimer) return;
+    clearInterval(this.ambTimer);
+    this.ambTimer = null;
+    const g = this.amb;
+    const t = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.8);
+    setTimeout(() => g.disconnect(), 1500);
+  }
+
+  ambientSchedule() {
+    const spb = 60 / 76;
+    const out = this.amb;
+    while (this.ambNext < this.ctx.currentTime + 0.2) {
+      const i = this.ambBeat;
+      const t = this.ambNext;
+      const C = BeatAudio.CHORDS[['Cmaj7', 'Am7', 'Fmaj7', 'G'][Math.floor(i / 8) % 4]];
+      if (i % 8 === 0) {
+        this.pad(t, C.slice(1).map((n) => BeatAudio.m2f(n)), spb * 8, 0.04, out);
+        this.bass(t, BeatAudio.m2f(C[0] - 12) / 2, spb * 6, 0.1, out);
+      }
+      if (BeatAudio.hash(i + 101) < 0.7) this.bell(t, BeatAudio.m2f(C[1 + Math.floor(BeatAudio.hash(i + 55) * 4)] + 12), 0.045, out);
+      this.ambNext += spb;
+      this.ambBeat++;
+    }
+  }
+
+  // ---------------- 악기 ----------------
+  pluck(t, f, dur, vol, out = this.master) {
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(4200, t);
+    lp.frequency.exponentialRampToValueAtTime(900, t + 0.25);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    lp.connect(g).connect(out);
+    for (const [type, mul, v] of [['triangle', 1, 1], ['sine', 2, 0.35]]) {
+      const o = c.createOscillator();
+      o.type = type;
+      o.frequency.value = f * mul;
+      const og = c.createGain();
+      og.gain.value = v;
+      o.connect(og).connect(lp);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    }
+  }
+
+  pad(t, freqs, dur, vol, out = this.master) {
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1300;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + Math.min(0.4, dur * 0.3));
+    g.gain.setValueAtTime(vol, t + dur * 0.75);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g).connect(out);
+    for (const f of freqs) {
+      for (const d of [-7, 7]) {
+        const o = c.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = f;
+        o.detune.value = d;
+        o.connect(lp);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+      }
+    }
+  }
+
+  stab(t, freqs, vol) {
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2400;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    lp.connect(g).connect(this.master);
+    for (const f of freqs) {
+      const o = c.createOscillator();
+      o.type = 'square';
+      o.frequency.value = f;
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + 0.15);
+    }
+  }
+
+  // 아코디언처럼: 살짝 어긋난 두 톱니파 + 떨림
+  accordion(t, f, dur, vol) {
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2600;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.03);
+    g.gain.setValueAtTime(vol, t + Math.max(0.03, dur - 0.06));
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g).connect(this.master);
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 5.5;
+    const depth = c.createGain();
+    depth.gain.value = 9;
+    lfo.connect(depth);
+    lfo.start(t);
+    lfo.stop(t + dur + 0.05);
+    for (const d of [0, 12]) {
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = f;
+      o.detune.value = d;
+      depth.connect(o.detune);
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+  }
+
+  bell(t, f, vol, out = this.master) {
+    const c = this.ctx;
+    for (const [mul, v, len] of [[1, 1, 1.6], [2.76, 0.25, 0.6]]) {
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * mul;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol * v, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + len);
+      o.connect(g).connect(out);
+      o.start(t);
+      o.stop(t + len + 0.02);
+    }
+  }
+
+  woodblock(t, f, vol) {
+    const c = this.ctx;
+    for (const [type, mul, v] of [['sine', 1, 1], ['triangle', 1.52, 0.4]]) {
+      const o = c.createOscillator();
+      o.type = type;
+      o.frequency.value = f * mul;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol * v, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      o.connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + 0.08);
+    }
+  }
+
+  noiseHit(t, type, freq, vol, len, q = 1) {
+    const c = this.ctx;
+    const s = c.createBufferSource();
+    s.buffer = this.noise;
+    const f = c.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    s.connect(f).connect(g).connect(this.master);
+    s.start(t);
+    s.stop(t + len + 0.02);
+  }
+
+  shaker(t, vol) {
+    this.noiseHit(t, 'highpass', 6500, vol, 0.06);
+  }
+
+  openHat(t, vol) {
+    this.noiseHit(t, 'highpass', 8000, vol, 0.18);
+  }
+
+  clap(t, vol) {
+    this.noiseHit(t, 'bandpass', 1300, vol, 0.13, 0.9);
+    this.noiseHit(t + 0.012, 'bandpass', 1300, vol * 0.7, 0.1, 0.9);
+  }
+
+  kick(t, vol = 0.9, from = 140) {
     const c = this.ctx;
     const o = c.createOscillator();
     const g = c.createGain();
-    o.frequency.setValueAtTime(140, t);
+    o.frequency.setValueAtTime(from, t);
     o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-    g.gain.setValueAtTime(0.9, t);
+    g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
     o.connect(g).connect(this.master);
     o.start(t);
@@ -133,7 +471,7 @@ class BeatAudio {
     s.stop(t + 0.16);
   }
 
-  hat(t) {
+  hat(t, vol = 0.12) {
     const c = this.ctx;
     const s = c.createBufferSource();
     s.buffer = this.noise;
@@ -141,23 +479,23 @@ class BeatAudio {
     f.type = 'highpass';
     f.frequency.value = 7000;
     const g = c.createGain();
-    g.gain.setValueAtTime(0.12, t);
+    g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
     s.connect(f).connect(g).connect(this.master);
     s.start(t);
     s.stop(t + 0.05);
   }
 
-  bass(t, freq, dur) {
+  bass(t, freq, dur, vol = 0.25, out = this.master) {
     const c = this.ctx;
     const o = c.createOscillator();
     o.type = 'triangle';
     o.frequency.value = freq * 2;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.001, t + Math.min(dur, 0.5));
-    o.connect(g).connect(this.master);
+    o.connect(g).connect(out);
     o.start(t);
     o.stop(t + Math.min(dur, 0.5) + 0.02);
   }

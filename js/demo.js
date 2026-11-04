@@ -36,7 +36,7 @@ const Demo = {
     // 대기 화면 오른쪽 그림: 운영 버전은 바퀴 안의 두뇌(app/attract-visual.js), 프로토타입은 모양이 바뀌는 두뇌 그래프
     this.preview = typeof AttractVisual !== 'undefined' ? AttractVisual.init(app) : null;
     this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
-    if (!this.preview) Radar.render($('#att-radar'), this.deco.v, null);
+    if (!this.preview && $('#att-radar')) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
     this.bindPin();
     this.bindHolds();
@@ -147,6 +147,7 @@ const Demo = {
   // 장식용 그래프가 천천히 모양을 바꾼다
   animateDeco(dt, rpm) {
     if (this.preview) return this.preview.tick(dt, rpm);
+    if (!$('#att-radar')) return;
     const d = this.deco;
     d.t -= dt;
     if (d.t <= 0) {

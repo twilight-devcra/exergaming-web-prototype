@@ -228,7 +228,7 @@ body[data-theme="scenic"] {
 
 /* ================= 세션 설정 화면 ================= */
 /* 운동 시간 세 칸, 난이도 세 칸, 시작 버튼. 어르신이 누르기 쉽게 칸을 크게 */
-#setup {
+#setup, #login, #history {
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
@@ -347,3 +347,105 @@ body[data-theme="scenic"] {
 #calib .calib-ring .num { font-size: clamp(56px, 10vh, 84px); color: var(--ink); }
 #calib > h2 { font-size: clamp(28px, 4.6vh, 38px); color: var(--ink); }
 .calib-state { font-size: 20px; }
+
+/* ================= 회원: 로그인 · 기록 · 결과의 회원 카드 (app/members.js) ================= */
+.lg-body { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 28px); align-items: stretch; min-height: 0; }
+.lg-cam {
+  position: relative; border-radius: 24px; overflow: hidden; background: #1d2b24; aspect-ratio: 4 / 3; max-height: 62vh;
+  box-shadow: var(--card-shadow);
+}
+.lg-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+.lg-frame {
+  position: absolute; left: 50%; top: 46%; width: 46%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 22px; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.25);
+}
+.lg-cam.off .lg-frame { display: none; }
+.lg-cam-msg {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 14px; text-align: center;
+  background: rgba(29, 43, 36, 0.72); color: #fff; font-size: clamp(16px, 2.5vh, 19px); font-weight: 500;
+}
+.lg-cam.off .lg-cam-msg { top: 0; display: flex; align-items: center; justify-content: center; background: transparent; }
+.lg-side { display: flex; flex-direction: column; min-width: 0; }
+.lg-choices { display: flex; flex-direction: column; gap: clamp(12px, 2vh, 18px); height: 100%; }
+.lg-opt {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px;
+  padding: clamp(16px, 3vh, 26px) clamp(18px, 2vw, 26px); border: 3px solid transparent; border-radius: 24px;
+  background: var(--panel); box-shadow: var(--card-shadow); font-family: var(--font); text-align: left; color: var(--ink); cursor: pointer;
+}
+.lg-opt b { font-size: clamp(24px, 4.4vh, 34px); font-weight: 700; letter-spacing: -0.02em; }
+.lg-opt small { font-size: clamp(15px, 2.4vh, 18px); color: var(--ink-soft); line-height: 1.45; }
+.lg-guest { background: var(--accent); color: var(--on-accent); }
+.lg-guest small { color: rgba(255, 255, 255, 0.85); }
+.lg-opt:active { transform: scale(0.98); }
+.lg-pad { display: flex; flex-direction: column; align-items: stretch; gap: 10px; background: var(--panel); border-radius: 24px; padding: 18px; box-shadow: var(--card-shadow); }
+.lg-pad[hidden], .lg-choices[hidden] { display: none; }
+.lg-digits { display: flex; justify-content: center; gap: 6px; }
+.lg-digits i {
+  width: clamp(26px, 3.4vw, 36px); height: clamp(36px, 6vh, 48px); border-radius: 8px; background: var(--cell);
+  display: flex; align-items: center; justify-content: center; font: 900 clamp(22px, 3.8vh, 30px) var(--font-num); font-style: normal; color: var(--ink);
+}
+.lg-digits i.on { background: var(--accent-soft); }
+.lg-digits em { width: 10px; }
+.lg-digits.shake { animation: shake 0.35s; }
+.lg-pad-msg { margin: 0; text-align: center; font-size: 16px; color: var(--ink-soft); min-height: 1.5em; }
+.lg-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lg-keys button {
+  height: clamp(44px, 7.4vh, 60px); border: 0; border-radius: 14px; background: var(--cell); color: var(--ink);
+  font: 800 clamp(22px, 3.6vh, 28px) var(--font-num); cursor: pointer;
+}
+.lg-keys button[data-k="del"] { font: 500 17px var(--font); }
+.lg-keys button.ok { background: var(--accent); color: var(--on-accent); font: 700 19px var(--font); }
+.lg-keys button:active { transform: scale(0.96); }
+#lg-pad-cancel { align-self: center; }
+
+.hs-id { margin: 0; font: 800 18px var(--font-num); color: var(--ink-soft); letter-spacing: 0.03em; }
+.hs-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 28px); min-height: 0; }
+.hs-calbox { background: var(--panel); border-radius: 24px; padding: clamp(14px, 2.4vh, 22px); box-shadow: var(--card-shadow); }
+.hs-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.hs-cal-head b { font-size: clamp(19px, 3vh, 23px); }
+.hs-nav { width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--cell); font-size: 24px; color: var(--ink); cursor: pointer; }
+.hs-nav:disabled { opacity: 0.3; cursor: default; }
+.hs-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.hs-cal b { font-size: 14px; color: var(--ink-soft); font-weight: 500; padding-bottom: 4px; }
+.hs-cal b.sun { color: var(--bad); }
+.hs-cal span {
+  position: relative; aspect-ratio: 1; max-height: 6.2vh; margin: 0 auto; width: 100%; max-width: 6.2vh;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  font: 800 clamp(14px, 2.3vh, 18px) var(--font-num); color: var(--ink);
+}
+.hs-cal span.future { color: var(--line); }
+.hs-cal span.today { box-shadow: inset 0 0 0 2px var(--accent); }
+.hs-cal span.done { background: var(--good); color: #fff; }
+.hs-cal span small {
+  position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: var(--warn); color: #fff; font: 800 11px/18px var(--font-num);
+}
+.hs-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.hs-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hs-stats div { background: var(--panel); border-radius: 18px; padding: 12px 14px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; }
+.hs-stats span { font-size: 14px; color: var(--ink-soft); }
+.hs-stats b { font: 900 clamp(24px, 4.2vh, 32px) var(--font-num); color: var(--ink); }
+.hs-stats b small { font: 500 15px var(--font); margin-left: 2px; color: var(--ink-soft); }
+.hs-side h3 { margin: 4px 0 0; font-size: 17px; color: var(--ink-soft); }
+.hs-recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hs-recent li { display: grid; grid-template-columns: 1.3fr 1fr auto; gap: 10px; align-items: center; background: var(--panel); border-radius: 14px; padding: 10px 14px; font-size: 16px; }
+.hs-recent li b { font: 800 17px var(--font-num); }
+.hs-recent li.empty { display: block; color: var(--ink-soft); }
+
+/* 결과 화면의 회원 카드 */
+.dr-member { width: 100%; margin-top: auto; }
+.dr-member h4 { margin: 0 0 10px; font-size: 18px; color: var(--ink); text-align: left; }
+.dm-card { display: flex; gap: 14px; align-items: center; text-align: left; }
+.dm-qr { flex: 0 0 auto; width: clamp(120px, 19vh, 156px); aspect-ratio: 1; background: #fff; border-radius: 12px; padding: 4px; }
+.dm-qr svg { width: 100%; height: 100%; display: block; }
+.dm-steps { margin: 12px 0 0; padding-left: 1.2em; text-align: left; display: flex; flex-direction: column; gap: 6px; font-size: clamp(14px, 2.1vh, 16px); line-height: 1.4; color: var(--ink); }
+.dm-steps b { color: var(--accent); }
+.dm-id { margin: 0; font-size: 14px; color: var(--ink-soft); text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.dm-id b { font: 900 22px var(--font-num); color: var(--ink); letter-spacing: 0.02em; white-space: nowrap; }
+.dm-id span { font-size: 13px; line-height: 1.4; }
+.dm-saved { margin: 0; font-size: 18px; color: var(--ink); }
+.dm-saved span { font-size: 15px; color: var(--ink-soft); }
+.dm-note { margin: 0; color: var(--ink-soft); }
+@media (max-width: 860px), (max-aspect-ratio: 1/1) {
+  .lg-body, .hs-body { grid-template-columns: 1fr; }
+}

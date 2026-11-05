@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- 두뇌 PT 회원 카드 (휴대폰용). 결과 화면의 QR 코드를 휴대폰 카메라로 읽으면 열린다. 주소의 #번호 가 회원 번호 -->
+  <title>두뇌 PT 회원 카드</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@800;900&display=swap">
+  <style>
+    :root {
+      --bg: #f2f4ee; --panel: #ffffff; --ink: #1d2b24; --ink-soft: #4a5a52; --good: #15803d; --line: #dde3da; --accent: #2563eb;
+      --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+      --font-num: "Nunito", var(--font);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--font);
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand img { width: 48px; height: 48px; border-radius: 26%; }
+    .brand b { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; }
+    .brand b span { color: var(--good); font-family: var(--font-num); font-weight: 900; }
+    .card {
+      width: min(100%, 380px); background: var(--panel); border-radius: 28px; padding: 22px 22px 24px;
+      box-shadow: 0 2px 6px rgba(29, 43, 36, 0.06), 0 18px 40px rgba(29, 43, 36, 0.12);
+      display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+    }
+    .card h1 { margin: 0; font-size: 20px; }
+    .qr { width: 100%; max-width: 300px; aspect-ratio: 1; }
+    .qr svg { width: 100%; height: 100%; display: block; }
+    .id { font: 900 30px var(--font-num); letter-spacing: 0.04em; }
+    .id small { display: block; font: 500 14px var(--font); color: var(--ink-soft); letter-spacing: 0; }
+    ol { width: min(100%, 380px); margin: 0; padding: 0 0 0 1.4em; display: flex; flex-direction: column; gap: 8px; }
+    ol b { color: var(--accent); }
+    .bad { color: #dc2626; font-weight: 700; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="brand"><img src="logo.svg" alt=""><b>두뇌 <span>PT</span></b></div>
+  <div class="card" id="card">
+    <h1>나의 회원 카드</h1>
+    <div class="qr" id="qr"></div>
+    <div class="id" id="id"></div>
+  </div>
+  <ol id="how">
+    <li>이 화면을 <b>캡처</b>해 두거나 <b>즐겨찾기</b>에 넣어 두세요</li>
+    <li>운동하러 오시면 태블릿의 <b>'회원 카드가 있으신가요?'</b> 화면에서 이 QR 코드를 태블릿 카메라에 보여 주세요</li>
+    <li>운동한 날이 달력에 차곡차곡 쌓여요</li>
+  </ol>
+  <script src="vendor/qrcode.js"></script>
+  <script>
+    // 회원 번호 확인 (app/members.js 의 Members.valid 와 같은 규칙: 8자리, 끝자리는 Luhn 검사 숫자)
+    const id = (location.hash.match(/\d{8}/) || [''])[0];
+    const luhn = (b) => { let s = 0; for (let i = 0; i < b.length; i++) { let d = +b[b.length - 1 - i]; if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; } s += d; } return String((10 - (s % 10)) % 10); };
+    if (/^[1-9]\d{7}$/.test(id) && luhn(id.slice(0, 7)) === id[7]) {
+      const qr = qrcode(0, 'M');
+      qr.addData(location.href.split('#')[0] + '#' + id);
+      qr.make();
+      document.getElementById('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      document.getElementById('id').innerHTML = `${id.slice(0, 4)} ${id.slice(4)}<small>회원 번호 · QR 이 안 되면 이 번호를 눌러도 돼요</small>`;
+    } else {
+      document.getElementById('card').innerHTML = '<p class="bad">회원 번호를 찾지 못했어요.<br>QR 코드를 다시 찍어 주세요.</p>';
+      document.getElementById('how').hidden = true;
+    }
+  </script>
+</body>
+</html>

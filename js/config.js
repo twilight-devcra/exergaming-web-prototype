@@ -170,6 +170,8 @@ const SESSION_UPLOAD = { url: '', key: '' };
 
 // 스테이션 모드에서 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력)
 const DEMO_OPERATOR_PIN = '2580';
+// 운영 버전의 PIN. 비워 두면 PIN 없이 바로 열린다 (2026-11-05: 지금은 필요 없음). 다시 쓰려면 네 자리 숫자를 넣는다
+const APP_OPERATOR_PIN = '';
 
 const Config = {
   // 스테이션 모드: 테스트 화면의 저장값과 무관하다. 운영 메뉴에서 바꾼 DEMO_SETTINGS 항목만 덮는다

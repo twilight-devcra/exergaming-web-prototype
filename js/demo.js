@@ -38,6 +38,8 @@ const Demo = {
     this.preview = typeof AttractVisual !== 'undefined' ? AttractVisual.init(app) : null;
     // 운영 버전: 속도 측정 화면의 둥근 길과 자전거 (app/calib-visual.js)
     this.calibVisual = typeof CalibVisual !== 'undefined' ? CalibVisual.init() : null;
+    // 운영 버전: QR 회원 (app/members.js). 대기 화면 → 로그인 → 기록 → 세션 설정
+    this.members = typeof MemberUI !== 'undefined' ? MemberUI.init(this, app) : null;
     this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
     if (!this.preview && $('#att-radar')) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
@@ -121,6 +123,7 @@ const Demo = {
     if (a.state !== 'attract' || this.opOpen || this.pinOpen || !this.canStart()) return;
     this.enterKiosk();
     if (this.simResult) return this.simulateRound();
+    if (this.members) return this.members.openLogin(via);
     if ($('#setup')) return this.openSetup(via);
     this.beginRound(via);
   },
@@ -131,6 +134,7 @@ const Demo = {
     a.startRound();
     a.log.meta.station = this.station;
     if (session) a.log.meta.session = { ...session };
+    if (this.members) this.members.tagLog(a.log);
     a.log.ev('start', { via, ...(session ? { session } : {}) });
     this.activeAt = a.clock;
     this.renderCfg();
@@ -163,10 +167,11 @@ const Demo = {
     };
   },
 
-  openSetup(via) {
+  // preset: 미리 골라 둘 { min, difficulty } (회원이면 지난번 것)
+  openSetup(via, preset = null) {
     const a = this.app;
     this.setupVia = via;
-    this.setup = { ...SESSION_DEFAULT };
+    this.setup = { ...SESSION_DEFAULT, ...(preset || {}) };
     this.pickSetup({});
     a.show('setup');
     a.state = 'setup';
@@ -258,8 +263,9 @@ const Demo = {
   tick(dt, rpm) {
     const a = this.app;
     if (rpm > this.RPM_ACTIVE) this.activeAt = a.clock;
-    if (a.state !== 'setup') a.audio.ambient(false);
+    if (!['login', 'history', 'setup'].includes(a.state)) a.audio.ambient(false);
     const entered = a.state !== this.prevState;
+    if (this.members) this.members.tick(a, entered);
     this.prevState = a.state;
 
     if (a.state === 'attract') {
@@ -358,6 +364,8 @@ const Demo = {
     $('#dr-id').classList.toggle('sim', sim);
     $('#dr-total').textContent = a.score.toLocaleString('ko-KR');
     $('#dr-break').textContent = `운동 ${a.exScore.toLocaleString('ko-KR')} + 두뇌 게임 ${a.cogScore.toLocaleString('ko-KR')}`;
+    // 운영 버전: 회원 기록에 더하고, 손님이면 새 회원 번호와 QR 카드를 보여 준다 (세션 로그에 meta.user 를 붙이므로 저장보다 먼저)
+    if (this.members) this.members.onResult(a, sim);
     Fx.confetti(1.2);
     if (sim) return a.show('demo-result');
 
@@ -481,7 +489,7 @@ const Demo = {
         ? `라운드 길이·난이도는 참가자가 고름 · `
         : `라운드 난이도 ${preset ? preset.label : '직접 설정'} · 라운드 ${U.fmtTime(c.durationSec)} · `) +
       `측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
-      '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.';
+      (this.pin ? '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.' : '운영 메뉴는 대기 화면의 ⚙ 운영 버튼이나 왼쪽 위 모서리 2초 누르기로 열립니다 (PIN 없음).');
   },
 
   // ---------------- 라운드 설정 (DEMO_SETTINGS) ----------------
@@ -659,10 +667,10 @@ const Demo = {
       const k = b.dataset.k;
       if (k === 'cancel') return this.closePin();
       if (k === 'del') this.pinBuf = this.pinBuf.slice(0, -1);
-      else if (this.pinBuf.length < DEMO_OPERATOR_PIN.length) this.pinBuf += b.textContent;
+      else if (this.pinBuf.length < this.pin.length) this.pinBuf += b.textContent;
       this.renderPin();
-      if (this.pinBuf.length < DEMO_OPERATOR_PIN.length) return;
-      if (this.pinBuf === DEMO_OPERATOR_PIN) {
+      if (this.pinBuf.length < this.pin.length) return;
+      if (this.pinBuf === this.pin) {
         this.closePin(true);
         this.openOp();
       } else {
@@ -676,8 +684,14 @@ const Demo = {
     });
   },
 
+  // 운영 메뉴 PIN. 운영 버전은 APP_OPERATOR_PIN (비어 있으면 PIN 없이 연다)
+  get pin() {
+    return EDITION === 'app' ? APP_OPERATOR_PIN : DEMO_OPERATOR_PIN;
+  },
+
   openPin() {
     if (this.opOpen || this.pinOpen) return;
+    if (!this.pin) return this.openOp();
     this.pinOpen = true;
     this.pinBuf = '';
     this.renderPin();

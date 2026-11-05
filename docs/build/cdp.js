@@ -6,7 +6,8 @@ const path = require('path');
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 
-async function launch({ port = 9333, width = 1600, height = 1000 } = {}) {
+// args: 브라우저에 더 넘길 옵션 (예: 가짜 카메라 --use-file-for-fake-video-capture=...)
+async function launch({ port = 9333, width = 1600, height = 1000, args = [] } = {}) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'edge-cdp-'));
   const proc = spawn(EDGE, [
     '--headless=new',
@@ -17,6 +18,7 @@ async function launch({ port = 9333, width = 1600, height = 1000 } = {}) {
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--hide-scrollbars',
+    ...args,
     'about:blank',
   ], { stdio: 'ignore' });
 

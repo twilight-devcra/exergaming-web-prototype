@@ -6,14 +6,14 @@
   <!-- 파일 주소 끝의 ?v= 는 고칠 때마다 바꾼다. 브라우저가 예전 파일과 새 파일을 섞어 쓰다 멈추는 일을 막는다 -->
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>두뇌 PT</title>
-  <link rel="icon" href="logo.svg?v=20261105d" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=20261105f" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
-  <link rel="stylesheet" href="../css/style.css?v=20261105d">
-  <link rel="stylesheet" href="../css/themes.css?v=20261105d">
-  <link rel="stylesheet" href="app.css?v=20261105d">
+  <link rel="stylesheet" href="../css/style.css?v=20261105f">
+  <link rel="stylesheet" href="../css/themes.css?v=20261105f">
+  <link rel="stylesheet" href="app.css?v=20261105f">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -174,7 +174,7 @@
   <section id="attract" class="screen">
     <div class="att-main">
       <div class="att-logo">
-        <img src="logo.svg?v=20261105d" alt="">
+        <img src="logo.svg?v=20261105f" alt="">
         <h1>두뇌 <span>PT</span></h1>
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
@@ -194,6 +194,66 @@
     <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span>
       <!-- 운영 메뉴 열기 (PIN). 게임 중에는 왼쪽 위 모서리 2초 길게 누르기 -->
       <button class="op-open" id="op-open" aria-label="운영 메뉴"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>운영</button>
+    </div>
+  </section>
+
+  <!-- 로그인: 대기 화면 다음 (app/members.js). 카메라로 회원 QR 을 읽거나, 번호를 누르거나, 손님으로 -->
+  <section id="login" class="screen">
+    <header class="su-head">
+      <button class="su-back" id="lg-back">‹ 처음으로</button>
+      <h2>회원 카드가 있으신가요?</h2>
+    </header>
+    <div class="lg-body">
+      <div class="lg-cam">
+        <video id="lg-video" playsinline muted></video>
+        <div class="lg-frame"></div>
+        <div class="lg-cam-msg" id="lg-cam-msg">카메라를 켜는 중…</div>
+      </div>
+      <div class="lg-side">
+        <div class="lg-choices" id="lg-choices">
+          <button class="lg-opt lg-guest" id="lg-guest"><b>손님으로 하기</b><small>처음이시면 여기를 누르세요.<br>운동이 끝나면 회원 카드를 드려요</small></button>
+          <button class="lg-opt" id="lg-code"><b>번호로 들어가기</b><small>QR 코드 아래에 적힌 8자리 번호</small></button>
+        </div>
+        <div class="lg-pad" id="lg-pad" hidden>
+          <div class="lg-digits" id="lg-digits"></div>
+          <p class="lg-pad-msg" id="lg-pad-msg"></p>
+          <div class="lg-keys" id="lg-keys">
+            <button>1</button><button>2</button><button>3</button>
+            <button>4</button><button>5</button><button>6</button>
+            <button>7</button><button>8</button><button>9</button>
+            <button data-k="del">지우기</button><button>0</button><button data-k="ok" class="ok">확인</button>
+          </div>
+          <button class="su-back" id="lg-pad-cancel">‹ 돌아가기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 회원 기록: 로그인하면 (app/members.js). 운동한 날을 달력에 표시 -->
+  <section id="history" class="screen">
+    <header class="su-head">
+      <button class="su-back" id="hs-back">‹ 처음으로</button>
+      <h2 id="hs-title"></h2>
+      <p class="hs-id" id="hs-id"></p>
+    </header>
+    <div class="hs-body">
+      <div class="hs-calbox">
+        <div class="hs-cal-head">
+          <button class="hs-nav" id="hs-prev" aria-label="지난달">‹</button>
+          <b id="hs-month"></b>
+          <button class="hs-nav" id="hs-next" aria-label="다음 달">›</button>
+        </div>
+        <div class="hs-cal" id="hs-cal"></div>
+      </div>
+      <div class="hs-side">
+        <div class="hs-stats" id="hs-stats"></div>
+        <h3>최근 트레이닝</h3>
+        <ol class="hs-recent" id="hs-recent"></ol>
+      </div>
+    </div>
+    <div class="su-foot">
+      <button class="btn su-go" id="hs-go">트레이닝 시작</button>
+      <div class="su-sum" id="hs-sum"></div>
     </div>
   </section>
 
@@ -228,7 +288,8 @@
         <h3>최종 점수</h3>
         <div class="dr-total" id="dr-total">0</div>
         <div class="dr-break" id="dr-break"></div>
-        <div class="dr-note">진행 요원에게 이 화면을 보여주세요<br>점수로 행사 마지막에 시상합니다</div>
+        <!-- 회원: 손님이면 새 회원 QR 카드, 회원이면 기록 저장 안내 (app/members.js) -->
+        <div class="dr-member" id="dr-member"></div>
       </div>
       <!-- 두뇌 그래프·운동량 (#tpl-report) -->
     </div>
@@ -352,35 +413,37 @@
   </div>
   <div id="debug"></div>
 
-  <script src="../js/config.js?v=20261105d"></script>
-  <script src="../js/pedal.js?v=20261105d"></script>
-  <script src="../js/pedal-link.js?v=20261105d"></script>
-  <script src="../js/cadence-est.js?v=20261105d"></script>
-  <script src="../js/audio.js?v=20261105d"></script>
-  <script src="../js/band.js?v=20261105d"></script>
-  <script src="../js/exercise.js?v=20261105d"></script>
-  <script src="../js/fx.js?v=20261105d"></script>
-  <script src="../js/themes.js?v=20261105d"></script>
-  <script src="../js/diagram.js?v=20261105d"></script>
-  <script src="../js/games/path.js?v=20261105d"></script>
-  <script src="../js/games/symbol.js?v=20261105d"></script>
-  <script src="../js/games/arith.js?v=20261105d"></script>
-  <script src="../js/games/count.js?v=20261105d"></script>
-  <script src="../js/games/fit.js?v=20261105d"></script>
-  <script src="../js/games/seek.js?v=20261105d"></script>
-  <script src="../js/games/cover.js?v=20261105d"></script>
-  <script src="../js/games/ladder.js?v=20261105d"></script>
-  <script src="../js/games/novel.js?v=20261105d"></script>
-  <script src="../js/games/track.js?v=20261105d"></script>
-  <script src="../js/games/follow.js?v=20261105d"></script>
-  <script src="../js/games/pair.js?v=20261105d"></script>
-  <script src="../js/games/box.js?v=20261105d"></script>
-  <script src="../js/abilities.js?v=20261105d"></script>
-  <script src="../js/session-log.js?v=20261105d"></script>
-  <script src="../js/session-upload.js?v=20261105d"></script>
-  <script src="../js/demo.js?v=20261105d"></script>
-  <script src="attract-visual.js?v=20261105d"></script>
-  <script src="calib-visual.js?v=20261105d"></script>
-  <script src="../js/main.js?v=20261105d"></script>
+  <script src="../js/config.js?v=20261105f"></script>
+  <script src="../js/pedal.js?v=20261105f"></script>
+  <script src="../js/pedal-link.js?v=20261105f"></script>
+  <script src="../js/cadence-est.js?v=20261105f"></script>
+  <script src="../js/audio.js?v=20261105f"></script>
+  <script src="../js/band.js?v=20261105f"></script>
+  <script src="../js/exercise.js?v=20261105f"></script>
+  <script src="../js/fx.js?v=20261105f"></script>
+  <script src="../js/themes.js?v=20261105f"></script>
+  <script src="../js/diagram.js?v=20261105f"></script>
+  <script src="../js/games/path.js?v=20261105f"></script>
+  <script src="../js/games/symbol.js?v=20261105f"></script>
+  <script src="../js/games/arith.js?v=20261105f"></script>
+  <script src="../js/games/count.js?v=20261105f"></script>
+  <script src="../js/games/fit.js?v=20261105f"></script>
+  <script src="../js/games/seek.js?v=20261105f"></script>
+  <script src="../js/games/cover.js?v=20261105f"></script>
+  <script src="../js/games/ladder.js?v=20261105f"></script>
+  <script src="../js/games/novel.js?v=20261105f"></script>
+  <script src="../js/games/track.js?v=20261105f"></script>
+  <script src="../js/games/follow.js?v=20261105f"></script>
+  <script src="../js/games/pair.js?v=20261105f"></script>
+  <script src="../js/games/box.js?v=20261105f"></script>
+  <script src="../js/abilities.js?v=20261105f"></script>
+  <script src="../js/session-log.js?v=20261105f"></script>
+  <script src="../js/session-upload.js?v=20261105f"></script>
+  <script src="../js/demo.js?v=20261105f"></script>
+  <script src="attract-visual.js?v=20261105f"></script>
+  <script src="calib-visual.js?v=20261105f"></script>
+  <script src="vendor/qrcode.js?v=20261105f"></script>
+  <script src="members.js?v=20261105f"></script>
+  <script src="../js/main.js?v=20261105f"></script>
 </body>
 </html>

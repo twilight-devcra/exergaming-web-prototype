@@ -40,6 +40,7 @@
 | `id` | 기록 시작 시각 (epoch ms, 문자열). IndexedDB 의 키. 태블릿 안에서만 겹치지 않는다 |
 | `device` | 태블릿(브라우저)마다 처음 한 번 만드는 고유 번호 (UUID, localStorage `exergame.device`). 서버에서는 `device` + `id` 가 세션 하나 |
 | `edition` | `prototype` (index.html) \| `app` (운영 버전 app/) |
+| `user`, `guest`, `userNew` | 운영 버전만. 회원 번호(8자리 문자열, `app/members.js`), 손님으로 시작했는지, 이 판 결과 화면에서 새로 만든 번호인지(손님은 결과 화면에서 번호를 받는다). 결과 없이 끝난 손님 판은 `user` 가 null |
 | `session` | 운영 버전만. 참가자가 세션 설정 화면에서 고른 `{ min, difficulty }` (`difficulty`: `relax` · `normal` · `challenge`). 이것으로 정해진 값은 `config` 에 들어 있다 (`Config.session`) |
 | `mode` | `test` \| `demo` |
 | `station`, `participant` | 시연 모드의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |

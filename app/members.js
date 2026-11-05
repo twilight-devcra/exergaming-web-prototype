@@ -483,6 +483,9 @@ const MemberUI = {
   onResult(a, sim) {
     const box = document.getElementById('dr-member');
     if (!box) return;
+    // 새 회원 카드를 보여 줄 때만 결과 화면의 첫 칸을 넓힌다 (app/app.css .with-card)
+    const screen = document.getElementById('demo-result');
+    screen.classList.remove('with-card');
     if (sim) {
       box.innerHTML = '<p class="dm-note">가상 결과라 기록하지 않아요</p>';
       return;
@@ -507,17 +510,22 @@ const MemberUI = {
     });
     document.getElementById('dr-id').textContent = `회원 ${Members.format(id)}`;
     if (fresh) {
+      screen.classList.add('with-card');
+      // 사진으로 찍어 두면 QR 이 작아 태블릿이 잘 못 읽는다. 휴대폰 카메라로 비춰 링크를 열고, 회원 카드 화면(app/card.html)에서
+      // '갤러리에 저장' 한 큰 QR 그림을 쓰도록 안내한다. 결과 화면에서 눈에 잘 띄도록 따로 강조한 칸에 둔다
       box.innerHTML = `
-        <h4>회원 카드가 생겼어요</h4>
-        <div class="dm-card">
-          <div class="dm-qr">${Members.qrSvg(Members.cardUrl(id))}</div>
-          <p class="dm-id">회원 번호<b>${Members.format(id)}</b><span>QR 이 안 되면<br>이 번호를 눌러도 돼요</span></p>
-        </div>
-        <ol class="dm-steps">
-          <li>휴대폰 <b>카메라로 이 QR 코드를 찍어</b> 두세요</li>
-          <li>다음에 오시면 <b>'회원 카드가 있으신가요?'</b> 화면에서 그 사진을 태블릿 카메라에 보여 주세요</li>
-          <li>오늘 기록부터 달력에 쌓여요</li>
-        </ol>`;
+        <div class="dm-new">
+          <h4><em>새 회원</em>회원 카드를 휴대폰에 담아 가세요</h4>
+          <div class="dm-card">
+            <div class="dm-qr">${Members.qrSvg(Members.cardUrl(id))}</div>
+            <ol class="dm-steps">
+              <li>휴대폰 <b>카메라를 켜고</b> 이 QR 코드에 <b>비춰</b> 주세요 <small>(사진은 찍지 않아도 돼요)</small></li>
+              <li>화면에 뜨는 <b>링크를 누르면</b> 회원 카드가 열려요</li>
+              <li>회원 카드의 <b>'갤러리에 저장'</b>을 누르세요</li>
+            </ol>
+          </div>
+          <p class="dm-id">다음에 오시면 저장한 사진을 태블릿 카메라에 보여 주세요. 안 되면 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
+        </div>`;
     } else {
       const n = Members.merged(id).length;
       box.innerHTML = `<p class="dm-saved"><b>${n}번째 트레이닝</b>을 기록했어요<br><span>회원 ${Members.format(id)}</span></p>`;

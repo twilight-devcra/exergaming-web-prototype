@@ -16,6 +16,7 @@
       --font-num: "Nunito", var(--font);
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; } /* .card · .save 의 display 가 hidden 을 덮지 않게 */
     body {
       margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--font);
       display: flex; flex-direction: column; align-items: center; gap: 18px;
@@ -31,25 +32,33 @@
       display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
     }
     .card h1 { margin: 0; font-size: 20px; }
-    .qr { width: 100%; max-width: 300px; aspect-ratio: 1; }
-    .qr svg { width: 100%; height: 100%; display: block; }
-    .id { font: 900 30px var(--font-num); letter-spacing: 0.04em; }
-    .id small { display: block; font: 500 14px var(--font); color: var(--ink-soft); letter-spacing: 0; }
     ol { width: min(100%, 380px); margin: 0; padding: 0 0 0 1.4em; display: flex; flex-direction: column; gap: 8px; }
     ol b { color: var(--accent); }
     .bad { color: #dc2626; font-weight: 700; text-align: center; }
+    /* 회원 카드 그림 (canvas 로 그린 PNG). 그림 자체라 길게 눌러 저장할 수도 있다 */
+    .shot { width: min(100%, 380px); border-radius: 28px; box-shadow: 0 2px 6px rgba(29, 43, 36, 0.06), 0 18px 40px rgba(29, 43, 36, 0.12); display: block; }
+    .save {
+      width: min(100%, 380px); padding: 16px 20px; border: 0; border-radius: 18px; background: var(--accent); color: #fff;
+      font: 700 20px var(--font); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+    }
+    .save:active { transform: translateY(1px); }
+    .save svg { width: 24px; height: 24px; }
+    .tip { width: min(100%, 380px); margin: -6px 0 0; font-size: 14px; color: var(--ink-soft); text-align: center; }
+    .done { color: var(--good); font-weight: 700; }
   </style>
 </head>
 <body>
-  <div class="brand"><img src="logo.svg" alt=""><b>두뇌 <span>PT</span></b></div>
-  <div class="card" id="card">
-    <h1>나의 회원 카드</h1>
-    <div class="qr" id="qr"></div>
-    <div class="id" id="id"></div>
-  </div>
-  <ol id="how">
-    <li>이 화면을 <b>캡처</b>해 두거나 <b>즐겨찾기</b>에 넣어 두세요</li>
-    <li>운동하러 오시면 태블릿의 <b>'회원 카드가 있으신가요?'</b> 화면에서 이 QR 코드를 태블릿 카메라에 보여 주세요</li>
+  <img class="shot" id="shot" alt="두뇌 PT 회원 카드" hidden>
+  <button class="save" id="save" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    갤러리에 저장
+  </button>
+  <p class="tip" id="tip" hidden>버튼이 안 되면 위 카드를 <b>길게 눌러</b> 저장하거나 화면을 캡처해 주세요</p>
+  <div class="card" id="bad" hidden><p class="bad">회원 번호를 찾지 못했어요.<br>태블릿의 QR 코드에 휴대폰 카메라를 다시 비춰 주세요.</p></div>
+  <ol id="how" hidden>
+    <li><b>'갤러리에 저장'</b>을 눌러 회원 카드 사진을 저장하세요</li>
+    <li>운동하러 오시면 태블릿의 <b>'회원 카드가 있으신가요?'</b> 화면에서 그 사진을 화면 가득 띄워 태블릿 카메라에 보여 주세요</li>
     <li>운동한 날이 달력에 차곡차곡 쌓여요</li>
   </ol>
   <script src="vendor/qrcode.js"></script>
@@ -57,15 +66,119 @@
     // 회원 번호 확인 (app/members.js 의 Members.valid 와 같은 규칙: 8자리, 끝자리는 Luhn 검사 숫자)
     const id = (location.hash.match(/\d{8}/) || [''])[0];
     const luhn = (b) => { let s = 0; for (let i = 0; i < b.length; i++) { let d = +b[b.length - 1 - i]; if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; } s += d; } return String((10 - (s % 10)) % 10); };
-    if (/^[1-9]\d{7}$/.test(id) && luhn(id.slice(0, 7)) === id[7]) {
+    const $ = (s) => document.getElementById(s);
+    const show = (...ids) => ids.forEach((x) => ($(x).hidden = false));
+
+    // 회원 카드 그림 (1080 × 1440 PNG). 저장해 두고 태블릿 카메라에 보여 주는 그림이라 QR 을 크게, 회원 번호만 담는다:
+    // 태블릿은 번호만 있으면 되고(app/members.js Members.parse), 내용이 짧으면 QR 칸이 21 × 21 로 굵어져 멀리서·작게 보여도 잘 읽힌다.
+    // 둘레 여백은 표준대로 4칸 (사진 속 어두운 배경과 붙지 않게)
+    async function drawCard() {
+      const W = 1080, H = 1440;
+      const cv = document.createElement('canvas');
+      cv.width = W;
+      cv.height = H;
+      const g = cv.getContext('2d');
+      const text = '"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+      const num = 'Nunito, ' + text;
+      try {
+        await Promise.all([document.fonts.load(`700 60px ${text}`), document.fonts.load(`900 120px ${num}`)]);
+      } catch (e) { }
+      const logo = await new Promise((res) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => res(null);
+        im.src = 'logo.svg';
+      });
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, W, H);
+      // 머리: 로고와 이름
+      g.textBaseline = 'middle';
+      g.textAlign = 'left';
+      g.font = `700 64px ${text}`;
+      const name = '두뇌 ';
+      const nw = g.measureText(name).width;
+      g.font = `900 64px ${num}`;
+      const pw = g.measureText('PT').width;
+      const lw = logo ? 92 : 0;
+      let x = (W - (lw + (logo ? 22 : 0) + nw + pw)) / 2;
+      if (logo) g.drawImage(logo, x, 70, lw, lw);
+      x += lw + (logo ? 22 : 0);
+      g.fillStyle = '#1d2b24';
+      g.font = `700 64px ${text}`;
+      g.fillText(name, x, 118);
+      g.fillStyle = '#15803d';
+      g.font = `900 64px ${num}`;
+      g.fillText('PT', x + nw, 118);
+      g.textAlign = 'center';
+      g.fillStyle = '#4a5a52';
+      g.font = `500 40px ${text}`;
+      g.fillText('나의 회원 카드', W / 2, 220);
+      // QR (회원 번호만)
       const qr = qrcode(0, 'M');
-      qr.addData(location.href.split('#')[0] + '#' + id);
+      qr.addData(id);
       qr.make();
-      document.getElementById('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
-      document.getElementById('id').innerHTML = `${id.slice(0, 4)} ${id.slice(4)}<small>회원 번호 · QR 이 안 되면 이 번호를 눌러도 돼요</small>`;
+      const n = qr.getModuleCount();
+      const quiet = 4;
+      const size = 780;
+      const cell = Math.floor(size / (n + quiet * 2));
+      const qs = cell * (n + quiet * 2);
+      const qx = (W - qs) / 2, qy = 290;
+      g.fillStyle = '#ffffff';
+      g.fillRect(qx, qy, qs, qs);
+      g.fillStyle = '#111111';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect(qx + (c + quiet) * cell, qy + (r + quiet) * cell, cell, cell);
+      // 회원 번호
+      g.fillStyle = '#1d2b24';
+      g.font = `900 120px ${num}`;
+      g.fillText(`${id.slice(0, 4)} ${id.slice(4)}`, W / 2, qy + qs + 90);
+      g.fillStyle = '#4a5a52';
+      g.font = `500 36px ${text}`;
+      g.fillText('회원 번호', W / 2, qy + qs + 175);
+      // 쓰는 법
+      g.fillStyle = '#2563eb';
+      g.font = `700 40px ${text}`;
+      g.fillText('운동하러 오시면 이 사진을', W / 2, H - 150);
+      g.fillText('태블릿 카메라에 보여 주세요', W / 2, H - 92);
+      return new Promise((res) => cv.toBlob(res, 'image/png'));
+    }
+
+    // 갤러리에 저장: iPhone 은 공유 창의 '이미지 저장'으로 사진 앱에, 그 밖(안드로이드 등)은 내려받기로 (갤러리의 '다운로드' 앨범에 보인다).
+    // 내려받기를 막는 앱 안 브라우저도 있어 그림을 길게 눌러 저장하는 길도 안내한다
+    async function save(blob) {
+      const fileName = `두뇌PT-회원카드-${id}.png`;
+      const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (ios && navigator.canShare) {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: '두뇌 PT 회원 카드' });
+            return '공유 창에서 \'이미지 저장\'을 고르면 사진 앱에 저장돼요';
+          } catch (e) {
+            if (e.name === 'AbortError') return '';
+          }
+        }
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      return '저장했어요! 갤러리(사진)의 \'다운로드\'에서 찾을 수 있어요';
+    }
+
+    if (/^[1-9]\d{7}$/.test(id) && luhn(id.slice(0, 7)) === id[7]) {
+      drawCard().then((blob) => {
+        $('shot').src = URL.createObjectURL(blob);
+        show('shot', 'save', 'tip', 'how');
+        $('save').onclick = async () => {
+          const msg = await save(blob);
+          if (msg) $('tip').innerHTML = `<span class="done">${msg}</span>`;
+        };
+      });
     } else {
-      document.getElementById('card').innerHTML = '<p class="bad">회원 번호를 찾지 못했어요.<br>QR 코드를 다시 찍어 주세요.</p>';
-      document.getElementById('how').hidden = true;
+      show('bad');
     }
   </script>
 </body>

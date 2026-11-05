@@ -107,6 +107,7 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 | `score` | `meta.summary.score` | 최근 기록 |
 | `device`, `sid` | `meta.device`, `meta.id` (문자열) | 태블릿에 있는 같은 세션과 겹치지 않게. 둘이 같으면 한 번만 센다. 빠지면 같은 판이 두 번 보일 수 있다 |
 | `level`, `distM`, `kcal` (선택) | `meta.summary.stats` 의 `level` 최댓값, `meta.summary.exercise.distM` · `kcal` | 지금은 쓰지 않음 (나중에 그래프용) |
+| `look` (선택) | `meta.landmark` 그대로 | 풍경 길가에 세운 기념물(건물)의 생김새. 그대로 돌려주면 다른 태블릿에서도 같은 건물로 선다. 없으면(이 필드를 더하기 전 세션) 태블릿이 난이도·시간으로 정한다 |
 
 - **어떤 세션을 돌려줄까**: `meta.user` 가 그 번호이고 결과 화면까지 간 것 (`meta.ended` 가 `abandoned` 가 아닌 것). 태블릿 기록도 결과 화면에서만 쌓입니다
 - **순서·개수**: 순서는 상관없습니다 (태블릿이 시간순으로 다시 정렬한다). 달력은 최근 2년까지만 넘겨 볼 수 있으므로 그보다 오래된 것은 빼도 됩니다

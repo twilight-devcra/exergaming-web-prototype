@@ -43,6 +43,12 @@ const App = {
       this.audio.sfx('go');
       Fx.confetti(0.35);
     };
+    // 라운드 끝 짓기 연출 (운영 버전, Band.plant): 한 단계(층·지붕) 올릴 때마다 통통, 다 지으면 축하
+    this.band.onBuildStep = (i, n) => this.audio.sfx(i === n - 1 ? 'buildTop' : 'build');
+    this.band.onBuilt = () => {
+      this.audio.sfx('clear');
+      Fx.confetti(0.6);
+    };
     Fx.init();
     Theme.init();
     this.bindMusic();
@@ -523,6 +529,7 @@ const App = {
     this.band.setSlope(0);
     this.band.theta = 0;
     this.band.restart();
+    $('#game').classList.remove('build'); // 지난 판의 짓기 연출이 남아 있지 않게
     this.show('game');
     this.band.resize();
     this.updateHud();
@@ -1050,36 +1057,49 @@ const App = {
       <div class="name">수고하셨어요!</div>
       <div class="score"><b>0</b>점</div>
       <div class="hint">화면을 누르면 바로 결과를 봅니다</div>`;
-    // 운영 버전의 회원 라운드: 이번 점수 자리에 기념물을 세운다 (Band.plant). 풍경이 보이도록 마무리 카드는 아래 게임 카드 안에 띄운다
+    // 운영 버전의 회원 라운드: 먼저 풍경 카드를 화면 가득 키우고 이번 점수 자리에 건물을 한 층씩 짓는다 (Band.plant).
+    // 오늘 운동이 건물이 되는 것을 알아볼 수 있게, 다 지은 뒤 BUILD_HOLD_MS 동안 보여 주고 나서야
+    // 풍경을 줄이고 마무리 카드를 아래 게임 카드 안에 띄운다. 짓는 동안은 눌러도 넘어가지 않는다
     const plant = this.demo ? Demo.plantInfo() : null;
+    let cardAt = 0;
     if (plant) {
-      this.band.plant(this.score, plant);
-      this.after(500, () => this.audio.sfx('blink'), gen);
+      // 생김새를 세션 로그에 남긴다 (회원 기록에도 들어가 다음 라운드부터 같은 모양으로 선다)
+      const look = this.band.plant(this.score, plant);
+      if (this.log) this.log.meta.landmark = look;
+      $('#game').classList.add('build');
+      cardAt = this.band.planting.doneAt * 1000 + this.BUILD_HOLD_MS;
     }
-    (plant ? $('#cog') : $('#game')).append(el);
-    Fx.confetti(0.5);
-
-    const num = el.querySelector('.score b');
-    const t0 = performance.now();
-    const count = (now) => {
-      const t = U.clamp((now - t0) / 1300, 0, 1);
-      num.textContent = Math.round(this.score * (1 - Math.pow(1 - t, 3))).toLocaleString('ko-KR');
-      if (t < 1 && el.isConnected) requestAnimationFrame(count);
-    };
-    requestAnimationFrame(count);
 
     const go = () => {
       if (gen !== this.gen || this.state !== 'ending') return;
       el.remove();
+      $('#game').classList.remove('build');
       this.state = 'result';
       this.showResult();
     };
-    this.after(this.ENDING_MS, go, gen);
-    this.after(this.ENDING_SKIP_MS, () => {
-      el.classList.add('skippable');
-      el.addEventListener('pointerdown', go);
-    }, gen);
+    const showCard = () => {
+      if (gen !== this.gen || this.state !== 'ending') return;
+      $('#game').classList.remove('build');
+      (plant ? $('#cog') : $('#game')).append(el);
+      Fx.confetti(0.5);
+      const num = el.querySelector('.score b');
+      const t0 = performance.now();
+      const count = (now) => {
+        const t = U.clamp((now - t0) / 1300, 0, 1);
+        num.textContent = Math.round(this.score * (1 - Math.pow(1 - t, 3))).toLocaleString('ko-KR');
+        if (t < 1 && el.isConnected) requestAnimationFrame(count);
+      };
+      requestAnimationFrame(count);
+      this.after(this.ENDING_SKIP_MS, () => {
+        el.classList.add('skippable');
+        el.addEventListener('pointerdown', go);
+      }, gen);
+    };
+    if (cardAt) this.after(cardAt, showCard, gen);
+    else showCard();
+    this.after(cardAt + this.ENDING_MS, go, gen);
   },
+  BUILD_HOLD_MS: 1500, // 건물을 다 지은 뒤 풍경을 그대로 보여 주는 시간
 
   // 두뇌 그래프·운동량 카드 (#tpl-report) 를 root 안에서 채운다. 시연·테스트 결과 화면이 함께 쓴다.
   // 반환: { abil(능력 점수), keep(속도 유지율 %), kcal } — 시연 결과가 기록에 쓴다

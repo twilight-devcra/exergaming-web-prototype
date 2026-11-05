@@ -677,6 +677,15 @@ class BeatAudio {
         this.tone(1320, 0.2, 'sine', 0.25, 0.18);
         break;
       case 'blink': this.tone(520, 0.06, 'sine', 0.12); break;
+      // 라운드 끝에 건물을 한 층 올릴 때 (나무 블록을 얹는 통통 소리), 지붕을 얹을 때는 한 음 높게
+      case 'build':
+        this.tone(262, 0.09, 'triangle', 0.28);
+        this.tone(392, 0.07, 'triangle', 0.14, 0.03);
+        break;
+      case 'buildTop':
+        this.tone(392, 0.09, 'triangle', 0.28);
+        this.tone(523, 0.1, 'triangle', 0.16, 0.03);
+        break;
       case 'tick': this.tone(1200, 0.04, 'square', 0.06); break;
       case 'count': this.tone(440, 0.12, 'sine', 0.3); break;
       case 'go': this.tone(880, 0.25, 'sine', 0.3); break;

@@ -83,7 +83,7 @@ const Members = {
 
   // ---------------- 서버의 회원 기록 (SESSION_UPLOAD.historyUrl) ----------------
   // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목은 이 태블릿 기록과 같은 모양
-  // ({ at, min, difficulty, score, distM, kcal, level, device, sid }). 형식은 docs/SERVER.md
+  // ({ at, min, difficulty, score, distM, kcal, level, device, sid, look }). 형식은 docs/SERVER.md
   remote: {},      // 회원 번호 → 서버에서 받은 목록 (이 화면을 여는 동안만)
   TIMEOUT_MS: 6000,
 
@@ -123,6 +123,7 @@ const Members = {
       at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
       score: sum.score, device: m.device || null, sid: m.id,
       level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
+      look: m.landmark || null,
     };
   },
 
@@ -461,7 +462,7 @@ const MemberUI = {
   landmarks() {
     if (!this.user) return [];
     return Members.merged(this.user).map((x) => ({
-      score: x.score || 0, at: x.at, difficulty: x.difficulty, min: x.min,
+      score: x.score || 0, at: x.at, difficulty: x.difficulty, min: x.min, look: x.look || null,
       key: x.sid ? `${x.device || ''}:${x.sid}` : x.at,
     }));
   },
@@ -501,6 +502,8 @@ const MemberUI = {
       ended: a.log ? a.log.meta.ended : null,
       // 서버 기록과 겹치는지 가리는 열쇠 (세션 로그의 meta.device + meta.id)
       device: a.log ? a.log.meta.device : null, sid: a.log ? a.log.meta.id : null,
+      // 풍경에 세운 기념물의 생김새 (js/band.js Band.lookOf). 다음 라운드부터 이대로 그린다
+      look: (a.log && a.log.meta.landmark) || null,
     });
     document.getElementById('dr-id').textContent = `회원 ${Members.format(id)}`;
     if (fresh) {

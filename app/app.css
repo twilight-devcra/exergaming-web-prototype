@@ -78,6 +78,8 @@ body[data-theme="scenic"] {
   transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1), margin 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 #game.shift #band { height: 100%; margin-bottom: 0; }
+/* 라운드 끝 짓기 연출 (회원): 풍경 카드가 화면 가득 커져 건물이 올라가는 것을 크게 보여 준다 (js/main.js showEnding) */
+#game.build #band { height: 100%; margin-bottom: 0; }
 
 #cog {
   background: var(--panel);
@@ -86,6 +88,7 @@ body[data-theme="scenic"] {
   transition: opacity 0.3s;
 }
 #game.shift #cog { opacity: 0; }
+#game.build #cog { opacity: 0; }
 
 /* 풍경 위에 얹는 표시: 왼쪽 위 남은 시간·달린 거리, 오른쪽 위 점수 */
 #band-ui {

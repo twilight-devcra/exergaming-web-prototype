@@ -6,14 +6,14 @@
   <!-- 파일 주소 끝의 ?v= 는 고칠 때마다 바꾼다. 브라우저가 예전 파일과 새 파일을 섞어 쓰다 멈추는 일을 막는다 -->
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>두뇌 PT</title>
-  <link rel="icon" href="logo.svg?v=20261105h" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=20261105i" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
-  <link rel="stylesheet" href="../css/style.css?v=20261105h">
-  <link rel="stylesheet" href="../css/themes.css?v=20261105h">
-  <link rel="stylesheet" href="app.css?v=20261105h">
+  <link rel="stylesheet" href="../css/style.css?v=20261105i">
+  <link rel="stylesheet" href="../css/themes.css?v=20261105i">
+  <link rel="stylesheet" href="app.css?v=20261105i">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -174,7 +174,7 @@
   <section id="attract" class="screen">
     <div class="att-main">
       <div class="att-logo">
-        <img src="logo.svg?v=20261105h" alt="">
+        <img src="logo.svg?v=20261105i" alt="">
         <h1>두뇌 <span>PT</span></h1>
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
@@ -351,12 +351,13 @@
           <p class="setting-note">판마다 문제·답·걸린 시간과 페달 원시 파형(또는 키 입력)을 이 태블릿에 자동 저장합니다.</p>
           <button class="btn secondary small" id="op-sess-export">전체 내보내기 (.jsonl)</button>
         </div>
-        <!-- 끝난 세션을 서버로 자동 업로드 (js/session-upload.js, 형식은 docs/SESSION_LOG.md '업로드') -->
+        <!-- 끝난 세션을 서버로 자동 업로드 (js/session-upload.js, 형식은 docs/SERVER.md) -->
         <div class="op-upload">
           <h2>자동 업로드 <small id="op-up-state"></small></h2>
           <label class="setting">업로드 주소<input id="op-up-url" type="url" inputmode="url" placeholder="https://… (비우면 업로드 안 함)" autocomplete="off"></label>
           <label class="setting">인증 키 (선택)<input id="op-up-key" type="password" autocomplete="off"></label>
           <label class="setting">회원 기록 주소 (선택, 달력을 서버 기록으로 채움)<input id="op-up-hist" type="url" inputmode="url" placeholder="https://… (비우면 이 태블릿 기록만)" autocomplete="off"></label>
+          <label class="setting check">시험용: 회원 기록 서버 대신 이 태블릿의 세션 로그 쓰기<input id="op-up-local" type="checkbox"></label>
           <button class="btn secondary small" id="op-up-now">지금 보내기</button>
         </div>
       </div>
@@ -415,37 +416,37 @@
   </div>
   <div id="debug"></div>
 
-  <script src="../js/config.js?v=20261105h"></script>
-  <script src="../js/pedal.js?v=20261105h"></script>
-  <script src="../js/pedal-link.js?v=20261105h"></script>
-  <script src="../js/cadence-est.js?v=20261105h"></script>
-  <script src="../js/audio.js?v=20261105h"></script>
-  <script src="../js/band.js?v=20261105h"></script>
-  <script src="../js/exercise.js?v=20261105h"></script>
-  <script src="../js/fx.js?v=20261105h"></script>
-  <script src="../js/themes.js?v=20261105h"></script>
-  <script src="../js/diagram.js?v=20261105h"></script>
-  <script src="../js/games/path.js?v=20261105h"></script>
-  <script src="../js/games/symbol.js?v=20261105h"></script>
-  <script src="../js/games/arith.js?v=20261105h"></script>
-  <script src="../js/games/count.js?v=20261105h"></script>
-  <script src="../js/games/fit.js?v=20261105h"></script>
-  <script src="../js/games/seek.js?v=20261105h"></script>
-  <script src="../js/games/cover.js?v=20261105h"></script>
-  <script src="../js/games/ladder.js?v=20261105h"></script>
-  <script src="../js/games/novel.js?v=20261105h"></script>
-  <script src="../js/games/track.js?v=20261105h"></script>
-  <script src="../js/games/follow.js?v=20261105h"></script>
-  <script src="../js/games/pair.js?v=20261105h"></script>
-  <script src="../js/games/box.js?v=20261105h"></script>
-  <script src="../js/abilities.js?v=20261105h"></script>
-  <script src="../js/session-log.js?v=20261105h"></script>
-  <script src="../js/session-upload.js?v=20261105h"></script>
-  <script src="../js/demo.js?v=20261105h"></script>
-  <script src="attract-visual.js?v=20261105h"></script>
-  <script src="calib-visual.js?v=20261105h"></script>
-  <script src="vendor/qrcode.js?v=20261105h"></script>
-  <script src="members.js?v=20261105h"></script>
-  <script src="../js/main.js?v=20261105h"></script>
+  <script src="../js/config.js?v=20261105i"></script>
+  <script src="../js/pedal.js?v=20261105i"></script>
+  <script src="../js/pedal-link.js?v=20261105i"></script>
+  <script src="../js/cadence-est.js?v=20261105i"></script>
+  <script src="../js/audio.js?v=20261105i"></script>
+  <script src="../js/band.js?v=20261105i"></script>
+  <script src="../js/exercise.js?v=20261105i"></script>
+  <script src="../js/fx.js?v=20261105i"></script>
+  <script src="../js/themes.js?v=20261105i"></script>
+  <script src="../js/diagram.js?v=20261105i"></script>
+  <script src="../js/games/path.js?v=20261105i"></script>
+  <script src="../js/games/symbol.js?v=20261105i"></script>
+  <script src="../js/games/arith.js?v=20261105i"></script>
+  <script src="../js/games/count.js?v=20261105i"></script>
+  <script src="../js/games/fit.js?v=20261105i"></script>
+  <script src="../js/games/seek.js?v=20261105i"></script>
+  <script src="../js/games/cover.js?v=20261105i"></script>
+  <script src="../js/games/ladder.js?v=20261105i"></script>
+  <script src="../js/games/novel.js?v=20261105i"></script>
+  <script src="../js/games/track.js?v=20261105i"></script>
+  <script src="../js/games/follow.js?v=20261105i"></script>
+  <script src="../js/games/pair.js?v=20261105i"></script>
+  <script src="../js/games/box.js?v=20261105i"></script>
+  <script src="../js/abilities.js?v=20261105i"></script>
+  <script src="../js/session-log.js?v=20261105i"></script>
+  <script src="../js/session-upload.js?v=20261105i"></script>
+  <script src="../js/demo.js?v=20261105i"></script>
+  <script src="attract-visual.js?v=20261105i"></script>
+  <script src="calib-visual.js?v=20261105i"></script>
+  <script src="vendor/qrcode.js?v=20261105i"></script>
+  <script src="members.js?v=20261105i"></script>
+  <script src="../js/main.js?v=20261105i"></script>
 </body>
 </html>

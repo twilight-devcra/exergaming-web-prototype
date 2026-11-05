@@ -167,8 +167,10 @@ const MUSIC_KEY = 'exergame.music';
 // 운영 메뉴의 '자동 업로드'에 적은 값이 칸마다 이것을 덮는다 (운영 메뉴 칸이 비어 있으면 여기 값). 둘 다 url 이 없으면 업로드하지 않는다.
 // 주의: 이 파일은 누구나 볼 수 있으므로 key 에는 '업로드만 할 수 있는' 키를 넣는다.
 // historyUrl: 회원 기록을 받아 오는 주소 (운영 버전, app/members.js). 비어 있으면 이 태블릿의 기록만 보여 준다.
-//   GET <historyUrl>?user=<회원 번호> 에 그 회원의 세션 요약 목록으로 답해야 한다 (docs/SESSION_LOG.md '회원 기록 받아 오기')
-const SESSION_UPLOAD = { url: '', key: '', historyUrl: '' };
+//   GET <historyUrl>?user=<회원 번호> 에 그 회원의 세션 요약 목록으로 답해야 한다 (docs/SERVER.md)
+// localHistory: 시험용. true 면 historyUrl 대신 이 태블릿의 세션 로그가 회원 기록 서버 노릇을 한다 (app/members.js 의 Members.localServer).
+//   주소 칸이 비었다고 저절로 켜지지 않는다. 운영 메뉴의 체크 칸이나 여기서 일부러 켜야 한다
+const SESSION_UPLOAD = { url: '', key: '', historyUrl: '', localHistory: false };
 
 // 스테이션 모드에서 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력)
 const DEMO_OPERATOR_PIN = '2580';

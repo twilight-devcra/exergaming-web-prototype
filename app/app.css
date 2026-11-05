@@ -319,6 +319,9 @@ body[data-theme="scenic"] {
 .op-upload .setting { flex-direction: column; align-items: stretch; gap: 4px; padding: 4px 0; }
 .op-upload input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font: 15px var(--font); }
 .op-upload .btn { align-self: flex-start; margin-top: 6px; }
+.op-upload .setting.check { flex-direction: row; align-items: center; justify-content: space-between; }
+.op-upload input[type="checkbox"] { width: 20px; flex: none; }
+.op-upload input:disabled { opacity: 0.5; }
 
 /* 운영 메뉴 버튼 (대기 화면 오른쪽 아래) 과 PIN 제목 */
 .station-tag { align-items: center; }

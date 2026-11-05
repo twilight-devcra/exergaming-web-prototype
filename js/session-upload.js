@@ -1,4 +1,4 @@
-// 끝난 세션을 서버로 자동 업로드한다 (시연·운영 버전). 형식은 docs/SESSION_LOG.md '업로드'.
+// 끝난 세션을 서버로 자동 업로드한다 (시연·운영 버전). 형식은 docs/SERVER.md.
 // 세션은 지금처럼 먼저 태블릿(IndexedDB, SessionStore)에 저장하고, 여기서 아직 안 보낸 것을 오래된 것부터 하나씩 보낸다.
 // 서버가 2xx 로 답한 것만 '보냄'으로 적는다. 실패하면 멈췄다가 30초 → 1분 → 2분 … (최대 10분) 뒤 다시 시도하고,
 // 인터넷이 다시 연결될 때와 5분마다도 다시 본다. 그래서 와이파이가 끊겨도 세션을 잃지 않는다.
@@ -26,15 +26,17 @@ const SessionUpload = {
       url: (saved.url || SESSION_UPLOAD.url || '').trim(),
       key: saved.key || SESSION_UPLOAD.key || '',
       historyUrl: (saved.historyUrl || SESSION_UPLOAD.historyUrl || '').trim(),
+      localHistory: 'localHistory' in saved ? !!saved.localHistory : !!SESSION_UPLOAD.localHistory,
     };
   },
 
   // 기본값(SESSION_UPLOAD)과 다른 칸만 태블릿에 저장한다. 그래야 기본값을 고쳐 배포하면 따로 바꾸지 않은 태블릿이 새 값을 따른다
-  setSettings({ url, key, historyUrl = '' }) {
+  setSettings({ url, key, historyUrl = '', localHistory = !!SESSION_UPLOAD.localHistory }) {
     const own = {};
     if (url.trim() && url.trim() !== SESSION_UPLOAD.url) own.url = url.trim();
     if (key && key !== SESSION_UPLOAD.key) own.key = key;
     if (historyUrl.trim() && historyUrl.trim() !== (SESSION_UPLOAD.historyUrl || '')) own.historyUrl = historyUrl.trim();
+    if (!!localHistory !== !!SESSION_UPLOAD.localHistory) own.localHistory = !!localHistory;
     try {
       if (Object.keys(own).length) localStorage.setItem(this.KEY, JSON.stringify(own));
       else localStorage.removeItem(this.KEY);

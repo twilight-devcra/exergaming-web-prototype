@@ -216,6 +216,20 @@ const SessionStore = {
     return this.run('readwrite', (s) => s.put({ id, at: new Date().toISOString() }), 'uploaded');
   },
 
+  // 세션을 하나씩 fn(log) 에 넘긴다 (시험용 회원 기록 서버, app/members.js)
+  scan(fn) {
+    return this.run('readonly', (s) => {
+      const req = s.openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return;
+        fn(c.value);
+        c.continue();
+      };
+      return null;
+    });
+  },
+
   // 한 줄에 세션 하나 (JSON Lines). 큰 문자열 하나로 합치지 않고 조각째 Blob 으로 넘긴다
   async exportAll(name) {
     const parts = [];

@@ -83,12 +83,19 @@ const Members = {
 
   // ---------------- 서버의 회원 기록 (SESSION_UPLOAD.historyUrl) ----------------
   // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목은 이 태블릿 기록과 같은 모양
-  // ({ at, min, difficulty, score, distM, kcal, level, device, sid }). 형식은 docs/SESSION_LOG.md '회원 기록 받아 오기'
+  // ({ at, min, difficulty, score, distM, kcal, level, device, sid }). 형식은 docs/SERVER.md
   remote: {},      // 회원 번호 → 서버에서 받은 목록 (이 화면을 여는 동안만)
   TIMEOUT_MS: 6000,
 
+  // 서버 기록을 받아 올 곳이 있는가 (회원 기록 주소, 또는 시험용 로컬 서버)
+  hasRemote() {
+    const { historyUrl, localHistory } = SessionUpload.settings();
+    return !!(localHistory || historyUrl);
+  },
+
   async fetchRemote(id) {
-    const { historyUrl, key } = SessionUpload.settings();
+    const { historyUrl, key, localHistory } = SessionUpload.settings();
+    if (localHistory) return (this.remote[id] = await this.localServer(id));
     if (!historyUrl) return null;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), this.TIMEOUT_MS);
@@ -104,6 +111,30 @@ const Members = {
     } finally {
       clearTimeout(t);
     }
+  },
+
+  // 세션 로그 하나 → 회원 기록 항목 하나. 서버도 업로드된 세션에서 이렇게 뽑는다 (docs/SERVER.md '회원 기록')
+  summarize(log) {
+    const m = log.meta || {};
+    const sum = m.summary || {};
+    const ex = sum.exercise || {};
+    const levels = Object.values(sum.stats || {}).map((s) => s.level || 0);
+    return {
+      at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
+      score: sum.score, device: m.device || null, sid: m.id,
+      level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
+    };
+  },
+
+  // 시험용 회원 기록 서버 (SESSION_UPLOAD.localHistory): 바깥 서버 대신 이 태블릿의 세션 로그(IndexedDB)에서
+  // 서버와 같은 규칙으로 고른다. 그 회원 번호이고 결과 화면까지 간 세션. 세션 로그를 모두 읽으므로 시험용으로만 쓴다
+  async localServer(id) {
+    const out = [];
+    await SessionStore.scan((log) => {
+      const m = log.meta || {};
+      if (m.user === id && m.ended && m.ended !== 'abandoned') out.push(this.summarize(log));
+    });
+    return out.filter((x) => x.at && !isNaN(new Date(x.at)));
   },
 
   // 이 태블릿 기록 + 서버 기록. 같은 세션(태블릿 번호 + 세션 번호)은 한 번만, 시간순
@@ -295,12 +326,15 @@ const MemberUI = {
   async loadRemote(id) {
     const src = document.getElementById('hs-src');
     delete Members.remote[id];
-    if (!SessionUpload.settings().historyUrl) { src.textContent = ''; return; }
+    if (!Members.hasRemote()) { src.textContent = ''; return; }
+    const local = SessionUpload.settings().localHistory;
     src.textContent = '다른 태블릿의 기록도 불러오는 중…';
     try {
       const list = await Members.fetchRemote(id);
       if (this.user !== id) return;
-      src.textContent = list && list.length ? '다른 태블릿의 기록까지 모두 보여 드려요' : '';
+      // 시험용 로컬 서버는 언제나 알린다. 실제 서버로 착각하지 않게
+      src.textContent = local ? `시험용: 이 태블릿의 세션 로그를 서버 대신 썼어요 (${list.length}건)`
+        : list && list.length ? '다른 태블릿의 기록까지 모두 보여 드려요' : '';
     } catch (e) {
       if (this.user !== id) return;
       src.textContent = '지금은 서버에 연결하지 못해 이 태블릿의 기록만 보여 드려요';
@@ -404,7 +438,7 @@ const MemberUI = {
         const d = new Date(x.at);
         return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min}분 · ${diffLabel(x.difficulty)}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
       }).join('')
-      : `<li class="empty">${SessionUpload.settings().historyUrl ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
+      : `<li class="empty">${Members.hasRemote() ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
     // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'
     const ro = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c < 11172 && c % 28 && c % 28 !== 8 ? '으로' : '로'; };
     const dl = last ? diffLabel(last.difficulty) : '';

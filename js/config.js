@@ -1,11 +1,12 @@
 // 시연 환경에 맞춰 조절 가능한 설정값. 메뉴 화면의 '시연 설정'에서 바꾼 값은 localStorage에 저장된다.
 
 // 난이도 단계. Lv1·Lv2 는 50~60대에게 원래의 첫 단계도 버겁다는 의견을 받고 그 아래에 더한 쉬운 단계다 (2026-10-21).
-// 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이고, 점수 배율도 Lv3 부터 오른다.
+// 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이다. 점수 배율은 Lv1 부터 오른다 (levelMult).
 // 쉬운 단계는 문제를 줄이는 것과 함께 제한 시간도 EASY_TIME 배로 늘린다 (Lv1, Lv2 순).
 // 2026-11-05: 1.5 · 1.25 → 2 · 1.6 (어르신이 처음 몇 판을 서두르지 않고 풀 수 있게)
 const EASY_LEVELS = 2;
 const BASE_LEVEL = EASY_LEVELS + 1;
+const TOP_LEVEL = 8; // 미니게임의 가장 높은 난이도. 점수 배율 곡선의 끝 (multiplierTop)
 const EASY_TIME = [2, 1.6];
 // 저장해 둔 시작 난이도가 어느 번호 체계로 적힌 것인가. 1 = 쉬운 단계를 더하기 전 (그때의 Lv1 이 지금의 Lv3)
 const LEVEL_SCHEME = 2;
@@ -17,7 +18,9 @@ const DEFAULT_CONFIG = {
   tolerance: 0.12,           // 목표 RPM 대비 허용 구역 (±12%)
   maxDeviation: 0.45,        // 공이 화면 끝까지 밀려나는 편차
   tickSec: 1,                // 운동 점수 취득 간격
-  tickMaxPoints: 10,         // 틱당 최대 운동 점수
+  // 틱당 최대 운동 점수. 2026-11-05: 10 → 15. 인지 게임 배율을 Lv1 x1 → Lv8 x5 로 바꾸며(multiplierTop) 인지 점수가 보통 1.5배쯤 늘어,
+  // 운동 점수도 1.5배로 맞췄다. 보통 참가자의 인지 점수 비중이 예전처럼 40% 안팎이고, 높은 난이도에 오른 사람만 그보다 커진다
+  tickMaxPoints: 15,
   rpmChange: true,           // 라운드 중 목표 RPM 변화 여부
   // 속도 전환 구간 사이의 간격: 이 둘 사이에서 매번 무작위로 (라운드 시작 → 첫 전환, 전환이 끝난 뒤 → 다음 전환).
   // 지나면 진행 중인 인지 게임이 끝난 뒤 전환한다. 전환 구간은 인지 게임이 없는 '두뇌 쉬는 시간'이기도 하다
@@ -46,7 +49,10 @@ const DEFAULT_CONFIG = {
   // 게임 하나가 문제를 3개씩 내므로, 줄이지 않으면 8종을 켰을 때 잘하는 사람은 몇 종을 보기도 전에 최고 난이도에 닿는다.
   // 2 이면 8종을 한 바퀴 다 맞혀도 약 2.4단계 오른다 — 5분 라운드(2~3바퀴) 끝 무렵에야 최고 난이도에 닿는다.
   diffGamesRef: 2,
-  multiplierStep: 0.2,       // 난이도 1단계당 배율 증가 (Lv3 x1.0, Lv4 x1.2 ... 쉬운 단계 Lv1·Lv2 도 x1.0)
+  // 인지 게임 점수 배율: Lv1 x1.0 에서 Lv8 x(이 값)까지 레벨마다 같은 비율로 곱해 오른다 (levelMult).
+  // 5 면 한 단계에 약 x1.26: Lv1 1.0 · Lv2 1.26 · Lv3 1.58 · Lv4 2.0 · Lv5 2.5 · Lv6 3.2 · Lv7 4.0 · Lv8 5.0
+  // (2026-11-05 전: Lv3 까지 x1.0, 그 위로 +0.2 씩 · Lv8 x2.0 = multiplierStep)
+  multiplierTop: 5,
   questionTimer: true,       // 문제마다 제한 시간. 시간이 다 되면 그 문제는 틀린 것으로 친다
   questionTimeScale: 1,      // 모든 문제 제한 시간에 곱하는 배율 (라운드 난이도 프리셋이 정한다). 게임 소개 시간에도 곱한다
   introMs: { first: 4500, again: 2200 }, // 게임 소개(설명 그림) 시간: 라운드에서 처음 나올 때 / 다시 나올 때. 누르면 바로 넘어간다
@@ -139,7 +145,7 @@ const DEMO_SETTINGS = [
   { key: 'tolerance', label: '허용 구역 (±%)', min: 3, max: 40, step: 1, scale: 100 },
   { key: 'tickMaxPoints', label: '운동 점수 (초당 최대)', min: 1, max: 100, step: 1 },
   { key: 'cogBasePoints', label: '인지 게임 기본 점수 (한 판 다 맞히면)', min: 10, max: 1000, step: 10 },
-  { key: 'multiplierStep', label: '난이도 1단계당 점수 배율 증가', min: 0, max: 1, step: 0.05 },
+  { key: 'multiplierTop', label: '최고 난이도(Lv8) 점수 배율 (Lv1 은 x1)', min: 1, max: 10, step: 0.5 },
   { key: 'difficulty', label: '난이도 방식', options: [['adaptive', '정답·오답에 따라 오르내림'], ['cycle', '한 바퀴 돌 때마다 +1']] },
   { key: 'startLevel', label: '시작 난이도', min: 1, max: 8, step: 1 },
   { key: 'diffUp', label: '정답 하나에 난이도 + (오르내림 방식)', min: 0.05, max: 2, step: 0.05 },
@@ -200,6 +206,12 @@ const Config = {
       if (Object.keys(diff).length) localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify({ ...diff, levelScheme: LEVEL_SCHEME }));
       else localStorage.removeItem(DEMO_SETTINGS_KEY);
     } catch (e) { }
+  },
+  // 인지 게임 점수 배율. Lv1 x1 → TOP_LEVEL x multiplierTop, 레벨마다 같은 비율로 곱한다 (높은 단계일수록 한 단계에 더 많이 오른다)
+  levelMult(cfg, level) {
+    const top = cfg.multiplierTop > 0 ? cfg.multiplierTop : 1;
+    const k = Math.min(Math.max(level, 1), TOP_LEVEL) - 1;
+    return top ** (k / (TOP_LEVEL - 1));
   },
   // 스테이션끼리 설정이 같은지 맞춰 보는 4자리 코드 (DEMO_SETTINGS 값으로 만든 해시)
   demoCode(cfg) {

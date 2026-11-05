@@ -457,6 +457,20 @@ const MemberUI = {
     if ((a.state === 'login' || a.state === 'history') && (a.clock - this.demo.activeAt) / 1000 > this.IDLE_SEC) a.show('attract');
   },
 
+  // 풍경에 세울 지난 세션들 (js/band.js setLandmarks). 기념물 종류는 난이도, 크기는 시간으로 정한다. 손님은 없다
+  landmarks() {
+    if (!this.user) return [];
+    return Members.merged(this.user).map((x) => ({
+      score: x.score || 0, at: x.at, difficulty: x.difficulty, min: x.min,
+      key: x.sid ? `${x.device || ''}:${x.sid}` : x.at,
+    }));
+  },
+
+  // 이번 라운드가 이 회원의 몇 번째 기록인가 (라운드 끝 기념물의 이름표). 손님은 결과 화면에서 회원 번호를 받으므로 첫 기록이다
+  nextCount() {
+    return (this.user ? Members.merged(this.user).length : 0) + 1;
+  },
+
   // 라운드를 시작할 때 세션 로그에 회원 번호를 붙인다
   tagLog(log) {
     log.meta.user = this.user;

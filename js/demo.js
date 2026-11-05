@@ -132,12 +132,21 @@ const Demo = {
     const a = this.app;
     if (session) Object.assign(a.cfg, Config.session(session.min, session.difficulty));
     a.startRound();
+    // 회원이면 지난 세션들이 기념물로 길가에 선다 (손님·프로토타입은 없음)
+    a.band.setLandmarks(this.members ? this.members.landmarks() : []);
     a.log.meta.station = this.station;
     if (session) a.log.meta.session = { ...session };
     if (this.members) this.members.tagLog(a.log);
     a.log.ev('start', { via, ...(session ? { session } : {}) });
     this.activeAt = a.clock;
     this.renderCfg();
+  },
+
+  // 라운드 끝에 세울 기념물 { n, difficulty, min } (js/band.js plant). 운영 버전(회원·손님)만, 아니면 null
+  plantInfo() {
+    if (!this.members) return null;
+    const s = (this.app.log && this.app.log.meta.session) || {};
+    return { n: this.members.nextCount(), difficulty: s.difficulty, min: s.min };
   },
 
   // ---------------- 세션 설정 (운영 버전) ----------------
@@ -523,7 +532,7 @@ const Demo = {
     // 두 열로 나눠 놓는다. DEMO_SETTINGS 순서는 설정 코드(Config.demoCode)에 쓰이므로 바꾸지 않고 여기서만 가른다
     const cols = [U.el('div', 'op-set-col', '<h3>시간·점수·페달</h3>'), U.el('div', 'op-set-col', '<h3>미니게임 난이도</h3>')];
     box.append(...cols);
-    const right = ['difficulty', 'startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'multiplierStep'];
+    const right = ['difficulty', 'startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'multiplierTop'];
     for (const s of DEMO_SETTINGS) {
       const input = s.options
         ? `<select data-key="${s.key}">${s.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`

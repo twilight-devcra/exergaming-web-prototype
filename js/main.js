@@ -36,6 +36,13 @@ const App = {
       this.audio.sfx('go');
       Fx.confetti(0.35);
     };
+    // 회원의 지난 기념물을 지날 때 (운영 버전). 가장 높은 기록을 넘는 순간만 알린다
+    this.band.onLandmark = (lm) => {
+      if (!lm.best || this.state !== 'play') return;
+      this.band.addFloater('최고 기록 넘었어요!', 'good');
+      this.audio.sfx('go');
+      Fx.confetti(0.35);
+    };
     Fx.init();
     Theme.init();
     this.bindMusic();
@@ -149,7 +156,7 @@ const App = {
     $('#cfg-diff-down').value = c.diffDown;
     $('#cfg-maxdev').value = Math.round(c.maxDeviation * 100);
     $('#cfg-change-amt').value = Math.round(c.rpmChangeAmount * 100);
-    $('#cfg-mult').value = c.multiplierStep;
+    $('#cfg-mult').value = c.multiplierTop;
     $('#cfg-difficulty').value = c.difficulty;
     $('#cfg-change').checked = c.rpmChange;
     $('#cfg-shift').value = c.shiftSec;
@@ -192,7 +199,7 @@ const App = {
     c.diffDown = r(num('#cfg-diff-down', 0.05, 2, 0.6));
     c.maxDeviation = r(num('#cfg-maxdev', 10, 100, 45) / 100);
     c.rpmChangeAmount = r(num('#cfg-change-amt', 0, 40, 12) / 100);
-    c.multiplierStep = num('#cfg-mult', 0, 1, 0.2);
+    c.multiplierTop = num('#cfg-mult', 1, 10, 5);
     c.difficulty = $('#cfg-difficulty').value;
     c.rpmChange = $('#cfg-change').checked;
     c.shiftSec = num('#cfg-shift', 4, 30, 8);
@@ -563,8 +570,8 @@ const App = {
     const level = this.cfg.difficulty === 'adaptive'
       ? U.clamp(Math.floor(this.diff), 1, top)
       : Math.min(cycle + this.cfg.startLevel, top);
-    // 쉬운 단계(Lv1·Lv2)는 원래의 첫 단계(Lv3)와 같은 x1.0 이다
-    const mult = 1 + this.cfg.multiplierStep * Math.max(0, level - BASE_LEVEL);
+    // Lv1 x1.0 → Lv8 x multiplierTop (config.js 의 Config.levelMult)
+    const mult = Config.levelMult(this.cfg, level);
     const prev = this.lastLevel[T.id];
     const firstTime = prev == null;
     const tag = firstTime ? '새 게임' : level > prev ? '레벨 업' : level < prev ? '숨 고르기' : '한 번 더';
@@ -1043,7 +1050,13 @@ const App = {
       <div class="name">수고하셨어요!</div>
       <div class="score"><b>0</b>점</div>
       <div class="hint">화면을 누르면 바로 결과를 봅니다</div>`;
-    $('#game').append(el);
+    // 운영 버전의 회원 라운드: 이번 점수 자리에 기념물을 세운다 (Band.plant). 풍경이 보이도록 마무리 카드는 아래 게임 카드 안에 띄운다
+    const plant = this.demo ? Demo.plantInfo() : null;
+    if (plant) {
+      this.band.plant(this.score, plant);
+      this.after(500, () => this.audio.sfx('blink'), gen);
+    }
+    (plant ? $('#cog') : $('#game')).append(el);
     Fx.confetti(0.5);
 
     const num = el.querySelector('.score b');
@@ -1175,6 +1188,11 @@ const App = {
           this.band.draw();
           this.updateHud(dt);
         }
+      }
+      // 마무리 화면: 자전거가 멈추며 기념물을 세운다 (세우지 않으면 마무리 카드가 풍경을 덮고 있다)
+      if (this.state === 'ending' && this.band.planting) {
+        this.band.update(dt, this.band.rpm * Math.exp(-dt / 0.6), 0, this.score);
+        this.band.draw();
       }
       this.runTimers();
       if (this.state === 'play') this.updateQTimer();

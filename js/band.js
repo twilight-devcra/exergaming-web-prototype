@@ -28,6 +28,12 @@ class Band {
     this.rpm = 0;
     this.time = 0;        // 흐른 시간 (s). 구름·풍차처럼 점수와 상관없이 움직이는 것에 쓴다
     this.dayT = 0;        // 라운드 진행 0~1. 풍경 라이딩에서 아침 → 해 질 녘 (main.js 가 넣는다)
+    // 기념물 (풍경 라이딩, 운영 버전의 회원): 지난 세션마다 그 최종 점수 자리에 하나씩 서 있다 (Band.LANDMARKS).
+    // 점수가 오르면 자전거가 지난 기록들을 지나가고, 비슷한 점수로 여러 번 하면 그 자리에 모인다. 라운드가 끝나면 이번 점수 자리에 세운다
+    this.landmarks = [];    // [{ score, seed, best, pop, tag, kind, size }] 점수 순. tag = 팻말 글자 (날짜)
+    this.onLandmark = null; // (lm) 지난 기념물을 지나는 순간
+    this.planting = null;   // 라운드 끝에 세우는 기념물 { score, t, label, seed, kind, size }
+    this.endShift = 0;      // 나무를 심을 때 자전거가 앞으로 비켜 가는 정도 0~1
     // 화면 스타일(js/themes.js)에 따른 색과 그리는 방식. glow = 빛 번짐, pixel = 픽셀 크기, outline = 테두리 두께, speedLines = 공 뒤 속도선
     this.look = {};
     this.pal = Band.readPalette();
@@ -99,6 +105,63 @@ class Band {
     this.passed = null;
     this.floaters = [];
     this.rings = [];
+    this.planting = null;
+    this.endShift = 0;
+    this.landmarks.forEach((lm) => (lm.pop = 0));
+  }
+
+  // 기념물 종류는 세션 난이도로, 크기는 세션 길이로 정한다 (5분 0 · 10분 1 · 15분 2).
+  // village (기본): 집 · 가게 · 탑. 크기 = 층수 1~3. 같은 점수대에 여러 번 하면 마을이 생긴다. 벽·지붕 색은 세션마다 다르다
+  // objects: 바람개비(페달 속도로 돈다) · 풍선(수 1~3, 흔들린다) · 돌탑(돌 3~5). 주소에 ?marks=objects 로 비교해 본다
+  static LANDMARK_SETS = {
+    village: {
+      relax: { kind: 'cottage', verb: '집을 지었어요' },
+      normal: { kind: 'shop', verb: '가게를 열었어요' },
+      challenge: { kind: 'tower', verb: '탑을 세웠어요' },
+    },
+    objects: {
+      relax: { kind: 'pinwheel', verb: '바람개비를 꽂았어요' },
+      normal: { kind: 'balloon', verb: '풍선을 달았어요' },
+      challenge: { kind: 'cairn', verb: '돌탑을 쌓았어요' },
+    },
+  };
+  static get LANDMARKS() {
+    const q = new URLSearchParams(location.search).get('marks');
+    return Band.LANDMARK_SETS[q] || Band.LANDMARK_SETS.village;
+  }
+  static LM_COLORS = ['#e5484d', '#f5b301', '#2f6fed', '#e93d82', '#12a594'];
+  static WALLS = ['#fff1d6', '#ffe0c7', '#f9d8df', '#dfeef8', '#e7f1d4'];
+  static ROOFS = ['#e2574c', '#4a7fd4', '#f09a2c', '#2fae94', '#9b62c9'];
+
+  static landmarkOf(difficulty, min) {
+    const L = Band.LANDMARKS[difficulty] || Band.LANDMARKS.normal;
+    const size = !(min > 0) ? 1 : min <= 7 ? 0 : min <= 12 ? 1 : 2;
+    return { ...L, size };
+  }
+
+  // 지난 세션들 [{ score, key, at, difficulty, min }] (key = 세션마다 다른 값. 색을 정한다, at = 날짜 → 팻말).
+  // 가장 높은 점수의 기념물에는 별을 단다
+  setLandmarks(list) {
+    const seedOf = (k) => [...String(k)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 100003, 7);
+    const tagOf = (at) => {
+      const d = new Date(at);
+      return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()}`;
+    };
+    const lms = (list || []).filter((x) => x.score > 0).map((x) => {
+      const { kind, size } = Band.landmarkOf(x.difficulty, x.min);
+      return { score: x.score, seed: seedOf(x.key), best: false, pop: 0, tag: tagOf(x.at), kind, size };
+    });
+    lms.sort((a, b) => a.score - b.score);
+    if (lms.length) lms[lms.length - 1].best = true;
+    this.landmarks = lms;
+  }
+
+  // 라운드 끝: 이번 점수 자리에 기념물을 세운다 (main.js 의 마무리 화면). 자전거는 앞으로 비켜 가며 멈춘다
+  // info = { n: 이 회원의 몇 번째 기록인가, difficulty, min }
+  plant(score, { n = 1, difficulty, min } = {}) {
+    const { kind, size, verb } = Band.landmarkOf(difficulty, min);
+    const label = `${n === 1 ? '첫' : `${n}번째`} 기록 · ${verb}`;
+    this.planting = { score: Math.max(score, this.dist), t: 0, label, seed: this.landmarks.length * 7 + 3, kind, size };
   }
 
   // deviation: (rpm - target) / target
@@ -121,6 +184,17 @@ class Band {
       if (this.onMilestone) this.onMilestone(m);
     }
     if (this.passed) this.passed.t += dt;
+    for (const lm of this.landmarks) {
+      lm.pop = Math.max(0, lm.pop - dt / 0.6);
+      if (before < lm.score && this.dist >= lm.score) {
+        lm.pop = 1;
+        if (this.onLandmark) this.onLandmark(lm);
+      }
+    }
+    if (this.planting) {
+      this.planting.t += dt;
+      this.endShift = Math.min(1, this.endShift + dt / 0.9);
+    }
     // 색과 점수는 실제 편차가 아니라 화면에 보이는 공 위치를 기준으로 한다 (보이는 대로 채점)
     const out = Math.max(0, Math.abs(this.deviation) - tolerance) / (maxDeviation - tolerance);
     this.outAmount = U.lerp(this.outAmount, U.clamp(out * 1.5 + (out > 0 ? 0.35 : 0), 0, 1), 1 - Math.exp(-dt / 0.12));
@@ -522,6 +596,15 @@ class Band {
     // 길 아래에 자리가 넉넉하면(속도 전환 구간) 길가의 꽃과 덤불이 가장 빨리 지나간다
     const below = H - gy - roadH / 2;
     if (below > 40) this.drawRoadside(ext, roadH / 2, below, scroll * 1.25, U.clamp((below - 40) / 80, 0, 1));
+    // 길 건너편의 낮은 언덕 (길과 함께 기울고 점수만큼 흘러간다). 입체 언덕의 앞쪽 비탈을 보는 것으로 여긴다:
+    // 기념물(마을)은 그 앞 비탈, 꼭대기보다 아래·길보다 위에 선다. 언덕을 먼저 그리고 기념물을 그 앞에 그려 가려지지 않는다.
+    // 꼭대기는 길 윗선에서 verge × 0.9 ~ 2.0 위, 밑동은 verge × 0.45 위라 건물 아랫부분 뒤로 늘 언덕 비탈이 보인다
+    const verge = U.clamp(r * 0.85, 10, 32);
+    const crest = (x) => -roadH / 2 - verge * (1.45 + 0.35 * Math.sin((x + scroll) * 0.009) + 0.2 * Math.sin((x + scroll) * 0.023 + 1.7));
+    this.drawRoadsideHill(ext, -roadH / 2, crest, verge);
+    this.drawLandmarks(this.landmarkItems(r, ext), r, -roadH / 2 - verge * 0.45);
+    // 점수 깃발도 같은 비탈에 똑바로 (기념물 앞에 그려 가려지지 않게)
+    this.drawScenicFlags(ext, r, -roadH / 2 - verge * 0.45);
     g.fillStyle = pal.road;
     g.fillRect(-ext, -roadH / 2, ext * 2, roadH);
     g.fillStyle = pal.roadEdge;
@@ -551,10 +634,10 @@ class Band {
     g.stroke();
     g.setLineDash([]);
 
-    this.drawFlags(ext, r, -roadH / 2, (big) => -roadH / 2 - r * (big ? 2.3 : 1.7));
 
-    // 자전거 배지 (정답 직후에는 잠깐 커지면서 초록으로 물든다)
-    const bx = this.ballX * trackHalf;
+    // 자전거 배지 (정답 직후에는 잠깐 커지면서 초록으로 물든다). 나무를 심을 때는 앞으로 비켜 간다
+    const shift = this.endShift * this.endShift * (3 - 2 * this.endShift);
+    const bx = this.ballX * trackHalf + shift * Math.min(trackHalf * 0.6, W * 0.22);
     const br = r * (1 + 0.25 * this.pop);
     const by = -roadH * 0.12;
     this.drawRings(trackHalf, by, r);
@@ -587,6 +670,7 @@ class Band {
     const pw = padX * 2 + w1 + gapX + w2;
     const px = U.clamp(bx, -W / 2 + pw / 2 + 12, W / 2 - pw / 2 - 12);
     const pyTop = by - r - fs * 0.6 - ph; // 배지가 커져도 말풍선은 제자리
+    g.globalAlpha = 1 - this.endShift;
     g.fillStyle = pal.ink;
     g.beginPath();
     g.roundRect(px - pw / 2, pyTop, pw, ph, ph / 2);
@@ -605,6 +689,7 @@ class Band {
     g.fillStyle = this.inZone ? pal.tipGood : pal.tipWarn;
     g.font = `700 ${fs}px ${pal.fontText}`;
     g.fillText(tip, px - pw / 2 + padX + w1 + gapX, pyTop + ph / 2 + 1);
+    g.globalAlpha = 1;
 
     // 구역 밖에 있을 때만 구역 위에 '여기에 맞춰 달려요' 표지 (말풍선보다 위에 두어 겹치지 않게).
     // 속도 전환 구간에는 안내 카드가 같은 말을 하므로 숨긴다
@@ -628,6 +713,612 @@ class Band {
 
     this.drawFloaters(trackHalf, pyTop - 4, r);
     g.restore();
+  }
+
+  // ----- 기념물 -----
+  // 밑면 너비의 절반(body)과 팻말을 세울 자리(sign, 지붕 처마 바깥). h = 기념물 크기
+  static footprint(kind, size, h) {
+    if (kind === 'cottage') return { body: 0.4 * h, sign: 0.544 * h };
+    if (kind === 'shop') return { body: 0.46 * h, sign: 0.51 * h };
+    if (kind === 'tower') return { body: 0.28 * h, sign: 0.36 * h };
+    if (kind === 'cairn') return { body: (0.26 + 0.03 * size) * h, sign: 0.32 * h };
+    return { body: 0.08 * h, sign: 0.32 * h };
+  }
+
+  // 화면 근처의 기념물과 그 터 [L, R] (밑면 + 팻말). 길가 언덕 앞 비탈에 그린다
+  landmarkItems(r, ext) {
+    const { g, W, pal } = this;
+    const h = r * 1.8;
+    const at = (score) => (score - this.dist) * Band.PX_PER_POINT;
+    // 양옆의 시간·점수 표시와 겹치지 않게 가장자리에서는 사라진다 (깃발과 같은 규칙)
+    const fade = (x) => U.clamp((W / 2 - 170 - Math.abs(x)) / 100, 0, 1);
+    // 날짜 팻말은 곧 지나갈 기념물 하나에만: 자전거 조금 앞(ahead, 가운데 말풍선에 가리지 않는 자리)에 가장 가까운 것.
+    // 다가오면 나타났다가 자전거에 닿기 전에 사라진다.
+    // 비슷한 점수가 모여 마을이 되면 팻말이 건물 사이에 빽빽하게 끼어 어수선했다 (2026-11-05)
+    const ahead = Math.max(120, W / 2 - 230) * 0.55;
+    let near = null;
+    for (const lm of this.landmarks) {
+      const d = Math.abs(at(lm.score) - ahead);
+      if (lm.tag && (!near || d < near.d)) near = { lm, d };
+    }
+    const tagAlpha = near ? U.clamp(1 - (near.d - h * 0.6) / (h * 1.2), 0, 1) : 0;
+    const fs = Math.round(U.clamp(r * 0.42, 10, 18));
+    g.font = `800 ${fs}px ${pal.font}`;
+    const items = [];
+    const add = (lm, x, tag, extra) => {
+      const fp = Band.footprint(lm.kind, lm.size, h);
+      const tw = tag ? g.measureText(tag).width + fs * 0.7 : 0;
+      const R = tag ? fp.sign + h * 0.06 + tw : fp.body;
+      items.push({ lm, x, tag, L: x - fp.body - h * 0.12, R: x + R + h * 0.12, ...extra });
+    };
+    for (const lm of this.landmarks) {
+      const x = at(lm.score);
+      if (Math.abs(x) > ext + h * 2) continue;
+      const alpha = fade(x);
+      const showTag = alpha > 0 && tagAlpha > 0 && near.lm === lm;
+      add(lm, x, showTag ? lm.tag : '', { alpha, tagAlpha: showTag ? tagAlpha : 0 });
+    }
+    if (this.planting) add(this.planting, at(this.planting.score), '오늘', { planting: true, alpha: 1 });
+    return items;
+  }
+
+  // 풍경 라이딩의 점수 깃발: 기념물처럼 길가 언덕 앞 비탈(baseY)에 똑바로 선 동화책 풍 깃발.
+  // 나무 깃대 + 금색 꼭지, 바람에 흔들리는 천(제 색을 조금 어둡게 한 윤곽), 밑에 옅은 그림자, 옆에 점수 (밝은 테두리로 언덕 위에서도 읽힌다).
+  // 색: 아직 안 지난 깃발은 크림색, 1000점마다 큰 깃발은 강조색, 지난 깃발은 금색 (초록은 언덕에 묻힌다). 지나는 순간 커졌다 돌아온다
+  drawScenicFlags(ext, r, baseY) {
+    const { g, W, pal } = this;
+    const tone = (c) => Band.mix(c, '#3a2a20', 0.3);
+    const first = Math.max(Band.MARK_EVERY, Math.ceil((this.dist - ext / Band.PX_PER_POINT) / Band.MARK_EVERY) * Band.MARK_EVERY);
+    for (let m = first; (m - this.dist) * Band.PX_PER_POINT < ext; m += Band.MARK_EVERY) {
+      const x = (m - this.dist) * Band.PX_PER_POINT;
+      // 양옆의 시간·점수 표시와 겹치지 않게 가장자리에서는 사라진다
+      const alpha = U.clamp((W / 2 - 170 - Math.abs(x)) / 100, 0, 1);
+      if (alpha <= 0) continue;
+      const big = m % Band.MARK_BIG === 0;
+      const done = m <= this.dist;
+      const pop = this.passed && this.passed.m === m ? Math.max(0, 1 - this.passed.t / Band.POP_SEC) : 0;
+      const s = 1 + 0.35 * pop;
+      const ph = r * (big ? 2.2 : 1.65) * s;          // 깃대 높이
+      const fw = r * (big ? 1.25 : 0.9) * s;           // 천 너비
+      const fh = fw * 0.72;
+      const cloth = done ? '#f5b301' : big ? pal.accent : '#fff4dc';
+      const lw = Math.max(1.2, r * 0.07);
+      g.save();
+      g.globalAlpha = alpha;
+      g.translate(x, baseY);
+      g.rotate(this.theta);
+      g.lineJoin = 'round';
+      g.lineCap = 'round';
+      g.fillStyle = 'rgba(30, 60, 35, 0.22)';
+      g.beginPath();
+      g.ellipse(r * 0.08, 0, r * 0.32, r * 0.09, 0, 0, Math.PI * 2);
+      g.fill();
+      // 깃대
+      g.strokeStyle = tone(pal.trunk);
+      g.lineWidth = lw * 2.4;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(0, -ph);
+      g.stroke();
+      g.strokeStyle = pal.trunk;
+      g.lineWidth = lw * 1.3;
+      g.stroke();
+      // 천: 깃대에서 펄럭이며 끝이 두 갈래
+      const top = -ph + r * 0.12;
+      const wv = Math.sin(this.time * 3 + m * 0.01) * fh * 0.12;
+      g.beginPath();
+      g.moveTo(0, top);
+      g.quadraticCurveTo(fw * 0.5, top - fh * 0.12 + wv, fw, top + wv);
+      g.lineTo(fw * 0.78, top + fh * 0.5 + wv);
+      g.lineTo(fw, top + fh + wv);
+      g.quadraticCurveTo(fw * 0.5, top + fh * 0.88 + wv, 0, top + fh);
+      g.closePath();
+      g.fillStyle = cloth;
+      g.fill();
+      g.strokeStyle = tone(cloth);
+      g.lineWidth = lw;
+      g.stroke();
+      // 꼭지
+      g.fillStyle = '#f5d36b';
+      g.beginPath();
+      g.arc(0, -ph, lw * 1.6, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = tone('#f5d36b');
+      g.stroke();
+      // 점수
+      g.font = `800 ${Math.round(r * (big ? 0.7 : 0.55) * s)}px ${pal.font}`;
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      const tx = fw + r * 0.18;
+      const ty = top + fh / 2 + wv;
+      g.lineWidth = Math.max(2.5, r * 0.14);
+      g.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      g.strokeText(String(m), tx, ty);
+      g.fillStyle = done ? tone('#f5b301') : big ? pal.accent : pal.ink;
+      g.fillText(String(m), tx, ty);
+      g.restore();
+    }
+  }
+
+  // 길가 언덕 (길 윗선 roadTop 에서 꼭대기 crest(x) 까지). 기념물보다 먼저 그린다.
+  // 꼭대기는 뒤 언덕(hillNear)에 가까운 밝은 풀색, 길 쪽으로 갈수록 풀밭색 — 앞으로 기운 비탈처럼 보이고 뒤 언덕과 길을 잇는다
+  drawRoadsideHill(ext, roadTop, crest, verge) {
+    const { g, pal } = this;
+    const grad = g.createLinearGradient(0, roadTop - verge * 2, 0, roadTop);
+    grad.addColorStop(0, Band.mix(pal.hillNear, pal.grass, 0.25));
+    grad.addColorStop(1, pal.grass);
+    g.fillStyle = grad;
+    g.beginPath();
+    g.moveTo(-ext, roadTop + 1);
+    for (let x = -ext; x <= ext; x += 8) g.lineTo(x, crest(x));
+    g.lineTo(ext, roadTop + 1);
+    g.closePath();
+    g.fill();
+  }
+
+  // items = landmarkItems, baseY = 밑동 높이 (길가 언덕의 앞 비탈, 길 윗선에서 조금 위). 화면 가운데가 지금 점수 자리다
+  drawLandmarks(items, r, baseY) {
+    const { g, pal } = this;
+    const h = r * 1.8;
+    let p = null;
+    for (const it of items) {
+      if (it.planting) {
+        p = it;
+        continue;
+      }
+      if (it.alpha <= 0) continue;
+      g.globalAlpha = it.alpha;
+      this.drawLandmark(it.lm, it.x, baseY, h * (1 + 0.35 * it.lm.pop), '', r);
+    }
+    // 날짜 팻말은 모든 건물 위에 (이웃 건물에 가려지지 않게)
+    for (const it of items) {
+      if (!it.tag || it.planting || it.alpha <= 0) continue;
+      g.globalAlpha = it.alpha * it.tagAlpha;
+      const hh = h * (1 + 0.35 * it.lm.pop);
+      g.save();
+      g.translate(it.x, baseY);
+      g.rotate(this.theta);
+      this.drawSign(it.lm, hh, it.tag, r);
+      g.restore();
+    }
+    g.globalAlpha = 1;
+    if (!p) return;
+    const x = p.x;
+    p = this.planting;
+    const k = p.t - 0.35; // 자전거가 비켜 간 뒤에 심는다
+    if (k <= 0) return;
+    // 바닥: 흙 둔덕 (건물이면 그 위로 흙먼지가 피어오른다)
+    const m = U.clamp(k / 0.25, 0, 1);
+    g.fillStyle = pal.trunk;
+    g.beginPath();
+    g.ellipse(x, baseY, h * 0.42 * m, h * 0.1 * m, 0, Math.PI, 0);
+    g.fill();
+    if (k < 0.9) {
+      const dk = k / 0.9;
+      g.fillStyle = '#d8d2c4';
+      g.globalAlpha = 0.8 * (1 - dk);
+      for (const s of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          g.beginPath();
+          g.arc(x + s * h * (0.3 + dk * 0.5 + i * 0.12), baseY - h * (0.05 + i * 0.08 + dk * 0.1), h * (0.07 + dk * 0.06), 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+      g.globalAlpha = 1;
+    }
+    // 톡 튀어나오듯 자란다 (끝에서 살짝 넘쳤다가 제 크기)
+    const gk = U.clamp((k - 0.15) / 0.7, 0, 1);
+    const c1 = 1.70158;
+    const grow = gk <= 0 ? 0 : 1 + (c1 + 1) * (gk - 1) ** 3 + c1 * (gk - 1) ** 2;
+    let top = -h; // 기념물 맨 위 (밑동 기준, 똑바로 선 좌표)
+    if (grow > 0.02) top = this.drawLandmark(p, x, baseY, h * grow, grow > 0.9 ? '오늘' : '', r);
+    // 반짝임
+    if (k > 0.45 && k < 1.7) {
+      const sk = (k - 0.45) / 1.25;
+      g.fillStyle = pal.sun;
+      for (let i = 0; i < 6; i++) {
+        const ang = -Math.PI / 2 + (i - 2.5) * 0.45;
+        const d = h * (0.5 + sk * 0.9);
+        g.globalAlpha = 1 - sk;
+        g.beginPath();
+        g.arc(x + Math.cos(ang) * d, baseY - h * 0.6 + Math.sin(ang) * d * 0.7, Math.max(2, r * 0.1) * (1 - sk * 0.5), 0, Math.PI * 2);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+    // 이름표 ('N번째 기록 · 집을 지었어요'). 기념물처럼 비탈에서도 똑바로
+    if (k > 0.8 && p.label) {
+      const fs = Math.round(U.clamp(r * 0.6, 13, 26));
+      g.font = `700 ${fs}px ${pal.fontText}`;
+      const tw = g.measureText(p.label).width + fs * 1.4;
+      const th = Math.round(fs * 1.75);
+      const ty = top - th - 8;
+      g.save();
+      g.translate(x, baseY);
+      g.rotate(this.theta);
+      g.globalAlpha = U.clamp((k - 0.8) / 0.3, 0, 1);
+      g.fillStyle = pal.ink;
+      g.beginPath();
+      g.roundRect(-tw / 2, ty, tw, th, th / 2);
+      g.fill();
+      g.fillStyle = pal.onAccent;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(p.label, 0, ty + th / 2 + 1);
+      g.restore();
+    }
+  }
+
+  // 기념물 하나 { kind, size, seed, best } 를 길 좌표 (x, y) 밑동에 h 크기로. tag = 오른쪽 작은 팻말의 글자 (날짜).
+  // 오르막·내리막에서는 길이 기울지만(theta) 기념물은 똑바로 선다. 밑에는 언덕 비탈에 드리운 옅은 그림자를 깔아 땅에 붙어 보이게 한다.
+  // 돌려주는 값 = 맨 위 높이 (밑동 기준, 똑바로 선 좌표. 별·이름표를 그 위에 둔다)
+  drawLandmark(lm, x, y, h, tag = '', r = h / 1.8) {
+    const { g, pal } = this;
+    g.save();
+    g.translate(x, y);
+    g.rotate(this.theta);
+    let top;
+    const fp = Band.footprint(lm.kind, lm.size, h);
+    g.fillStyle = 'rgba(30, 60, 35, 0.22)';
+    g.beginPath();
+    g.ellipse(h * 0.05, 0, fp.body * 1.25 + h * 0.05, h * 0.07, 0, 0, Math.PI * 2);
+    g.fill();
+    if (lm.kind === 'pinwheel') top = this.drawPinwheel(0, 0, h, lm.size, lm.seed);
+    else if (lm.kind === 'cairn') top = this.drawCairn(0, 0, h, lm.size, lm.seed);
+    else if (lm.kind === 'balloon') top = this.drawBalloons(0, 0, h, lm.size, lm.seed);
+    else ({ top } = this.drawBuilding(lm.kind, 0, 0, h, lm.size, lm.seed));
+    if (lm.best) {
+      this.drawStar(0, top - h * 0.2, h * 0.17);
+      top -= h * 0.37;
+    }
+    if (tag) this.drawSign(lm, h, tag, r);
+    g.restore();
+    return top;
+  }
+
+  // 기념물 오른쪽(지붕 처마 바깥)의 작은 날짜 팻말. 밑동 기준, 똑바로 선 좌표에서 부른다
+  drawSign(lm, h, tag, r) {
+    const { g, pal } = this;
+    const fs = Math.round(U.clamp(r * 0.42, 10, 18));
+    g.font = `800 ${fs}px ${pal.font}`;
+    const w = g.measureText(tag).width + fs * 0.7;
+    const sh = fs * 1.35;
+    const sx = Band.footprint(lm.kind, lm.size, h).sign + h * 0.06;
+    const sy = -h * 0.3 - sh;
+    g.fillStyle = pal.trunk;
+    g.fillRect(sx + w * 0.5 - 1.5, sy + sh, 3, -sy - sh + 1);
+    g.beginPath();
+    g.roundRect(sx, sy, w, sh, 3);
+    g.fill();
+    g.fillStyle = pal.panel;
+    g.beginPath();
+    g.roundRect(sx + 1.5, sy + 1.5, w - 3, sh - 3, 2);
+    g.fill();
+    g.fillStyle = pal.ink;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(tag, sx + w / 2, sy + sh / 2 + 1);
+  }
+
+  // 마을 기념물 (동화책 풍): cottage(편안하게) 불룩한 박공지붕 집 · shop(보통) 줄무늬 차양 가게 · tower(도전) 깃발 단 탑.
+  // size 0~2 = 층수 1~3. 색은 seed 로. 둥근 모서리, 아치 문·창, 창가 화분, 오른쪽 그늘.
+  // 윤곽선은 검은 선이 아니라 칸마다 제 색을 조금 어둡게 한 선이다 (윤곽 없는 풍경 그림과 어울리게).
+  // 길가 언덕의 앞 비탈에 선다. 돌려주는 값 = { top: 맨 위 높이, half: 몸체 너비의 절반 }
+  drawBuilding(kind, x, y, h, size, seed) {
+    const { g } = this;
+    const floors = size + 1;
+    const fh = h * 0.44;                 // 한 층 높이
+    const wall = Band.WALLS[seed % Band.WALLS.length];
+    const roof = Band.ROOFS[(seed * 3 + 1) % Band.ROOFS.length];
+    const glass = '#ffe2a0', woodC = '#8a5a3a', stone = '#e6d6bb', brick = '#c0674a';
+    const tone = (c) => Band.mix(c, '#3a2a20', 0.3);
+    const lw = Math.max(1.2, h * 0.04);
+    g.lineJoin = 'round';
+    g.lineCap = 'round';
+    g.lineWidth = lw;
+    const paint = (fill) => {
+      g.fillStyle = fill;
+      g.fill();
+      g.strokeStyle = tone(fill);
+      g.stroke();
+    };
+    const shade = (bx, by, bw, bh) => {
+      g.fillStyle = 'rgba(80, 50, 30, 0.1)';
+      g.fillRect(bx + bw * 0.72, by, bw * 0.28, bh);
+    };
+    const archWin = (cx, cy, s) => {
+      g.beginPath();
+      g.moveTo(cx - s / 2, cy + s * 0.55);
+      g.lineTo(cx - s / 2, cy - s * 0.1);
+      g.arc(cx, cy - s * 0.1, s / 2, Math.PI, 0);
+      g.lineTo(cx + s / 2, cy + s * 0.55);
+      g.closePath();
+      g.fillStyle = glass;
+      g.fill();
+      g.strokeStyle = tone(wall);
+      g.stroke();
+      g.lineWidth = lw * 0.6;
+      g.beginPath();
+      g.moveTo(cx, cy - s * 0.55);
+      g.lineTo(cx, cy + s * 0.55);
+      g.moveTo(cx - s / 2, cy + s * 0.12);
+      g.lineTo(cx + s / 2, cy + s * 0.12);
+      g.stroke();
+      g.lineWidth = lw;
+      // 창가 화분
+      g.beginPath();
+      g.roundRect(cx - s * 0.6, cy + s * 0.55, s * 1.2, s * 0.22, s * 0.08);
+      paint('#b8704a');
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle = Band.LM_COLORS[(seed + i) % Band.LM_COLORS.length];
+        g.beginPath();
+        g.arc(cx - s * 0.35 + i * s * 0.35, cy + s * 0.52, s * 0.12, 0, Math.PI * 2);
+        g.fill();
+      }
+    };
+    const door = (cx, dw, dh) => {
+      g.beginPath();
+      g.moveTo(cx - dw / 2, y);
+      g.lineTo(cx - dw / 2, y - dh + dw / 2);
+      g.arc(cx, y - dh + dw / 2, dw / 2, Math.PI, 0);
+      g.lineTo(cx + dw / 2, y);
+      g.closePath();
+      paint(woodC);
+      g.fillStyle = '#f5d36b';
+      g.beginPath();
+      g.arc(cx + dw * 0.25, y - dh * 0.42, lw * 0.6, 0, Math.PI * 2);
+      g.fill();
+    };
+    // 불룩한 지붕: 양 처마에서 꼭대기로 곡선
+    const puffyRoof = (ry, hw, rh, bulge) => {
+      g.beginPath();
+      g.moveTo(x - hw, ry + h * 0.04);
+      g.quadraticCurveTo(x - hw * 0.44, ry - rh * bulge, x, ry - rh);
+      g.quadraticCurveTo(x + hw * 0.44, ry - rh * bulge, x + hw, ry + h * 0.04);
+      g.closePath();
+      paint(roof);
+    };
+
+    if (kind === 'tower') {
+      const w = h * 0.5;
+      const bh = fh * (floors + 0.55);
+      g.beginPath();
+      g.moveTo(x - w * 0.56, y);
+      g.lineTo(x - w * 0.46, y - bh);
+      g.lineTo(x + w * 0.46, y - bh);
+      g.lineTo(x + w * 0.56, y);
+      g.closePath();
+      g.fillStyle = stone;
+      g.fill();
+      shade(x - w * 0.5, y - bh, w, bh);
+      g.strokeStyle = tone(stone);
+      g.stroke();
+      // 돌 무늬
+      g.fillStyle = 'rgba(120, 90, 60, 0.22)';
+      for (let i = 0; i < floors * 3; i++) {
+        g.beginPath();
+        g.roundRect(x - w * 0.4 + Band.hash(seed + i) * w * 0.6, y - bh + Band.hash(seed + i * 7) * bh * 0.9, w * 0.16, h * 0.05, 2);
+        g.fill();
+      }
+      for (let i = 1; i <= floors; i++) archWin(x, y - fh * (i + 0.15), h * 0.18);
+      door(x, w * 0.36, fh * 0.6);
+      const ry = y - bh;
+      const rh = h * 0.7;
+      puffyRoof(ry, w * 0.72, rh, 0.25);
+      const pole = ry - rh;
+      g.strokeStyle = tone(roof);
+      g.beginPath();
+      g.moveTo(x, pole);
+      g.lineTo(x, pole - h * 0.3);
+      g.stroke();
+      const flutter = Math.sin(this.time * 4 + seed) * h * 0.03;
+      g.beginPath();
+      g.moveTo(x, pole - h * 0.3);
+      g.quadraticCurveTo(x + h * 0.14, pole - h * 0.3 + flutter, x + h * 0.24, pole - h * 0.22 + flutter);
+      g.lineTo(x, pole - h * 0.16);
+      g.closePath();
+      paint('#f5b301');
+      return { top: pole - h * 0.3, half: w * 0.72 };
+    }
+
+    if (kind === 'shop') {
+      const w = h * 0.92;
+      const bh = fh * floors + h * 0.12;
+      g.beginPath();
+      g.roundRect(x - w / 2, y - bh, w, bh, h * 0.04);
+      g.fillStyle = wall;
+      g.fill();
+      shade(x - w / 2, y - bh, w, bh);
+      g.strokeStyle = tone(wall);
+      g.stroke();
+      g.beginPath();
+      g.roundRect(x - w / 2 - h * 0.05, y - bh - h * 0.12, w + h * 0.1, h * 0.14, h * 0.05);
+      paint(roof);
+      // 1층: 큰 진열창과 문, 그 위 줄무늬 차양
+      g.beginPath();
+      g.roundRect(x - w * 0.42, y - fh * 0.74, w * 0.46, fh * 0.56, h * 0.04);
+      g.fillStyle = glass;
+      g.fill();
+      g.strokeStyle = tone(wall);
+      g.stroke();
+      door(x + w * 0.26, w * 0.24, fh * 0.74);
+      const aw = w + h * 0.1;
+      const ay = y - fh * 0.98;
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        const sx = x - aw / 2 + (aw / n) * i;
+        g.beginPath();
+        g.moveTo(sx, ay);
+        g.lineTo(sx + aw / n, ay);
+        g.lineTo(sx + aw / n, ay + h * 0.1);
+        g.arc(sx + aw / n / 2, ay + h * 0.1, aw / n / 2, 0, Math.PI);
+        g.closePath();
+        g.fillStyle = i % 2 ? '#fffaf0' : roof;
+        g.fill();
+        g.strokeStyle = tone(roof);
+        g.stroke();
+      }
+      for (let f = 1; f < floors; f++) {
+        archWin(x - w * 0.22, y - fh * (f + 0.45), h * 0.17);
+        archWin(x + w * 0.22, y - fh * (f + 0.45), h * 0.17);
+      }
+      return { top: y - bh - h * 0.12, half: w / 2 + h * 0.05 };
+    }
+
+    // cottage
+    const w = h * 0.8;
+    const bh = fh * floors;
+    g.beginPath();
+    g.roundRect(x - w / 2, y - bh, w, bh, h * 0.03);
+    g.fillStyle = wall;
+    g.fill();
+    shade(x - w / 2, y - bh, w, bh);
+    g.strokeStyle = tone(wall);
+    g.stroke();
+    door(x - w * 0.22, w * 0.26, fh * 0.7);
+    archWin(x + w * 0.2, y - fh * 0.55, h * 0.17);
+    for (let f = 1; f < floors; f++) {
+      archWin(x - w * 0.2, y - fh * (f + 0.45), h * 0.17);
+      archWin(x + w * 0.2, y - fh * (f + 0.45), h * 0.17);
+    }
+    const ry = y - bh;
+    const rh = h * 0.5;
+    // 굴뚝(지붕 뒤)과 피어오르는 연기
+    g.beginPath();
+    g.roundRect(x + w * 0.14, ry - rh * 0.95, w * 0.16, rh * 0.7, h * 0.02);
+    paint(brick);
+    g.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    const a0 = g.globalAlpha;
+    for (let i = 0; i < 3; i++) {
+      const t = (this.time * 0.35 + i / 3 + seed * 0.13) % 1;
+      g.globalAlpha = a0 * (1 - t);
+      g.beginPath();
+      g.arc(x + w * 0.22 + t * h * 0.16, ry - rh - h * (0.04 + t * 0.32), h * (0.035 + t * 0.05), 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = a0;
+    puffyRoof(ry, w * 0.68, rh, 0.6);
+    // 지붕 위 밝은 띠
+    g.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    g.beginPath();
+    g.moveTo(x - w * 0.42, ry - rh * 0.22);
+    g.quadraticCurveTo(x, ry - rh * 0.55, x + w * 0.42, ry - rh * 0.22);
+    g.stroke();
+    return { top: ry - rh, half: w * 0.68 };
+  }
+
+  // 바람개비 (편안하게): 막대 위의 네 날개. 페달을 밟는 만큼 돈다. size 0~2 = 크기
+  drawPinwheel(x, y, h, size, seed) {
+    const { g, pal } = this;
+    const L = h * (0.8 + 0.18 * size);
+    const R = h * (0.28 + 0.07 * size);
+    const cy = y - L;
+    g.strokeStyle = pal.trunk;
+    g.lineWidth = Math.max(2, h * 0.06);
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x, cy);
+    g.stroke();
+    const a0 = this.roll * 0.7 + seed;
+    const C = Band.LM_COLORS;
+    g.lineWidth = Math.max(1, h * 0.025);
+    g.strokeStyle = 'rgba(0,0,0,0.25)';
+    for (let k = 0; k < 4; k++) {
+      const a = a0 + (k * Math.PI) / 2;
+      g.fillStyle = C[(seed + k) % C.length];
+      g.beginPath();
+      g.moveTo(x, cy);
+      g.lineTo(x + Math.cos(a) * R, cy + Math.sin(a) * R);
+      g.lineTo(x + Math.cos(a + 0.8) * R * 0.72, cy + Math.sin(a + 0.8) * R * 0.72);
+      g.closePath();
+      g.fill();
+      g.stroke();
+    }
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.arc(x, cy, Math.max(1.5, h * 0.045), 0, Math.PI * 2);
+    g.fill();
+    return cy - R;
+  }
+
+  // 풍선 (보통): 말뚝에 묶인 풍선 size+1 개. 천천히 흔들린다
+  drawBalloons(x, y, h, size, seed) {
+    const { g, pal } = this;
+    const n = size + 1;
+    const rx = h * 0.2;
+    const ry = h * 0.25;
+    const peg = y - h * 0.14;
+    g.fillStyle = pal.trunk;
+    g.fillRect(x - h * 0.03, peg, h * 0.06, y - peg);
+    let top = y;
+    const C = Band.LM_COLORS;
+    for (let i = 0; i < n; i++) {
+      const off = n === 1 ? 0 : (i - (n - 1) / 2) * h * 0.34;
+      const cx = x + off + Math.sin(this.time * 1.3 + seed + i * 2.1) * h * 0.05;
+      const cy = y - h * (1.25 + (i % 2) * 0.14) + Math.sin(this.time * 1.7 + seed * 0.7 + i) * h * 0.04;
+      g.strokeStyle = pal.ink;
+      g.globalAlpha *= 0.55;
+      g.lineWidth = Math.max(1, h * 0.02);
+      g.beginPath();
+      g.moveTo(x, peg);
+      g.quadraticCurveTo(x + off * 0.3, (peg + cy) / 2, cx, cy + ry);
+      g.stroke();
+      g.globalAlpha /= 0.55;
+      g.fillStyle = C[(seed + i * 2) % C.length];
+      g.beginPath();
+      g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.moveTo(cx, cy + ry - 1);
+      g.lineTo(cx - rx * 0.22, cy + ry + rx * 0.3);
+      g.lineTo(cx + rx * 0.22, cy + ry + rx * 0.3);
+      g.closePath();
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.45)';
+      g.beginPath();
+      g.ellipse(cx - rx * 0.35, cy - ry * 0.35, rx * 0.22, ry * 0.3, -0.5, 0, Math.PI * 2);
+      g.fill();
+      top = Math.min(top, cy - ry);
+    }
+    return top;
+  }
+
+  // 돌탑 (도전): 납작한 돌을 위로 갈수록 작게 쌓는다. size 0~2 = 돌 3~5 개
+  drawCairn(x, y, h, size, seed) {
+    const { g } = this;
+    const greys = ['#8d949b', '#aeb4ba', '#767d84', '#9da3a9'];
+    let w = h * (0.52 + 0.06 * size);
+    let cy = y;
+    g.strokeStyle = '#4b5157';
+    g.lineWidth = Math.max(1, h * 0.03);
+    for (let i = 0; i < 3 + size; i++) {
+      const sh = w * 0.5;
+      const dx = (Band.hash(seed + i * 13) - 0.5) * w * 0.25;
+      g.fillStyle = greys[(seed + i) % greys.length];
+      g.beginPath();
+      g.ellipse(x + dx, cy - sh / 2, w / 2, sh / 2, 0, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      cy -= sh * 0.85;
+      w *= 0.8;
+    }
+    return cy;
+  }
+
+  drawStar(x, y, s) {
+    const { g, pal } = this;
+    g.fillStyle = pal.sun;
+    g.strokeStyle = pal.ink;
+    g.lineWidth = Math.max(1, s * 0.15);
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const d = i % 2 ? s * 0.45 : s;
+      g.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d);
+    }
+    g.closePath();
+    g.fill();
+    g.stroke();
   }
 
   // ----- 풍경 소품. (x, y) = 밑동, h = 크기 -----

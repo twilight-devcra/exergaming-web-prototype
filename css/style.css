@@ -1063,7 +1063,8 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   border: 4px solid transparent;
   border-radius: 16px;
 }
-.cnt-opt svg { width: 56%; height: 56%; margin: 0 auto; display: block; fill: rgba(255, 255, 255, 0.8); }
+/* 모양은 격자 칸과 같은 크기: 칸의 svg 와 같은 --csz 상자에 같은 그림을 가운데 둔다 (버튼보다 커도 그림은 상자 가운데 절반쯤이라 버튼 안에 든다) */
+.cnt-opt svg { position: absolute; left: 50%; top: 50%; width: var(--csz); height: var(--csz); transform: translate(-50%, -50%); display: block; overflow: visible; pointer-events: none; fill: rgba(255, 255, 255, 0.8); }
 .cnt-opt .n {
   position: absolute;
   left: 0;

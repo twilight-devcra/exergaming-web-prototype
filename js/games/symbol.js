@@ -122,8 +122,11 @@ class SymbolGame {
     this.target.append(symbolEl(q.sym));
     this.target.classList.add('active');
     U.say(this.question, '이 그림은 어디 있었나요?', 'act');
+    // 앞 질문의 ✓/✕ 표시를 지운다. 고른 칸을 막아 두면 한 번 틀린 칸이 다음 질문의 정답일 때 고를 수 없었다
     this.cells.forEach((c) => {
-      if (!c.classList.contains('closed')) c.classList.add('clickable');
+      c.classList.remove('closed', 'right', 'wrong');
+      c.querySelectorAll('.mark').forEach((m) => m.remove());
+      c.classList.add('clickable');
     });
     this.phase = 'input';
     this.h.question({
@@ -137,7 +140,6 @@ class SymbolGame {
   pick(i) {
     if (this.phase !== 'input') return;
     const cell = this.cells[i] || null;
-    if (cell && cell.classList.contains('closed')) return;
     this.phase = 'wait';
     this.h.stopTimer();
     this.cells.forEach((c) => c.classList.remove('clickable'));

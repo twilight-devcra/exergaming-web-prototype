@@ -22,14 +22,19 @@ const SessionUpload = {
   settings() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { }
-    return { url: (saved.url || SESSION_UPLOAD.url || '').trim(), key: saved.key || SESSION_UPLOAD.key || '' };
+    return {
+      url: (saved.url || SESSION_UPLOAD.url || '').trim(),
+      key: saved.key || SESSION_UPLOAD.key || '',
+      historyUrl: (saved.historyUrl || SESSION_UPLOAD.historyUrl || '').trim(),
+    };
   },
 
   // 기본값(SESSION_UPLOAD)과 다른 칸만 태블릿에 저장한다. 그래야 기본값을 고쳐 배포하면 따로 바꾸지 않은 태블릿이 새 값을 따른다
-  setSettings({ url, key }) {
+  setSettings({ url, key, historyUrl = '' }) {
     const own = {};
     if (url.trim() && url.trim() !== SESSION_UPLOAD.url) own.url = url.trim();
     if (key && key !== SESSION_UPLOAD.key) own.key = key;
+    if (historyUrl.trim() && historyUrl.trim() !== (SESSION_UPLOAD.historyUrl || '')) own.historyUrl = historyUrl.trim();
     try {
       if (Object.keys(own).length) localStorage.setItem(this.KEY, JSON.stringify(own));
       else localStorage.removeItem(this.KEY);

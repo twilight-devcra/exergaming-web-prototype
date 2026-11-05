@@ -197,9 +197,11 @@ const Demo = {
     };
     SessionUpload.init();
     if (!$('#op-up-url')) return;
-    const save = () => SessionUpload.setSettings({ url: $('#op-up-url').value, key: $('#op-up-key').value });
+    const hist = $('#op-up-hist');
+    const save = () => SessionUpload.setSettings({ url: $('#op-up-url').value, key: $('#op-up-key').value, historyUrl: hist ? hist.value : '' });
     $('#op-up-url').addEventListener('change', save);
     $('#op-up-key').addEventListener('change', save);
+    if (hist) hist.addEventListener('change', save);
     $('#op-up-now').onclick = () => {
       save();
       SessionUpload.kick();
@@ -208,9 +210,10 @@ const Demo = {
 
   renderUpload() {
     if (!$('#op-up-url')) return;
-    const { url, key } = SessionUpload.settings();
+    const { url, key, historyUrl } = SessionUpload.settings();
     $('#op-up-url').value = url;
     $('#op-up-key').value = key;
+    if ($('#op-up-hist')) $('#op-up-hist').value = historyUrl;
     SessionUpload.refresh();
   },
 

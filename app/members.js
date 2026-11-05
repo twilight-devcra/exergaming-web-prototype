@@ -81,6 +81,40 @@ const Members = {
     return (this.all()[id] || { history: [] }).history;
   },
 
+  // ---------------- 서버의 회원 기록 (SESSION_UPLOAD.historyUrl) ----------------
+  // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목은 이 태블릿 기록과 같은 모양
+  // ({ at, min, difficulty, score, distM, kcal, level, device, sid }). 형식은 docs/SESSION_LOG.md '회원 기록 받아 오기'
+  remote: {},      // 회원 번호 → 서버에서 받은 목록 (이 화면을 여는 동안만)
+  TIMEOUT_MS: 6000,
+
+  async fetchRemote(id) {
+    const { historyUrl, key } = SessionUpload.settings();
+    if (!historyUrl) return null;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), this.TIMEOUT_MS);
+    try {
+      const u = new URL(historyUrl, location.href);
+      u.searchParams.set('user', id);
+      const res = await fetch(u, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: ctrl.signal });
+      if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+      const body = await res.json();
+      const list = (Array.isArray(body) ? body : body.sessions || []).filter((x) => x && x.at && !isNaN(new Date(x.at)));
+      this.remote[id] = list;
+      return list;
+    } finally {
+      clearTimeout(t);
+    }
+  },
+
+  // 이 태블릿 기록 + 서버 기록. 같은 세션(태블릿 번호 + 세션 번호)은 한 번만, 시간순
+  merged(id) {
+    const out = new Map();
+    const keyOf = (x) => (x.sid ? `${x.device || ''}:${x.sid}` : `at:${x.at}`);
+    for (const x of this.remote[id] || []) out.set(keyOf(x), x);
+    for (const x of this.history(id)) out.set(keyOf(x), x);
+    return [...out.values()].sort((a, b) => new Date(a.at) - new Date(b.at));
+  },
+
   // ---------------- QR 그리기 (app/vendor/qrcode.js) ----------------
   qrSvg(text) {
     const qr = qrcode(0, 'M');
@@ -200,7 +234,7 @@ const MemberUI = {
     $('#hs-next').onclick = () => this.moveMonth(1);
     $('#hs-go').onclick = () => {
       if (app.state !== 'history') return;
-      const last = Members.history(this.user).slice(-1)[0];
+      const last = Members.merged(this.user).slice(-1)[0];
       demo.openSetup(this.via, last ? { min: last.min, difficulty: last.difficulty } : null);
     };
     return this;
@@ -254,6 +288,24 @@ const MemberUI = {
     this.guest = false;
     this.app.audio.sfx('clear');
     this.openHistory();
+    this.loadRemote(id);
+  },
+
+  // 서버에서 이 회원의 다른 태블릿 기록까지 받아 와 달력을 다시 그린다. 그동안은 이 태블릿 기록만 보인다
+  async loadRemote(id) {
+    const src = document.getElementById('hs-src');
+    delete Members.remote[id];
+    if (!SessionUpload.settings().historyUrl) { src.textContent = ''; return; }
+    src.textContent = '다른 태블릿의 기록도 불러오는 중…';
+    try {
+      const list = await Members.fetchRemote(id);
+      if (this.user !== id) return;
+      src.textContent = list && list.length ? '다른 태블릿의 기록까지 모두 보여 드려요' : '';
+    } catch (e) {
+      if (this.user !== id) return;
+      src.textContent = '지금은 서버에 연결하지 못해 이 태블릿의 기록만 보여 드려요';
+    }
+    if (this.app.state === 'history') this.renderHistory();
   },
 
   showPad(on) {
@@ -308,7 +360,7 @@ const MemberUI = {
 
   renderHistory() {
     const id = this.user;
-    const hist = Members.history(id);
+    const hist = Members.merged(id);
     const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     const byDay = {};
     for (const h of hist) {
@@ -352,8 +404,11 @@ const MemberUI = {
         const d = new Date(x.at);
         return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min}분 · ${diffLabel(x.difficulty)}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
       }).join('')
-      : '<li class="empty">이 태블릿에는 아직 기록이 없어요. 오늘 트레이닝부터 쌓여요</li>';
-    const sum = last ? `지난번처럼 ${last.min}분 · ${diffLabel(last.difficulty)}로 골라 둘게요` : '다음 화면에서 시간과 난이도를 골라요';
+      : `<li class="empty">${SessionUpload.settings().historyUrl ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
+    // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'
+    const ro = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c < 11172 && c % 28 && c % 28 !== 8 ? '으로' : '로'; };
+    const dl = last ? diffLabel(last.difficulty) : '';
+    const sum = last ? `지난번처럼 ${last.min}분 · ${dl}${ro(dl)} 골라 둘게요` : '다음 화면에서 시간과 난이도를 골라요';
     document.getElementById('hs-sum').textContent = sum;
     void monthCount;
   },
@@ -396,6 +451,8 @@ const MemberUI = {
       at: new Date().toISOString(), min: s ? s.min : Math.round(a.cfg.durationSec / 60), difficulty: s ? s.difficulty : 'normal',
       score: a.score, distM: Math.round(a.meter.distM), kcal: Math.round(a.meter.kcal * 10) / 10, level: lv,
       ended: a.log ? a.log.meta.ended : null,
+      // 서버 기록과 겹치는지 가리는 열쇠 (세션 로그의 meta.device + meta.id)
+      device: a.log ? a.log.meta.device : null, sid: a.log ? a.log.meta.id : null,
     });
     document.getElementById('dr-id').textContent = `회원 ${Members.format(id)}`;
     if (fresh) {
@@ -411,7 +468,7 @@ const MemberUI = {
           <li>오늘 기록부터 달력에 쌓여요</li>
         </ol>`;
     } else {
-      const n = Members.history(id).length;
+      const n = Members.merged(id).length;
       box.innerHTML = `<p class="dm-saved"><b>${n}번째 트레이닝</b>을 기록했어요<br><span>회원 ${Members.format(id)}</span></p>`;
     }
   },

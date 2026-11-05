@@ -449,3 +449,4 @@ body[data-theme="scenic"] {
 @media (max-width: 860px), (max-aspect-ratio: 1/1) {
   .lg-body, .hs-body { grid-template-columns: 1fr; }
 }
+.hs-src { margin: 0; font-size: 14px; color: var(--ink-soft); min-height: 1.4em; }

@@ -14,7 +14,10 @@
 //   per   — 한 차례에 한 줄로 옮기는 과일 수 [최소, 최대]
 //   kinds — 과일 종류 수
 //   mixed — 한 줄 안에서 다음 과일이 앞 과일과 다른 종류일 확률 (0 이면 한 줄은 늘 같은 과일)
-//   start — 처음부터 상자 안에 든 과일 수 [최소, 최대]. 상자가 열린 채로 잠깐 보여 준 뒤 닫힌다 (0 이면 빈 상자)
+//   start — 처음부터 상자 안에 든 과일 수 [최소, 최대]. 상자가 열린 채로 잠깐 보여 준 뒤 닫힌다 (0 이면 빈 상자).
+//           상자가 둘이면 두 상자를 합친 수이고, 상자마다 START_MIN 개 이상 든다.
+//           첫 차례에는 상자를 비우지 않는다 — 비우면 처음 보여 준 과일을 기억할 필요가 없어진다
+//           (예전에는 Lv4 판의 약 4분의 1, Lv8 판의 3분의 1 남짓이 첫 차례에 상자를 비웠다, 2026-11-09)
 //   out   — 한 차례가 빼기(상자 → 밖, 또는 상자 → 상자)일 확률 (기본 OUT. 뺄 것이 없으면 넣는다)
 //   decoy — 상자 위로 지나가기만 하고 들어가지 않는 과일 수 (주의 흐트리기. 차례와 함께 움직인다. 상자가 하나일 때만)
 //   boxes — 상자 수. 둘이면 위아래 두 줄에 하나씩 두고 (줄마다 상자 하나일 때와 똑같이 왼쪽에서 들어가 오른쪽으로 나온다)
@@ -72,14 +75,15 @@ class BoxGame {
     { steps: 3, per: [2, 3], kinds: 3, start: [3, 4], mixed: 0.5, decoy: 1, q: ['kind', 'most'] },
     { steps: 4, per: [1, 3], kinds: 3, start: [3, 5], mixed: 0.6, decoy: 2, q: ['diff', 'kind'], opts: 5 },
     // 상자 둘 (위아래 두 줄)
-    { steps: 4, per: [1, 3], kinds: 2, start: [3, 4], mixed: 0.4, boxes: 2, q: ['kind', 'total'], opts: 5 },
+    { steps: 4, per: [1, 3], kinds: 2, start: [4, 5], mixed: 0.4, boxes: 2, q: ['kind', 'total'], opts: 5 },
   ];
   static maxLevel = BoxGame.levels.length;
   static SPEED = 0.1;     // 판 단위/ms. 과일 하나가 칸 끝에서 상자 뒤까지(GAP + FS) 약 1.2초
   static PAUSE_MS = 300;  // 한 줄이 다 숨은 뒤 다음 차례까지
   static CAP = 9;         // 상자 하나에 들 수 있는 과일 수 (답이 한 자리 수가 되게)
   static OUT = 0.45;
-  static ZERO = 0.12;     // 답이 0 인 문제를 이 정도만 남긴다 (자주 나오면 '0' 을 찍는 것이 수가 된다)
+  static ZERO = 0.12;
+  static START_MIN = 2;   // 상자가 둘일 때 상자마다 처음 드는 최소 과일 수     // 답이 0 인 문제를 이 정도만 남긴다 (자주 나오면 '0' 을 찍는 것이 수가 된다)
   // 판 (판 단위). 한 번에 하나씩 숨으므로 상자는 과일 하나만 가리면 되지만, 열었을 때 9개가 3열로 들어가게 둔다
   static FS = 46;         // 움직이는 과일 크기 (열린 상자 속은 IN_FS)
   static IN_FS = 24;
@@ -385,14 +389,14 @@ class BoxGame {
     }
     const empty = () => Object.fromEntries(kinds.map((k) => [k, 0]));
     const cnt = Object.fromEntries(boxes.map((b) => [b, empty()]));
-    // 처음 든 과일: 상자가 둘이면 위 상자에 더 많이
+    // 처음 든 과일: 상자가 둘이면 위 상자에 더 많이 (같을 수도 있다), 상자마다 START_MIN 개 이상
     if (spec.start) {
-      let n = U.randInt(...spec.start);
-      boxes.forEach((b, i) => {
-        const m = i === boxes.length - 1 ? n : Math.max(1, n - U.randInt(1, 2));
-        for (let j = 0; j < m; j++) cnt[b][kinds[U.rand(kinds.length)]]++;
-        n -= m;
-      });
+      const n = U.randInt(...spec.start);
+      const lo = BoxGame.START_MIN;
+      const bottom = nb === 2 ? U.randInt(lo, Math.max(lo, Math.floor(n / 2))) : 0;
+      const fill = (b, m) => { for (let j = 0; j < m; j++) cnt[b][kinds[U.rand(kinds.length)]]++; };
+      fill('A', n - bottom);
+      if (nb === 2) fill('B', bottom);
     }
     const start = JSON.parse(JSON.stringify(cnt));
     const paths = boxes.flatMap((b) => [['L', b], [b, 'R']]);
@@ -405,7 +409,8 @@ class BoxGame {
       let move = null;
       for (const [from, to] of order) {
         const room = to === 'R' ? Infinity : CAP - BoxGame.sum(cnt[to]);
-        const have = from === 'L' ? Infinity : BoxGame.sum(cnt[from]);
+        // 첫 차례에 빼면 적어도 하나는 남긴다
+        const have = from === 'L' ? Infinity : BoxGame.sum(cnt[from]) - (s === 0 ? 1 : 0);
         const n = Math.min(U.randInt(...spec.per), room, have);
         if (n < 1) continue;
         // 한 줄 세우기: 첫 과일을 고르고, 다음 과일은 mixed 확률로 다른 종류. 상자에서 뺄 때는 든 것 가운데서만

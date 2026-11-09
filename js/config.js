@@ -58,7 +58,7 @@ const DEFAULT_CONFIG = {
   introMs: { first: 4500, again: 2200 }, // 게임 소개(설명 그림) 시간: 라운드에서 처음 나올 때 / 다시 나올 때. 누르면 바로 넘어간다
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
   // 쉬운 단계(Lv1·Lv2)는 여기에 EASY_TIME 을 곱한다. 아래 범위는 Lv3~8 의 값이다.
-  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수 · track: 고를 공 수 · follow: 지시의 양 (버튼 하나 1 · 스위치·차례 누를 수 · 바로 옆 2 · 램프 조건 3 · 이어진 지시 단계 수 + 1) · pair: 양말 수 · box: 세어 둬야 할 과일 종류 수 (상자가 둘이면 +1)
+  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수 · track: 고를 공 수 · follow: 지시의 양 (버튼 하나 1 · 스위치·차례 누를 수 · 바로 옆 2 · 램프 조건 3 · 이어진 지시 단계 수 + 1) · pair: 양말 수 · box: 세어 둬야 할 과일 종류 수 (상자가 둘이면 +1) · compare: 왼쪽 그림의 선 수
   questionTime: {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
     symbol: { base: 6, per: 0 },     // 6초
@@ -73,6 +73,7 @@ const DEFAULT_CONFIG = {
     follow: { base: 4, per: 1.5 },
     box: { base: 4, per: 1.5 },      // 순서가 끝난 뒤부터: 한 종류 5.5초 ~ 세 종류 8.5초 (상자 둘 10초)
     pair: { base: 3, per: 0.6 },     // 양말 5개 6초 ~ 15개 12초   // 하나 5.5초 ~ 셋 8.5초
+    compare: { base: 2.5, per: 0.35 }, // 선 6개 4.6초 · 20개 9.5초 · 35개 14.8초
   },
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
   minRpm: 25,

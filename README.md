@@ -112,7 +112,7 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 | `js/exercise.js` | 운동량: RPM → 거리, MET → 열량 |
 | `css/themes.css`, `js/themes.js`, `js/fx.js` | 화면 스타일과 연출 효과 |
 | `js/session-log.js` | 세션 로그 (문제·답·입력 장치 원시 입력). 형식: `docs/SESSION_LOG.md` |
-| `js/games/` | 인지 게임 8종: 길 따라 그리기, 심볼 위치 외우기, 사칙연산 역산, 우세한 색 찾기, 빈자리 채우기, 숨은 순서 찾기, 가린 숫자 더하기, 사다리 타기 |
+| `js/games/` | 인지 게임 14종: 길 따라 그리기, 심볼 위치 외우기, 사칙연산 역산, 우세한 색 찾기, 빈자리 채우기, 숨은 순서 찾기, 가린 숫자 더하기, 사다리 타기, 없던 그림 찾기, 공 따라가기, 지시 따르기, 짝 없는 것 찾기, 상자 속 과일 세기, 두 그림 비교하기 (설명은 `docs/DEMO_BRIEF.md`) |
 | `docs/DEMO_BRIEF.md` | 시연 행사 준비 작업 개요 (스테이션 흐름의 배경) |
 | `docs/엑서게임_기획_슬라이드.pdf` | 기획 요약 슬라이드 |
 | `docs/slides.html`, `docs/shots/` | 슬라이드 원본과 플레이 화면 스크린샷 |

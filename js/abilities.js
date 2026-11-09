@@ -26,6 +26,7 @@ const ABILITY_WEIGHTS = {
   follow: { attention: 0.5, logic: 0.3, memory: 0.2 },
   pair: { attention: 0.5, spatial: 0.2, speed: 0.3 },
   box: { memory: 0.5, attention: 0.3, logic: 0.2 },
+  compare: { attention: 0.7, speed: 0.3 },
 };
 
 // 처리속도 축에 들어가는 게임은 문제당 걸린 시간도 본다 (정답 피드백·연출 시간 포함, 초).
@@ -35,6 +36,7 @@ const ABILITY_PACE = {
   seek: { fast: 5, slow: 18 },
   ladder: { fast: 5, slow: 15 },
   pair: { fast: 4, slow: 12 },
+  compare: { fast: 4, slow: 10 },
 };
 
 const Abilities = {

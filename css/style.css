@@ -993,6 +993,49 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .dg-bx-q { fill: rgba(255, 255, 255, 0.4); font-weight: 800; }
 .dg-bx-arrow { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 
+/* 두 그림 비교하기: 점 격자 위의 굵은 선 그림 둘. 속 빈 선의 속은 그림 바탕색(--panel)으로 칠해 화면 스타일을 따른다 */
+.cmp-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+.cmp-board { display: block; overflow: visible; touch-action: none; }
+.cmp-card { fill: var(--panel); stroke: var(--line); stroke-width: 2; transition: stroke 0.2s; }
+.cmp-card.same { stroke: var(--good); stroke-width: 6; }
+.cmp-dot { fill: var(--line); }
+.cmp-ln { stroke: var(--ink); stroke-linecap: round; }
+.cmp-in { stroke: var(--panel); }
+.cmp-in-cap { fill: var(--panel); }
+/* 답한 뒤 바뀐 선: 있는 선은 뒤에 퍼지는 띠, 한쪽에 없는 선은 그 자리에 점선 */
+.cmp-mark { fill: none; stroke: var(--accent); stroke-linecap: round; opacity: 0.45; animation: cmp-pulse 0.8s ease-in-out infinite alternate; }
+.cmp-mark.miss { opacity: 1; stroke-dasharray: 3 11; animation: none; }
+@keyframes cmp-pulse { to { opacity: 0.15; } }
+@media (prefers-reduced-motion: reduce) { .cmp-mark { animation: none; } }
+.cmp-opts { display: flex; gap: 20px; }
+/* .ar-cand(정사각 숫자 보기)의 크기를 글자 단추에 맞게 덮는다 (.ar-cand 가 뒤에 있어 두 클래스로 쓴다) */
+.ar-cand.cmp-btn { width: auto; min-width: clamp(160px, 24vh, 220px); padding: 0 26px; display: flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; font-size: clamp(24px, 4.2vh, 34px); }
+.ar-cand.cmp-btn svg { width: 1.05em; height: 1.05em; flex: none; fill: none; stroke: currentColor; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+/* 같아요는 초록, 달라요는 빨강으로 옅게 칠하고 그림(✓ ✕)에 진한 색을 쓴다 */
+.ar-cand.cmp-btn.same { background: var(--good-soft); }
+.ar-cand.cmp-btn.diff { background: var(--bad-soft); }
+.ar-cand.cmp-btn.same svg { color: var(--good); }
+.ar-cand.cmp-btn.diff svg { color: var(--bad); }
+@media (hover: hover) {
+  .ar-cand.cmp-btn.same:hover:not(:disabled) { background: color-mix(in srgb, var(--good-soft) 75%, var(--good)); }
+  .ar-cand.cmp-btn.diff:hover:not(:disabled) { background: color-mix(in srgb, var(--bad-soft) 75%, var(--bad)); }
+}
+/* 답한 뒤: 맞힌 단추는 초록, 잘못 누른 단추는 빨강으로 꽉 채운다 (그림도 흰색) */
+.ar-cand.cmp-btn.right { background: var(--good); color: var(--on-accent); opacity: 1; }
+.ar-cand.cmp-btn.wrong { background: var(--bad); color: var(--on-accent); opacity: 1; }
+.ar-cand.cmp-btn:is(.right, .wrong) svg { color: var(--on-accent); }
+/* 화면 스타일이 .ar-cand 의 그림자를 덮어써도 정답 테두리는 보이게 */
+.ar-cand.cmp-btn.answer { box-shadow: inset 0 0 0 4px var(--good); }
+/* 소개 그림 */
+.dg-cmp-card { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.dg-cmp-dot { fill: var(--line); }
+.dg-cmp-ln { stroke: var(--ink); stroke-width: 6; stroke-linecap: round; }
+.dg-cmp-same { fill: var(--good-soft); }
+.dg-cmp-diff { fill: var(--bad-soft); }
+.dg-cmp-ico { fill: none; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.dg-cmp-ico.same { stroke: var(--good); }
+.dg-cmp-ico.diff { stroke: var(--bad); }
+
 /* 짝 없는 것 찾기: 빨랫줄의 양말 */
 .pr-wrap { display: flex; align-items: center; justify-content: center; }
 .pr-board { display: block; touch-action: none; overflow: visible; }

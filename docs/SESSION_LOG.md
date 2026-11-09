@@ -188,6 +188,17 @@
 세로줄은 왼쪽부터 0. 모양 id: `circle` `square` `triangle` `diamond` `plus`. 높이는 사다리 위끝 0 ~ 아래끝 1 의 비율이고, 양 끝이 다르면 비스듬한 가로줄입니다.
 길은 그려진 그대로 따라갑니다: 세로줄을 내려가다 처음 만나는 가로줄 끝에서 반대쪽 끝으로 건너가 거기서부터 다시 내려갑니다 (`LadderGame.trace`). 제한 시간의 `load` 는 `load` 입니다.
 
+**`compare` 두 그림 비교하기** — 게임 하나에 문제 3개
+
+| 이벤트 | 필드 |
+|---|---|
+| `question` | `n`: 몇 번째 문제 · `grid`: 점 격자 크기 (n×n) · `same`: 두 그림이 같은가 · `left`: 왼쪽 그림의 선 `[[x1, y1, x2, y2, 모양], ...]` · `change`: 같으면 null, 다르면 `{ kind, removed, added, restyled }` |
+| `answer` | `picked`: `"same"` \| `"diff"`, 시간 초과면 null |
+
+점 좌표는 왼쪽 위가 `[0, 0]` 이고 x 가 오른쪽, y 가 아래입니다. 선은 이웃한 두 점(대각선 포함)을 잇고, 모양은 `s` 꽉 찬 선 · `h` 속 빈 선입니다.
+`kind`: `add` 선이 생김 · `remove` 선이 없어짐 · `shift` 선 하나가 한 칸 밀림 · `style` 꽉 찬 선 ↔ 속 빈 선.
+오른쪽 그림은 왼쪽에서 `removed`(`[x1, y1, x2, y2]`)를 빼고 `added`(`[x1, y1, x2, y2, 모양]`)를 더한 것입니다. `style` 이면 `restyled` 가 바뀐 선과 오른쪽 그림에서의 모양입니다. 제한 시간의 `load` 는 왼쪽 그림의 선 수입니다.
+
 ## `keys`
 
 `[t, code]` — 모든 keydown 의 `KeyboardEvent.code` (`KeyA`, `KeyD`, `Escape` ...). 눌린 채 반복되는 입력은 뺍니다.

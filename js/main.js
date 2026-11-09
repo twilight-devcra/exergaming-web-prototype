@@ -7,10 +7,10 @@ const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조�
 const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다
 const SHIFT_OUT_MS = 650;    // 화면이 다시 줄어드는 시간. 그 뒤에 다음 인지 게임이 나온다
 
-// index.html?demo — 시연 행사용 스테이션 모드 (js/demo.js). 같은 라운드 흐름에 대기·결과·운영 화면만 바꿔 끼운다.
-// 운영 버전(app/index.html, <html data-edition="app">)은 주소에 ?demo 없이도 늘 이 흐름으로 연다.
+// 프로토타입(index.html)은 테스트 화면, 운영 버전(app/index.html, <html data-edition="app">)은 스테이션 흐름 (js/demo.js).
+// 스테이션 흐름은 같은 라운드에 대기·결과·운영 화면만 바꿔 끼운다. App.demo 가 이 흐름인지를 뜻한다 (세션 로그의 mode: 'demo')
 const EDITION = document.documentElement.dataset.edition || 'prototype';
-const DEMO = EDITION === 'app' || new URLSearchParams(location.search).has('demo');
+const DEMO = EDITION === 'app';
 
 const App = {
   demo: DEMO,
@@ -52,13 +52,14 @@ const App = {
     Fx.init();
     Theme.init();
     this.bindMusic();
-    // 두뇌 그래프·운동량 카드를 두 결과 화면에 붙인다 (시연 결과는 최종 점수 카드 뒤, 테스트 결과는 점수와 순위 사이)
+    // 두뇌 그래프·운동량 카드를 결과 화면에 붙인다 (스테이션 결과는 최종 점수 카드 뒤, 테스트 결과는 점수와 순위 사이)
     const report = () => $('#tpl-report').content.cloneNode(true);
-    $('#demo-result .dr-grid').append(report());
+    if (this.demo) $('#demo-result .dr-grid').append(report());
     $('#result .rp-slot').replaceWith(report());
     this.renderGameToggles();
     if (!this.demo) {
       this.bindPresets();
+      this.bindTabs();
       this.bindMenu();
     }
     else this.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
@@ -91,10 +92,51 @@ const App = {
       box.append(U.el('label', 'setting', `${T.title}<input type="checkbox" data-game="${T.id}">`));
     });
     box.addEventListener('change', (e) => {
-      // 전부 끄면 넣을 게임이 없다. 마지막 하나는 꺼지지 않게 되돌린다.
-      const on = [...box.querySelectorAll('input')].some((b) => b.checked);
-      if (!on) e.target.checked = true;
+      // 운영 버전에는 게임 수 표시·시작 버튼 막기가 없으니 예전처럼 마지막 하나는 꺼지지 않게 되돌린다
+      if (!$('#cfg-games-count') && ![...box.querySelectorAll('input')].some((b) => b.checked)) e.target.checked = true;
+      this.renderGamesCount();
     });
+    // 모두 해제한 뒤 하나만 고르기 쉽게, 게임을 전부 끌 수도 있다 (그동안은 시작 버튼을 막는다)
+    const setAll = (on) => {
+      box.querySelectorAll('input').forEach((b) => (b.checked = on));
+      this.renderGamesCount();
+    };
+    // 운영 버전(app/index.html)도 이 파일을 쓰지만 이 버튼들은 테스트 화면에만 있다
+    if (!$('#cfg-games-all')) return;
+    $('#cfg-games-all').onclick = () => setAll(true);
+    $('#cfg-games-none').onclick = () => setAll(false);
+  },
+
+  // 게임 탭 이름 옆에 켜 둔 게임 수 (다른 탭을 보고 있어도 몇 개 꺼 두었는지 보이게).
+  // 하나도 안 골랐으면 시작 버튼을 막고 이유를 버튼에 적는다
+  renderGamesCount() {
+    if (!$('#cfg-games-count')) return; // 운영 버전에는 없다
+    const boxes = [...document.querySelectorAll('#cfg-games input')];
+    const on = boxes.filter((b) => b.checked).length;
+    $('#cfg-games-count').textContent = `${on}/${boxes.length}`;
+    $('#cfg-games-count').classList.toggle('none', !on);
+    $('#cfg-games-all').disabled = on === boxes.length;
+    $('#cfg-games-none').disabled = !on;
+    const start = $('#btn-start');
+    start.disabled = !on;
+    start.textContent = on ? '시작하기' : '게임을 하나 이상 고르세요';
+  },
+
+  // 메뉴 설정 탭. 마지막으로 연 탭을 이 브라우저에 기억한다 (못 읽으면 첫 탭)
+  bindTabs() {
+    const KEY = 'exergame.menuTab';
+    const tabs = [...document.querySelectorAll('.menu-tabs [data-tab]')];
+    if (!tabs.length) return;
+    const open = (id) => {
+      if (!tabs.some((t) => t.dataset.tab === id)) id = tabs[0].dataset.tab;
+      tabs.forEach((t) => t.setAttribute('aria-selected', t.dataset.tab === id));
+      document.querySelectorAll('.menu-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === id));
+      try { localStorage.setItem(KEY, id); } catch (e) { /* 저장 못 해도 탭은 바뀐다 */ }
+    };
+    tabs.forEach((t) => (t.onclick = () => open(t.dataset.tab)));
+    let saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) { /* 첫 탭으로 */ }
+    open(saved);
   },
 
   // 가장 단계가 많은 게임에 맞춘다 — 그보다 높게 시작하면 모든 게임이 최고 난이도로 고정된다
@@ -173,6 +215,7 @@ const App = {
     document.querySelectorAll('#cfg-games input').forEach((b) => {
       b.checked = !c.games || c.games.includes(b.dataset.game);
     });
+    this.renderGamesCount();
   },
 
   // 측정 방식은 고르는 즉시 적용한다 (라운드 시작을 기다리지 않고 페달 연결 상태에도 바로 반영)
@@ -263,7 +306,7 @@ const App = {
   },
 
   // ---------------- 페달 센서 ----------------
-  // 음악 스타일 고르기와 미리 듣기 (테스트 화면 '시연 설정', 운영 메뉴). 고른 것은 이 태블릿에 저장되고 다음 판부터 쓴다
+  // 음악 스타일 고르기와 미리 듣기 (테스트 화면 '화면·소리' 탭, 운영 메뉴). 고른 것은 이 태블릿에 저장되고 다음 판부터 쓴다
   bindMusic() {
     const pickers = document.querySelectorAll('select[data-music-picker]');
     pickers.forEach((sel) => {
@@ -427,7 +470,7 @@ const App = {
     this.log.ev('calib_start');
   },
 
-  // 세션 기록을 닫는다. 시연 모드에서 결과 없이 끝난 판은 여기서 바로 저장한다 (결과가 있으면 Demo.showResult 가 저장)
+  // 세션 기록을 닫는다. 스테이션 흐름(운영 버전)에서 결과 없이 끝난 판은 여기서 바로 저장한다 (결과가 있으면 Demo.showResult 가 저장)
   closeLog(ended) {
     const log = this.log;
     if (!log || log.done) return;
@@ -1101,8 +1144,8 @@ const App = {
   },
   BUILD_HOLD_MS: 1500, // 건물을 다 지은 뒤 풍경을 그대로 보여 주는 시간
 
-  // 두뇌 그래프·운동량 카드 (#tpl-report) 를 root 안에서 채운다. 시연·테스트 결과 화면이 함께 쓴다.
-  // 반환: { abil(능력 점수), keep(속도 유지율 %), kcal } — 시연 결과가 기록에 쓴다
+  // 두뇌 그래프·운동량 카드 (#tpl-report) 를 root 안에서 채운다. 스테이션(운영 버전)·테스트 결과 화면이 함께 쓴다.
+  // 반환: { abil(능력 점수), keep(속도 유지율 %), kcal } — 스테이션 결과가 기록에 쓴다
   fillReport(root) {
     const cfg = this.cfg;
     const m = this.meter;

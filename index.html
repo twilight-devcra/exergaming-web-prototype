@@ -18,60 +18,66 @@
     <div class="menu-main">
       <h1>페달 &amp; 브레인</h1>
       <p>일정한 속도로 페달을 밟으면서, 화면 아래 인지 게임을 풀어 점수를 모으세요.</p>
-      <p>
-        페달링: <span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기</span><span class="sensor-only">연결된 페달 센서</span><br>
-        터치: 마우스 클릭<br>
-        일시정지: <kbd>Esc</kbd> · 디버그 표시: <kbd>`</kbd>
-      </p>
+      <dl class="menu-keys">
+        <dt>페달링</dt><dd><span class="kbd-only"><span class="keys"><kbd>A</kbd><kbd>D</kbd></span> 번갈아 누르기</span><span class="sensor-only">연결된 페달 센서</span></dd>
+        <dt>터치</dt><dd>마우스 클릭</dd>
+        <dt>일시정지</dt><dd><kbd>Esc</kbd> <span class="menu-keys-sub">· 디버그 표시 <kbd>`</kbd></span></dd>
+      </dl>
       <div class="pedal-row">
         <span class="pedal-status"></span>
         <button class="btn secondary small" data-pedal-btn>페달 연결</button>
-      </div>
-      <div class="menu-links">
-        <a class="debug-link" href="?demo">시연 모드 (스테이션) →</a>
-        <a class="debug-link" href="app/">운영 버전 →</a>
-        <a class="debug-link" href="pedal-debug.html">센서 디버그 페이지</a>
       </div>
       <button class="btn" id="btn-start">시작하기</button>
       <div class="panel">
         <h2>순위</h2>
         <ol class="board-list" id="menu-board"></ol>
       </div>
+      <nav class="menu-footer">
+        <a class="debug-link" href="app/index.html">운영 버전</a>
+        <a class="debug-link" href="pedal-debug.html">센서 디버그</a>
+      </nav>
     </div>
-    <!-- 넓은 화면에서는 두 열로 놓아 스크롤 없이 다 보이게 한다 (좁으면 한 열로 스크롤) -->
-    <div class="menu-side">
-      <div class="panel">
-        <h2>라운드 난이도</h2>
-        <label class="setting">프리셋<select id="cfg-preset"></select></label>
-        <p class="setting-note" id="cfg-preset-note"></p>
-        <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
-        <label class="setting">최고 난이도<input type="number" id="cfg-max-level" min="1" step="1"></label>
-        <label class="setting">난이도 방식
-          <select id="cfg-difficulty">
-            <option value="adaptive">정답·오답에 따라</option>
-            <option value="cycle">한 바퀴마다 +1</option>
-          </select>
-        </label>
-        <label class="setting">정답 하나에 난이도 +<input type="number" id="cfg-diff-up" min="0.05" max="2" step="0.05"></label>
-        <label class="setting">오답 하나에 난이도 −<input type="number" id="cfg-diff-down" min="0.05" max="2" step="0.05"></label>
-        <label class="setting">문제 제한 시간 배율<input type="number" id="cfg-qscale" min="0.5" max="3" step="0.05"></label>
-        <label class="setting">Lv8 점수 배율 (Lv1 은 x1)<input type="number" id="cfg-mult" min="1" max="10" step="0.5"></label>
-        <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
-        <label class="setting" title="목표 속도에서 이만큼 벗어나면 공이 속도 막대 끝에 닿고 운동 점수가 0이 됩니다. 허용 구역 밖에서는 이 값까지 점수가 고르게 줄어듭니다.">편차 한계 (±%)<input type="number" id="cfg-maxdev" min="10" max="100" step="1"></label>
-        <label class="setting">오르막·내리막 속도 변화 (%)<input type="number" id="cfg-change-amt" min="0" max="40" step="1"></label>
+    <!-- 설정은 탭 하나에 한 묶음씩. 탭 내용은 같은 칸에 겹쳐 두어 가장 긴 탭에 높이를 맞춘다 (탭을 바꿔도 패널 크기가 그대로) -->
+    <div class="menu-settings panel">
+      <div class="menu-tabs" role="tablist">
+        <button role="tab" data-tab="level">난이도</button>
+        <button role="tab" data-tab="games">게임 <small id="cfg-games-count"></small></button>
+        <button role="tab" data-tab="round">진행</button>
+        <button role="tab" data-tab="look">화면·소리</button>
       </div>
-      <div class="menu-col">
-        <div class="panel">
-          <h2>시연 설정</h2>
-          <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
-          <label class="setting">음악<select data-music-picker></select></label>
-          <button class="btn secondary small" data-music-try>미리 듣기</button>
+      <div class="menu-panes">
+        <div class="menu-pane" role="tabpanel" data-pane="level">
+          <label class="setting">프리셋<select id="cfg-preset"></select></label>
+          <p class="setting-note" id="cfg-preset-note"></p>
+          <label class="setting">시작 난이도<input type="number" id="cfg-start-level" min="1" step="1"></label>
+          <label class="setting">최고 난이도<input type="number" id="cfg-max-level" min="1" step="1"></label>
+          <label class="setting">난이도 방식
+            <select id="cfg-difficulty">
+              <option value="adaptive">정답·오답에 따라</option>
+              <option value="cycle">한 바퀴마다 +1</option>
+            </select>
+          </label>
+          <label class="setting">정답 하나에 난이도 +<input type="number" id="cfg-diff-up" min="0.05" max="2" step="0.05"></label>
+          <label class="setting">오답 하나에 난이도 −<input type="number" id="cfg-diff-down" min="0.05" max="2" step="0.05"></label>
+          <label class="setting">문제 제한 시간 배율<input type="number" id="cfg-qscale" min="0.5" max="3" step="0.05"></label>
+          <label class="setting">Lv8 점수 배율 (Lv1 은 x1)<input type="number" id="cfg-mult" min="1" max="10" step="0.5"></label>
+          <label class="setting">허용 구역 (±%)<input type="number" id="cfg-tol" min="3" max="40" step="1"></label>
+          <label class="setting" title="목표 속도에서 이만큼 벗어나면 공이 속도 막대 끝에 닿고 운동 점수가 0이 됩니다. 허용 구역 밖에서는 이 값까지 점수가 고르게 줄어듭니다.">편차 한계 (±%)<input type="number" id="cfg-maxdev" min="10" max="100" step="1"></label>
+          <label class="setting">오르막·내리막 속도 변화 (%)<input type="number" id="cfg-change-amt" min="0" max="40" step="1"></label>
+        </div>
+        <div class="menu-pane" role="tabpanel" data-pane="games">
+          <div class="games-bulk">
+            <button class="btn secondary small" id="cfg-games-all">모두 선택</button>
+            <button class="btn secondary small" id="cfg-games-none">모두 해제</button>
+          </div>
+          <div id="cfg-games"></div>
+        </div>
+        <div class="menu-pane" role="tabpanel" data-pane="round">
           <label class="setting">라운드 길이 (초)<input type="number" id="cfg-duration" min="30" max="900" step="15"></label>
           <label class="setting">속도 측정 시간 (초)<input type="number" id="cfg-calib" min="5" max="60" step="1"></label>
+          <label class="setting">문제 제한 시간<input type="checkbox" id="cfg-qtimer"></label>
           <label class="setting">오르막·내리막<input type="checkbox" id="cfg-change"></label>
           <label class="setting">속도 전환 구간 (초)<input type="number" id="cfg-shift" min="4" max="30" step="1"></label>
-          <label class="setting">문제 제한 시간<input type="checkbox" id="cfg-qtimer"></label>
-          <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
           <label class="setting">속도 측정 방식
             <select id="cfg-source">
               <option value="zc">파형 영교차 (권장)</option>
@@ -82,9 +88,10 @@
           </label>
           <p class="setting-note" id="cfg-source-note"></p>
         </div>
-        <div class="panel">
-          <h2>사용할 게임</h2>
-          <div id="cfg-games"></div>
+        <div class="menu-pane" role="tabpanel" data-pane="look">
+          <label class="setting" title="T 키로 다음 스타일 (게임 중에도 됨)"><span>화면 스타일 <kbd>T</kbd></span><select data-theme-picker></select></label>
+          <div class="setting"><span>음악</span><span class="setting-ctl"><select data-music-picker></select><button class="btn secondary small" data-music-try>미리 듣기</button></span></div>
+          <label class="setting">사운드<input type="checkbox" id="cfg-sound"></label>
         </div>
       </div>
     </div>
@@ -131,7 +138,7 @@
   </section>
 
   <!-- 결과 -->
-  <!-- 시연 결과와 같은 짜임: 머리 줄 + 한 화면에 들어가는 카드 한 줄 (넘쳐서 스크롤되지 않게) -->
+  <!-- 운영 버전 결과와 같은 짜임: 머리 줄 + 한 화면에 들어가는 카드 한 줄 (넘쳐서 스크롤되지 않게) -->
   <section id="result" class="screen">
     <header class="dr-head">
       <h2 class="dr-title">라운드 종료</h2>
@@ -164,45 +171,7 @@
     </div>
   </section>
 
-  <!-- ===== 시연(스테이션) 모드 전용: index.html?demo ===== -->
-  <!-- 대기 화면 -->
-  <section id="attract" class="screen">
-    <div class="att-main">
-      <div class="att-brand">페달 &amp; 브레인</div>
-      <h1>페달을 밟으며<br>두뇌를 깨워 보세요</h1>
-      <ol class="att-steps">
-        <li><b>1</b><span>편안한 속도 찾기</span><small id="att-calib"></small></li>
-        <li><b>2</b><span>페달 + 두뇌 게임</span><small id="att-dur"></small></li>
-        <li><b>3</b><span>나의 두뇌 그래프와 점수</span></li>
-      </ol>
-      <button class="btn att-start" id="att-start">시작하기</button>
-      <div class="att-hint" id="att-hint">화면을 누르거나 페달을 밟으면 시작합니다</div>
-    </div>
-    <div class="att-visual">
-      <svg class="radar deco" id="att-radar"></svg>
-    </div>
-    <div class="station-tag"><span class="pedal-status"></span><span class="st-name"></span></div>
-  </section>
-
-  <!-- 시연 결과 -->
-  <section id="demo-result" class="screen">
-    <header class="dr-head">
-      <div class="dr-title">수고하셨습니다!</div>
-      <div class="dr-id" id="dr-id"></div>
-    </header>
-    <div class="dr-grid">
-      <div class="dr-card dr-score">
-        <h3>최종 점수</h3>
-        <div class="dr-total" id="dr-total">0</div>
-        <div class="dr-break" id="dr-break"></div>
-        <div class="dr-note">진행 요원에게 이 화면을 보여주세요<br>점수로 행사 마지막에 시상합니다</div>
-      </div>
-      <!-- 두뇌 그래프·운동량 (#tpl-report) -->
-    </div>
-    <button class="hold-btn" id="dr-next"><i></i><span>길게 눌러서 시작 화면으로</span></button>
-  </section>
-
-  <!-- 두뇌 그래프·운동량 카드: 시연 결과와 테스트 결과 화면이 함께 쓴다 (App.fillReport 가 채운다) -->
+  <!-- 두뇌 그래프·운동량 카드: 결과 화면에 붙인다 (App.fillReport 가 채운다). 운영 버전(app/index.html)에도 같은 카드가 있다 -->
   <template id="tpl-report">
     <div class="dr-card dr-brain">
       <h3>나의 두뇌 그래프</h3>
@@ -223,79 +192,6 @@
     </div>
   </template>
 
-  <!-- 운영 메뉴 (처음 열 때, 또는 왼쪽 위 모서리 길게 누르기 + PIN) -->
-  <div id="op" class="overlay">
-    <div class="op-box">
-      <div class="op-col">
-        <h2>시연 스테이션</h2>
-        <label class="setting">스테이션 번호<input type="number" id="op-station" min="1" max="99" inputmode="numeric"></label>
-        <div class="pedal-row">
-          <span class="pedal-status"></span>
-          <button class="btn secondary small" data-pedal-btn>페달 연결</button>
-        </div>
-        <label class="setting">화면 스타일<select data-theme-picker></select></label>
-        <label class="setting">음악<select data-music-picker></select></label>
-        <button class="btn secondary small" data-music-try>미리 듣기</button>
-        <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
-        <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
-        <p class="setting-note" id="op-cfg"></p>
-        <button class="btn secondary small" id="op-set-open">라운드 설정</button>
-        <div class="op-round" id="op-round">
-          <p class="op-round-note" id="op-round-note"></p>
-          <button class="btn secondary" id="op-end">지금 끝내고 결과 보기</button>
-          <button class="btn secondary" id="op-abandon">중단하고 대기 화면으로 (기록 안 함)</button>
-        </div>
-        <button class="btn" id="op-close">대기 화면 열기</button>
-        <a class="debug-link" href="#" id="op-exit">테스트 화면으로 나가기</a>
-      </div>
-      <div class="op-col">
-        <h2>이 태블릿의 기록 <small id="op-log-count"></small></h2>
-        <ol class="op-log" id="op-log"></ol>
-        <button class="btn secondary small" id="op-csv">CSV 저장</button>
-        <div class="op-sessions">
-          <h2>세션 로그 <small id="op-sess-count"></small></h2>
-          <p class="setting-note">판마다 문제·답·걸린 시간과 페달 원시 파형(또는 키 입력)을 이 태블릿에 자동 저장합니다.</p>
-          <button class="btn secondary small" id="op-sess-export">전체 내보내기 (.jsonl)</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 운영 메뉴 > 라운드 설정 (DEMO_SETTINGS) -->
-  <div id="op-set" class="overlay">
-    <div class="op-set-box">
-      <h2>라운드 설정 <small id="op-set-code"></small></h2>
-      <p class="setting-note">이 태블릿에 저장되고 다음 판부터 적용됩니다. 점수를 비교하려면 모든 스테이션의 설정 코드가 같아야 합니다.</p>
-      <div class="op-set-fields" id="op-set-fields"></div>
-      <div class="op-set-btns">
-        <button class="btn" id="op-set-save">저장</button>
-        <button class="btn secondary" id="op-set-cancel">취소</button>
-        <button class="btn secondary" id="op-set-reset">기본값으로</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 운영 메뉴 PIN -->
-  <div id="pin" class="overlay">
-    <div class="pin-box">
-      <div class="pin-dots" id="pin-dots"><i></i><i></i><i></i><i></i></div>
-      <div class="pin-pad" id="pin-pad">
-        <button>1</button><button>2</button><button>3</button>
-        <button>4</button><button>5</button><button>6</button>
-        <button>7</button><button>8</button><button>9</button>
-        <button data-k="cancel">취소</button><button>0</button><button data-k="del">⌫</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 페달 끊김 / 자리 비움 안내 -->
-  <div id="alert" class="overlay">
-    <div class="alert-box">
-      <div class="alert-title" id="alert-title"></div>
-      <div class="alert-text" id="alert-text"></div>
-    </div>
-  </div>
-  <div id="op-corner"></div>
   <canvas id="fx"></canvas>
   <div id="toast"></div>
 
@@ -337,8 +233,6 @@
   <script src="js/games/box.js"></script>
   <script src="js/abilities.js"></script>
   <script src="js/session-log.js"></script>
-  <script src="js/session-upload.js"></script>
-  <script src="js/demo.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

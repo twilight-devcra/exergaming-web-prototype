@@ -166,16 +166,48 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .setting-note { margin: 0 0 4px; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
 /* 라운드 난이도 프리셋이 정한 값 (프리셋이 그대로일 때만) */
 .setting.preset > :is(input, select) { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
-/* 설정은 두 열로 놓아 1280×800 가로 태블릿에서도 스크롤 없이 다 보이게 한다.
-   그보다 작으면 한 열로 바꾸고, 화면보다 길어지면 이 열만 스크롤한다 (body가 overflow: hidden이라 안 그러면 잘린다) */
-.menu-side { display: grid; grid-template-columns: repeat(2, 360px); align-items: start; gap: 16px; max-height: 100%; overflow-y: auto; }
-.menu-col { display: flex; flex-direction: column; gap: 16px; }
-.menu-side .panel { width: 360px; padding: 16px 20px; }
-.menu-side .setting { padding: 4px 0; }
+/* 설정은 탭 하나에 한 묶음씩 (난이도 / 게임 / 진행 / 화면·소리).
+   탭 내용은 같은 칸에 겹쳐 두고 안 보이는 탭은 visibility 로 숨긴다 — 패널 높이가 가장 긴 탭에 맞춰져 탭을 바꿔도 흔들리지 않고,
+   숨은 탭 안의 글도 높이를 잴 수 있다 (U.reserveHeight). 화면보다 길어지면 이 패널만 스크롤한다 (body가 overflow: hidden) */
+.menu-settings.panel { width: min(420px, 100%); padding: 8px 20px 16px; max-height: 100%; overflow-y: auto; }
+.menu-tabs { display: flex; gap: 4px; margin: 0 -8px 12px; border-bottom: 1px solid var(--line); }
+.menu-tabs button {
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.menu-tabs button:hover { color: var(--ink); }
+.menu-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.menu-tabs small { font-size: 12px; font-weight: 400; opacity: 0.8; }
+.menu-panes { display: grid; }
+.menu-pane { grid-area: 1 / 1; }
+.menu-pane:not(.active) { visibility: hidden; }
+.menu-settings .setting { padding: 4px 0; }
+.setting-ctl { display: flex; align-items: center; gap: 8px; }
+.games-bulk { display: flex; gap: 8px; margin-bottom: 8px; }
+.menu-tabs small.none { color: var(--bad); opacity: 1; font-weight: 700; }
 #cfg-games { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
 #cfg-games .setting { font-size: 14px; }
 .menu-main { max-height: 100%; overflow-y: auto; }
 .menu-main .panel { width: 100%; }
+.menu-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; color: var(--ink-soft); font-size: 15px; align-items: center; }
+.menu-keys dt { font-weight: 600; }
+.menu-keys dd { margin: 0; }
+.menu-keys-sub { font-size: 13px; margin-left: 6px; }
+/* 운영 버전(app/index.html)의 메뉴는 아직 예전 두 열 짜임 (.menu-side / .menu-col) 이다.
+   1280×800 가로 태블릿에서도 스크롤 없이 다 보이게 두 열로 놓고, 그보다 작으면 한 열로 바꿔 이 열만 스크롤한다 */
+.menu-side { display: grid; grid-template-columns: repeat(2, 360px); align-items: start; gap: 16px; max-height: 100%; overflow-y: auto; }
+.menu-col { display: flex; flex-direction: column; gap: 16px; }
+.menu-side .panel { width: 360px; padding: 16px 20px; }
+.menu-side .setting { padding: 4px 0; }
 @media (max-width: 1260px) {
   #menu { gap: 24px; }
   .menu-side { grid-template-columns: 360px; }
@@ -1336,7 +1368,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .calib-state { height: 28px; font-size: 18px; font-weight: 700; color: var(--accent); }
 
 /* ---------- 결과 (테스트) ----------
-   시연 결과(#demo-result)의 머리 줄·카드(.dr-*)를 그대로 쓰고, 카드를 넷(점수 · 두뇌 그래프 · 운동량 · 순위)으로 늘린다.
+   스테이션 결과(#demo-result, 운영 버전)의 머리 줄·카드(.dr-*)를 그대로 쓰고, 카드를 넷(점수 · 두뇌 그래프 · 운동량 · 순위)으로 늘린다.
    카드 한 줄이 화면 높이에 맞춰 줄어들어 스크롤이 생기지 않는다 */
 #result {
   flex-direction: column;
@@ -1439,8 +1471,11 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 
 .menu-links { display: flex; justify-content: space-between; margin-top: -14px; }
 .menu-links .debug-link { margin-top: 0; }
+/* 테스트 화면: 다른 화면으로 가는 링크는 왼쪽 열 맨 아래에 작게 */
+.menu-footer { display: flex; justify-content: center; gap: 8px 20px; flex-wrap: wrap; }
+.menu-footer .debug-link { margin-top: 0; align-self: auto; }
 
-/* ================= 시연(스테이션) 모드: index.html?demo ================= */
+/* ================= 스테이션 흐름 (js/demo.js): 운영 버전이 쓴다. app/app.css 가 그 위에 덮는다 ================= */
 body.demo {
   touch-action: manipulation;  /* 두 번 눌러 확대 막기 */
   overscroll-behavior: none;   /* 당겨서 새로고침 막기 */
@@ -1484,16 +1519,6 @@ body.demo #op-corner {
   cursor: pointer;
 }
 .att-main { display: flex; flex-direction: column; gap: clamp(14px, 3vh, 28px); max-width: 560px; }
-.att-brand {
-  align-self: flex-start;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 800;
-  font-size: clamp(14px, 2.2vh, 18px);
-  letter-spacing: 0.02em;
-}
 .att-main h1 {
   margin: 0;
   font-size: clamp(34px, 7.5vh, 68px);
@@ -1560,9 +1585,8 @@ body.demo #op-corner {
 .radar .rd-half-off { stop-color: var(--line); }
 #demo-result .radar .rd-shape { animation: radarin 0.9s cubic-bezier(0.2, 1.2, 0.4, 1) both; transform-origin: 200px 190px; }
 @keyframes radarin { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
-.radar.deco .rd-grid.outer { fill: color-mix(in srgb, var(--panel) 70%, transparent); }
 
-/* ---------- 시연 결과 ---------- */
+/* ---------- 스테이션 결과 ---------- */
 #demo-result {
   flex-direction: column;
   gap: clamp(10px, 2vh, 20px);

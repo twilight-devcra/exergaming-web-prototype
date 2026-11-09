@@ -1,6 +1,8 @@
 # Demo Event Brief — Polish Pass
 
 Start here if you are picking up work on preparing this prototype for the public demonstration.
+
+> **2026-11-09:** the prototype's demo mode (`index.html?demo`) has been removed. The station flow described here (`js/demo.js`) now runs only in the production edition (`app/`). This brief is kept as background.
 It records the goal, what is already decided, and what is still open. Read `README.md` (Korean) for how to run the game and connect the pedal.
 
 ## The event

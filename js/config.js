@@ -1,4 +1,4 @@
-// 시연 환경에 맞춰 조절 가능한 설정값. 메뉴 화면의 '시연 설정'에서 바꾼 값은 localStorage에 저장된다.
+// 조절 가능한 설정값. 테스트 화면(메뉴)의 설정 탭에서 바꾼 값은 localStorage에 저장된다.
 
 // 난이도 단계. Lv1·Lv2 는 50~60대에게 원래의 첫 단계도 버겁다는 의견을 받고 그 아래에 더한 쉬운 단계다 (2026-10-21).
 // 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이다. 점수 배율은 Lv1 부터 오른다 (levelMult).
@@ -128,7 +128,7 @@ const SESSION_DIFFICULTIES = [
 const SESSION_DEFAULT = { min: 10, difficulty: 'normal' }; // 화면을 열 때 미리 골라 둔 것
 const SESSION_ANSWERS_PER_MIN = 10; // 분당 답 수 어림값 (게임 하나에 문제 3개, 대개 10초 안팎 — docs/DEMO_BRIEF.md 'Round pacing')
 
-// 시연 행사 스테이션 모드(index.html?demo)의 설정. 테스트 화면의 localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것을 덮는다.
+// 스테이션 흐름(운영 버전, js/demo.js)의 설정. 테스트 화면의 localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것을 덮는다.
 // 그 위에 운영 메뉴의 '라운드 설정'(DEMO_SETTINGS 의 항목만)을 태블릿마다 저장해 덮는다.
 // 상품을 걸고 점수를 비교하므로 모든 스테이션이 같은 설정이어야 한다 — 운영 메뉴의 설정 코드(Config.demoCode)로 맞춰 본다.
 const DEMO_CONFIG = {
@@ -158,7 +158,7 @@ const DEMO_SETTINGS = [
 const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
 
 // 게임 중 음악 스타일 (js/audio.js 의 BeatAudio.STYLES). 모두 비트 하나 = 페달 반 바퀴로 박자를 이끈다.
-// 태블릿마다 운영 메뉴(테스트 화면은 '시연 설정')의 '음악'에서 고르고, 주소에 ?music=trot 처럼 붙여도 된다.
+// 태블릿마다 운영 메뉴(테스트 화면은 '화면·소리' 탭)의 '음악'에서 고르고, 주소에 ?music=trot 처럼 붙여도 된다.
 const MUSIC_STYLES = [
   { id: 'disco', label: '신나는 댄스' },
   { id: 'acoustic', label: '산책 기타 (가볍고 밝게)' },
@@ -178,9 +178,7 @@ const MUSIC_KEY = 'exergame.music';
 //   주소 칸이 비었다고 저절로 켜지지 않는다. 운영 메뉴의 체크 칸이나 여기서 일부러 켜야 한다
 const SESSION_UPLOAD = { url: '', key: '', historyUrl: '', localHistory: false };
 
-// 스테이션 모드에서 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력)
-const DEMO_OPERATOR_PIN = '2580';
-// 운영 버전의 PIN. 비워 두면 PIN 없이 바로 열린다 (2026-11-05: 지금은 필요 없음). 다시 쓰려면 네 자리 숫자를 넣는다
+// 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력). 비워 두면 PIN 없이 바로 열린다 (2026-11-05: 지금은 필요 없음). 다시 쓰려면 네 자리 숫자를 넣는다
 const APP_OPERATOR_PIN = '';
 
 const Config = {

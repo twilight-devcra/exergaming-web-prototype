@@ -1,5 +1,5 @@
-// 시연 행사 스테이션 모드 (index.html?demo). 배경은 docs/DEMO_BRIEF.md.
-// 흐름: 운영 메뉴(처음 한 번) → 대기 화면 → 속도 측정 → 라운드 → 결과 → 진행 요원이 길게 눌러 초기화 → 대기 화면
+// 스테이션 흐름: 운영 버전(app/index.html)이 쓴다. 처음엔 시연 행사용으로 만들었다 (배경은 docs/DEMO_BRIEF.md).
+// 흐름: 대기 화면 → (회원 로그인 → 세션 설정, app/members.js) → 속도 측정 → 라운드 → 결과 → 길게 눌러 초기화 → 대기 화면
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
 // 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '라운드 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
 const Demo = {
@@ -17,7 +17,7 @@ const Demo = {
 
   app: null,
   station: '',
-  allowKbd: false,  // 페달 없이 A/D 키로 시작할 수 있게 한다 (점검용). ?demo&kbd 또는 운영 메뉴에서 켠다. 저장하지 않으므로 새로고침하면 꺼진다
+  allowKbd: false,  // 페달 없이 A/D 키로 시작할 수 있게 한다 (점검용). app/?kbd 또는 운영 메뉴에서 켠다. 저장하지 않으므로 새로고침하면 꺼진다
   simResult: false, // 시작하면 라운드 없이 가상 성적으로 바로 결과 화면을 연다 (흐름 점검용). 저장하지 않는다
   kiosk: false,     // 운영 메뉴를 한 번 닫은 뒤부터 전체 화면·화면 꺼짐 방지를 유지한다
   opOpen: false,
@@ -34,14 +34,12 @@ const Demo = {
     document.body.classList.add('demo');
     this.allowKbd = new URLSearchParams(location.search).has('kbd');
     this.station = this.load('station', '');
-    // 대기 화면 오른쪽 그림: 운영 버전은 바퀴 안의 두뇌(app/attract-visual.js), 프로토타입은 모양이 바뀌는 두뇌 그래프
+    // 대기 화면 오른쪽 그림: 바퀴 안의 두뇌 (app/attract-visual.js)
     this.preview = typeof AttractVisual !== 'undefined' ? AttractVisual.init(app) : null;
     // 운영 버전: 속도 측정 화면의 둥근 길과 자전거 (app/calib-visual.js)
     this.calibVisual = typeof CalibVisual !== 'undefined' ? CalibVisual.init() : null;
     // 운영 버전: QR 회원 (app/members.js). 대기 화면 → 로그인 → 기록 → 세션 설정
     this.members = typeof MemberUI !== 'undefined' ? MemberUI.init(this, app) : null;
-    this.deco = { v: [60, 60, 60, 60, 60], to: [60, 60, 60, 60, 60], t: 0 };
-    if (!this.preview && $('#att-radar')) Radar.render($('#att-radar'), this.deco.v, null);
     this.bindOp();
     this.bindSetup();
     this.bindUpload();
@@ -60,12 +58,10 @@ const Demo = {
     app.show('attract');
     this.renderStation();
     this.updateAttract();
-    // 시연(프로토타입)은 운영 메뉴부터 연다. 페달 연결(기기 선택)과 전체 화면은 사람이 화면을 눌러야만 요청할 수 있다.
-    // 운영 버전은 바로 대기 화면. 페달은 대기 화면의 '페달 연결' 버튼으로, 전체 화면은 시작을 누를 때 요청한다
-    if (EDITION === 'app') {
-      if (!this.station) this.station = '1'; // 운영 메뉴에서 바꿀 수 있다 (저장은 그때)
-      this.renderStation();
-    } else this.openOp();
+    // 바로 대기 화면. 페달은 대기 화면의 '페달 연결' 버튼으로, 전체 화면은 시작을 누를 때 요청한다
+    // (페달 연결(기기 선택)과 전체 화면은 사람이 화면을 눌러야만 요청할 수 있다)
+    if (!this.station) this.station = '1'; // 운영 메뉴에서 바꿀 수 있다 (저장은 그때)
+    this.renderStation();
   },
 
   // ---------------- 저장 (태블릿마다 따로) ----------------
@@ -268,21 +264,6 @@ const Demo = {
     this.showResult({ sim: true });
   },
 
-  // 장식용 그래프가 천천히 모양을 바꾼다
-  animateDeco(dt, rpm) {
-    if (this.preview) return this.preview.tick(dt, rpm);
-    if (!$('#att-radar')) return;
-    const d = this.deco;
-    d.t -= dt;
-    if (d.t <= 0) {
-      d.t = 2.6;
-      d.to = d.v.map(() => U.randInt(38, 96));
-    }
-    const k = 1 - Math.exp(-dt / 0.6);
-    d.v = d.v.map((v, i) => U.lerp(v, d.to[i], k));
-    Radar.update($('#att-radar'), d.v);
-  },
-
   // ---------------- 매 프레임 (일시정지 중에는 불리지 않는다) ----------------
   tick(dt, rpm) {
     const a = this.app;
@@ -297,7 +278,7 @@ const Demo = {
         this.attractAt = a.clock;
         this.pedalHold = 0;
       }
-      this.animateDeco(dt, rpm);
+      if (this.preview) this.preview.tick(dt, rpm);
       const ready = (a.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.opOpen && this.canStart();
       this.pedalHold = ready && rpm > this.RPM_ACTIVE ? this.pedalHold + dt : Math.max(0, this.pedalHold - dt);
       if (this.pedalHold >= this.PEDAL_START_SEC) this.start('pedal');
@@ -446,12 +427,6 @@ const Demo = {
       this.hideOp();
       this.app.quit();
       this.syncPause();
-    };
-    // 쿼리(?demo)만 떼고 같은 페이지로. 상대 경로 './'는 file:// 로 열면 폴더 목록으로 간다
-    $('#op-exit').onclick = (e) => {
-      e.preventDefault();
-      this.leaving = true;
-      location.href = location.pathname;
     };
     $('#op-csv').onclick = () => this.downloadCsv();
     $('#op-sess-export').onclick = async () => {
@@ -708,9 +683,9 @@ const Demo = {
     });
   },
 
-  // 운영 메뉴 PIN. 운영 버전은 APP_OPERATOR_PIN (비어 있으면 PIN 없이 연다)
+  // 운영 메뉴 PIN (비어 있으면 PIN 없이 연다)
   get pin() {
-    return EDITION === 'app' ? APP_OPERATOR_PIN : DEMO_OPERATOR_PIN;
+    return APP_OPERATOR_PIN;
   },
 
   openPin() {

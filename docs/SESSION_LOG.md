@@ -3,16 +3,16 @@
 한 판(속도 측정 ~ 결과)의 기록 형식입니다. 만드는 코드는 `js/session-log.js`, 기록하는 곳은 `js/main.js`(판 흐름·입력 장치)와 `js/games/*.js`(문제·답)입니다.
 형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **3** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함).
 
-시연·운영 버전은 저장한 세션을 서버로 자동 업로드할 수도 있습니다 — 서버 요구 사항은 [SERVER.md](SERVER.md).
+운영 버전은 저장한 세션을 서버로 자동 업로드할 수도 있습니다 — 서버 요구 사항은 [SERVER.md](SERVER.md).
 
 ## 파일 얻기
 
 | 모드 | 방법 | 파일 |
 |---|---|---|
 | 테스트 화면 | 결과 화면의 **세션 로그 저장** | `exergame-session-<YYYYMMDD-HHMMSS>.json` — 세션 하나, JSON 객체 하나 |
-| 시연 모드 (`?demo`) | 판이 끝날 때마다 태블릿(IndexedDB `exergame-sessions`)에 자동 저장 → 운영 메뉴 **세션 로그 → 전체 내보내기** | `exergame-sessions-station<N>-<YYYY-MM-DD>.jsonl` — 한 줄에 세션 하나 (JSON Lines) |
+| 운영 버전 (`app/`) | 판이 끝날 때마다 태블릿(IndexedDB `exergame-sessions`)에 자동 저장 → 운영 메뉴 **세션 로그 → 전체 내보내기** | `exergame-sessions-station<N>-<YYYY-MM-DD>.jsonl` — 한 줄에 세션 하나 (JSON Lines) |
 
-시연 모드는 결과 없이 끝난 판(중단, 측정 중 자리 비움)도 저장합니다. 결과 화면 없이 끝난 테스트 화면의 판은 내려받을 수 없습니다.
+운영 버전은 결과 없이 끝난 판(중단, 측정 중 자리 비움)도 저장합니다. 예전 프로토타입 시연 모드(`index.html?demo`, 지금은 없음)도 같은 방식이었고, 그 기록은 `edition: prototype`, `mode: demo` 입니다. 결과 화면 없이 끝난 테스트 화면의 판은 내려받을 수 없습니다.
 크기는 페달로 5분 한 판에 약 0.6 MB 이고 대부분 `capd` 입니다.
 
 ## 시각
@@ -43,8 +43,8 @@
 | `user`, `guest`, `userNew` | 운영 버전만. 회원 번호(8자리 문자열, `app/members.js`), 손님으로 시작했는지, 이 판 결과 화면에서 새로 만든 번호인지(손님은 결과 화면에서 번호를 받는다). 결과 없이 끝난 손님 판은 `user` 가 null |
 | `session` | 운영 버전만. 참가자가 세션 설정 화면에서 고른 `{ min, difficulty }` (`difficulty`: `relax` · `normal` · `challenge`). 이것으로 정해진 값은 `config` 에 들어 있다 (`Config.session`) |
 | `landmark` | 운영 버전의 회원 라운드만 (결과 화면까지 간 판). 풍경 길가에 세운 기념물의 생김새 `{ v, kind, size, seed, wall, roof }` — `kind`: `cottage` · `shop` · `tower` (예전 안은 `pinwheel` · `balloon` · `cairn`), `size`: 0~2 (층수 1~3), `seed`: 작은 차이(창가 꽃 색 등)를 정하는 수, `wall` · `roof`: 색 `#rrggbb`. 회원 기록에도 `look` 으로 들어가 다음 라운드부터 이 모양 그대로 선다 (`js/band.js` 의 `Band.lookOf`) |
-| `mode` | `test` \| `demo` |
-| `station`, `participant` | 시연 모드의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |
+| `mode` | `test` (테스트 화면) \| `demo` (스테이션 흐름: 운영 버전, 그리고 예전 프로토타입 시연 모드(`index.html?demo`, 지금은 없음)) |
+| `station`, `participant` | 운영 버전(스테이션 흐름)의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |
 | `startedAt`, `endedAt` | ISO 시각 |
 | `durationMs` | 기록 길이 (실제 시간) |
 | `ended` | 끝난 방식. `complete`(시간이 다 됨) · `operator`(운영 메뉴에서 끝냄) · `idle`(자리 비움으로 끝남) · `abandoned`(결과 없이 버림: 중단, 측정 중 자리 비움, 테스트 화면에서 메뉴로) |
@@ -68,8 +68,8 @@
 | `elapsedSec` | 플레이한 시간 (게임 시계) |
 | `stats` | 게임별 `{ plays, cleared, correct, total, points, level, runs, ms }`. `level` 은 도달한 최고 난이도, `runs` 는 판마다 `[레벨, 맞힌 수, 문제 수]`, `ms` 는 문제를 푼 시간 합 |
 | `exercise` | `{ kcal, distM, revs, avgRpm, activeSec }` RPM 으로 어림한 운동량 (`js/exercise.js`). `kcal` 은 MET 표·체중 65 kg 기준, `distM` 은 한 바퀴 6 m |
-| `abilities` | 시연 모드 결과만. 능력 축별 별 수 1~5 (0.5 단위), 데이터가 없는 축은 null (`js/abilities.js`) |
-| `abilitiesRaw` | 시연 모드 결과만. 별로 바꾸기 전 '해낸 레벨' (판마다 `레벨 − 1 + 정확도`, 게임 가중치 × 레벨로 가중 평균), 데이터가 없는 축은 null |
+| `abilities` | 스테이션 결과(`mode: demo`)만. 능력 축별 별 수 1~5 (0.5 단위), 데이터가 없는 축은 null (`js/abilities.js`) |
+| `abilitiesRaw` | 스테이션 결과(`mode: demo`)만. 별로 바꾸기 전 '해낸 레벨' (판마다 `레벨 − 1 + 정확도`, 게임 가중치 × 레벨로 가중 평균), 데이터가 없는 축은 null |
 
 ## `events`
 
@@ -80,7 +80,7 @@
 | `type` | 추가 필드 | 언제 |
 |---|---|---|
 | `calib_start` | | 속도 측정 화면이 열림 (기록 시작) |
-| `start` | `via`: `tap` \| `pedal`, 운영 버전은 `session` | 시연 모드만. 대기 화면에서 무엇으로 시작했나 (`calib_start` 바로 뒤) |
+| `start` | `via`: 운영 버전은 `session` (예전 시연 모드는 `tap` \| `pedal`) | `mode: demo` 만. 대기 화면에서 무엇으로 시작했나 (`calib_start` 바로 뒤) |
 | `calib_pedaling` | | 측정 중 처음 밟음 (측정 시간이 여기서부터 흐른다) |
 | `calib_end` | `baseline`, `measured`, `samples`, `fallback` | 측정 끝. `measured` 가 `config.minRpm` 보다 낮으면 `fallback: true` 이고 `baseline` 은 대체값. 이어서 3초 카운트다운 |
 | `play_start` | | 카운트다운 끝 (GO) |
@@ -91,10 +91,10 @@
 | `points` | `game`, `pts` | 인지 게임 점수 지급 |
 | `shift_start` | `from`, `to` | 속도 전환 구간 시작. 기울기 -1(내리막) · 0(평지) · 1(오르막). 목표 RPM = `baseline × (1 + 기울기 × config.rpmChangeAmount)` |
 | `shift_end` | `slope` | 속도 전환 구간 끝 |
-| `pause`, `resume` | | 게임 시계가 멈춤 / 다시 흐름. 이유는 바로 앞의 `link` · `operator` 로 알 수 있다. 둘 다 없으면 시연 모드의 PIN 입력 중이거나 테스트 화면의 Esc |
+| `pause`, `resume` | | 게임 시계가 멈춤 / 다시 흐름. 이유는 바로 앞의 `link` · `operator` 로 알 수 있다. 둘 다 없으면 운영 메뉴의 PIN 입력 중이거나 테스트 화면의 Esc |
 | `link` | `state`, `detail` | 페달 연결 상태 변화 (`ready` · `connecting` · `reconnecting` · `disconnected` · `idle`) |
-| `operator` | `open` | 시연 모드 운영 메뉴가 라운드 중에 열림/닫힘 |
-| `idle_prompt`, `idle_resumed` | | 시연 모드 '아직 하고 계신가요?' 안내가 뜸 / 다시 움직여서 사라짐 |
+| `operator` | `open` | 운영 메뉴가 라운드 중에 열림/닫힘 |
+| `idle_prompt`, `idle_resumed` | | 운영 버전 '아직 하고 계신가요?' 안내가 뜸 / 다시 움직여서 사라짐 |
 | `session_end` | `ended` | 기록 끝 (`meta.ended` 와 같음) |
 
 ### 문제
@@ -248,8 +248,8 @@ for e in E:
         print(e['q'], e['game'], e['correct'], e.get('timedOut', False), e['ms'])
 ```
 
-시연 모드 내보내기(`.jsonl`)는 한 줄씩 `json.loads` 하면 위와 같은 객체입니다.
+운영 버전 내보내기(`.jsonl`)는 한 줄씩 `json.loads` 하면 위와 같은 객체입니다.
 
 ## 업로드
 
-시연·운영 버전은 저장한 세션을 서버로도 보냅니다. 서버가 해야 하는 일(업로드, 회원 기록 받아 오기)은 [SERVER.md](SERVER.md) 에 있습니다.
+운영 버전은 저장한 세션을 서버로도 보냅니다. 서버가 해야 하는 일(업로드, 회원 기록 받아 오기)은 [SERVER.md](SERVER.md) 에 있습니다.

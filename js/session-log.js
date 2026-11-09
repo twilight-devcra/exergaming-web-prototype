@@ -7,7 +7,7 @@
 //  - workout : 페달이 1초마다 보내는 avg_rpm·watt·rev_count
 //  - samples : 게임이 쓴 RPM·목표·공 위치·점수 (초당 10번)
 // 시각 t 는 기록 시작부터의 ms (실제 시간), clock 은 게임 시계 ms (일시정지 동안 멈춘다).
-// 테스트 화면은 결과 화면의 버튼으로 내려받고, 시연 모드는 판이 끝날 때마다 태블릿(IndexedDB)에 저장한다.
+// 테스트 화면은 결과 화면의 버튼으로 내려받고, 운영 버전(스테이션 흐름)은 판이 끝날 때마다 태블릿(IndexedDB)에 저장한다.
 class SessionLog {
   static VERSION = 3;
   static SAMPLE_SEC = 0.1;
@@ -158,7 +158,7 @@ function downloadBlob(name, parts, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-// 시연 모드: 끝난 세션을 태블릿에 쌓아 두고 운영 메뉴에서 한꺼번에 내보낸다
+// 운영 버전(스테이션 흐름): 끝난 세션을 태블릿에 쌓아 두고 운영 메뉴에서 한꺼번에 내보낸다
 const SessionStore = {
   db: null,
 

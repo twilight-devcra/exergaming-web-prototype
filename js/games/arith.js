@@ -9,7 +9,10 @@
 //   given   — 미리 채워 두는 칸 수 (가장 쉬운 단계). 채워 둔 숫자는 후보에서 빠지므로 n 은 그 숫자까지 센 수다.
 //             빈칸이 하나 남으면 '답 − 채워 둔 수'를 찾기만 하면 된다.
 // '큰 수부터 넣고 나머지를 맞춰 보는' 요령이 통하지 않도록 문제를 고른다 (generate 참고).
-class ArithGame {
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
+export class ArithGame {
   static id = 'arith';
   static tags = ['number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '사칙연산 역산';

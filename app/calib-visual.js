@@ -1,7 +1,10 @@
 // 속도 측정(준비 운동) 화면의 그림 (운영 버전만).
 // 둥근 길 위를 게임 속 자전거가 페달 빠르기에 맞춰 돌고(페달 네 바퀴에 한 바퀴), 안쪽 파란 고리가 측정 시간만큼 찬다.
 // 가운데 숫자(남은 초)와 아래 안내 문구는 main.js 의 updateCalib 이 그대로 채운다. Demo.tick 이 측정 중에 매 프레임 부른다.
-const CalibVisual = {
+import { U } from '../js/config.js';
+import { Band } from '../js/band.js';
+
+export const CalibVisual = {
   REVS_PER_LAP: 4, // 페달 몇 바퀴에 길을 한 바퀴 도는가 (60 RPM 이면 4초에 한 바퀴)
 
   init() {

@@ -7,6 +7,9 @@
 //   clump  — 같은 색이 서로 붙어 놓일 확률. 뭉쳐 있으면 면적으로 바로 보이고, 흩어지면 하나씩 세야 한다.
 // 격자는 Lv5 까지 작게 유지하고, 네 가지를 다 조인 Lv6~8 에서만 칸을 늘린다 (2026-10-23 시험: 높은 단계가 쉬웠다).
 // 1·2위 차이가 1칸인 채로 칸이 늘면 눈대중이 더는 안 통하고 끝까지 세어야 한다.
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const COUNT_COLORS = [
   // 색만으로 구분하지 않도록 칸마다 색에 딸린 모양을 함께 찍는다 (색약 대응)
   { id: 'red', fill: '#e5484d', glyph: '<circle cx="50" cy="50" r="25"/>' },
@@ -16,7 +19,7 @@ const COUNT_COLORS = [
   { id: 'purple', fill: '#8e4ec6', glyph: '<path d="M43 23h14v20h20v14H57v20H43V57H23V43h20z"/>' },
 ];
 
-class CountGame {
+export class CountGame {
   static id = 'count';
   static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '우세한 색 찾기';
@@ -73,6 +76,8 @@ class CountGame {
     body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(body);
+    // 보기 높이가 격자 크기 셈에 들어가므로, 보기가 바뀌면 다시 맞춘다
+    this.ro.observe(this.opts);
     this.next();
   }
 
@@ -119,8 +124,8 @@ class CountGame {
   layout() {
     const s = this.body;
     const [rows, cols] = this.spec.grid;
-    // 보기 버튼이 쓰는 높이를 뺀 나머지에 격자를 맞춘다
-    const avail = s.clientHeight - 150;
+    // 보기 버튼과 그 위 간격이 쓰는 높이를 뺀 나머지에 격자를 맞춘다 (보기가 아직 없으면 버튼 한 줄 + 아래 여백 114px 로 친다)
+    const avail = s.clientHeight - (this.opts.offsetHeight || 114) - U.gapOf(this.wrap, 26) - 10;
     const gap = 6;   // css .cnt-grid gap
     const sz = U.clamp(Math.min((avail - (rows - 1) * gap) / rows, (s.clientWidth - 40 - (cols - 1) * gap) / cols), 22, 92);
     this.wrap.style.setProperty('--csz', `${sz}px`);

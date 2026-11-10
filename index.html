@@ -208,32 +208,8 @@
   </div>
   <div id="debug"></div>
 
-  <script src="js/config.js"></script>
-  <script src="js/pedal.js"></script>
-  <script src="js/pedal-link.js"></script>
-  <script src="js/cadence-est.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/band.js"></script>
-  <script src="js/exercise.js"></script>
-  <script src="js/fx.js"></script>
-  <script src="js/themes.js"></script>
-  <script src="js/diagram.js"></script>
-  <script src="js/games/path.js"></script>
-  <script src="js/games/symbol.js"></script>
-  <script src="js/games/arith.js"></script>
-  <script src="js/games/count.js"></script>
-  <script src="js/games/fit.js"></script>
-  <script src="js/games/seek.js"></script>
-  <script src="js/games/cover.js"></script>
-  <script src="js/games/ladder.js"></script>
-  <script src="js/games/novel.js"></script>
-  <script src="js/games/track.js"></script>
-  <script src="js/games/follow.js"></script>
-  <script src="js/games/pair.js"></script>
-  <script src="js/games/box.js"></script>
-  <script src="js/games/compare.js"></script>
-  <script src="js/abilities.js"></script>
-  <script src="js/session-log.js"></script>
-  <script src="js/main.js"></script>
+  <!-- 게임 코드는 ES 모듈이다. main.js 가 필요한 파일을 import 로 불러온다.
+       모듈은 파일을 바로 열면(file://) 막히므로 node server.js 로 띄워서 연다 -->
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>

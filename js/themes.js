@@ -1,6 +1,9 @@
 // 화면 스타일. 색·글꼴·모양은 css/themes.css 의 body[data-theme] 가 맡고,
 // 여기서는 캔버스에 그리는 속도 띠(band)와 연출 효과(fx, js/fx.js)를 정한다.
 // 고른 스타일은 태블릿에 저장되고 테스트 화면과 운영 버전이 함께 쓴다 (같은 주소에서 열 때). ?theme=neon 처럼 주소로도 고를 수 있다.
+import { EDITION, $ } from './config.js';
+import { Fx } from './fx.js';
+
 const THEMES = [
   { id: 'clean', name: '기본', band: {}, fx: {} },
   // dark = 어두운 배경. 어두운 그림(달)을 밝게 바꾸고 그림 둘레에 옅은 빛을 둘러 잘 보이게 한다
@@ -12,13 +15,14 @@ const THEMES = [
   { id: 'scenic', name: '풍경 라이딩', app: true, band: { scenic: true }, fx: { burst: 'star', confetti: 'paper', shake: 0 } },
 ];
 
-const Theme = {
+export const Theme = {
   KEY: 'exergame.theme',
   current: THEMES[0],
 
   list: THEMES,
 
-  init() {
+  init(band) {
+    this.band = band;
     // 운영 버전은 자기 스타일 하나만 쓰고 저장하지 않는다 (프로토타입이 저장한 스타일을 건드리지 않게).
     // 프로토타입에서는 운영 버전 전용 스타일을 고를 수 없다
     const app = EDITION === 'app';
@@ -33,7 +37,7 @@ const Theme = {
       sel.onchange = () => this.apply(sel.value);
     });
     // 글꼴이 늦게 도착하면 캔버스 글자를 다시 그린다
-    if (document.fonts) document.fonts.ready.then(() => App.band.draw());
+    if (document.fonts) document.fonts.ready.then(() => this.band.draw());
   },
 
   apply(id, save = true) {
@@ -41,7 +45,7 @@ const Theme = {
     this.current = t;
     document.body.dataset.theme = t.id;
     document.body.classList.toggle('theme-dark', !!t.dark);
-    App.band.setLook(t.band);
+    this.band.setLook(t.band);
     Fx.setStyle(t.fx);
     if (save && !t.app) {
       try { localStorage.setItem(this.KEY, t.id); } catch (e) {}

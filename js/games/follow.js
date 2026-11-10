@@ -39,6 +39,10 @@
 //           이어진 지시는 첫 단계만 그렇고, 그 뒤 단계는 바로 뜨고 바로 조작한다 (단계마다 기다리면 지루하다)
 //   cover — read 동안 조작판(램프·스위치·버튼)을 덮개로 가린다
 //   time  — 제한 시간 배율 (1 보다 작으면 짧다. 읽는 시간은 빼고 잰다)
+import { DEFAULT_CONFIG, U } from '../config.js';
+import { Dg } from '../diagram.js';
+import { SYMBOLS } from './symbol.js';
+
 const FOLLOW_NAMES = { circle: '동그라미', square: '네모', triangle: '세모', star: '별', plus: '십자', moon: '달', heart: '하트' };
 const FOLLOW_SHAPES = SYMBOLS.filter((s) => FOLLOW_NAMES[s.id]);
 const FOLLOW_LAMPS = ['A', 'B', 'C'];
@@ -50,7 +54,7 @@ function followJosa(word, a, b) {
   return code >= 0 && code < 11172 && code % 28 ? a : b;
 }
 
-class FollowGame {
+export class FollowGame {
   static id = 'follow';
   static tags = ['order']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '지시 따르기';
@@ -153,6 +157,8 @@ class FollowGame {
     body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(body);
+    // 지시 문구가 두 줄로 늘어나는 등 판 자체가 커져도 다시 맞춘다 (scale 은 크기 측정에 들어가지 않아 되풀이되지 않는다)
+    this.ro.observe(this.panel);
     this.layout();
     this.h.after(250, () => this.ask());
   }

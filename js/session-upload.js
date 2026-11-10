@@ -3,7 +3,10 @@
 // 서버가 2xx 로 답한 것만 '보냄'으로 적는다. 실패하면 멈췄다가 30초 → 1분 → 2분 … (최대 10분) 뒤 다시 시도하고,
 // 인터넷이 다시 연결될 때와 5분마다도 다시 본다. 그래서 와이파이가 끊겨도 세션을 잃지 않는다.
 // 응답이 오기 전에 연결이 끊기면 같은 세션을 한 번 더 보낼 수 있으므로, 서버는 meta.device + meta.id 로 덮어써야 한다.
-const SessionUpload = {
+import { SESSION_UPLOAD } from './config.js';
+import { SessionStore } from './session-log.js';
+
+export const SessionUpload = {
   KEY: 'exergame.upload',
   RETRY_MIN_SEC: 30,
   RETRY_MAX_SEC: 600,

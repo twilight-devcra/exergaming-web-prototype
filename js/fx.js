@@ -4,7 +4,9 @@
 //   burst    — 정답 때 터지는 입자 모양: glow 빛 | streak 속도선 | star 별 | pixel 네모
 //   confetti — 깃발·완벽·결과 화면 꽃가루 모양: glow | paper 종이 | star | pixel
 //   shake    — 오답 때 게임 영역을 흔드는 세기 (px). 0 이면 흔들지 않는다
-const Fx = {
+import { $ } from './config.js';
+
+export const Fx = {
   style: {},
   parts: [],
   sprites: {}, // 빛 입자 그림 (색마다 하나, glowSprite)

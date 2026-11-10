@@ -4,7 +4,9 @@
 //  - 센서 파형(lz): 페달 원시 파형에서 직접 구한 케이던스 (js/cadence-est.js). 켜져 있고 파형이 들어오는 동안은
 //    avg_rpm 보다 우선한다. 페달 검출기는 느리게 밟으면 회전을 놓치는데(DIR_FLIP), 파형은 그 구간에도 맞는 값을 낸다.
 //    파형이 LZ_STALE_MS 넘게 끊기면 avg_rpm 으로 돌아간다 (구 펌웨어, 유실 등).
-class Pedal {
+import { U } from './config.js';
+
+export class Pedal {
   constructor() {
     this.lastKey = null;
     this.times = [];

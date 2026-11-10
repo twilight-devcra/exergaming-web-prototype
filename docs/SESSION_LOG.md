@@ -47,7 +47,7 @@
 | `station`, `participant` | 운영 버전(스테이션 흐름)의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |
 | `startedAt`, `endedAt` | ISO 시각 |
 | `durationMs` | 기록 길이 (실제 시간) |
-| `ended` | 끝난 방식. `complete`(시간이 다 됨) · `operator`(운영 메뉴에서 끝냄) · `idle`(자리 비움으로 끝남) · `abandoned`(결과 없이 버림: 중단, 측정 중 자리 비움, 테스트 화면에서 메뉴로) |
+| `ended` | 끝난 방식. `complete`(시간이 다 됨) · `operator`(운영 메뉴에서 끝냄) · `idle`(자리 비움으로 끝남) · `user`(참가자가 그만하기로 도중에 마침, 결과 화면 없이 대기 화면으로) · `abandoned`(결과 없이 버림: 중단, 측정 중 자리 비움, 테스트 화면에서 메뉴로) |
 | `theme` | 화면 스타일 id |
 | `music` | 음악 스타일 id (`js/audio.js` 의 `STYLES`: `acoustic` · `trot` · `disco` · `calm` · `beat`). 이 필드가 없는 예전 기록은 `beat` |
 | `input` | 판을 시작할 때의 입력 장치. `pedal` \| `keyboard` |
@@ -91,9 +91,10 @@
 | `points` | `game`, `pts` | 인지 게임 점수 지급 |
 | `shift_start` | `from`, `to` | 속도 전환 구간 시작. 기울기 -1(내리막) · 0(평지) · 1(오르막). 목표 RPM = `baseline × (1 + 기울기 × config.rpmChangeAmount)` |
 | `shift_end` | `slope` | 속도 전환 구간 끝 |
-| `pause`, `resume` | | 게임 시계가 멈춤 / 다시 흐름. 이유는 바로 앞의 `link` · `operator` 로 알 수 있다. 둘 다 없으면 운영 메뉴의 PIN 입력 중이거나 테스트 화면의 Esc |
+| `pause`, `resume` | | 게임 시계가 멈춤 / 다시 흐름. 이유는 바로 앞의 `link` · `operator` · `end_ask` 로 알 수 있다. 둘 다 없으면 운영 메뉴의 PIN 입력 중이거나 테스트 화면의 Esc |
 | `link` | `state`, `detail` | 페달 연결 상태 변화 (`ready` · `connecting` · `reconnecting` · `disconnected` · `idle`) |
 | `operator` | `open` | 운영 메뉴가 라운드 중에 열림/닫힘 |
+| `end_ask`, `end_cancel` | | 참가자가 그만하기를 누름 (확인 창, 게임 멈춤) / 계속하기를 고름. 마치기를 고르면 `session_end` 의 `ended` 가 `user` |
 | `idle_prompt`, `idle_resumed` | | 운영 버전 '아직 하고 계신가요?' 안내가 뜸 / 다시 움직여서 사라짐 |
 | `session_end` | `ended` | 기록 끝 (`meta.ended` 와 같음) |
 

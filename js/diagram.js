@@ -2,7 +2,7 @@
 // 게임마다 static diagram() 이 [{ svg, caption }, ...] (보통 두 단계: 무엇을 보고 → 무엇을 누르나)를 돌려주고,
 // Dg.render 가 '① … → ② …' 모양으로 늘어놓는다. 그림은 게임 안에서 쓰는 모양·색을 그대로 써서
 // 소개에서 본 것이 실제 판에서 바로 알아보이게 한다. 색은 css 변수(--cell, --accent …)를 따라 화면 스타일마다 바뀐다.
-const Dg = {
+export const Dg = {
   svg(viewBox, body) {
     return `<svg class="dg-svg" viewBox="${viewBox}">${body}</svg>`;
   },

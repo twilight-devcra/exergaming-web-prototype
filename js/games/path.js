@@ -10,7 +10,10 @@
 //   touch — 길이 자기 자신 바로 옆을 지나가도 되는 칸 수. 옆 칸이 다음 칸인지 헷갈리게 된다.
 //           제한 없이 두면 길이 한 덩어리로 뭉쳐 버리므로 몇 칸까지만 허용한다.
 //   step  — 한 칸을 보여주는 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 STEP_MS 로 고정이다.
-class PathGame {
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
+export class PathGame {
   static id = 'path';
   static tags = ['memory', 'trace']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '길 따라 그리기';
@@ -222,6 +225,12 @@ class PathGame {
     const ox = (w - (size * this.cols + gap * (this.cols - 1))) / 2;
     const oy = (h - (size * this.rows + gap * (this.rows - 1))) / 2;
     this.geo = { size, gap, ox, oy };
+    // 칸들이 차지하는 자리: 운영 버전은 여기에만 흰 판 바탕을 깐다 (app/app.css .path-board::before)
+    const bs = this.board.style;
+    bs.setProperty('--mat-x', `${ox}px`);
+    bs.setProperty('--mat-y', `${oy}px`);
+    bs.setProperty('--mat-w', `${size * this.cols + gap * (this.cols - 1)}px`);
+    bs.setProperty('--mat-h', `${size * this.rows + gap * (this.rows - 1)}px`);
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const s = this.cells[r][c].style;

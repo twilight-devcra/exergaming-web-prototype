@@ -12,7 +12,7 @@
 // 최근 1초 동안 lz 의 변화 폭(최대 − 최소)이 STOP_RANGE_MG 아래면 정지로 보고 셋 다 0.
 // DC 제거 뒤 진폭으로 판정하면 DC 추정의 잔물결(최대 40 mg 정도)이 1.5초 시정수로 빠질 때까지 정지가 늦게 잡힌다.
 // 녹화 두 개에서 1초 변화 폭은 페달링 중 최소 110 mg (약 30 rpm), 정지 중 최대 16.6 mg 였다.
-class LzCadence {
+export class LzCadence {
   constructor() {
     this.reset();
     this.seq = -1;

@@ -1,7 +1,10 @@
 // 심볼 위치 외우기
 // 2x4 판의 몇 칸에 서로 다른 심볼을 잠깐 보여준 뒤, 위쪽 칸에 뜬 심볼이 어디 있었는지 3번 맞힌다
 // (심볼이 둘뿐인 가장 쉬운 단계는 2번).
-const SYMBOLS = (() => {
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
+export const SYMBOLS = (() => {
   const star = Array.from({ length: 10 }, (_, i) => {
     const a = ((-90 + i * 36) * Math.PI) / 180;
     const rad = i % 2 ? 20 : 47;
@@ -25,7 +28,7 @@ function symbolEl(sym) {
   return U.el('div', 'sym', `<svg viewBox="0 0 100 100">${sym.svg}</svg>`);
 }
 
-class SymbolGame {
+export class SymbolGame {
   static id = 'symbol';
   static tags = ['memory']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '심볼 위치 외우기';
@@ -110,7 +113,8 @@ class SymbolGame {
 
   layout() {
     const s = this.body;
-    const avail = s.clientHeight - 14 * 2;
+    // 물어보는 칸 + 격자 두 줄 = 세 칸 높이. 빼는 것: 물어보는 칸과 격자 사이 간격(css gap) + 격자 줄 사이 14px
+    const avail = s.clientHeight - U.gapOf(this.wrap, 14) - 14;
     const sz = Math.max(48, Math.min(avail / 3, s.clientWidth / 4.5, 140));
     this.wrap.style.setProperty('--sz', `${sz}px`);
   }

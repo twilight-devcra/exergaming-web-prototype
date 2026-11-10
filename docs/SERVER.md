@@ -70,7 +70,7 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 | `meta.mode` | `test` \| `demo` (업로드는 `demo` 만 온다) |
 | `meta.user`, `meta.guest`, `meta.userNew` | 운영 버전의 회원 번호 등. 회원 기록을 만들 때 쓴다 |
 | `meta.station`, `meta.participant` | 스테이션·참가 번호 |
-| `meta.startedAt`, `meta.ended` | 시작 시각, 끝난 방식 (`abandoned` 는 결과 없이 끝난 판) |
+| `meta.startedAt`, `meta.ended` | 시작 시각, 끝난 방식 (`abandoned` 는 결과 없이 버린 판, `user` 는 참가자가 그만하기로 도중에 마친 판) |
 | `meta.summary` | 점수·운동량·게임별 성적 요약. 원본(`events`, `capd` …) 없이도 대부분의 통계는 이것으로 된다 |
 
 ## 회원 기록 — `GET <회원 기록 주소>?user=<번호>`
@@ -109,7 +109,7 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 | `level`, `distM`, `kcal` (선택) | `meta.summary.stats` 의 `level` 최댓값, `meta.summary.exercise.distM` · `kcal` | 지금은 쓰지 않음 (나중에 그래프용) |
 | `look` (선택) | `meta.landmark` 그대로 | 풍경 길가에 세운 기념물(건물)의 생김새. 그대로 돌려주면 다른 태블릿에서도 같은 건물로 선다. 없으면(이 필드를 더하기 전 세션) 태블릿이 난이도·시간으로 정한다 |
 
-- **어떤 세션을 돌려줄까**: `meta.user` 가 그 번호이고 결과 화면까지 간 것 (`meta.ended` 가 `abandoned` 가 아닌 것). 태블릿 기록도 결과 화면에서만 쌓입니다
+- **어떤 세션을 돌려줄까**: `meta.user` 가 그 번호이고 결과 화면까지 간 것 (`meta.ended` 가 `abandoned` 도 `user` 도 아닌 것). 태블릿 기록도 결과 화면에서만 쌓입니다. `user` 는 참가자가 그만하기로 도중에 마친 판이라 업로드는 되지만 달력·기념물에는 넣지 않습니다
 - **순서·개수**: 순서는 상관없습니다 (태블릿이 시간순으로 다시 정렬한다). 달력은 최근 2년까지만 넘겨 볼 수 있으므로 그보다 오래된 것은 빼도 됩니다
 - **기록이 없는 번호**: 오류가 아니라 빈 목록(`[]` 또는 `{ "sessions": [] }`)으로 답합니다. 손님이 처음 받은 번호는 서버에 아직 없을 수 있습니다
 - **실패**: 2xx 가 아니거나 JSON 이 아니면 '지금은 서버에 연결하지 못해 이 태블릿의 기록만 보여 드려요' 가 나옵니다. 다시 시도하지는 않습니다 (다음 로그인 때 다시 묻는다)

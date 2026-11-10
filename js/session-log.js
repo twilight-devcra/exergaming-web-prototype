@@ -8,7 +8,10 @@
 //  - samples : 게임이 쓴 RPM·목표·공 위치·점수 (초당 10번)
 // 시각 t 는 기록 시작부터의 ms (실제 시간), clock 은 게임 시계 ms (일시정지 동안 멈춘다).
 // 테스트 화면은 결과 화면의 버튼으로 내려받고, 운영 버전(스테이션 흐름)은 판이 끝날 때마다 태블릿(IndexedDB)에 저장한다.
-class SessionLog {
+import { Config, EDITION } from './config.js';
+import { Theme } from './themes.js';
+
+export class SessionLog {
   static VERSION = 3;
   static SAMPLE_SEC = 0.1;
 
@@ -29,7 +32,7 @@ class SessionLog {
       rpmSource: app.cfg.rpmSource,
       userAgent: navigator.userAgent,
       screen: [window.innerWidth, window.innerHeight],
-      edition: typeof EDITION !== 'undefined' ? EDITION : null, // prototype | app
+      edition: EDITION, // prototype | app
       device: SessionLog.deviceId(), // 태블릿마다 하나. id 는 태블릿 안에서만 겹치지 않으므로 서버에서는 device + id 로 구분한다
       config: JSON.parse(JSON.stringify(app.cfg)),
       preset: Config.presetOf(app.cfg), // 라운드 난이도 프리셋 (값을 하나라도 고쳤으면 custom)
@@ -159,7 +162,7 @@ function downloadBlob(name, parts, type) {
 }
 
 // 운영 버전(스테이션 흐름): 끝난 세션을 태블릿에 쌓아 두고 운영 메뉴에서 한꺼번에 내보낸다
-const SessionStore = {
+export const SessionStore = {
   db: null,
 
   open() {

@@ -18,7 +18,10 @@
 //   cands — 조각 수.
 //   pick  — 오답을 고르는 방법. far = 정답과 셋 이상의 변에서 다른 것, near = 가장 적게 다른 것, any = 아무거나.
 //   upright — 조각을 돌려 놓지 않는다 (쉬운 단계). 정답 조각이 빈자리와 같은 방향이라 머릿속으로 돌려 볼 필요가 없다.
-class FitGame {
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
+export class FitGame {
   static id = 'fit';
   static tags = ['shape']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '빈자리 채우기';
@@ -125,7 +128,8 @@ class FitGame {
     const s = this.body;
     const n = this.spec.cands;
     const ratio = FitGame.PIECE_VIEW / FitGame.BOARD_VIEW;   // 버튼 크기 = 판 크기 * ratio
-    const avail = s.clientHeight - 112;
+    // 판과 조각 사이 간격(css gap)을 뺀 높이에 판 + 조각 한 줄을 맞춘다
+    const avail = s.clientHeight - 88 - U.gapOf(this.wrap, 24);
     const cand = U.clamp(Math.min(avail / (1 / ratio + 1.1), (s.clientWidth - 40) / n - 16), 52, 132);
     this.wrap.style.setProperty('--psz', `${cand}px`);
     this.wrap.style.setProperty('--bsz', `${Math.round(cand / ratio)}px`);

@@ -5,13 +5,13 @@
 // 쉬운 단계는 문제를 줄이는 것과 함께 제한 시간도 EASY_TIME 배로 늘린다 (Lv1, Lv2 순).
 // 2026-11-05: 1.5 · 1.25 → 2 · 1.6 (어르신이 처음 몇 판을 서두르지 않고 풀 수 있게)
 const EASY_LEVELS = 2;
-const BASE_LEVEL = EASY_LEVELS + 1;
+export const BASE_LEVEL = EASY_LEVELS + 1;
 const TOP_LEVEL = 8; // 미니게임의 가장 높은 난이도. 점수 배율 곡선의 끝 (multiplierTop)
-const EASY_TIME = [2, 1.6];
+export const EASY_TIME = [2, 1.6];
 // 저장해 둔 시작 난이도가 어느 번호 체계로 적힌 것인가. 1 = 쉬운 단계를 더하기 전 (그때의 Lv1 이 지금의 Lv3)
 const LEVEL_SCHEME = 2;
 
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
   durationSec: 180,          // 라운드 길이 (인지 게임 진행과 무관하게 고정)
   calibrationSec: 15,        // 시작 전 편안한 속도 측정 시간
   calibrationIgnoreSec: 4,   // 측정 초반 가속 구간은 기준값 계산에서 제외
@@ -89,8 +89,8 @@ const DEFAULT_CONFIG = {
 // '보통'은 DEFAULT_CONFIG 의 값 그대로다. 나머지 둘은 첫 추정값이라 플레이해 보며 다듬는다.
 const PRESET_NOTE = '칠한 칸은 이 프리셋이 정한 값입니다. 하나라도 바꾸면 직접 설정이 됩니다.';
 const PRESET_CUSTOM_NOTE = '프리셋 값에서 하나 이상을 직접 바꾼 상태입니다.';
-const PRESET_KEYS = ['startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'tolerance', 'maxDeviation', 'rpmChangeAmount'];
-const ROUND_PRESETS = [
+export const PRESET_KEYS = ['startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'tolerance', 'maxDeviation', 'rpmChangeAmount'];
+export const ROUND_PRESETS = [
   {
     id: 'elderly', label: '가볍게',
     desc: '쉬운 단계(Lv1)부터 Lv5까지. 정답률 75% 근처에 머물고, 제한 시간이 1.3배, 페달 허용 구역이 ±20%로 넓고, 오르막·내리막이 완만합니다.',
@@ -116,17 +116,17 @@ const ROUND_PRESETS = [
 // 그래서 15분 세션은 5분 세션보다 한 단계씩 천천히 오른다 (긴 세션이 앞부분에서 최고 난이도에 닿아 버리지 않게).
 // hold = 레벨이 제자리에 머무는 정답률. 이보다 잘 맞히면 오르고 못 맞히면 내려간다 (diffDown 을 여기서 정한다).
 // 다른 값(페달 허용 구역, 점수 등)은 운영 메뉴의 '라운드 설정'을 따른다.
-const SESSION_LENGTHS = [
+export const SESSION_LENGTHS = [
   { min: 5, label: '5분', desc: '가볍게 한 번' },
   { min: 10, label: '10분', desc: '꾸준한 운동' },
   { min: 15, label: '15분', desc: '충분한 운동' },
 ];
-const SESSION_DIFFICULTIES = [
+export const SESSION_DIFFICULTIES = [
   { id: 'relax', label: '편안하게', desc: '난이도가 천천히 올라요', maxLevel: 5, climb: 0.9, hold: 0.8, questionTimeScale: 1.3 },
   { id: 'normal', label: '보통', desc: '알맞은 속도로 올라요', maxLevel: 7, climb: 0.7, hold: 0.67, questionTimeScale: 1.1 },
   { id: 'challenge', label: '도전', desc: '난이도가 빠르게 올라요', maxLevel: 8, climb: 0.5, hold: 0.55, questionTimeScale: 1 },
 ];
-const SESSION_DEFAULT = { min: 10, difficulty: 'normal' }; // 화면을 열 때 미리 골라 둔 것
+export const SESSION_DEFAULT = { min: 10, difficulty: 'normal' }; // 화면을 열 때 미리 골라 둔 것
 const SESSION_ANSWERS_PER_MIN = 10; // 분당 답 수 어림값 (게임 하나에 문제 3개, 대개 10초 안팎 — docs/DEMO_BRIEF.md 'Round pacing')
 
 // 스테이션 흐름(운영 버전, js/demo.js)의 설정. 테스트 화면의 localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것을 덮는다.
@@ -141,7 +141,7 @@ const DEMO_CONFIG = {
   rpmSource: 'zc',
 };
 // 운영 메뉴에서 바꿀 수 있는 항목 (라운드 시간과 점수에 관한 것만). scale = 화면에 보일 때 곱하는 값
-const DEMO_SETTINGS = [
+export const DEMO_SETTINGS = [
   { key: 'durationSec', label: '라운드 길이 (초)', min: 60, max: 900, step: 15 },
   { key: 'tolerance', label: '허용 구역 (±%)', min: 3, max: 40, step: 1, scale: 100 },
   { key: 'tickMaxPoints', label: '운동 점수 (초당 최대)', min: 1, max: 100, step: 1 },
@@ -160,7 +160,7 @@ const DEMO_SETTINGS_KEY = 'exergame.demo.cfg';
 
 // 게임 중 음악 스타일 (js/audio.js 의 BeatAudio.STYLES). 모두 비트 하나 = 페달 반 바퀴로 박자를 이끈다.
 // 태블릿마다 운영 메뉴(테스트 화면은 '화면·소리' 탭)의 '음악'에서 고르고, 주소에 ?music=trot 처럼 붙여도 된다.
-const MUSIC_STYLES = [
+export const MUSIC_STYLES = [
   { id: 'disco', label: '신나는 댄스' },
   { id: 'acoustic', label: '산책 기타 (가볍고 밝게)' },
   { id: 'trot', label: '트로트 (쿵짝 + 아코디언)' },
@@ -177,12 +177,12 @@ const MUSIC_KEY = 'exergame.music';
 //   GET <historyUrl>?user=<회원 번호> 에 그 회원의 세션 요약 목록으로 답해야 한다 (docs/SERVER.md)
 // localHistory: 시험용. true 면 historyUrl 대신 이 태블릿의 세션 로그가 회원 기록 서버 노릇을 한다 (app/members.js 의 Members.localServer).
 //   주소 칸이 비었다고 저절로 켜지지 않는다. 운영 메뉴의 체크 칸이나 여기서 일부러 켜야 한다
-const SESSION_UPLOAD = { url: '', key: '', historyUrl: '', localHistory: false };
+export const SESSION_UPLOAD = { url: '', key: '', historyUrl: '', localHistory: false };
 
 // 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력). 비워 두면 PIN 없이 바로 열린다 (2026-11-05: 지금은 필요 없음). 다시 쓰려면 네 자리 숫자를 넣는다
-const APP_OPERATOR_PIN = '';
+export const APP_OPERATOR_PIN = '';
 
-const Config = {
+export const Config = {
   // 스테이션 모드: 테스트 화면의 저장값과 무관하다. 운영 메뉴에서 바꾼 DEMO_SETTINGS 항목만 덮는다
   demo() {
     return Object.assign({}, DEFAULT_CONFIG, DEMO_CONFIG, this.demoSaved());
@@ -250,7 +250,7 @@ const Config = {
     let saved = null;
     try { saved = localStorage.getItem(MUSIC_KEY); } catch (e) { }
     if (ok(saved)) return saved;
-    return MUSIC_DEFAULT[typeof EDITION !== 'undefined' ? EDITION : 'prototype'] || 'beat';
+    return MUSIC_DEFAULT[EDITION] || 'beat';
   },
   setMusic(id) {
     try { localStorage.setItem(MUSIC_KEY, id); } catch (e) { }
@@ -280,8 +280,14 @@ const Config = {
   },
 };
 
+// 프로토타입(index.html)은 테스트 화면, 운영 버전(app/index.html, <html data-edition="app">)은 스테이션 흐름 (js/demo.js).
+// 스테이션 흐름은 같은 라운드에 대기·결과·운영 화면만 바꿔 끼운다. DEMO(App.demo) 가 이 흐름인지를 뜻한다 (세션 로그의 mode: 'demo')
+export const EDITION = document.documentElement.dataset.edition || 'prototype';
+export const DEMO = EDITION === 'app';
+
 // 공용 유틸
-const U = {
+export const $ = (s) => document.querySelector(s);
+export const U = {
   rand: (n) => Math.floor(Math.random() * n),
   randInt: (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1)),
   clamp: (v, lo, hi) => Math.max(lo, Math.min(hi, v)),
@@ -335,6 +341,12 @@ const U = {
     const body = U.el('div', 'stage-body');
     stage.append(head, body);
     return { body, dots };
+  },
+  // 문제와 보기 사이 간격 (css gap). 운영 버전은 문제와 보기를 따로 감싸느라 더 넓다 (app/app.css '문제와 보기를 나눈다').
+  // 게임은 판 크기를 셈할 때 이 값을 쓴다. 못 읽으면 fallback
+  gapOf(el, fallback) {
+    const v = parseFloat(getComputedStyle(el).rowGap);
+    return Number.isFinite(v) ? v : fallback;
   },
   fmtTime(sec) {
     sec = Math.max(0, Math.ceil(sec));

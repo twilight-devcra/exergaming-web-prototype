@@ -111,7 +111,7 @@ These are reasonable defaults. Confirm with the user before relying on them.
 
 ## Working notes for future sessions
 
-- No build step and no dependencies. Plain HTML/CSS/JS loaded via `<script>` tags in `index.html`. Keep it that way unless there's a strong reason.
+- No build step and no dependencies. Plain HTML/CSS/JS as native ES modules: each page loads only `js/main.js` (`<script type="module">`), and every file imports what it uses. Serve with `node server.js`, since modules don't load from `file://`. Deploys go through `.github/workflows/pages.yml`, which runs `tools/stamp.js` to set `?v=<commit>` and regenerate the import map in the deployed `app/index.html`. Nothing to do by hand. Keep it this way unless there's a strong reason.
 - Code comments and UI text are Korean. Match that in code.
 - Config defaults: `js/config.js`. Round flow, scoring, and result screen: `js/main.js` (`beginCountdown`, `nextGame`, `updatePlay`, `endRound`, `showResult`).
 - Test without hardware: `A`/`D` keys simulate pedaling. `pedal-debug.html?sim` simulates the pedal on the debug page.

@@ -23,15 +23,16 @@ These match the eight existing games (`js/games/*.js`), so a new game slots into
 ### Checklist for adding a game
 
 1. Write `js/games/<id>.js` with `id`, `title`, `hint`, `tags`, `levels`, `maxLevel`, `diagram()`, a constructor taking `host`, `start()`, `result()` and `abort()`. Layout follows the stage size (`ResizeObserver`).
-2. Add the `<script>` tag in `index.html` (after `js/diagram.js`) and the class to `GAME_TYPES` in `js/main.js`.
-3. Add a `questionTime` entry in `js/config.js` and say in its comment what the "load" is.
-4. Add `ABILITY_WEIGHTS` in `js/abilities.js`, and `ABILITY_PACE` if the game feeds the speed axis.
-5. Log through the host:
+2. `export` the class, then import it in `js/games/index.js` and add it to `GAME_TYPES` there. Import what the game uses at the top of its file (usually `U` from `../config.js` and `Dg` from `../diagram.js`). No `<script>` tag is needed.
+3. In `app/app.css`, add the game's board wrapper to the "판 바탕" selector list, so the app's dotted card texture stays out of the playing field. This works when the wrapper is sized to the board. If the board fills the card width, report the field's rectangle as `--mat-x/y/w/h` the way `js/games/path.js` does. If the game has a problem plus answer buttons, tray them separately instead (the problem element and the answers container both go in that list), and read the gap between them with `U.gapOf(wrap, fallback)` in the size math, since the app widens it (see `js/games/count.js`).
+4. Add a `questionTime` entry in `js/config.js` and say in its comment what the "load" is.
+5. Add `ABILITY_WEIGHTS` in `js/abilities.js`, and `ABILITY_PACE` if the game feeds the speed axis.
+6. Log through the host:
    - `host.question(...)` with everything needed to replay the question
    - `host.input(...)` for picks along the way
    - `host.answer({ correct, timedOut, ... })` for the final answer
-6. Run the puzzle generator a few hundred times in Node for every level. Check that each puzzle has exactly one answer and never hangs (see how the easy levels were tested).
-7. Update the list of minigames in `DEMO_BRIEF.md`.
+7. Run the puzzle generator a few hundred times in Node for every level. Check that each puzzle has exactly one answer and never hangs (see how the easy levels were tested).
+8. Update the list of minigames in `DEMO_BRIEF.md`.
 
 ### Effect on game order
 

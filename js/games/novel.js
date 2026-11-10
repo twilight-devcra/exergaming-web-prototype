@@ -21,6 +21,9 @@
 //   replace — 있던 그림을 밀어내고 들어갈 확률 (나머지는 빈 칸에 더해진다). 밀어내면 그림 수가 그대로라 세어 봐서는 모른다
 //   shuffle — 가려진 사이 자리를 바꾸는 그림 수 (없거나 0 = 그대로, 'all' = 모두). 지금은 쓰지 않는다
 //   similar — 새 그림이 판에 있는 그림과 모양은 같고 무늬만 다를 확률. 그 밖에는 판에 없는 모양으로 고른다
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const NOVEL_SHAPES = (() => {
   const poly = (k, r, cy, rot) => Array.from({ length: k }, (_, i) => {
     const a = ((rot + (360 / k) * i) * Math.PI) / 180;
@@ -60,7 +63,7 @@ function novelPic(s, m) {
   return shape.svg + (mark ? `<g fill="#fff" stroke="rgba(0,0,0,0.22)" stroke-width="2.5" paint-order="stroke">${mark}</g>` : '');
 }
 
-class NovelGame {
+export class NovelGame {
   static id = 'novel';
   static tags = ['memory']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '없던 그림 찾기';

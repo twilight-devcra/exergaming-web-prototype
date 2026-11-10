@@ -2,7 +2,18 @@
 // 흐름: 대기 화면 → (회원 로그인 → 세션 설정, app/members.js) → 속도 측정 → 라운드 → 결과 → 길게 눌러 초기화 → 대기 화면
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
 // 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '라운드 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
-const Demo = {
+import { BASE_LEVEL, PRESET_KEYS, ROUND_PRESETS, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_DEFAULT, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, U } from './config.js';
+import { Exercise } from './exercise.js';
+import { Fx } from './fx.js';
+import { ABILITIES } from './abilities.js';
+import { GAME_TYPES } from './games/index.js';
+import { SessionStore } from './session-log.js';
+import { SessionUpload } from './session-upload.js';
+import { AttractVisual } from '../app/attract-visual.js';
+import { CalibVisual } from '../app/calib-visual.js';
+import { MemberUI } from '../app/members.js';
+
+export const Demo = {
   IDLE_SEC: 40,          // 라운드 중 페달도 터치도 없이 이만큼 지나면 '아직 하고 계신가요?'
   IDLE_GRACE_SEC: 15,    // 그 안내 뒤 이만큼 더 지나면 라운드를 끝내고 결과를 보여준다
   CALIB_IDLE_SEC: 60,    // 측정 화면에서 페달을 밟지 않고 이만큼 지나면 대기 화면으로 돌아간다
@@ -13,6 +24,7 @@ const Demo = {
   CORNER_HOLD_MS: 2000,  // 운영 메뉴: 왼쪽 위 모서리를 이만큼 누르고 있으면 PIN 입력
   NEXT_HOLD_MS: 500,    // 결과 화면의 '다음 참가자'를 이만큼 누르고 있어야 넘어간다 (참가자가 실수로 지우지 않게)
   PIN_TIMEOUT_MS: 20000,
+  END_ASK_SEC: 30,       // '그만하기' 확인 창에 이만큼 답이 없으면 그대로 마친다 (누르고 자리를 떠난 경우)
   LOG_MAX: 1000,
 
   app: null,
@@ -21,6 +33,7 @@ const Demo = {
   simResult: false, // 시작하면 라운드 없이 가상 성적으로 바로 결과 화면을 연다 (흐름 점검용). 저장하지 않는다
   kiosk: false,     // 운영 메뉴를 한 번 닫은 뒤부터 전체 화면·화면 꺼짐 방지를 유지한다
   opOpen: false,
+  endOpen: false,   // '그만하기' 확인 창이 열려 있다 (게임은 멈춤)
   pinOpen: false,
   leaving: false,
   activeAt: 0,      // 마지막으로 페달을 밟거나 화면을 누른 게임 시계 시각 (ms)
@@ -35,12 +48,13 @@ const Demo = {
     this.allowKbd = new URLSearchParams(location.search).has('kbd');
     this.station = this.load('station', '');
     // 대기 화면 오른쪽 그림: 바퀴 안의 두뇌 (app/attract-visual.js)
-    this.preview = typeof AttractVisual !== 'undefined' ? AttractVisual.init(app) : null;
+    this.preview = AttractVisual.init(app);
     // 운영 버전: 속도 측정 화면의 둥근 길과 자전거 (app/calib-visual.js)
-    this.calibVisual = typeof CalibVisual !== 'undefined' ? CalibVisual.init() : null;
+    this.calibVisual = CalibVisual.init();
     // 운영 버전: QR 회원 (app/members.js). 대기 화면 → 로그인 → 기록 → 세션 설정
-    this.members = typeof MemberUI !== 'undefined' ? MemberUI.init(this, app) : null;
+    this.members = MemberUI.init(this, app);
     this.bindOp();
+    this.bindEnd();
     this.bindSetup();
     this.bindUpload();
     this.bindPin();
@@ -295,6 +309,43 @@ const Demo = {
       this.checkIdle();
     }
     if (a.state !== 'play') this.hideAlert('idle');
+    const canEnd = a.inRound && !this.endOpen;
+    document.querySelectorAll('.end-btn').forEach((b) => (b.hidden = !canEnd));
+    if (this.endOpen && !a.inRound) this.closeEnd(false);
+  },
+
+  // ---------------- 그만하기 (참가자가 세션을 도중에 마침) ----------------
+  // 속도 측정·라운드 중 구석의 작은 버튼 → 확인 창(게임 멈춤) → 마치면 하던 데까지 세션 로그에 남기고 대기 화면으로 (App.endEarly)
+  bindEnd() {
+    document.querySelectorAll('.end-btn').forEach((b) => (b.onclick = () => this.openEnd()));
+    $('#end-no').onclick = () => this.closeEnd(false);
+    $('#end-yes').onclick = () => this.closeEnd(true);
+  },
+
+  openEnd() {
+    const a = this.app;
+    if (!a.inRound || this.endOpen || this.opOpen) return;
+    this.endOpen = true;
+    a.log.ev('end_ask');
+    $('#end-ask').classList.add('active');
+    this.syncPause();
+    clearTimeout(this.endTimer);
+    this.endTimer = setTimeout(() => this.closeEnd(true), this.END_ASK_SEC * 1000);
+  },
+
+  closeEnd(end) {
+    if (!this.endOpen) return;
+    clearTimeout(this.endTimer);
+    this.endOpen = false;
+    $('#end-ask').classList.remove('active');
+    const a = this.app;
+    if (end && a.inRound) {
+      a.setPaused(false);
+      a.endEarly();
+    } else if (a.inRound) {
+      a.log.ev('end_cancel');
+    }
+    this.syncPause();
   },
 
   // 라운드 도중 참가자가 자리를 떠났을 때: 안내 → 그래도 없으면 결과 화면으로 (점수는 남겨 둔다)
@@ -339,12 +390,12 @@ const Demo = {
     this.syncPause();
   },
 
-  // 스테이션 모드의 일시정지는 두 가지뿐이다: 운영 메뉴(PIN 포함)가 열려 있을 때, 센서로 하던 라운드에서 페달이 끊겼을 때.
-  // 끊김은 다시 연결되면 저절로 풀린다. 참가자가 직접 멈추거나 메뉴로 나갈 방법은 없다.
+  // 스테이션 모드의 일시정지: 운영 메뉴(PIN 포함)가 열려 있을 때, '그만하기' 확인 창이 열려 있을 때, 센서로 하던 라운드에서 페달이 끊겼을 때.
+  // 끊김은 다시 연결되면 저절로 풀린다.
   syncPause() {
     const a = this.app;
     const lost = a.inRound && a.roundSensor && a.link.state !== 'ready';
-    const want = a.inRound && (this.opOpen || this.pinOpen || lost);
+    const want = a.inRound && (this.opOpen || this.pinOpen || this.endOpen || lost);
     if (want !== a.paused) a.setPaused(want);
     if (lost && !this.opOpen) {
       const retrying = a.link.state === 'reconnecting' || a.link.state === 'connecting';

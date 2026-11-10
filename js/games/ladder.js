@@ -30,6 +30,9 @@
 //   kinds    — 조각 모양 수
 //   slant    — 가로줄 끝 높이의 칸 안 흔들림 (칸 높이 비율). 0 이면 양 끝이 같이 움직여 평평하다
 //   tricks   — 속임 가로줄 수
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const LADDER_PEGS = [
   // 색만으로 구분하지 않도록 색마다 모양이 다르다 (색약 대응). 모두 (0, 0) 을 가운데로 그린다
   { id: 'circle', fill: '#e5484d', svg: '<circle r="21"/>' },
@@ -39,7 +42,7 @@ const LADDER_PEGS = [
   { id: 'plus', fill: '#8e4ec6', svg: '<path d="M-8 -22h16v14h14v16h-14v14h-16v-14h-14v-16h14z"/>' },
 ];
 
-class LadderGame {
+export class LadderGame {
   static id = 'ladder';
   static tags = ['trace']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '사다리 타기';

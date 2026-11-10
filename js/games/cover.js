@@ -13,6 +13,9 @@
 //   both   — 두 숫자가 모두 덮인 것일 확률. 머릿속에서 둘을 다 꺼내 더해야 한다
 //   opts   — 보기 수
 //   show   — 외우는 시간의 기본 몫(ms). 쉬운 단계만 따로 정하고, 나머지는 SHOW_MS 다
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const COVER_MARKS = (() => {
   const star = Array.from({ length: 10 }, (_, i) => {
     const a = ((-90 + i * 36) * Math.PI) / 180;
@@ -30,7 +33,7 @@ const COVER_MARKS = (() => {
   ];
 })();
 
-class CoverGame {
+export class CoverGame {
   static id = 'cover';
   static tags = ['memory', 'number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '가린 숫자 더하기';
@@ -136,10 +139,21 @@ class CoverGame {
     const W = b.clientWidth;
     const H = b.clientHeight;
     if (!W || !H) return;
-    // 안내 문구와 제한 시간 막대가 쓰는 높이(약 70px)를 빼고 맞춘다
-    const tk = Math.round(U.clamp(Math.min((H - 70) / 5.6, W / (this.toks.length * 1.3 + 0.5)), 36, 110));
+    // 안내 문구와 제한 시간 막대가 쓰는 높이(약 70px)를 빼고 맞춘다. 운영 버전은 식과 보기 사이를 더 띄우므로 그만큼도 뺀다
+    const prevTk = parseFloat(b.style.getPropertyValue('--tk'));
+    const extra = prevTk ? Math.max(0, U.gapOf(this.center, prevTk * 0.3) - prevTk * 0.3) : 0;
+    const tk = Math.round(U.clamp(Math.min((H - 70 - extra) / 5.6, W / (this.toks.length * 1.3 + 0.5)), 36, 110));
     b.style.setProperty('--tk', `${tk}px`);
     const br = b.getBoundingClientRect();
+    // 숫자 줄과 식을 함께 감싼 자리 (문제): 운영 버전은 여기에 판 바탕을 깐다 (app/app.css .cv-board::before). 보기는 따로 감싼다
+    const rr = this.row.getBoundingClientRect();
+    const cr = this.eq.getBoundingClientRect();
+    const mx = Math.min(rr.left, cr.left) - br.left;
+    const my = Math.min(rr.top, cr.top) - br.top;
+    b.style.setProperty('--mat-x', `${mx}px`);
+    b.style.setProperty('--mat-y', `${my}px`);
+    b.style.setProperty('--mat-w', `${Math.max(rr.right, cr.right) - br.left - mx}px`);
+    b.style.setProperty('--mat-h', `${Math.max(rr.bottom, cr.bottom) - br.top - my}px`);
     const er = this.slots.map((s) => s.getBoundingClientRect());
     this.toks.forEach((t) => {
       const r = t.at != null ? er[t.at] : t.home.getBoundingClientRect();

@@ -5,6 +5,10 @@
 //    세션 로그에는 meta.user 로 번호가 붙어 업로드되므로, 바깥 DB 에서 모으면 태블릿을 넘어 이어 볼 수 있다
 // 흐름: 대기 화면 → 로그인(카메라로 QR · 번호 입력 · 손님) → 회원이면 기록(달력) → 세션 설정 → … → 결과
 //       손님은 결과 화면에서 새 회원 번호와 QR 코드를 받는다 (오늘 기록이 그 번호로 저장된다)
+import { SESSION_DIFFICULTIES } from '../js/config.js';
+import { SessionStore } from '../js/session-log.js';
+import { SessionUpload } from '../js/session-upload.js';
+
 const Members = {
   KEY: 'exergame.members',
 
@@ -128,12 +132,12 @@ const Members = {
   },
 
   // 시험용 회원 기록 서버 (SESSION_UPLOAD.localHistory): 바깥 서버 대신 이 태블릿의 세션 로그(IndexedDB)에서
-  // 서버와 같은 규칙으로 고른다. 그 회원 번호이고 결과 화면까지 간 세션. 세션 로그를 모두 읽으므로 시험용으로만 쓴다
+  // 서버와 같은 규칙으로 고른다. 그 회원 번호이고 결과 화면까지 간 세션 (중단 abandoned·그만하기 user 는 뺀다). 세션 로그를 모두 읽으므로 시험용으로만 쓴다
   async localServer(id) {
     const out = [];
     await SessionStore.scan((log) => {
       const m = log.meta || {};
-      if (m.user === id && m.ended && m.ended !== 'abandoned') out.push(this.summarize(log));
+      if (m.user === id && m.ended && m.ended !== 'abandoned' && m.ended !== 'user') out.push(this.summarize(log));
     });
     return out.filter((x) => x.at && !isNaN(new Date(x.at)));
   },
@@ -233,7 +237,7 @@ const QrScanner = {
 
 // ---------------- 화면: 로그인 · 기록 · 결과의 회원 카드 ----------------
 // js/demo.js 가 부른다: openLogin(대기 화면에서 시작), tick(매 프레임), onResult(결과 화면을 열 때)
-const MemberUI = {
+export const MemberUI = {
   IDLE_SEC: 60, // 로그인·기록 화면에서 아무 입력이 없으면 대기 화면으로
   user: null,   // 로그인한 회원 번호 (손님이면 null)
   guest: false,

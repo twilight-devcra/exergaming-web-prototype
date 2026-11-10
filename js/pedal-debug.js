@@ -10,7 +10,10 @@
 //  RS_G  회전 검출 파라미터 14개 (정지 판정 기준 등) — 연결 때 한 번 읽는다
 // 같은 조합을 페달 쪽 PC 툴이 tools/capture_dbg_cap.py 로 받는다. CAP CSV 는 그 툴과 같은 형식이라
 // 페달 저장소의 tools/verify_phase_detector.py 로 그대로 재생할 수 있다.
-const $ = (s) => document.querySelector(s);
+import { Config, $, U } from './config.js';
+import { Pedal } from './pedal.js';
+import { NUS, FrameCodec, PedalLink } from './pedal-link.js';
+import { LzCadence } from './cadence-est.js';
 
 const DBG_POLL_MS = 500;
 const CAP_SEC = 300;         // 펌웨어 상한 RAW_CAP_MAX_SEC

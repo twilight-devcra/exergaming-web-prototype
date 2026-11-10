@@ -1,7 +1,7 @@
 // Cardio 페달 BLE 연결 (Web Bluetooth). CardioArcade 안드로이드 앱의 ble/Protocol.kt, PedalLink.kt를 옮긴 것이다.
 // 페달은 Nordic UART(NUS)로 ASCII 프레임을 주고받는다: `NAME,<필드 수>:v1,v2,...;`
 // 인자가 없는 명령도 `,0:`은 있어야 한다 (`VER,0:;`). 펌웨어 파서가 ','와 ':'를 모두 요구한다.
-const NUS = {
+export const NUS = {
   SERVICE: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
   RX: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // 웹 → 페달 (write)
   TX: '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // 페달 → 웹 (notify)
@@ -9,7 +9,7 @@ const NUS = {
   command: (name, values = []) => `${name},${values.length}:${values.join(',')};`,
 };
 
-const FrameCodec = {
+export const FrameCodec = {
   // 끝의 ';'는 있어도 없어도 된다. 프레임이 아니면 null
   parse(text) {
     const comma = text.indexOf(',');
@@ -59,7 +59,7 @@ class FrameSplitter {
 
 // 페달 하나와의 BLE 연결.
 // 안드로이드 앱과 달리 스캔 목록·본딩·MTU는 다루지 않는다. Web Bluetooth에서는 기기 선택 창과 OS가 맡는다.
-class PedalLink {
+export class PedalLink {
   constructor() {
     this.state = 'idle'; // idle | connecting | reconnecting | ready | disconnected
     this.detail = '';

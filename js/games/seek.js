@@ -7,6 +7,9 @@
 //   - 쉬운 단계(slanted)의 첫 문제는 일부러 비스듬한 줄에 숨긴다.
 // 난이도는 판 크기(radius), 순서 길이(len), 그림 종류(symbols),
 // 그리고 한 칸만 다른 가짜 줄의 수(decoys)로 조절한다.
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const SEEK_SYMBOLS = [
   // 색만으로 구분하지 않도록 색마다 모양이 다르다 (색약 대응)
   '<circle cx="50" cy="50" r="33" fill="#e5484d"/>',
@@ -17,7 +20,7 @@ const SEEK_SYMBOLS = [
   '<circle cx="50" cy="50" r="27" fill="none" stroke="#06aed5" stroke-width="15"/>',
 ];
 
-class SeekGame {
+export class SeekGame {
   static id = 'seek';
   static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '숨은 순서 찾기';

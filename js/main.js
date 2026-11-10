@@ -1,16 +1,24 @@
-const $ = (s) => document.querySelector(s);
-const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame];
 // 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
+import { BASE_LEVEL, EASY_TIME, ROUND_PRESETS, MUSIC_STYLES, Config, EDITION, DEMO, $, U } from './config.js';
+import { Pedal } from './pedal.js';
+import { NUS, PedalLink } from './pedal-link.js';
+import { LzCadence } from './cadence-est.js';
+import { BeatAudio } from './audio.js';
+import { Band } from './band.js';
+import { Exercise, ExerciseMeter } from './exercise.js';
+import { Fx } from './fx.js';
+import { Theme } from './themes.js';
+import { Dg } from './diagram.js';
+import { GAME_TYPES } from './games/index.js';
+import { Abilities, Radar } from './abilities.js';
+import { SessionLog } from './session-log.js';
+import { Demo } from './demo.js';
+
 const OPENING_GAMES = ['count', 'ladder'];
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
 const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
 const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다
 const SHIFT_OUT_MS = 650;    // 화면이 다시 줄어드는 시간. 그 뒤에 다음 인지 게임이 나온다
-
-// 프로토타입(index.html)은 테스트 화면, 운영 버전(app/index.html, <html data-edition="app">)은 스테이션 흐름 (js/demo.js).
-// 스테이션 흐름은 같은 라운드에 대기·결과·운영 화면만 바꿔 끼운다. App.demo 가 이 흐름인지를 뜻한다 (세션 로그의 mode: 'demo')
-const EDITION = document.documentElement.dataset.edition || 'prototype';
-const DEMO = EDITION === 'app';
 
 const App = {
   demo: DEMO,
@@ -50,7 +58,7 @@ const App = {
       Fx.confetti(0.6);
     };
     Fx.init();
-    Theme.init();
+    Theme.init(this.band);
     this.bindMusic();
     // 두뇌 그래프·운동량 카드를 결과 화면에 붙인다 (스테이션 결과는 최종 점수 카드 뒤, 테스트 결과는 점수와 순위 사이)
     const report = () => $('#tpl-report').content.cloneNode(true);
@@ -430,9 +438,30 @@ const App = {
     this.audio.stop();
     this.gen++;
     this.timers = [];
+    // 하던 게임도 멈춘다 (애니메이션·ResizeObserver). 안 멈추면 따라가기의 공 움직임이 다음 판 시계로 계속 돌다 멈춘다.
+    // gen 을 올린 뒤라 abort 가 점수나 기록을 남기지 않는다
+    if (this.current) {
+      this.current.game.abort();
+      this.current = null;
+    }
     this.clearShift();
     $('#cog').innerHTML = '';
     this.show(this.demo ? 'attract' : 'menu');
+  },
+
+  // 참가자가 '그만하기'로 끝냄 (운영 버전, js/demo.js bindEnd). 하던 데까지를 세션 로그에 ended 'user' 로 남기고(업로드됨)
+  // 결과 화면 없이 대기 화면으로 간다. 결과 화면을 거치지 않으므로 회원 기록·달력·기념물·이 태블릿의 기록에는 들어가지 않는다
+  endEarly() {
+    if (!this.inRound) return;
+    if (this.current && this.state === 'play') {
+      const res = this.current.game.abort();
+      const { host } = this.current;
+      if (res.total > 0) this.record(this.current.T, res, host.level, this.clock - host.t0);
+      this.log.ev('game_abort', { game: this.current.T.id, ...res });
+      this.current = null;
+    }
+    this.closeLog('user');
+    this.quit();
   },
 
   // ---------------- 게임 시계 기반 예약 ----------------
@@ -475,7 +504,8 @@ const App = {
     const log = this.log;
     if (!log || log.done) return;
     log.finish(ended, this.summary());
-    if (this.demo && ended === 'abandoned') Demo.storeLog(log);
+    // 결과 화면까지 가지 않은 판은 여기서 저장한다 (결과 화면까지 간 판은 Demo.showResult 가 저장)
+    if (this.demo && (ended === 'abandoned' || ended === 'user')) Demo.storeLog(log);
   },
 
   summary() {
@@ -1288,4 +1318,5 @@ const App = {
   },
 };
 
+window.App = App; // 콘솔과 docs/build/capture.js 에서 쓴다
 App.init();

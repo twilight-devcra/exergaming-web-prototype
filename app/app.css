@@ -81,14 +81,93 @@ body[data-theme="scenic"] {
 /* 라운드 끝 짓기 연출 (회원): 풍경 카드가 화면 가득 커져 건물이 올라가는 것을 크게 보여 준다 (js/main.js showEnding) */
 #game.build #band { height: 100%; margin-bottom: 0; }
 
+/* 게임 카드: 옅은 점무늬. 게임 판 자리는 아래 '판 바탕'이 흰색으로 덮어 무늬가 판 안에 들어가지 않는다 */
 #cog {
-  background: var(--panel);
+  --dot: rgba(29, 43, 36, 0.13);
+  --mat-pad: 12px; /* 판 둘레의 흰 여백 */
+  /* 판 바탕: 흰 여백 → 가는 테두리 → 옅은 그림자. 무늬 위에 판이 쟁반처럼 놓여 보이게 한다 */
+  --mat-shadow:
+    0 0 0 var(--mat-pad) var(--panel),
+    0 0 0 calc(var(--mat-pad) + 1.5px) #d3dbd0,
+    0 calc(var(--mat-pad) * 0.3 + 4px) 22px var(--mat-pad) rgba(29, 43, 36, 0.09);
+  background-color: var(--panel);
+  background-image: radial-gradient(circle, var(--dot) 1.4px, transparent 1.9px);
+  background-size: 24px 24px;
+  background-position: center;
   border-radius: 28px;
   box-shadow: var(--card-shadow);
   transition: opacity 0.3s;
 }
 #game.shift #cog { opacity: 0; }
 #game.build #cog { opacity: 0; }
+
+/* 판 바탕: 흰 바탕을 깔고 box-shadow 로 둘레에 흰 여백·테두리·그림자를 칠한다 (자리를 차지하지 않아 판 배치는 그대로).
+   판 크기에 맞는 요소만 여기 적는다. 사다리는 그림(svg)이 그림 크기에 맞게 줄어든다 (아래).
+   길 따라 그리기·가린 숫자 더하기는 판이 카드 너비를 다 써서 게임이 판 자리를 --mat-* 로 알려 준다 (js/games/path.js, cover.js) */
+#cog :is(.nv-wrap, .tr-wrap, .cp-wrap, .pr-wrap, .seek-side, .seek-board, .lad-svg,
+         .sym-target, .sym-grid, .ar-eq, .ar-cands, .cnt-grid, .cnt-opts, .fit-board, .fit-cands,
+         .bx-arena, .bx-opts, .cmp-board, .cmp-opts, .cv-opts) {
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: var(--mat-shadow);
+}
+
+/* 문제와 보기를 나눈다: 문제(판)와 보기(고르는 단추)를 따로 감싸고 그 사이를 띄운다.
+   보기가 아직 없을 때(상자 속 과일 세기는 상자를 다 연 뒤에 나온다)는 빈 바탕을 그리지 않는다.
+   게임은 이 간격을 U.gapOf 로 읽어 판 크기를 맞춘다 (js/games/count.js 등) */
+#cog { --answer-gap: calc(2 * var(--mat-pad) + 20px); }
+#cog :is(.sym-wrap, .ar-wrap, .cnt-wrap, .fit-wrap, .bx-wrap, .cmp-wrap) { gap: var(--answer-gap); }
+#cog .cv-center { gap: calc(var(--tk) * 0.3 + var(--answer-gap)); }
+#cog .cnt-opts { padding-bottom: 0; }
+#cog :is(.ar-cands, .cnt-opts, .fit-cands, .bx-opts, .cmp-opts, .cv-opts):empty { background: none; box-shadow: none; }
+
+/* 판 자리(.stage-body)를 흰 여백만큼 줄여, 여백·테두리가 안내 문구나 카드 가장자리에 닿지 않게 한다.
+   게임은 판 자리의 크기를 재서 판을 맞추므로 저절로 그 안에 들어간다 */
+#cog .stage { padding-bottom: 20px; }
+#cog .stage-body { margin: calc(var(--mat-pad) + 2px) var(--mat-pad) var(--mat-pad); width: calc(100% - 2 * var(--mat-pad)); }
+
+/* 게임 이름·레벨·진행 점은 카드 왼쪽 위 구석에 둔다. 가운데 위에는 안내 문구만 남아 판 자리가 한 줄만큼 넓어진다 */
+#cog .stage-meta { position: absolute; left: 30px; top: 22px; justify-content: flex-start; }
+#cog .stage-head { gap: 0; }
+#cog .lad-board { display: flex; align-items: center; justify-content: center; }
+#cog .lad-svg { width: auto; height: 100%; max-width: 100%; }
+#cog :is(.path-board, .cv-board) { isolation: isolate; }
+#cog :is(.path-board, .cv-board)::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: var(--mat-x, 0);
+  top: var(--mat-y, 0);
+  width: var(--mat-w, 0);
+  height: var(--mat-h, 0);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--mat-shadow);
+}
+
+/* 그만하기: 눈에 띄지 않게 풍경 카드 오른쪽 아래 구석 (속도 측정 화면은 오른쪽 위) */
+.end-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 10px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-soft);
+  font: 600 16px var(--font);
+  box-shadow: 0 1px 4px rgba(29, 43, 36, 0.12);
+}
+.end-btn[hidden] { display: none; }
+.end-btn:active { background: var(--panel); color: var(--ink); }
+#calib .end-btn { top: 24px; right: 24px; bottom: auto; background: var(--panel); }
+#end-ask { z-index: 300; background: var(--scrim); }
+.end-actions { display: flex; gap: 14px; justify-content: center; margin-top: 14px; }
+.end-actions .btn { min-width: 160px; font-size: 22px; padding: 18px 28px; border-radius: 16px; }
 
 /* 풍경 위에 얹는 표시: 왼쪽 위 남은 시간·달린 거리, 오른쪽 위 점수 */
 #band-ui {

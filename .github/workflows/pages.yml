@@ -1,0 +1,35 @@
+# main 에 올리면 GitHub Pages 에 배포한다.
+# 배포본의 app/index.html 에만 ?v=<커밋 번호> 와 가져오기 지도를 넣는다 (tools/stamp.js). 저장소의 파일은 바뀌지 않는다.
+# 저장소 Settings → Pages → Source 가 'GitHub Actions' 여야 한다.
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp app/index.html with the commit
+        run: node tools/stamp.js "${GITHUB_SHA::8}"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

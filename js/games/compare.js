@@ -21,9 +21,12 @@
 //   edge    — 꽉 참 ↔ 속 빔을 '속 빈 구간의 끝'(다른 모양의 선과 맞닿은 선)에서 고를 확률.
 //             그러면 구간이 한 칸 늘거나 줄기만 한다 (구간 한가운데를 바꾸면 줄이 둘로 끊겨 보여 쉽다)
 // 미리 보기로 다듬은 값이다 (2026-11-09). 플레이해 보며 고친다.
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const COMPARE_GEO = ['add', 'remove', 'shift'];
 
-class CompareGame {
+export class CompareGame {
   static id = 'compare';
   static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '두 그림 비교하기';
@@ -108,6 +111,8 @@ class CompareGame {
     body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(body);
+    // 보기 높이가 그림 크기 셈에 들어가므로, 보기가 바뀌면 다시 맞춘다
+    this.ro.observe(this.opts);
     this.layout();
     this.h.after(200, () => this.ask());
   }
@@ -116,7 +121,7 @@ class CompareGame {
     const s = this.body;
     const ar = this.VW / CompareGame.S;
     const optH = this.opts.offsetHeight || 104;
-    const w = Math.max(280, Math.min(s.clientWidth - 40, (s.clientHeight - optH - 40) * ar, 760));
+    const w = Math.max(280, Math.min(s.clientWidth - 40, (s.clientHeight - optH - U.gapOf(this.wrap, 22) - 18) * ar, 760));
     this.svg.style.width = `${w}px`;
     this.svg.style.height = `${w / ar}px`;
   }

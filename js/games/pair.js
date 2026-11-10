@@ -9,6 +9,9 @@
 //   lure    — 짝 없는 양말이 어느 짝과 한 군데만 다를 확률 (같은 색에 발목이나 무늬 하나만 다르다)
 //   subtle  — 그때 다른 곳이 비슷한 무늬(굵은 줄 ↔ 가는 줄, 하트 ↔ 별 …)다
 //   flip    — 양말이 저마다 왼쪽·오른쪽을 본다 (한 짝도 서로 반대로 걸릴 수 있다)
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const PAIR_COLORS = [
   { fill: '#e5484d', ink: '#ffffff' },
   { fill: '#2f6fed', ink: '#ffffff' },
@@ -38,7 +41,7 @@ const PAIR_PATTERNS = {
 // 헷갈리기 쉬운 무늬 짝 (subtle 미끼에 쓴다)
 const PAIR_SIMILAR = { stripes: 'thin', thin: 'stripes', heart: 'star', star: 'heart', dots: 'zigzag', zigzag: 'dots', vstripe: 'stripes', plain: 'toe', toe: 'plain' };
 
-class PairGame {
+export class PairGame {
   static id = 'pair';
   static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '짝 없는 것 찾기';

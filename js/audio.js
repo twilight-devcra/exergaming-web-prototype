@@ -1,6 +1,6 @@
 // WebAudio로 합성하는 비트 + 효과음.
 // 비트 1개 = 페달 반 바퀴 (A 또는 D 한 번). 짝수 비트는 킥(A), 홀수 비트는 스네어(D).
-class BeatAudio {
+export class BeatAudio {
   constructor() {
     this.ctx = null;
     this.master = null;

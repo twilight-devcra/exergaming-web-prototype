@@ -1,7 +1,7 @@
 // 운동량 (결과 화면). 표시 전용이고 점수에는 들어가지 않는다.
 // 페달 저항은 참가자마다 바뀔 수 있고 페달의 watt 는 보정되지 않은 진동 값이라 쓰지 않는다.
 // 게임이 이미 구한 RPM(zc 파형 추정)만으로 거리와 열량을 어림한다.
-const Exercise = {
+export const Exercise = {
   // 자전거로 치면 한 바퀴에 가는 거리 (m). 페달 펌웨어의 기본 D_rev 와 같은 값
   M_PER_REV: 6,
 
@@ -36,7 +36,7 @@ const Exercise = {
 };
 
 // 라운드 하나의 운동량을 쌓는다
-class ExerciseMeter {
+export class ExerciseMeter {
   constructor() {
     this.reset();
   }

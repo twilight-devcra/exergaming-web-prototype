@@ -25,6 +25,9 @@
 //           나오자마자 다른 상자로 들어가는 과일을 따라가기 벅찼다 (2026-11-02)
 //   q     — 질문 종류: total 모두 몇 개 · kind (그림) 몇 개 · most 가장 많은 과일 · diff (그림)가 (그림)보다 몇 개 더
 //   opts  — 숫자 보기 수 (기본 4)
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
 const FRUITS = [
   {
     id: 'apple',
@@ -57,7 +60,7 @@ const FRUITS = [
 // 함께 내지 않는 짝: 작게 보면 둥글고 붉은 기운이 비슷하다
 const FRUIT_CLASH = [['apple', 'orange']];
 
-class BoxGame {
+export class BoxGame {
   static id = 'box';
   static tags = ['memory', 'number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '상자 속 과일 세기';
@@ -145,6 +148,8 @@ class BoxGame {
     this.body.append(this.wrap);
     this.ro = new ResizeObserver(() => this.layout());
     this.ro.observe(this.body);
+    // 보기 높이가 상자 크기 셈에 들어가므로, 보기가 바뀌면 다시 맞춘다
+    this.ro.observe(this.opts);
     this.layout();
 
     if (hasStart) {
@@ -166,7 +171,8 @@ class BoxGame {
     const s = this.body;
     const ar = this.p.W / this.p.H;
     const optH = this.opts.offsetHeight || 104;
-    const w = Math.max(260, Math.min(s.clientWidth - 40, (s.clientHeight - optH - 40) * ar, 960));
+    // 최소 200px: 화면이 낮아도 상자와 보기가 판 자리를 넘치지 않게
+    const w = Math.max(200, Math.min(s.clientWidth - 40, (s.clientHeight - optH - U.gapOf(this.wrap, 22) - 18) * ar, 960));
     this.svg.style.width = `${w}px`;
     this.svg.style.height = `${w / ar}px`;
   }

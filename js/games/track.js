@@ -15,7 +15,10 @@
 //   pass   — 공끼리 겹쳐 지나간다 (아니면 서로 튕긴다)
 //   cue    — ★ 을 보여 주는 시간(ms)
 //   wander — 공이 곧게만 가지 않고 휘어 가는 정도 (초당 최대 회전 각도). 가던 방향으로 짐작해서는 못 찾게 한다
-class TrackGame {
+import { U } from '../config.js';
+import { Dg } from '../diagram.js';
+
+export class TrackGame {
   static id = 'track';
   static tags = ['track']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '공 따라가기';

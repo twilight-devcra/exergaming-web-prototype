@@ -4,7 +4,10 @@
 // 과학적으로 정확할 필요는 없다. 아래 표의 숫자는 플레이해 보며 감으로 다듬는다.
 // 능력마다 만점 기준이 없으므로 '어느 난이도까지 해냈나' 를 별 1~5개(반 개 단위)로 보여 준다.
 // 별 수 ≈ 해낸 레벨이라 짧은 라운드에서는 2~3개가 보통이고, 더 올라갈 자리가 남는다.
-const ABILITIES = [
+import { BASE_LEVEL, U } from './config.js';
+import { GAME_TYPES } from './games/index.js';
+
+export const ABILITIES = [
   { id: 'memory', name: '기억력', praise: '본 것을 오래 또렷하게 기억해요' },
   { id: 'spatial', name: '공간지각', praise: '모양과 위치를 한눈에 파악해요' },
   { id: 'attention', name: '주의집중', praise: '헷갈리는 것 속에서도 집중을 잃지 않아요' },
@@ -39,7 +42,7 @@ const ABILITY_PACE = {
   compare: { fast: 4, slow: 10 },
 };
 
-const Abilities = {
+export const Abilities = {
   MAX_STARS: 5,
   MIN_STARS: 1,    // 데이터가 있으면 적어도 별 하나
   STAR_BONUS: 0.5, // 별 = 해낸 레벨 + 이만큼
@@ -100,7 +103,7 @@ const Abilities = {
 };
 
 // 오각형 레이더 그래프 (SVG). values는 0~100.
-const Radar = {
+export const Radar = {
   NS: 'http://www.w3.org/2000/svg',
   CX: 200,
   CY: 190,

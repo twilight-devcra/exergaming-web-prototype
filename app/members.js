@@ -87,7 +87,7 @@ const Members = {
 
   // ---------------- 서버의 회원 기록 (SESSION_UPLOAD.historyUrl) ----------------
   // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목은 이 태블릿 기록과 같은 모양
-  // ({ at, min, difficulty, score, distM, kcal, level, device, sid, look }). 형식은 docs/SERVER.md
+  // ({ at, min, difficulty, track, score, distM, kcal, level, device, sid, look }). 형식은 docs/SERVER.md
   remote: {},      // 회원 번호 → 서버에서 받은 목록 (이 화면을 여는 동안만)
   TIMEOUT_MS: 6000,
 
@@ -125,6 +125,8 @@ const Members = {
     const levels = Object.values(sum.stats || {}).map((s) => s.level || 0);
     return {
       at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
+      // 운동 방식: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). meta.track 이 없는 예전 세션은 모두 dual
+      track: m.track || 'dual',
       score: sum.score, device: m.device || null, sid: m.id,
       level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
       look: m.landmark || null,
@@ -271,7 +273,7 @@ export const MemberUI = {
     $('#hs-go').onclick = () => {
       if (app.state !== 'history') return;
       const last = Members.merged(this.user).slice(-1)[0];
-      demo.openSetup(this.via, last ? { min: last.min, difficulty: last.difficulty } : null);
+      demo.openSetup(this.via, last ? { min: last.min, difficulty: last.difficulty, track: last.track || 'dual' } : null);
     };
     return this;
   },
@@ -441,13 +443,13 @@ export const MemberUI = {
     document.getElementById('hs-recent').innerHTML = hist.length
       ? hist.slice(-4).reverse().map((x) => {
         const d = new Date(x.at);
-        return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min}분 · ${diffLabel(x.difficulty)}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
+        return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min}분 · ${diffLabel(x.difficulty)}${x.track === 'brain' ? ' · 두뇌만' : ''}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
       }).join('')
       : `<li class="empty">${Members.hasRemote() ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
     // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'
     const ro = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c < 11172 && c % 28 && c % 28 !== 8 ? '으로' : '로'; };
     const dl = last ? diffLabel(last.difficulty) : '';
-    const sum = last ? `지난번처럼 ${last.min}분 · ${dl}${ro(dl)} 골라 둘게요` : '다음 화면에서 시간과 난이도를 골라요';
+    const sum = last ? `지난번처럼 ${last.min}분 · ${dl}${last.track === 'brain' ? ' · 두뇌 게임만' : ''}${ro(last.track === 'brain' ? '만' : dl)} 골라 둘게요` : '다음 화면에서 시간과 난이도를 골라요';
     document.getElementById('hs-sum').textContent = sum;
     void monthCount;
   },
@@ -505,6 +507,7 @@ export const MemberUI = {
     const s = a.log && a.log.meta.session;
     Members.record(id, {
       at: new Date().toISOString(), min: s ? s.min : Math.round(a.cfg.durationSec / 60), difficulty: s ? s.difficulty : 'normal',
+      track: a.brainOnly ? 'brain' : 'dual', // 두뇌 게임만 한 판인가 (페달 + 두뇌 게임이면 dual)
       score: a.score, distM: Math.round(a.meter.distM), kcal: Math.round(a.meter.kcal * 10) / 10, level: lv,
       ended: a.log ? a.log.meta.ended : null,
       // 서버 기록과 겹치는지 가리는 열쇠 (세션 로그의 meta.device + meta.id)

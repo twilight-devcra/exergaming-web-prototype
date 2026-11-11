@@ -378,6 +378,20 @@ body[data-theme="scenic"] {
 .su-bars[data-n="1"] span:nth-child(-n+1),
 .su-bars[data-n="2"] span:nth-child(-n+2),
 .su-bars[data-n="3"] span:nth-child(-n+3) { background: var(--good); }
+/* 세 묶음(방식·시간·난이도)이 1280×800 에 다 들어가게 세션 설정만 묶음 사이를 조금 좁힌다 */
+#setup { gap: clamp(14px, 2.4vh, 28px); }
+/* 운동 방식 두 칸 (페달 + 두뇌 / 두뇌만): 세 묶음이 한 화면에 들어가게 그림과 글을 한 줄로 낮게 */
+.su-track { grid-template-columns: repeat(2, 1fr); }
+.su-track .su-opt { flex-direction: row; align-items: center; gap: clamp(12px, 1.6vw, 18px); padding-block: clamp(10px, 1.6vh, 14px); padding-right: 60px; }
+.su-track .su-opt b { font-size: clamp(22px, 3.6vh, 30px); white-space: nowrap; }
+/* 이름만으로 알 수 있어 설명은 막힌 칸의 까닭(페달 연결 필요)만 보인다 */
+.su-track .su-opt:not(:disabled) small { display: none; }
+.su-track .su-opt small { white-space: nowrap; }
+.su-track .su-opt.on::after { top: 50%; transform: translateY(-50%); }
+.su-ico { display: flex; flex: none; color: var(--accent); }
+.su-ico svg { width: clamp(40px, 6vh, 52px); height: clamp(30px, 4.5vh, 40px); }
+.su-opt:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.su-opt:disabled:active { transform: none; }
 .su-foot { display: flex; align-items: center; gap: 24px; margin-top: clamp(4px, 1vh, 10px); }
 .su-go {
   padding: clamp(18px, 3vh, 24px) clamp(56px, 7vw, 88px);

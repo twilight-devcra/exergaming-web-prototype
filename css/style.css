@@ -1704,6 +1704,13 @@ body.demo #op-corner {
 .dr-facts dt { color: var(--ink-soft); }
 .dr-facts dd { margin: 0; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
 .dr-fine { font-size: 12px; color: var(--ink-soft); }
+/* 두뇌 게임만 한 판 (App.fillReport): 운동량 대신 안내 한 줄 */
+.dr-ex-none { display: none; }
+.dr-ex.brain-only > :not(h3, .dr-ex-none) { display: none; }
+.dr-ex.brain-only .dr-ex-none { display: block; margin: auto 0; text-align: center; font-size: clamp(18px, 3vh, 26px); line-height: 1.5; color: var(--ink-soft); }
+.dr-ex-none b { color: var(--accent); }
+/* 두뇌 게임만 하는 판: 페달에 관한 표시(달린 거리, A·D 키)를 감춘다. 위쪽 띠는 자리를 그대로 지킨다 */
+#game.brain-only #hud-dist, #game.brain-only #keyhint { display: none; }
 
 /* 길게 눌러야 동작하는 버튼. 누르는 동안 채워진다 */
 .hold-btn {

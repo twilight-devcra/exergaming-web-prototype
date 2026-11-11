@@ -261,12 +261,16 @@
     </div>
   </section>
 
-  <!-- 세션 설정: 대기 화면 다음. 운동 시간과 난이도를 고른다 (js/config.js SESSION_LENGTHS·SESSION_DIFFICULTIES, js/demo.js openSetup) -->
+  <!-- 세션 설정: 대기 화면 다음. 운동 방식(페달 + 두뇌 / 두뇌만)·시간·난이도를 고른다 (js/config.js SESSION_TRACKS·SESSION_LENGTHS·SESSION_DIFFICULTIES, js/demo.js openSetup) -->
   <section id="setup" class="screen">
     <header class="su-head">
       <button class="su-back" id="su-back">‹ 처음으로</button>
       <h2>오늘의 트레이닝을 골라 주세요</h2>
     </header>
+    <div class="su-group">
+      <h3>운동 방식</h3>
+      <div class="su-opts su-track" id="su-track"></div>
+    </div>
     <div class="su-group">
       <h3>운동 시간</h3>
       <div class="su-opts" id="su-len"></div>
@@ -318,6 +322,8 @@
         <dt>속도 유지</dt><dd class="rp-keep"></dd>
       </dl>
       <div class="dr-fine">페달 속도로 어림한 값입니다. 거리는 한 바퀴 6 m, 열량은 운동 강도표(MET)와 체중 65 kg 기준</div>
+      <!-- 두뇌 게임만 한 판: 위의 운동량 대신 이것만 보인다 (.dr-ex.brain-only) -->
+      <p class="dr-ex-none">오늘은 페달 없이<br><b>두뇌 게임만</b> 했어요</p>
     </div>
   </template>
 

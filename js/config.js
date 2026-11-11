@@ -75,8 +75,11 @@ export const DEFAULT_CONFIG = {
     pair: { base: 3, per: 0.6 },     // 양말 5개 6초 ~ 15개 12초   // 하나 5.5초 ~ 셋 8.5초
     compare: { base: 2.5, per: 0.35 }, // 선 6개 4.6초 · 20개 9.5초 · 35개 14.8초
   },
-  fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM
+  fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM. 두뇌 게임만 하는 판(brainOnly)은 음악을 이 속도의 박자로 튼다
   minRpm: 25,
+  // 두뇌 게임만 (페달 없이). 속도 측정·운동 점수·속도 전환 구간이 없고, 위쪽 띠는 자리만 지키며 두뇌 게임 점수만큼 흘러간다.
+  // 점수는 운동 점수 0 인 판과 같다. 세션 로그 meta.track 이 'brain' (페달과 함께 하면 'dual')
+  brainOnly: false,
 };
 
 // 라운드 난이도 프리셋 (미니게임 난이도가 아니라 라운드 전체의 난이도). 고르면 PRESET_KEYS 값을 한꺼번에 채운다.
@@ -126,7 +129,12 @@ export const SESSION_DIFFICULTIES = [
   { id: 'normal', label: '보통', desc: '알맞은 속도로 올라요', maxLevel: 7, climb: 0.7, hold: 0.67, questionTimeScale: 1.1 },
   { id: 'challenge', label: '도전', desc: '난이도가 빠르게 올라요', maxLevel: 8, climb: 0.5, hold: 0.55, questionTimeScale: 1 },
 ];
-export const SESSION_DEFAULT = { min: 10, difficulty: 'normal' }; // 화면을 열 때 미리 골라 둔 것
+// 운동 방식: 페달을 밟으며 두뇌 게임 (dual) · 두뇌 게임만 (brain, 페달 없이). 페달이 연결돼 있지 않으면 두뇌 게임만 고를 수 있다
+export const SESSION_TRACKS = [
+  { id: 'dual', label: '페달 + 두뇌 게임', desc: '페달을 밟으며 풀어요' },
+  { id: 'brain', label: '두뇌 게임만', desc: '페달 없이 풀어요' },
+];
+export const SESSION_DEFAULT = { min: 10, difficulty: 'normal', track: 'dual' }; // 화면을 열 때 미리 골라 둔 것
 const SESSION_ANSWERS_PER_MIN = 10; // 분당 답 수 어림값 (게임 하나에 문제 3개, 대개 10초 안팎 — docs/DEMO_BRIEF.md 'Round pacing')
 
 // 스테이션 흐름(운영 버전, js/demo.js)의 설정. 테스트 화면의 localStorage 값은 쓰지 않고 DEFAULT_CONFIG 위에 이것을 덮는다.

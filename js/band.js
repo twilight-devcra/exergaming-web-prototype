@@ -36,6 +36,9 @@ export class Band {
     this.onLandmark = null; // (lm) 지난 기념물을 지나는 순간
     this.planting = null;   // 라운드 끝에 세우는 기념물 { score, t, label, seed, kind, size }
     this.endShift = 0;      // 나무를 심을 때 자전거가 앞으로 비켜 가는 정도 0~1
+    // 두뇌 게임만 하는 판 (페달 없이, main.js 가 넣는다): 띠는 자리를 지키며 점수만큼 흘러가지만, 허용 구역·RPM 말풍선이 없고
+    // 공·자전거 대신 두뇌 배지가 가운데에서 달린다
+    this.brainOnly = false;
     // 화면 스타일(js/themes.js)에 따른 색과 그리는 방식. glow = 빛 번짐, pixel = 픽셀 크기, outline = 테두리 두께, speedLines = 공 뒤 속도선
     this.look = {};
     this.pal = Band.readPalette();
@@ -292,29 +295,31 @@ export class Band {
     g.translate(cx, gy);
     g.rotate(-this.theta);
 
-    // 허용 구역
+    // 허용 구역 (두뇌 게임만 하는 판에는 없다)
     const red = this.outAmount;
-    g.fillStyle = pal.goodSoft;
-    g.fillRect(-zoneHalf, -zoneH, zoneHalf * 2, zoneH);
-    if (red > 0) {
-      g.globalAlpha = red;
-      g.fillStyle = pal.badSoft;
+    if (!this.brainOnly) {
+      g.fillStyle = pal.goodSoft;
       g.fillRect(-zoneHalf, -zoneH, zoneHalf * 2, zoneH);
+      if (red > 0) {
+        g.globalAlpha = red;
+        g.fillStyle = pal.badSoft;
+        g.fillRect(-zoneHalf, -zoneH, zoneHalf * 2, zoneH);
+      }
+      g.globalAlpha = this.inZone ? 1 : 0.4 + red * 0.6;
+      g.strokeStyle = this.inZone ? pal.good : pal.bad;
+      glow(g.strokeStyle);
+      g.lineWidth = 3;
+      g.setLineDash([6, 6]);
+      g.beginPath();
+      g.moveTo(-zoneHalf, -zoneH);
+      g.lineTo(-zoneHalf, 0);
+      g.moveTo(zoneHalf, -zoneH);
+      g.lineTo(zoneHalf, 0);
+      g.stroke();
+      g.setLineDash([]);
+      g.globalAlpha = 1;
+      noGlow();
     }
-    g.globalAlpha = this.inZone ? 1 : 0.4 + red * 0.6;
-    g.strokeStyle = this.inZone ? pal.good : pal.bad;
-    glow(g.strokeStyle);
-    g.lineWidth = 3;
-    g.setLineDash([6, 6]);
-    g.beginPath();
-    g.moveTo(-zoneHalf, -zoneH);
-    g.lineTo(-zoneHalf, 0);
-    g.moveTo(zoneHalf, -zoneH);
-    g.lineTo(zoneHalf, 0);
-    g.stroke();
-    g.setLineDash([]);
-    g.globalAlpha = 1;
-    noGlow();
 
     // 지면
     const ext = W;
@@ -347,6 +352,14 @@ export class Band {
     const bx = this.ballX * trackHalf;
     const br = r * (1 + 0.25 * this.pop);
     const by = -br - 2;
+    if (this.brainOnly) {
+      this.drawBrainBadge(bx, by, br);
+      this.drawFloaters(trackHalf, -r * 2 - 6, r, glow);
+      noGlow();
+      g.globalAlpha = 1;
+      g.restore();
+      return;
+    }
     // 스포츠 스타일: 공 뒤로 속도선 (빠를수록 길다)
     if (look.speedLines && this.rpm > 5) {
       g.strokeStyle = pal.ground;
@@ -667,23 +680,24 @@ export class Band {
     g.fillStyle = pal.roadMark;
     for (let x = -ext - (scroll % period); x < ext; x += period) g.fillRect(x, roadH * 0.24 - lh / 2, dash, lh);
 
-    // 허용 구역: 길 위의 초록 구간과 양옆 점선 기둥
+    // 허용 구역: 길 위의 초록 구간과 양옆 점선 기둥 (두뇌 게임만 하는 판에는 없다)
     const gateTop = -roadH / 2 - r * 1.3;
-    g.globalAlpha = 0.6;
-    g.fillStyle = pal.zone;
-    g.fillRect(-zoneHalf, -roadH / 2, zoneHalf * 2, roadH);
-    g.globalAlpha = 1;
-    g.strokeStyle = pal.panel;
-    g.lineWidth = Math.max(3, r * 0.12);
-    g.setLineDash([8, 6]);
-    g.beginPath();
-    g.moveTo(-zoneHalf, gateTop);
-    g.lineTo(-zoneHalf, roadH / 2);
-    g.moveTo(zoneHalf, gateTop);
-    g.lineTo(zoneHalf, roadH / 2);
-    g.stroke();
-    g.setLineDash([]);
-
+    if (!this.brainOnly) {
+      g.globalAlpha = 0.6;
+      g.fillStyle = pal.zone;
+      g.fillRect(-zoneHalf, -roadH / 2, zoneHalf * 2, roadH);
+      g.globalAlpha = 1;
+      g.strokeStyle = pal.panel;
+      g.lineWidth = Math.max(3, r * 0.12);
+      g.setLineDash([8, 6]);
+      g.beginPath();
+      g.moveTo(-zoneHalf, gateTop);
+      g.lineTo(-zoneHalf, roadH / 2);
+      g.moveTo(zoneHalf, gateTop);
+      g.lineTo(zoneHalf, roadH / 2);
+      g.stroke();
+      g.setLineDash([]);
+    }
 
     // 자전거 배지 (정답 직후에는 잠깐 커지면서 초록으로 물든다). 나무를 심을 때는 앞으로 비켜 간다
     const shift = this.endShift * this.endShift * (3 - 2 * this.endShift);
@@ -691,6 +705,14 @@ export class Band {
     const br = r * (1 + 0.25 * this.pop);
     const by = -roadH * 0.12;
     this.drawRings(trackHalf, by, r);
+    const fs = Math.round(U.clamp(r * 0.62, 13, 30));
+    if (this.brainOnly) {
+      // 두뇌 배지만. 말풍선(RPM)과 '여기에 맞춰 달려요' 없이, 알림(최고 기록 등)은 말풍선이 있던 자리 위에 뜬다
+      this.drawBrainBadge(bx, by, br);
+      this.drawFloaters(trackHalf, by - r - fs * 0.6 - Math.round(fs * 1.9) - 4, r);
+      g.restore();
+      return;
+    }
     g.fillStyle = pal.panel;
     g.beginPath();
     g.arc(bx, by, br, 0, Math.PI * 2);
@@ -707,7 +729,6 @@ export class Band {
     this.drawBike(bx, by, br);
 
     // 말풍선: RPM 과 할 일
-    const fs = Math.round(U.clamp(r * 0.62, 13, 30));
     const tip = this.inZone ? '좋아요' : this.slowSide ? '더 빠르게 ›' : '‹ 조금 천천히';
     const t1 = `${Math.round(this.rpm)} rpm`;
     g.font = `900 ${fs}px ${pal.font}`;
@@ -1528,6 +1549,70 @@ export class Band {
       g.fill();
     }
     g.globalAlpha = 1;
+  }
+
+  // 두뇌 배지 (두뇌 게임만 하는 판의 공·자전거 대신, s = 배지 반지름). 두뇌 모양은 로고(app/logo.svg)와 같다.
+  // 정답 직후(pop)에는 초록으로 물들고 신경망 마디가 밝아진다. 달리는 느낌이 나게 박자 없이 살짝 오르내린다
+  static BRAIN = new Path2D('M-0.95 0.05 C-1 -0.45 -0.6 -0.8 -0.1 -0.8 C0.45 -0.82 0.95 -0.5 0.95 -0.05 C0.97 0.25 0.85 0.42 0.62 0.45 C0.7 0.62 0.5 0.75 0.3 0.66 C0.22 0.62 0.18 0.56 0.15 0.52 L0.13 0.8 L0.01 0.8 L0.02 0.5 C-0.2 0.55 -0.45 0.5 -0.55 0.38 C-0.8 0.42 -0.92 0.28 -0.95 0.05 Z');
+  static BRAIN_NODES = [[-0.6, -0.1], [-0.2, -0.45], [0.3, -0.42], [0.55, -0.05], [0.15, 0.2], [-0.35, 0.25]];
+  static BRAIN_LINKS = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [1, 4], [0, 4]];
+  drawBrainBadge(x, y, s) {
+    const { g, pal, look } = this;
+    y += Math.sin(this.time * 5) * s * 0.04;
+    g.fillStyle = pal.panel;
+    g.beginPath();
+    g.arc(x, y, s, 0, Math.PI * 2);
+    g.fill();
+    if (this.pop > 0) {
+      g.globalAlpha = this.pop;
+      g.fillStyle = pal.goodSoft;
+      g.fill();
+      g.globalAlpha = 1;
+    }
+    g.lineWidth = Math.max(3, s * 0.15);
+    g.strokeStyle = pal.accent;
+    if (look.glow) {
+      g.shadowColor = pal.accent;
+      g.shadowBlur = look.glow;
+    }
+    g.stroke();
+    g.shadowBlur = 0;
+    g.save();
+    g.translate(x, y - s * 0.02);
+    const k = s * 0.62;
+    g.scale(k, k);
+    g.fillStyle = pal.accent;
+    g.fill(Band.BRAIN);
+    if (this.pop > 0) {
+      g.globalAlpha = this.pop;
+      g.fillStyle = pal.good;
+      g.fill(Band.BRAIN);
+      g.globalAlpha = 1;
+    }
+    const N = Band.BRAIN_NODES;
+    g.strokeStyle = pal.panel;
+    g.lineWidth = 0.08;
+    g.lineCap = 'round';
+    g.globalAlpha = 0.7;
+    g.beginPath();
+    for (const [a, b] of Band.BRAIN_LINKS) {
+      g.moveTo(...N[a]);
+      g.lineTo(...N[b]);
+    }
+    g.stroke();
+    g.globalAlpha = 1;
+    // 마디 하나씩 차례로 밝아진다 (생각이 도는 느낌). 정답 직후에는 모두 밝다
+    const lit = Math.floor(this.time * 2.5) % N.length;
+    N.forEach(([nx, ny], i) => {
+      g.fillStyle = pal.panel;
+      g.globalAlpha = this.pop > 0 || i === lit ? 1 : 0.75;
+      g.beginPath();
+      g.arc(nx, ny, i === lit ? 0.15 : 0.11, 0, Math.PI * 2);
+      g.fill();
+    });
+    g.globalAlpha = 1;
+    g.lineCap = 'butt';
+    g.restore();
   }
 
   // 배지 안의 자전거 (s = 배지 반지름). 바퀴는 페달보다 빨리 돌고, 크랭크는 페달 속도 그대로 돈다

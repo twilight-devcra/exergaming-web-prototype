@@ -1,7 +1,7 @@
 # 세션 로그 형식
 
 한 판(속도 측정 ~ 결과)의 기록 형식입니다. 만드는 코드는 `js/session-log.js`, 기록하는 곳은 `js/main.js`(판 흐름·입력 장치)와 `js/games/*.js`(문제·답)입니다.
-형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **3** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함).
+형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **4** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함, 4: `meta.track` 과 두뇌 게임만 하는 판을 더함).
 
 운영 버전은 저장한 세션을 서버로 자동 업로드할 수도 있습니다 — 서버 요구 사항은 [SERVER.md](SERVER.md).
 
@@ -36,13 +36,14 @@
 
 | 필드 | 내용 |
 |---|---|
-| `version` | 형식 버전 (지금 3) |
+| `version` | 형식 버전 (지금 4) |
 | `id` | 기록 시작 시각 (epoch ms, 문자열). IndexedDB 의 키. 태블릿 안에서만 겹치지 않는다 |
 | `device` | 태블릿(브라우저)마다 처음 한 번 만드는 고유 번호 (UUID, localStorage `exergame.device`). 서버에서는 `device` + `id` 가 세션 하나 |
 | `edition` | `prototype` (index.html) \| `app` (운영 버전 app/) |
 | `user`, `guest`, `userNew` | 운영 버전만. 회원 번호(8자리 문자열, `app/members.js`), 손님으로 시작했는지, 이 판 결과 화면에서 새로 만든 번호인지(손님은 결과 화면에서 번호를 받는다). 결과 없이 끝난 손님 판은 `user` 가 null |
-| `session` | 운영 버전만. 참가자가 세션 설정 화면에서 고른 `{ min, difficulty }` (`difficulty`: `relax` · `normal` · `challenge`). 이것으로 정해진 값은 `config` 에 들어 있다 (`Config.session`) |
+| `session` | 운영 버전만. 참가자가 세션 설정 화면에서 고른 `{ min, difficulty, track }` (`difficulty`: `relax` · `normal` · `challenge`, `track`: 아래 `track` 과 같음). 이것으로 정해진 값은 `config` 에 들어 있다 (`Config.session`) |
 | `landmark` | 운영 버전의 회원 라운드만 (결과 화면까지 간 판). 풍경 길가에 세운 기념물의 생김새 `{ v, kind, size, seed, wall, roof }` — `kind`: `cottage` · `shop` · `tower` (예전 안은 `pinwheel` · `balloon` · `cairn`), `size`: 0~2 (층수 1~3), `seed`: 작은 차이(창가 꽃 색 등)를 정하는 수, `wall` · `roof`: 색 `#rrggbb`. 회원 기록에도 `look` 으로 들어가 다음 라운드부터 이 모양 그대로 선다 (`js/band.js` 의 `Band.lookOf`) |
+| `track` | 운동 방식. `dual` (페달 + 두뇌 게임) \| `brain` (두뇌 게임만, 페달 없이). 테스트 화면은 설정의 **진행 → 페달 없이**, 운영 버전은 세션 설정의 **운동 방식**. `brain` 은 속도 측정이 없고(`calib_skip`), 운동 점수가 없어 `summary.exScore` 가 0, `baseline` 이 null 이며, 속도 전환 구간도 없다. `samples` 의 `rpm` 은 0, `target` 은 null (페달 원시 입력 `capd` · `workout` · `keys` 는 그대로 남는다). 이 필드가 없는 예전 기록은 모두 `dual` |
 | `mode` | `test` (테스트 화면) \| `demo` (스테이션 흐름: 운영 버전, 그리고 예전 프로토타입 시연 모드(`index.html?demo`, 지금은 없음)) |
 | `station`, `participant` | 운영 버전(스테이션 흐름)의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |
 | `startedAt`, `endedAt` | ISO 시각 |
@@ -80,6 +81,7 @@
 | `type` | 추가 필드 | 언제 |
 |---|---|---|
 | `calib_start` | | 속도 측정 화면이 열림 (기록 시작) |
+| `calib_skip` | `track: 'brain'` | 두뇌 게임만 하는 판: 속도 측정 없이 바로 카운트다운 (기록 시작, `calib_start` 대신) |
 | `start` | `via`: 운영 버전은 `session` (예전 시연 모드는 `tap` \| `pedal`) | `mode: demo` 만. 대기 화면에서 무엇으로 시작했나 (`calib_start` 바로 뒤) |
 | `calib_pedaling` | | 측정 중 처음 밟음 (측정 시간이 여기서부터 흐른다) |
 | `calib_end` | `baseline`, `measured`, `samples`, `fallback` | 측정 끝. `measured` 가 `config.minRpm` 보다 낮으면 `fallback: true` 이고 `baseline` 은 대체값. 이어서 3초 카운트다운 |

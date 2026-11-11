@@ -12,7 +12,7 @@ import { Config, EDITION } from './config.js';
 import { Theme } from './themes.js';
 
 export class SessionLog {
-  static VERSION = 3;
+  static VERSION = 4;
   static SAMPLE_SEC = 0.1;
 
   constructor(app) {
@@ -24,6 +24,8 @@ export class SessionLog {
       version: SessionLog.VERSION,
       id: this.id,
       mode: app.demo ? 'demo' : 'test',
+      // 운동 방식: dual = 페달 + 두뇌 게임 · brain = 두뇌 게임만 (페달 없이, 속도 측정·운동 점수 없음)
+      track: app.cfg.brainOnly ? 'brain' : 'dual',
       startedAt: d.toISOString(),
       theme: Theme.current.id,
       music: Config.music(), // 음악 스타일 (js/audio.js STYLES)

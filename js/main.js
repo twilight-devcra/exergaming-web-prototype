@@ -215,6 +215,7 @@ const App = {
     $('#cfg-mult').value = c.multiplierTop;
     $('#cfg-difficulty').value = c.difficulty;
     $('#cfg-change').checked = c.rpmChange;
+    $('#cfg-brain').checked = !!c.brainOnly;
     $('#cfg-shift').value = c.shiftSec;
     $('#cfg-sound').checked = c.sound;
     $('#cfg-qtimer').checked = c.questionTimer;
@@ -259,6 +260,7 @@ const App = {
     c.multiplierTop = num('#cfg-mult', 1, 10, 5);
     c.difficulty = $('#cfg-difficulty').value;
     c.rpmChange = $('#cfg-change').checked;
+    c.brainOnly = $('#cfg-brain').checked;
     c.shiftSec = num('#cfg-shift', 4, 30, 8);
     c.sound = $('#cfg-sound').checked;
     c.questionTimer = $('#cfg-qtimer').checked;
@@ -485,7 +487,9 @@ const App = {
     this.audio.setMuted(!this.cfg.sound);
     this.audio.setStyle(Config.music());
     this.pedal.reset();
-    this.roundSensor = this.pedal.sensorOn;
+    // 두뇌 게임만 하는 판: 페달을 쓰지 않으므로 페달이 끊겨도 멈추지 않는다
+    this.brainOnly = !!this.cfg.brainOnly;
+    this.roundSensor = this.pedal.sensorOn && !this.brainOnly;
     this.gen++;
     this.timers = [];
     this.clock = 0;
@@ -493,9 +497,18 @@ const App = {
     // 측정 중에는 밟는 속도를 천천히 따라가기만 한다. 비트는 밟기 시작할 때 그 속도로 시작한다 (updateCalib)
     this.calib = { elapsed: 0, started: false, samples: [], angle: 0, follow: this.cfg.fallbackRpm };
     document.querySelectorAll('.round-end').forEach((e) => e.remove()); // 마무리 화면 중에 운영 메뉴로 버린 판의 것
+    this.log = new SessionLog(this);
+    if (this.brainOnly) {
+      // 속도 측정 없이 바로 카운트다운. 음악은 정해 둔 박자로 서서히 들어온다 (기준·목표 속도는 없다)
+      this.log.ev('calib_skip', { track: 'brain' });
+      this.baseline = null;
+      this.target = null;
+      this.audio.start(() => this.cfg.fallbackRpm * 2, { fadeIn: 2.5 });
+      this.beginCountdown();
+      return;
+    }
     this.show('calib');
     this.state = 'calib';
-    this.log = new SessionLog(this);
     this.log.ev('calib_start');
   },
 
@@ -599,6 +612,8 @@ const App = {
     // level = 도달한 최고 난이도, runs = 판마다 [레벨, 맞힌 수, 문제 수], ms = 게임을 푸는 데 쓴 시간 (runs·ms 는 능력 그래프에 쓴다)
     GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0 }));
     this.band.cfg = this.cfg;
+    this.band.brainOnly = this.brainOnly;
+    $('#game').classList.toggle('brain-only', this.brainOnly);
     this.band.setSlope(0);
     this.band.theta = 0;
     this.band.restart();
@@ -610,7 +625,7 @@ const App = {
     // (오디오 시계 기준이라 일시정지 동안은 멈춘다)
     const ctx = this.audio.ctx;
     const from = U.clamp(this.calib.follow, 30, 110), at = ctx ? ctx.currentTime : 0;
-    this.audio.setTempo(() => {
+    if (!this.brainOnly) this.audio.setTempo(() => {
       const k = ctx ? U.clamp((ctx.currentTime - at) / 3, 0, 1) : 1;
       return U.lerp(from, this.target, k * k * (3 - 2 * k)) * 2;
     });
@@ -618,7 +633,11 @@ const App = {
     const cog = $('#cog');
     const gen = this.gen;
     const intro = U.el('div', 'intro');
-    intro.innerHTML = `
+    intro.innerHTML = this.brainOnly ? `
+      <div class="tag">준비 · 두뇌 게임만</div>
+      <div class="hint">이번에는 페달을 밟지 않아도 돼요.<br>
+      음악을 들으며 아래에 나오는 게임을 풀면 됩니다.</div>
+      <div class="big-count">3</div>` : `
       <div class="tag">준비</div>
       <div class="hint">비트에 맞춰 ${this.pedal.sensorOn ? '<b>페달</b>을' : '<b>A · D</b>를'} 밟아 ${EDITION === 'app' ? '자전거를 <b style="color:var(--good)">초록 구간</b>' : '공을 <b style="color:var(--good)">초록 구역</b>'} 안에 두세요.<br>
       그러면서 아래에 나오는 게임을 풀면 됩니다.</div>
@@ -835,7 +854,7 @@ const App = {
   // 그 동안은 위쪽 띠를 화면 전체로 넓혀 새 속도에 맞추는 것에만 집중하게 한다.
   shiftDue() {
     const { cfg } = this;
-    if (!cfg.rpmChange || this.elapsed < this.nextShiftAt) return false;
+    if (!cfg.rpmChange || this.brainOnly || this.elapsed < this.nextShiftAt) return false;
     // 라운드가 곧 끝나면 새 속도에 맞추기만 하다 끝나므로 건너뛴다
     return cfg.durationSec - this.elapsed >= cfg.shiftSec + 5;
   },
@@ -1069,10 +1088,17 @@ const App = {
     // 목표 RPM 변화 → 지면 각도. 속도 전환 구간에서만 움직인다.
     if (this.shift) this.updateShift();
     this.band.setSlope(this.slopeLevel);
-    this.target = this.baseline * (1 + this.slopeLevel * cfg.rpmChangeAmount);
+    if (!this.brainOnly) this.target = this.baseline * (1 + this.slopeLevel * cfg.rpmChangeAmount);
 
     if (held) return;
 
+    // 두뇌 게임만 하는 판은 운동 점수가 없다 (운동 점수 0 인 판과 같다)
+    if (!this.brainOnly) this.tickExercise(dt);
+    if (this.elapsed >= cfg.durationSec) this.endRound();
+  },
+
+  tickExercise(dt) {
+    const { cfg } = this;
     // 짧은 간격으로 운동 점수 지급. 화면의 공 위치(band)를 기준으로 채점해서 보이는 것과 점수가 어긋나지 않게 한다.
     this.tickAcc += this.frameScore(this.band.deviation) * dt;
     this.tickTime += dt;
@@ -1089,8 +1115,6 @@ const App = {
       const color = pts >= cfg.tickMaxPoints ? 'good' : pts > 0 ? 'warn' : 'bad';
       this.band.addFloater(`+${pts}`, color);
     }
-
-    if (this.elapsed >= cfg.durationSec) this.endRound();
   },
 
   // ended: complete(시간 다 됨) | operator(운영 메뉴에서 끝냄) | idle(자리 비움)
@@ -1195,6 +1219,8 @@ const App = {
     $r('time').textContent = U.fmtTime(m.activeSec);
     $r('rpm').textContent = `${Math.round(m.avgRpm)} RPM`;
     $r('keep').textContent = `${keep}%`;
+    // 두뇌 게임만 한 판: 운동량 대신 안내 한 줄 (app.css · style.css 의 .dr-ex.brain-only)
+    root.querySelector('.dr-ex').classList.toggle('brain-only', !!this.brainOnly);
     return { abil, keep, kcal };
   },
 
@@ -1203,8 +1229,8 @@ const App = {
     const cfg = this.cfg;
     const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
     $('#res-total').textContent = this.score;
-    $('#res-ex').textContent = this.exScore;
-    $('#res-ex-sub').textContent = ` / ${exMax}`;
+    $('#res-ex').textContent = this.brainOnly ? '–' : this.exScore;
+    $('#res-ex-sub').textContent = this.brainOnly ? ' 페달 없이 (두뇌 게임만)' : ` / ${exMax}`;
     $('#res-cog').textContent = this.cogScore;
     // 이번 라운드에 실제로 나온 게임만 적는다
     // 게임마다 한 줄 (이름 · 판 수 · 정답 · 점수). 줄바꿈 없이 표로 맞춰 11종이 다 나와도 카드에 들어간다
@@ -1236,7 +1262,7 @@ const App = {
     const name = $('#res-name').value.trim() || '이름없음';
     const board = this.loadBoard();
     this.savedId = Date.now();
-    board.push({ id: this.savedId, name, score: this.score, ex: this.exScore, cog: this.cogScore, dur: this.cfg.durationSec });
+    board.push({ id: this.savedId, name, score: this.score, ex: this.exScore, cog: this.cogScore, dur: this.cfg.durationSec, track: this.brainOnly ? 'brain' : 'dual' });
     board.sort((a, b) => b.score - a.score);
     try { localStorage.setItem('exergame.board', JSON.stringify(board.slice(0, 50))); } catch (e) {}
     $('#save-row').style.display = 'none';
@@ -1253,7 +1279,7 @@ const App = {
       <li class="${b.id === this.savedId ? 'me' : ''}">
         <span class="rank">${i + 1}</span>
         <span class="name">${b.name.replace(/[<>&]/g, '')}</span>
-        <span>${b.score}점 <small style="color:var(--ink-soft)">(${U.fmtTime(b.dur)})</small></span>
+        <span>${b.score}점 <small style="color:var(--ink-soft)">(${U.fmtTime(b.dur)}${b.track === 'brain' ? ' · 두뇌만' : ''})</small></span>
       </li>`).join('');
   },
 
@@ -1263,7 +1289,9 @@ const App = {
     this.last = now;
     if (!this.paused) {
       this.clock += dt * 1000;
-      const rpm = this.pedal.update(dt);
+      // 두뇌 게임만 하는 판에서는 페달을 밟아도 라운드에 들어가지 않는다 (운동량·띠·기록 모두 0). 대기 화면 등에서는 그대로 쓴다
+      const raw = this.pedal.update(dt);
+      const rpm = this.brainOnly && ['countdown', 'play', 'ending'].includes(this.state) ? 0 : raw;
 
       if (this.state === 'calib') this.updateCalib(dt, rpm);
       // 운동량은 측정이 시작된 뒤부터 라운드가 끝날 때까지 밟은 것을 모두 센다
@@ -1277,7 +1305,8 @@ const App = {
         if (this.state === 'play') this.updatePlay(dt, rpm);
         if (this.state === 'countdown' || this.state === 'play') {
           // 틱 사이에도 지면이 끊기지 않도록 진행 중인 틱에서 쌓인 몫까지 넘긴다
-          this.band.update(dt, rpm, (rpm - this.target) / this.target, this.score + this.tickAcc / this.cfg.tickSec);
+          const dev = this.brainOnly ? 0 : (rpm - this.target) / this.target;
+          this.band.update(dt, rpm, dev, this.score + this.tickAcc / this.cfg.tickSec);
           this.band.draw();
           this.updateHud(dt);
         }
@@ -1294,7 +1323,7 @@ const App = {
     this.capTick(now);
     // 비트에 맞춰 화면 가장자리 깜빡임 (짝수 = A쪽 왼편, 홀수 = D쪽 오른편)
     for (const b of this.audio.pollBeats()) {
-      if (this.state !== 'countdown' && this.state !== 'play') continue;
+      if ((this.state !== 'countdown' && this.state !== 'play') || this.brainOnly) continue;
       const e = document.querySelector(b.i % 2 === 0 ? '.edge.left' : '.edge.right');
       e.classList.remove('flash');
       void e.offsetWidth;
@@ -1308,6 +1337,7 @@ const App = {
     if (!d.classList.contains('active')) return;
     d.textContent = [
       `state    ${this.state}`,
+      `track    ${this.brainOnly ? 'brain (페달 없이)' : 'dual'}`,
       `input    ${this.pedal.sensorOn ? `sensor ${this.pedal.lzLive ? `lz ${this.cfg.rpmSource} ${this.pedal.lzRpm.toFixed(1)}` : 'avg_rpm'} / avg ${this.pedal.sensorRpm}rpm fw ${this.link.firmware || '?'}` : `keyboard (link ${this.link.state})`}`,
       `rpm      ${rpm.toFixed(1)}`,
       `target   ${this.target ? this.target.toFixed(1) : '-'}${this.shift ? ' (shift)' : ''}`,

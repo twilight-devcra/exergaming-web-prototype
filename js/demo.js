@@ -2,7 +2,7 @@
 // 흐름: 대기 화면 → (회원 로그인 → 세션 설정, app/members.js) → 속도 측정 → 라운드 → 결과 → 길게 눌러 초기화 → 대기 화면
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
 // 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '라운드 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
-import { BASE_LEVEL, PRESET_KEYS, ROUND_PRESETS, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_DEFAULT, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, U } from './config.js';
+import { BASE_LEVEL, PRESET_KEYS, ROUND_PRESETS, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_TRACKS, SESSION_DEFAULT, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, U } from './config.js';
 import { Exercise } from './exercise.js';
 import { Fx } from './fx.js';
 import { ABILITIES } from './abilities.js';
@@ -106,21 +106,29 @@ export const Demo = {
   },
 
   // ---------------- 대기 화면 ----------------
+  // 페달을 쓸 수 있는가 (연결됨, 또는 점검용 키보드). 없으면 세션 설정에서 '두뇌 게임만'만 고를 수 있다
+  pedalReady() {
+    return this.app.link.state === 'ready' || this.allowKbd;
+  },
+
+  // 세션 설정이 있는 운영 버전은 페달이 없어도 두뇌 게임만으로 시작할 수 있다
   canStart() {
-    return this.app.link.state === 'ready' || this.allowKbd || this.simResult;
+    return this.pedalReady() || this.simResult || !!$('#setup');
   },
 
   updateAttract() {
     const ok = this.canStart();
+    const pedal = this.pedalReady();
     $('#att-start').disabled = !ok;
     // 테스트용 스위치가 켜져 있으면 그렇다고 보여준다 (행사 때 켜 둔 채로 두지 않게)
-    const kbdOnly = ok && this.app.link.state !== 'ready';
+    const kbdOnly = pedal && this.app.link.state !== 'ready';
     $('#att-hint').textContent = this.simResult
       ? '가상 결과 모드 · 누르면 게임 없이 결과 화면으로 갑니다'
       : kbdOnly ? '키보드 테스트 모드 · A/D 키를 번갈아 눌러 페달링합니다'
-      : ok ? '화면을 누르거나 페달을 밟으면 시작합니다'
+      : pedal ? '화면을 누르거나 페달을 밟으면 시작합니다'
+      : ok ? '페달이 연결되지 않았어요 · 지금은 두뇌 게임만 할 수 있어요'
       : '페달 연결을 기다리는 중입니다 · 진행 요원에게 알려주세요';
-    $('#att-hint').classList.toggle('warn', !ok || kbdOnly || this.simResult);
+    $('#att-hint').classList.toggle('warn', !pedal || kbdOnly || this.simResult);
     // 운영 버전: 페달이 연결돼 있지 않으면 대기 화면에서 바로 연결한다 (운영 메뉴를 열지 않고)
     const pb = $('#att-pedal');
     if (pb) pb.hidden = this.app.link.state === 'ready';
@@ -141,6 +149,8 @@ export const Demo = {
   beginRound(via, session = null) {
     const a = this.app;
     if (session) Object.assign(a.cfg, Config.session(session.min, session.difficulty));
+    // 운동 방식은 판마다 고른다 (세션 로그를 만들기 전에 넣어야 meta.track 에 남는다)
+    a.cfg.brainOnly = !!session && session.track === 'brain';
     a.startRound();
     // 회원이면 지난 세션들이 기념물로 길가에 선다 (손님·프로토타입은 없음)
     a.band.setLandmarks(this.members ? this.members.landmarks() : []);
@@ -164,6 +174,13 @@ export const Demo = {
     if (!$('#setup')) return;
     const tile = (attrs, title, desc, extra = '') =>
       `<button class="su-opt" ${attrs}>${extra}<b>${title}</b><small>${desc}</small></button>`;
+    // 운동 방식 두 칸: 페달 + 두뇌 게임(자전거) / 두뇌 게임만(두뇌, 로고와 같은 모양)
+    const icons = {
+      dual: '<svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="22" r="8"/><circle cx="38" cy="22" r="8"/><path d="M10 22l8-13h13l7 13M18 9l6 13 7-13M15 5h7M31 9l-2-5h5"/></svg>',
+      brain: '<svg viewBox="-1 -0.85 2 1.7"><path fill="currentColor" d="M-0.95 0.05 C-1 -0.45 -0.6 -0.8 -0.1 -0.8 C0.45 -0.82 0.95 -0.5 0.95 -0.05 C0.97 0.25 0.85 0.42 0.62 0.45 C0.7 0.62 0.5 0.75 0.3 0.66 C0.22 0.62 0.18 0.56 0.15 0.52 L0.13 0.8 L0.01 0.8 L0.02 0.5 C-0.2 0.55 -0.45 0.5 -0.55 0.38 C-0.8 0.42 -0.92 0.28 -0.95 0.05 Z"/></svg>',
+    };
+    $('#su-track').innerHTML = SESSION_TRACKS.map((t) =>
+      tile(`data-track="${t.id}"`, t.label, t.desc, `<i class="su-ico" aria-hidden="true">${icons[t.id]}</i>`)).join('');
     $('#su-len').innerHTML = SESSION_LENGTHS.map((l) => tile(`data-min="${l.min}"`, l.label, l.desc)).join('');
     $('#su-diff').innerHTML = SESSION_DIFFICULTIES.map((d, i) =>
       tile(`data-diff="${d.id}"`, d.label, d.desc, `<i class="su-bars" data-n="${i + 1}"><span></span><span></span><span></span></i>`)).join('');
@@ -174,6 +191,10 @@ export const Demo = {
     $('#su-len').addEventListener('click', (e) => {
       const b = e.target.closest('[data-min]');
       if (b) this.pickSetup({ min: +b.dataset.min });
+    });
+    $('#su-track').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-track]');
+      if (b && !b.disabled) this.pickSetup({ track: b.dataset.track });
     });
     $('#su-diff').addEventListener('click', (e) => {
       const b = e.target.closest('[data-diff]');
@@ -186,11 +207,12 @@ export const Demo = {
     };
   },
 
-  // preset: 미리 골라 둘 { min, difficulty } (회원이면 지난번 것)
+  // preset: 미리 골라 둘 { min, difficulty, track } (회원이면 지난번 것)
   openSetup(via, preset = null) {
     const a = this.app;
     this.setupVia = via;
     this.setup = { ...SESSION_DEFAULT, ...(preset || {}) };
+    if (!SESSION_TRACKS.some((t) => t.id === this.setup.track)) this.setup.track = SESSION_DEFAULT.track;
     this.pickSetup({});
     a.show('setup');
     a.state = 'setup';
@@ -200,12 +222,24 @@ export const Demo = {
   },
 
   pickSetup(change) {
+    if (!this.setup) return;
     Object.assign(this.setup, change);
-    const { min, difficulty } = this.setup;
+    // 페달이 없으면 두뇌 게임만 (페달 칸은 막고 까닭을 적는다)
+    const pedal = this.pedalReady();
+    if (!pedal) this.setup.track = 'brain';
+    const { min, difficulty, track } = this.setup;
+    document.querySelectorAll('#su-track [data-track]').forEach((b) => {
+      const t = SESSION_TRACKS.find((x) => x.id === b.dataset.track);
+      const off = t.id === 'dual' && !pedal;
+      b.classList.toggle('on', t.id === track);
+      b.disabled = off;
+      b.querySelector('small').textContent = off ? '페달 연결 필요' : t.desc;
+    });
     document.querySelectorAll('#su-len [data-min]').forEach((b) => b.classList.toggle('on', +b.dataset.min === min));
     document.querySelectorAll('#su-diff [data-diff]').forEach((b) => b.classList.toggle('on', b.dataset.diff === difficulty));
     const d = SESSION_DIFFICULTIES.find((x) => x.id === difficulty);
-    $('#su-sum').textContent = `${min}분 · ${d ? d.label : ''} · 페달 속도를 잰 뒤 시작합니다`;
+    $('#su-sum').textContent = `${min}분 · ${d ? d.label : ''} · ` +
+      (track === 'brain' ? '두뇌 게임만, 바로 시작합니다' : '페달 속도를 잰 뒤 시작합니다');
   },
 
   // ---------------- 자동 업로드 (js/session-upload.js) ----------------
@@ -255,6 +289,7 @@ export const Demo = {
     const R = U.randInt;
     const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
     a.stats = {};
+    a.brainOnly = false;
     let cog = 0;
     for (const T of GAME_TYPES) {
       const total = T.id === 'path' ? R(8, 14) : 3 * R(1, 2);
@@ -387,6 +422,8 @@ export const Demo = {
   onLink() {
     if (!this.app) return; // App.init 이 처음 상태를 알릴 때는 아직 init 전이다
     this.updateAttract();
+    // 세션 설정 화면에서 페달이 붙거나 끊기면 운동 방식 칸을 다시 맞춘다
+    if (this.app.state === 'setup') this.pickSetup({});
     this.syncPause();
   },
 
@@ -419,7 +456,9 @@ export const Demo = {
     $('#dr-id').textContent = sim ? '가상 결과 · 기록 안 됨' : `참가 번호 ${this.label(no)}`;
     $('#dr-id').classList.toggle('sim', sim);
     $('#dr-total').textContent = a.score.toLocaleString('ko-KR');
-    $('#dr-break').textContent = `운동 ${a.exScore.toLocaleString('ko-KR')} + 두뇌 게임 ${a.cogScore.toLocaleString('ko-KR')}`;
+    $('#dr-break').textContent = a.brainOnly
+      ? `두뇌 게임 ${a.cogScore.toLocaleString('ko-KR')} · 페달 없이`
+      : `운동 ${a.exScore.toLocaleString('ko-KR')} + 두뇌 게임 ${a.cogScore.toLocaleString('ko-KR')}`;
     // 운영 버전: 회원 기록에 더하고, 손님이면 새 회원 번호와 QR 카드를 보여 준다 (세션 로그에 meta.user 를 붙이므로 저장보다 먼저)
     if (this.members) this.members.onResult(a, sim);
     Fx.confetti(1.2);
@@ -437,7 +476,7 @@ export const Demo = {
     const log = this.load('log', []);
     log.push({
       station: this.station, no, at: new Date().toISOString(),
-      score: a.score, ex: a.exScore, cog: a.cogScore,
+      score: a.score, ex: a.exScore, cog: a.cogScore, track: a.brainOnly ? 'brain' : 'dual',
       kcal: Math.round(kcal * 10) / 10, distM: Math.round(m.distM), revs: Math.round(m.revs), cfg: Config.demoCode(cfg),
       abilities: Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.stars : null])),
     });
@@ -497,6 +536,7 @@ export const Demo = {
     $('#op-kbd').onchange = () => {
       this.allowKbd = $('#op-kbd').checked;
       this.updateAttract();
+      if (this.app.state === 'setup') this.pickSetup({});
     };
     $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
     this.bindSettings();
@@ -690,14 +730,15 @@ export const Demo = {
     el.innerHTML = log.slice(-40).reverse().map((r) => {
       const t = new Date(r.at);
       const hm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-      return `<li><b>${r.station || '?'}-${String(r.no).padStart(3, '0')}</b><span>${hm}</span><span class="sc">${r.score.toLocaleString('ko-KR')}점</span></li>`;
+      return `<li><b>${r.station || '?'}-${String(r.no).padStart(3, '0')}</b><span>${hm}${r.track === 'brain' ? ' · 두뇌만' : ''}</span><span class="sc">${r.score.toLocaleString('ko-KR')}점</span></li>`;
     }).join('');
   },
 
   downloadCsv() {
     const log = this.load('log', []);
-    const head = ['station', 'no', 'time', 'settings', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...ABILITIES.map((x) => x.id)];
-    const rows = log.map((r) => [r.station, r.no, r.at, r.cfg ?? '', r.score, r.ex, r.cog, r.kcal, r.distM ?? '', r.revs, ...ABILITIES.map((x) => r.abilities?.[x.id] ?? '')]);
+    // track: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). 이 열을 더하기 전 기록은 dual
+    const head = ['station', 'no', 'time', 'settings', 'track', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...ABILITIES.map((x) => x.id)];
+    const rows = log.map((r) => [r.station, r.no, r.at, r.cfg ?? '', r.track || 'dual', r.score, r.ex, r.cog, r.kcal, r.distM ?? '', r.revs, ...ABILITIES.map((x) => r.abilities?.[x.id] ?? '')]);
     const csv = '﻿' + [head, ...rows].map((row) => row.join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));

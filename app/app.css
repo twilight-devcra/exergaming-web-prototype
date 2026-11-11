@@ -571,3 +571,97 @@ body[data-theme="scenic"] {
   .lg-body, .hs-body { grid-template-columns: 1fr; }
 }
 .hs-src { margin: 0; font-size: 14px; color: var(--ink-soft); min-height: 1.4em; }
+
+/* ================= 휴대폰 (세로로 든 휴대폰, 너비 600px 이하) =================
+   css/style.css 의 같은 묶음 위에 운영 버전 화면을 다듬는다. 넘치는 화면은 위부터 채우고 화면째 스크롤한다 */
+@media (max-width: 600px) {
+  /* ----- 게임 화면: 풍경 카드를 낮추고 게임 카드에 자리를 더 준다 ----- */
+  #game { padding: 10px; }
+  #band { height: 24%; margin-bottom: 10px; border-radius: 20px; }
+  #cog { border-radius: 20px; --mat-pad: 8px; --answer-gap: calc(2 * var(--mat-pad) + 12px); background-size: 20px 20px; }
+  #band-ui { left: 20px; right: 20px; top: 20px; }
+  .hud-row { gap: 8px; }
+  .hud { column-gap: 6px; padding: 6px 12px 8px; border-radius: 14px; }
+  .hud .label { font-size: 13px; }
+  .hud .value { font-size: 22px; }
+  #hud-time { width: 128px; }
+  .hud-bar { height: 6px; margin-top: 4px; }
+  #streak { padding: 4px 10px; font-size: 15px; }
+  .end-btn { right: 10px; bottom: 10px; padding: 7px 12px 7px 10px; font-size: 14px; }
+  #calib .end-btn { top: 14px; right: 14px; }
+  /* 게임 이름·레벨은 구석에 두면 안내 문구와 겹치므로 문구 바로 위 한 줄로 */
+  #cog .stage { padding-bottom: 12px; }
+  #cog .stage-meta { position: static; justify-content: center; }
+  #cog .stage-head { gap: 4px; }
+  .stage-title { font-size: 15px; }
+  #shift-msg { top: 76px; width: calc(100% - 32px); padding: 16px 16px 18px; white-space: normal; border-radius: 20px; }
+
+  /* ----- 대기 화면: 그림 위, 소개 아래. 세 단계는 세로 목록 ----- */
+  /* 위아래로 넘치면 위에서부터 스크롤되도록 column 으로 놓고 그림을 앞으로 (column-reverse 는 위로 넘쳐 스크롤할 수 없다).
+     자리가 남으면 위아래 auto 여백으로 가운데에 */
+  #attract { flex-direction: column; justify-content: flex-start; gap: 8px; padding: 16px 20px 14px; overflow-y: auto; }
+  .att-visual { order: -1; width: min(54vw, 27vh); flex: none; margin-top: auto; }
+  .att-main { flex: none; width: 100%; margin-bottom: auto; }
+  .att-logo img { width: 56px; }
+  .att-main .att-logo h1 { font-size: 44px; }
+  .att-tagline { margin-top: 10px; font-size: 18px; }
+  .att-steps { flex-direction: column; gap: 10px; margin-top: 16px; padding: 14px 6px; }
+  .att-steps li + li { border-left: 0; }
+  .att-steps li { font-size: 16px; }
+  .att-start { align-self: stretch; margin-top: 18px; padding: 16px; font-size: 24px; }
+  .att-hint { text-align: center; }
+  .att-pedal { align-self: center; }
+  /* 스테이션 표시는 구석에 띄우면 시작 버튼을 가리므로 맨 아래 줄로 */
+  .station-tag { position: static; flex: none; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+
+  /* ----- 로그인 · 기록 · 세션 설정 ----- */
+  #setup, #login, #history { justify-content: flex-start; gap: 14px; padding: 14px 18px 24px; overflow-y: auto; }
+  .su-head { gap: 4px; }
+  .su-head h2 { font-size: 26px; }
+  .su-group h3 { margin-bottom: 6px; font-size: 16px; }
+  .su-opts { gap: 8px; }
+  .su-opt { padding: 12px 12px 14px; border-width: 2px; border-radius: 18px; }
+  .su-opt b { font-size: clamp(18px, 5.2vw, 22px); white-space: nowrap; }
+  .su-opt small { font-size: 13px; word-break: keep-all; }
+  .su-opt.on::after { top: 8px; right: 8px; width: 24px; height: 24px; font-size: 14px; }
+  .su-bars { height: 18px; margin-bottom: 2px; gap: 3px; }
+  .su-bars span { width: 7px; }
+  .su-track { grid-template-columns: minmax(0, 1fr); }
+  .su-track .su-opt { padding: 10px 48px 10px 14px; }
+  .su-track .su-opt b { font-size: 20px; }
+  .su-track .su-opt.on::after { top: 50%; right: 14px; }
+  .su-ico svg { width: 40px; height: 30px; }
+  .su-foot { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 4px; }
+  .su-go { padding: 16px; font-size: 22px; }
+  .su-sum { font-size: 15px; text-align: center; }
+
+  .lg-body { gap: 12px; }
+  .lg-cam { max-height: 34vh; justify-self: center; width: 100%; }
+  .lg-choices { gap: 10px; }
+  .lg-opt { padding: 14px 16px; border-radius: 18px; }
+  .lg-opt b { font-size: 22px; }
+  .lg-opt small { font-size: 14px; }
+  .lg-pad { padding: 14px; border-radius: 18px; }
+  .lg-digits i { width: 30px; height: 40px; font-size: 22px; }
+  .lg-keys button { height: 50px; }
+
+  .hs-calbox { padding: 12px; border-radius: 18px; }
+  .hs-cal span { max-width: 40px; max-height: 40px; font-size: 15px; }
+  .hs-stats div { padding: 10px 12px; border-radius: 14px; }
+  .hs-stats b { font-size: 24px; }
+  .hs-recent li { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; padding: 9px 12px; font-size: 14px; }
+  .hs-recent li b { font-size: 15px; }
+
+  /* ----- 결과 ----- */
+  .dr-id { font-size: 18px; }
+  #demo-result.with-card .dr-grid { grid-template-columns: minmax(0, 1fr); }
+  #demo-result.with-card .dr-total { font-size: 64px; }
+  /* 새 회원 카드: QR 을 가운데 크게, 안내는 그 아래 */
+  .dm-card, .dm-new .dm-card { flex-direction: column; align-items: center; }
+  .dm-new .dm-qr { width: min(56vw, 200px); }
+  .dm-new { margin: 4px 0 0; }
+  .hold-btn { flex: none; }
+
+  /* ----- 안내 창 ----- */
+  .end-actions .btn { min-width: 0; flex: 1; padding: 16px 12px; font-size: 19px; }
+}

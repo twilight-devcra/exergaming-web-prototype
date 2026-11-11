@@ -93,7 +93,8 @@
 | `points` | `game`, `pts` | 인지 게임 점수 지급 |
 | `shift_start` | `from`, `to` | 속도 전환 구간 시작. 기울기 -1(내리막) · 0(평지) · 1(오르막). 목표 RPM = `baseline × (1 + 기울기 × config.rpmChangeAmount)` |
 | `shift_end` | `slope` | 속도 전환 구간 끝 |
-| `pause`, `resume` | | 게임 시계가 멈춤 / 다시 흐름. 이유는 바로 앞의 `link` · `operator` · `end_ask` 로 알 수 있다. 둘 다 없으면 운영 메뉴의 PIN 입력 중이거나 테스트 화면의 Esc |
+| `rotate` | `landscape` | 휴대폰을 가로로 눕힘(`true`, 라운드가 멈춤) / 다시 세움(`false`) |
+| `pause`, `resume` | | 게임 시계가 멈춤 / 다시 흐름. 이유는 바로 앞의 `link` · `operator` · `end_ask` · `rotate` 로 알 수 있다. 둘 다 없으면 운영 메뉴의 PIN 입력 중이거나 테스트 화면의 Esc |
 | `link` | `state`, `detail` | 페달 연결 상태 변화 (`ready` · `connecting` · `reconnecting` · `disconnected` · `idle`) |
 | `operator` | `open` | 운영 메뉴가 라운드 중에 열림/닫힘 |
 | `end_ask`, `end_cancel` | | 참가자가 그만하기를 누름 (확인 창, 게임 멈춤) / 계속하기를 고름. 마치기를 고르면 `session_end` 의 `ended` 가 `user` |

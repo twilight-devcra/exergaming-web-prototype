@@ -1,5 +1,5 @@
 // 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
-import { BASE_LEVEL, EASY_TIME, ROUND_PRESETS, MUSIC_STYLES, Config, EDITION, DEMO, $, U } from './config.js';
+import { BASE_LEVEL, EASY_TIME, ROUND_PRESETS, MUSIC_STYLES, PHONE_LANDSCAPE, Config, EDITION, DEMO, $, U } from './config.js';
 import { Pedal } from './pedal.js';
 import { NUS, PedalLink } from './pedal-link.js';
 import { LzCadence } from './cadence-est.js';
@@ -32,6 +32,8 @@ const App = {
   meter: new ExerciseMeter(),
   paused: false,
   linkPaused: false, // 페달 연결이 끊겨서 걸린 일시정지. 다시 연결되면 자동으로 풀린다
+  rotatePaused: false, // 휴대폰을 가로로 눕혀서 걸린 일시정지 (테스트 화면). 세로로 돌리면 풀린다
+  rotated: matchMedia(PHONE_LANDSCAPE), // 지금 휴대폰이 가로로 누워 있는가 (.matches)
   clock: 0,      // 일시정지 중에는 멈추는 게임 시계 (ms)
   timers: [],
   gen: 0,        // 인지 게임 세대. 바뀌면 이전 게임의 예약 콜백/점수 지급은 무시된다
@@ -73,6 +75,7 @@ const App = {
     else this.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
     this.bindKeys();
     this.bindLink();
+    this.rotated.addEventListener('change', () => this.onRotate());
     this.pedal.onStroke = (key) => this.onStroke(key);
     if (this.demo) Demo.init(this);
     $('#btn-start').onclick = () => this.startRound();
@@ -421,11 +424,26 @@ const App = {
     $('#pause-note').textContent = this.linkPaused ? `${detail} — 계속하기를 누르면 키보드로 이어갑니다.` : '';
   },
 
+  // 휴대폰을 가로로 눕히면 화면이 '세로로 돌려 주세요'로 덮이므로 라운드를 멈추고, 다시 세우면 이어 간다.
+  // 운영 버전은 Demo.syncPause 가 다른 멈춤(운영 메뉴·페달 끊김)과 함께 다룬다
+  onRotate() {
+    if (this.log) this.log.ev('rotate', { landscape: this.rotated.matches });
+    if (this.demo) return Demo.syncPause();
+    if (this.rotated.matches && this.inRound && !this.paused) {
+      this.setPaused(true);
+      this.rotatePaused = true;
+      $('#pause-note').textContent = '휴대폰을 세로로 돌리면 이어집니다.';
+    } else if (!this.rotated.matches && this.rotatePaused) {
+      this.setPaused(false);
+    }
+  },
+
   setPaused(p) {
     if (this.log && p !== this.paused) this.log.ev(p ? 'pause' : 'resume');
     this.paused = p;
     if (!p) {
       this.linkPaused = false;
+      this.rotatePaused = false;
       $('#pause-note').textContent = '';
     }
     if (!this.demo) $('#pause').classList.toggle('active', p);
@@ -1249,7 +1267,8 @@ const App = {
     this.fillReport($('#result'));
     this.show('result');
     Fx.confetti(1);
-    setTimeout(() => $('#res-name').focus(), 50);
+    // 터치 화면(휴대폰·태블릿)에서는 바로 자판이 올라와 결과를 가리므로 눌렀을 때만 넣는다
+    if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => $('#res-name').focus(), 50);
   },
 
   // ---------------- 순위 ----------------

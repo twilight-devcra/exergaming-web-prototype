@@ -291,6 +291,9 @@ export const Config = {
 // 프로토타입(index.html)은 테스트 화면, 운영 버전(app/index.html, <html data-edition="app">)은 스테이션 흐름 (js/demo.js).
 // 스테이션 흐름은 같은 라운드에 대기·결과·운영 화면만 바꿔 끼운다. DEMO(App.demo) 가 이 흐름인지를 뜻한다 (세션 로그의 mode: 'demo')
 export const EDITION = document.documentElement.dataset.edition || 'prototype';
+// 가로로 눕힌 휴대폰. 게임 판이 들어갈 높이가 없어 css/style.css 가 '세로로 돌려 주세요'로 덮고, 그동안 라운드를 멈춘다 (App.onRotate).
+// 이 값을 바꾸면 css/style.css 의 같은 @media 도 고친다
+export const PHONE_LANDSCAPE = '(orientation: landscape) and (max-height: 500px) and (pointer: coarse)';
 export const DEMO = EDITION === 'app';
 
 // 공용 유틸

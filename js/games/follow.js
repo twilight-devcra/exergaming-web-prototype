@@ -163,12 +163,14 @@ export class FollowGame {
     this.h.after(250, () => this.ask());
   }
 
-  // 조작판을 판 자리에 맞춰 통째로 줄이거나 키운다 (버튼이 가장 작을 때도 56px 은 넘는다)
+  // 조작판을 판 자리에 맞춰 통째로 줄이거나 키운다. 태블릿에서는 버튼이 가장 작을 때도 56px 은 넘는다.
+  // 세로로 든 휴대폰은 버튼 7개가 한 줄이라(왼쪽·오른쪽·사이를 묻는 지시가 있어 줄을 나눌 수 없다) 더 줄인다.
+  // 그만큼 지시 화면의 글자를 키워 둔다 (css/style.css 의 휴대폰 묶음)
   layout() {
     const s = this.body;
     const w = this.panel.offsetWidth;
     const h = this.panel.offsetHeight;
-    const k = U.clamp(Math.min((s.clientWidth - 24) / w, (s.clientHeight - 8) / h), 0.55, 1.2);
+    const k = U.clamp(Math.min((s.clientWidth - 24) / w, (s.clientHeight - 8) / h), 0.3, 1.2);
     this.panel.style.transform = `scale(${k})`;
     this.wrap.style.width = `${w * k}px`;
     this.wrap.style.height = `${h * k}px`;

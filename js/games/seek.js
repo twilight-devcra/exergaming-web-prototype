@@ -1,5 +1,5 @@
 // 숨은 순서 찾기
-// 육각형 칸으로 된 육각형 판 어딘가에 왼쪽에 보이는 그림 순서가 일직선으로 딱 한 번 놓여 있다.
+// 육각형 칸으로 된 육각형 판 어딘가에 왼쪽(좁은 화면에서는 위)에 보이는 그림 순서가 일직선으로 딱 한 번 놓여 있다.
 // 그 줄에 속한 칸을 하나만 누르면 된다 — 처음 누른 칸이 정답 줄 위에 있는지로 맞고 틀림을 가린다.
 // 설명 없이도 '어느 방향이든 된다'가 전해지도록:
 //   - 판이 육각형이라 가로줄이 따로 눈에 띄지 않고 여섯 방향이 똑같아 보인다.
@@ -24,7 +24,8 @@ export class SeekGame {
   static id = 'seek';
   static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
   static title = '숨은 순서 찾기';
-  static hint = '왼쪽의 그림 순서가 판 어딘가에 한 줄로 숨어 있습니다<br>그 줄에 있는 칸을 아무거나 하나 누르세요';
+  static STACK_BELOW = 560; // 판 자리가 이보다 좁으면 사슬을 판 위에 둔다 (px)
+  static hint = '빙글빙글 도는 그림 순서가 판 어딘가에 한 줄로 숨어 있습니다<br>그 줄에 있는 칸을 아무거나 하나 누르세요';
   // slanted — 첫 문제를 비스듬한 줄에 숨긴다. 처음 하는 사람이 나올 법한 단계(Lv1~3)에 둔다
   static levels = [
     // 쉬운 단계: 판이 작고(Lv1 은 7칸에 두 개짜리 순서), 그림 종류가 많아 찾는 순서가 눈에 잘 띈다
@@ -109,7 +110,7 @@ export class SeekGame {
     const { cells, syms, seq } = this.puzzle;
     const glyphs = U.shuffle([...SEEK_SYMBOLS]);
 
-    U.say(this.msg, '왼쪽 순서가 놓인 줄을 누르세요', 'act');
+    U.say(this.msg, `${this.isStacked() ? '위' : '왼쪽'} 순서가 놓인 줄을 누르세요`, 'act');
     [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
 
     // 찾을 순서: 천천히 도는 사슬. 그림은 판에서와 같은 방향으로 서 있도록 반대로 돌린다.
@@ -146,14 +147,21 @@ export class SeekGame {
     this.h.timer(cells.length, () => this.pick(-1));
   }
 
+  // 좁은 화면(세로로 든 휴대폰)에서는 사슬을 판 위에 둔다. 나란히 두면 판이 들어갈 너비가 없다
+  isStacked() {
+    return this.body.clientWidth < SeekGame.STACK_BELOW;
+  }
+
   layout() {
     const s = this.body;
-    const { radius, len } = this.spec;
-    // 머리 아래 남은 자리에 판을 맞춘다. 왼쪽에는 사슬이 한 바퀴 돌 자리가 필요하다.
-    const availH = s.clientHeight - 30;
-    const bead = U.clamp(s.clientWidth / 24, 30, 50);
+    const { len } = this.spec;
+    // 머리 아래 남은 자리에 판을 맞춘다. 사슬 옆(좁으면 위)에는 사슬이 한 바퀴 돌 자리가 필요하다.
+    const stack = this.isStacked();
+    this.wrap.classList.toggle('stack', stack);
+    const bead = U.clamp(s.clientWidth / 24, stack ? 22 : 30, 50);
     const side = len * bead + (len - 1) * 6 + 28;
-    const availW = s.clientWidth - side - 48;
+    const availH = s.clientHeight - 30 - (stack ? side + 16 : 0);
+    const availW = s.clientWidth - (stack ? 24 : side + 48);
     const hgt = U.clamp(Math.min(availH, availW / this.aspect), 140, 620);
     this.board.style.height = `${hgt}px`;
     this.board.style.width = `${hgt * this.aspect}px`;

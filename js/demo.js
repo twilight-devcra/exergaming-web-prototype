@@ -427,12 +427,12 @@ export const Demo = {
     this.syncPause();
   },
 
-  // 스테이션 모드의 일시정지: 운영 메뉴(PIN 포함)가 열려 있을 때, '그만하기' 확인 창이 열려 있을 때, 센서로 하던 라운드에서 페달이 끊겼을 때.
-  // 끊김은 다시 연결되면 저절로 풀린다.
+  // 스테이션 모드의 일시정지: 운영 메뉴(PIN 포함)가 열려 있을 때, '그만하기' 확인 창이 열려 있을 때, 센서로 하던 라운드에서 페달이 끊겼을 때,
+  // 휴대폰을 가로로 눕혔을 때 (App.onRotate). 끊김과 눕힘은 다시 연결하거나 세우면 저절로 풀린다.
   syncPause() {
     const a = this.app;
     const lost = a.inRound && a.roundSensor && a.link.state !== 'ready';
-    const want = a.inRound && (this.opOpen || this.pinOpen || this.endOpen || lost);
+    const want = a.inRound && (this.opOpen || this.pinOpen || this.endOpen || lost || a.rotated.matches);
     if (want !== a.paused) a.setPaused(want);
     if (lost && !this.opOpen) {
       const retrying = a.link.state === 'reconnecting' || a.link.state === 'connecting';

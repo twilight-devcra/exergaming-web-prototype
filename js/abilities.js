@@ -15,7 +15,8 @@ export const ABILITIES = [
   { id: 'speed', name: '처리속도', praise: '보고 판단하는 속도가 빨라요' },
 ];
 
-const ABILITY_WEIGHTS = {
+// 아래 두 표는 미니게임 설명서(tools/manual.js)도 읽는다
+export const ABILITY_WEIGHTS = {
   path: { memory: 0.5, spatial: 0.4, attention: 0.1 },
   symbol: { memory: 0.6, spatial: 0.3, attention: 0.1 },
   arith: { memory: 0.2, attention: 0.1, logic: 0.7 },
@@ -30,11 +31,12 @@ const ABILITY_WEIGHTS = {
   pair: { attention: 0.5, spatial: 0.2, speed: 0.3 },
   box: { memory: 0.5, attention: 0.3, logic: 0.2 },
   compare: { attention: 0.7, speed: 0.3 },
+  coin: { spatial: 0.4, logic: 0.4, attention: 0.2 },
 };
 
 // 처리속도 축에 들어가는 게임은 문제당 걸린 시간도 본다 (정답 피드백·연출 시간 포함, 초).
 // fast 이하면 그대로, slow 이상이면 그 게임의 처리속도 몫을 PACE_MIN 배로 깎는다. 문제를 고르는 동안의 시간만 따로 재지 않으므로 대략값이다.
-const ABILITY_PACE = {
+export const ABILITY_PACE = {
   count: { fast: 4, slow: 14 },
   seek: { fast: 5, slow: 18 },
   ladder: { fast: 5, slow: 15 },

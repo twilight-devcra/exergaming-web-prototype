@@ -704,8 +704,8 @@ const App = {
     intro.innerHTML = `
       <div class="tag">${tag}${mult > 1 ? ` · x${mult.toFixed(1)}` : ''}</div>
       <div class="name">${T.title}</div>
-      ${Dg.render(T)}
-      <div class="hint">${T.hint}</div>
+      ${Dg.render(T, level)}
+      <div class="hint">${typeof T.hint === 'function' ? T.hint(level) : T.hint}</div>
       <div class="skip">화면을 누르면 바로 시작합니다</div>`;
     cog.append(intro);
     this.inIntro = true;

@@ -13,5 +13,6 @@ import { FollowGame } from './follow.js';
 import { PairGame } from './pair.js';
 import { BoxGame } from './box.js';
 import { CompareGame } from './compare.js';
+import { CoinGame } from './coin.js';
 
-export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame];
+export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame];

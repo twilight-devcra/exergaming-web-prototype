@@ -106,7 +106,7 @@ body[data-theme="scenic"] {
    길 따라 그리기·가린 숫자 더하기는 판이 카드 너비를 다 써서 게임이 판 자리를 --mat-* 로 알려 준다 (js/games/path.js, cover.js) */
 #cog :is(.nv-wrap, .tr-wrap, .cp-wrap, .pr-wrap, .seek-side, .seek-board, .lad-svg,
          .sym-target, .sym-grid, .ar-eq, .ar-cands, .cnt-grid, .cnt-opts, .fit-board, .fit-cands,
-         .bx-arena, .bx-opts, .cmp-board, .cmp-opts, .cv-opts) {
+         .bx-arena, .bx-opts, .cmp-board, .cmp-opts, .cv-opts, .cn-arena, .cn-legend, .cn-opts) {
   background: var(--panel);
   border-radius: 12px;
   box-shadow: var(--mat-shadow);
@@ -116,10 +116,11 @@ body[data-theme="scenic"] {
    보기가 아직 없을 때(상자 속 과일 세기는 상자를 다 연 뒤에 나온다)는 빈 바탕을 그리지 않는다.
    게임은 이 간격을 U.gapOf 로 읽어 판 크기를 맞춘다 (js/games/count.js 등) */
 #cog { --answer-gap: calc(2 * var(--mat-pad) + 20px); }
-#cog :is(.sym-wrap, .ar-wrap, .cnt-wrap, .fit-wrap, .bx-wrap, .cmp-wrap) { gap: var(--answer-gap); }
+#cog :is(.sym-wrap, .ar-wrap, .cnt-wrap, .fit-wrap, .bx-wrap, .cmp-wrap, .cn-wrap) { gap: var(--answer-gap); }
+#cog .cn-side { gap: var(--answer-gap); }
 #cog .cv-center { gap: calc(var(--tk) * 0.3 + var(--answer-gap)); }
 #cog .cnt-opts { padding-bottom: 0; }
-#cog :is(.ar-cands, .cnt-opts, .fit-cands, .bx-opts, .cmp-opts, .cv-opts):empty { background: none; box-shadow: none; }
+#cog :is(.ar-cands, .cnt-opts, .fit-cands, .bx-opts, .cmp-opts, .cv-opts, .cn-opts):empty { background: none; box-shadow: none; }
 
 /* 판 자리(.stage-body)를 흰 여백만큼 줄여, 여백·테두리가 안내 문구나 카드 가장자리에 닿지 않게 한다.
    게임은 판 자리의 크기를 재서 판을 맞추므로 저절로 그 안에 들어간다 */

@@ -1036,6 +1036,38 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .dg-cmp-ico.same { stroke: var(--good); }
 .dg-cmp-ico.diff { stroke: var(--bad); }
 
+/* 동전 세기: 나무 테두리 탁자 위의 동전 (탁자·동전 색은 그림 안에 정해 둔다 — 화면 스타일과 상관없이 진짜 물건처럼).
+   넓은 화면은 .side: 탁자 오른쪽에 값 표와 그 아래 보기를, 좁은 화면은 탁자 · 값 표 · 보기를 위에서 아래로 (js/games/coin.js layout) */
+.cn-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+.cn-wrap.side { flex-direction: row; }
+.cn-side { flex: none; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.cn-arena { display: block; flex: none; touch-action: none; border-radius: 16px; }
+.cn-coin { transform-box: view-box; animation: cn-drop 0.22s ease-out both; }
+@keyframes cn-drop { from { opacity: 0; transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) {
+  .cn-coin, .cn-legend.flash { animation: none; }
+}
+/* 답한 뒤 동전 위에 적는 번호·값 */
+.cn-label { fill: #fff; stroke: rgba(0, 0, 0, 0.75); stroke-width: 2.4px; paint-order: stroke; font-weight: 800; font-family: var(--font-num); animation: bx-in 0.2s ease-out both; pointer-events: none; }
+/* 값 표: 넓은 화면(보기 위)은 두 칸씩, 좁은 화면은 가로로 늘어놓고 넘치면 줄을 바꾼다. 값이 문제마다 바뀌므로 새 문제마다 한 번 반짝인다 */
+.cn-legend { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 14px; background: var(--cell); }
+.cn-legend.flash { animation: cn-flash 0.9s ease-out; }
+@keyframes cn-flash { 0%, 60% { box-shadow: 0 0 0 4px var(--accent); } }
+.cn-legend-title { font-size: 15px; font-weight: 700; color: var(--ink-soft); text-align: center; }
+.cn-rows { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 22px; }
+.cn-legend { max-width: 100%; }
+.cn-wrap:not(.side) .cn-rows { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; }
+.cn-row { display: flex; align-items: center; gap: 6px; font-size: clamp(20px, 3.4vh, 26px); font-weight: 800; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cn-ico { height: clamp(30px, 5vh, 38px); width: auto; aspect-ratio: 6 / 5; flex: none; display: block; }
+.cn-val::before { content: "= "; color: var(--ink-soft); font-weight: 600; }
+.cn-val small, .cn-opt small { font-size: 0.55em; font-weight: 700; margin-left: 0.06em; }
+.cn-n { min-width: 2em; font-size: 0.75em; color: var(--accent); }
+/* 보기: 값 표 아래 한 줄 (옆 칸이 낮아야 태블릿에서 탁자가 위아래를 다 쓴다) */
+.cn-opts { flex: none; flex-wrap: nowrap; }
+.cn-opt { width: auto; min-width: clamp(72px, 12vh, 104px); padding: 0 10px; white-space: nowrap; animation: pop 0.18s ease-out; }
+.cn-opt:disabled:not(.right, .wrong, .answer) { opacity: 0.25; }
+.cn-opt.right { background: var(--good); color: var(--on-accent); opacity: 1; }
+
 /* 짝 없는 것 찾기: 빨랫줄의 양말 */
 .pr-wrap { display: flex; align-items: center; justify-content: center; }
 .pr-board { display: block; touch-action: none; overflow: visible; }

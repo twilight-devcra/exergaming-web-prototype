@@ -16,7 +16,7 @@ These match the eight existing games (`js/games/*.js`), so a new game slots into
 - **Input.** Taps only, with targets at least 56 px on a 1280×800 tablet. The player is pedalling, so nothing needs precise or rapid tapping, dragging, typing or reading more than a few words.
 - **Colour.** Never tell things apart by colour alone. Every colour gets a matching shape, as in the existing glyph sets (`SYMBOLS`, `COUNT_COLORS`, `COVER_MARKS`, `LADDER_PEGS`).
 - **Timing.** Use `host.after` (the game clock) for anything timed, and `host.now()` for positions in a moving animation, so operator pauses, pedal disconnects and intros stop the game too. Do not use `setTimeout` or `performance.now()` for game logic.
-- **Self-explaining.** The intro shows a two-step diagram (`static diagram()`, drawn with `js/diagram.js`) and a two-line `hint`. The first question should teach the rule without more text.
+- **Self-explaining.** The intro shows a two-step diagram (`static diagram(level)`, drawn with `js/diagram.js`) and a two-line `hint` (a string, or `static hint(level)` when the task changes with level, as in 동전 세기). The first question should teach the rule without more text.
 - **Feedback.** On a wrong answer or timeout, show the right answer for about a second, then move on.
 - **Instruction line.** Create one `stage-msg` element and place it **directly above the board**, inside the game's wrapper after the progress dots, so it sits where the player is looking. Change it only through `U.say(el, text, kind)`. Pick the kind that matches what to do: `look` (watch or remember), `act` (tap something), `good`, `bad`, or `''` for no icon. Keep the text short, like "새로 나타난 그림을 누르세요". The question timer attaches itself just under this line. Don't let the wrapper take all spare height (`flex: 1`); the instruction and board should centre together.
 
@@ -33,6 +33,7 @@ These match the eight existing games (`js/games/*.js`), so a new game slots into
    - `host.answer({ correct, timedOut, ... })` for the final answer
 7. Run the puzzle generator a few hundred times in Node for every level. Check that each puzzle has exactly one answer and never hangs (see how the easy levels were tested).
 8. Update the list of minigames in `DEMO_BRIEF.md`.
+9. Describe every level key in the file's header comment as `//   name — description` (exactly three spaces after `//`, deeper indentation for continuation lines), then run `node tools/manual.js` to regenerate the manual pages in `docs/games/`. Run it again whenever `levels` change.
 
 ### Effect on game order
 

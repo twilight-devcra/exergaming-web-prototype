@@ -26,9 +26,10 @@ export const Dg = {
     return `<circle class="dg-tap" cx="${x}" cy="${y}" r="${r}"/>`;
   },
 
-  render(T) {
+  // level = 이번 판의 레벨. 레벨에 따라 할 일이 바뀌는 게임은 diagram(level) 에서 그림을 고른다 (동전 세기)
+  render(T, level) {
     if (!T.diagram) return '';
-    const steps = T.diagram();
+    const steps = T.diagram(level);
     return `<div class="dg">${steps.map((s, i) =>
       `${i ? '<div class="dg-arrow">→</div>' : ''}<figure class="dg-step">${s.svg}<figcaption><b>${'①②③'[i]}</b> ${s.caption}</figcaption></figure>`
     ).join('')}</div>`;

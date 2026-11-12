@@ -6,14 +6,14 @@
   <!-- 파일 주소 끝의 ?v= 는 고칠 때마다 바꾼다 (node tools/stamp.js). 브라우저가 예전 파일과 새 파일을 섞어 쓰다 멈추는 일을 막는다 -->
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>두뇌 PT</title>
-  <link rel="icon" href="logo.svg?v=20261110" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=20261112" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
-  <link rel="stylesheet" href="../css/style.css?v=20261110">
-  <link rel="stylesheet" href="../css/themes.css?v=20261110">
-  <link rel="stylesheet" href="app.css?v=20261110">
+  <link rel="stylesheet" href="../css/style.css?v=20261112">
+  <link rel="stylesheet" href="../css/themes.css?v=20261112">
+  <link rel="stylesheet" href="app.css?v=20261112">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -177,7 +177,7 @@
   <section id="attract" class="screen">
     <div class="att-main">
       <div class="att-logo">
-        <img src="logo.svg?v=20261110" alt="">
+        <img src="logo.svg?v=20261112" alt="">
         <h1>두뇌 <span>PT</span></h1>
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
@@ -436,48 +436,49 @@
   <div id="debug"></div>
 
   <!-- QR 그리기 라이브러리는 모듈이 아닌 보통 스크립트다 (전역 qrcode) -->
-  <script src="vendor/qrcode.js?v=20261110"></script>
+  <script src="vendor/qrcode.js?v=20261112"></script>
   <!-- 게임 코드는 ES 모듈이다. import 주소에도 ?v= 가 붙도록 모든 모듈을 이 지도에 적는다.
        node tools/stamp.js 가 만들므로 직접 고치지 않는다 -->
   <script type="importmap">
   {
     "imports": {
-      "./attract-visual.js": "./attract-visual.js?v=20261110",
-      "./calib-visual.js": "./calib-visual.js?v=20261110",
-      "./members.js": "./members.js?v=20261110",
-      "../js/abilities.js": "../js/abilities.js?v=20261110",
-      "../js/audio.js": "../js/audio.js?v=20261110",
-      "../js/band.js": "../js/band.js?v=20261110",
-      "../js/cadence-est.js": "../js/cadence-est.js?v=20261110",
-      "../js/config.js": "../js/config.js?v=20261110",
-      "../js/demo.js": "../js/demo.js?v=20261110",
-      "../js/diagram.js": "../js/diagram.js?v=20261110",
-      "../js/exercise.js": "../js/exercise.js?v=20261110",
-      "../js/fx.js": "../js/fx.js?v=20261110",
-      "../js/games/arith.js": "../js/games/arith.js?v=20261110",
-      "../js/games/box.js": "../js/games/box.js?v=20261110",
-      "../js/games/compare.js": "../js/games/compare.js?v=20261110",
-      "../js/games/count.js": "../js/games/count.js?v=20261110",
-      "../js/games/cover.js": "../js/games/cover.js?v=20261110",
-      "../js/games/fit.js": "../js/games/fit.js?v=20261110",
-      "../js/games/follow.js": "../js/games/follow.js?v=20261110",
-      "../js/games/index.js": "../js/games/index.js?v=20261110",
-      "../js/games/ladder.js": "../js/games/ladder.js?v=20261110",
-      "../js/games/novel.js": "../js/games/novel.js?v=20261110",
-      "../js/games/pair.js": "../js/games/pair.js?v=20261110",
-      "../js/games/path.js": "../js/games/path.js?v=20261110",
-      "../js/games/seek.js": "../js/games/seek.js?v=20261110",
-      "../js/games/symbol.js": "../js/games/symbol.js?v=20261110",
-      "../js/games/track.js": "../js/games/track.js?v=20261110",
-      "../js/main.js": "../js/main.js?v=20261110",
-      "../js/pedal-link.js": "../js/pedal-link.js?v=20261110",
-      "../js/pedal.js": "../js/pedal.js?v=20261110",
-      "../js/session-log.js": "../js/session-log.js?v=20261110",
-      "../js/session-upload.js": "../js/session-upload.js?v=20261110",
-      "../js/themes.js": "../js/themes.js?v=20261110"
+      "./attract-visual.js": "./attract-visual.js?v=20261112",
+      "./calib-visual.js": "./calib-visual.js?v=20261112",
+      "./members.js": "./members.js?v=20261112",
+      "../js/abilities.js": "../js/abilities.js?v=20261112",
+      "../js/audio.js": "../js/audio.js?v=20261112",
+      "../js/band.js": "../js/band.js?v=20261112",
+      "../js/cadence-est.js": "../js/cadence-est.js?v=20261112",
+      "../js/config.js": "../js/config.js?v=20261112",
+      "../js/demo.js": "../js/demo.js?v=20261112",
+      "../js/diagram.js": "../js/diagram.js?v=20261112",
+      "../js/exercise.js": "../js/exercise.js?v=20261112",
+      "../js/fx.js": "../js/fx.js?v=20261112",
+      "../js/games/arith.js": "../js/games/arith.js?v=20261112",
+      "../js/games/box.js": "../js/games/box.js?v=20261112",
+      "../js/games/coin.js": "../js/games/coin.js?v=20261112",
+      "../js/games/compare.js": "../js/games/compare.js?v=20261112",
+      "../js/games/count.js": "../js/games/count.js?v=20261112",
+      "../js/games/cover.js": "../js/games/cover.js?v=20261112",
+      "../js/games/fit.js": "../js/games/fit.js?v=20261112",
+      "../js/games/follow.js": "../js/games/follow.js?v=20261112",
+      "../js/games/index.js": "../js/games/index.js?v=20261112",
+      "../js/games/ladder.js": "../js/games/ladder.js?v=20261112",
+      "../js/games/novel.js": "../js/games/novel.js?v=20261112",
+      "../js/games/pair.js": "../js/games/pair.js?v=20261112",
+      "../js/games/path.js": "../js/games/path.js?v=20261112",
+      "../js/games/seek.js": "../js/games/seek.js?v=20261112",
+      "../js/games/symbol.js": "../js/games/symbol.js?v=20261112",
+      "../js/games/track.js": "../js/games/track.js?v=20261112",
+      "../js/main.js": "../js/main.js?v=20261112",
+      "../js/pedal-link.js": "../js/pedal-link.js?v=20261112",
+      "../js/pedal.js": "../js/pedal.js?v=20261112",
+      "../js/session-log.js": "../js/session-log.js?v=20261112",
+      "../js/session-upload.js": "../js/session-upload.js?v=20261112",
+      "../js/themes.js": "../js/themes.js?v=20261112"
     }
   }
   </script>
-  <script type="module" src="../js/main.js?v=20261110"></script>
+  <script type="module" src="../js/main.js?v=20261112"></script>
 </body>
 </html>

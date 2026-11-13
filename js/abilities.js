@@ -32,6 +32,7 @@ export const ABILITY_WEIGHTS = {
   box: { memory: 0.5, attention: 0.3, logic: 0.2 },
   compare: { attention: 0.7, speed: 0.3 },
   coin: { spatial: 0.4, logic: 0.4, attention: 0.2 },
+  recall: { memory: 0.7, attention: 0.3 },
 };
 
 // 처리속도 축에 들어가는 게임은 문제당 걸린 시간도 본다 (정답 피드백·연출 시간 포함, 초).

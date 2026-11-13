@@ -1,4 +1,4 @@
-[← 설명서 목차·공통 규칙](README.md) · [← 두 그림 비교하기](compare.md)
+[← 설명서 목차·공통 규칙](README.md) · [← 두 그림 비교하기](compare.md) · [차례대로 외우기 →](recall.md)
 
 # 동전 세기 (`coin`)
 

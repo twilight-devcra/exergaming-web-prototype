@@ -32,3 +32,4 @@
 13. [상자 속 과일 세기](box.md) — `box`
 14. [두 그림 비교하기](compare.md) — `compare`
 15. [동전 세기](coin.md) — `coin`
+16. [차례대로 외우기](recall.md) — `recall`

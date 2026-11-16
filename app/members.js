@@ -8,6 +8,11 @@
 import { SESSION_DIFFICULTIES } from '../js/config.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
+import { drawCard, saveCard } from './member-card.js';
+
+// 휴대폰에서 하는 판인가. 휴대폰은 제 화면을 제 카메라로 비출 수 없으므로 회원 카드를 사진으로 저장하고 사진으로 읽는다.
+// 화면의 짧은 쪽이 600px 보다 작은 터치 기기 (스테이션 태블릿은 800px 쯤이다)
+const onPhone = () => matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
 
 const Members = {
   KEY: 'exergame.members',
@@ -218,6 +223,30 @@ const QrScanner = {
     loop();
   },
 
+  // 사진 파일 하나에서 QR 내용을 읽는다 (없으면 null). 회원 카드 그림은 QR 이 크지만, 결과 화면을 캡처한 사진처럼 작은 QR 도
+  // 읽히도록 jsQR 은 두 크기로 해 본다 (너무 큰 사진은 jsQR 이 느리고, 너무 줄이면 작은 QR 이 뭉개진다)
+  async readImage(file) {
+    const bmp = await createImageBitmap(file);
+    try {
+      if ('BarcodeDetector' in window && (await BarcodeDetector.getSupportedFormats()).includes('qr_code')) {
+        const found = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bmp);
+        if (found.length) return found[0].rawValue;
+      }
+    } catch (e) { }
+    await this.loadJsQR();
+    const cv = document.createElement('canvas');
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    for (const side of [1600, 800]) {
+      const k = Math.min(1, side / Math.max(bmp.width, bmp.height));
+      cv.width = Math.round(bmp.width * k);
+      cv.height = Math.round(bmp.height * k);
+      g.drawImage(bmp, 0, 0, cv.width, cv.height);
+      const r = jsQR(g.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: 'attemptBoth' });
+      if (r) return r.data;
+    }
+    return null;
+  },
+
   loadJsQR() {
     if (window.jsQR) return Promise.resolve();
     return new Promise((res, rej) => {
@@ -260,6 +289,15 @@ export const MemberUI = {
     $('#lg-guest').onclick = () => this.asGuest();
     $('#lg-code').onclick = () => this.showPad(true);
     $('#lg-pad-cancel').onclick = () => this.showPad(false);
+    $('#lg-photo').onclick = () => {
+      const f = $('#lg-photo-file');
+      f.value = ''; // 같은 사진을 다시 골라도 change 가 오게
+      f.click();
+    };
+    $('#lg-photo-file').addEventListener('change', (e) => {
+      demo.activeAt = app.clock; // 사진을 고르는 동안 자리 비움으로 넘어가지 않게
+      if (e.target.files[0]) this.fromPhoto(e.target.files[0]);
+    });
     $('#lg-keys').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
@@ -285,6 +323,8 @@ export const MemberUI = {
     this.user = null;
     this.guest = false;
     this.showPad(false);
+    document.getElementById('lg-photo').hidden = !onPhone();
+    document.getElementById('lg-photo-msg').textContent = '';
     a.show('login');
     a.state = 'login';
     this.demo.activeAt = a.clock;
@@ -297,7 +337,7 @@ export const MemberUI = {
     const box = document.querySelector('.lg-cam');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       box.classList.add('off');
-      msg.textContent = '이 기기에서는 카메라를 쓸 수 없어요. 번호로 들어가 주세요';
+      msg.textContent = onPhone() ? '이 기기에서는 카메라를 쓸 수 없어요. 사진이나 번호로 들어가 주세요' : '이 기기에서는 카메라를 쓸 수 없어요. 번호로 들어가 주세요';
       return;
     }
     QrScanner.start(document.getElementById('lg-video'), (text) => {
@@ -306,9 +346,28 @@ export const MemberUI = {
     }, (st) => {
       box.classList.toggle('off', st === 'denied');
       msg.textContent = st === 'denied'
-        ? '카메라를 켜지 못했어요. 번호로 들어가 주세요'
+        ? (onPhone() ? '카메라를 켜지 못했어요. 사진이나 번호로 들어가 주세요' : '카메라를 켜지 못했어요. 번호로 들어가 주세요')
         : st === 'starting' ? '카메라를 켜는 중…' : '휴대폰에 찍어 둔 QR 코드를 화면 위쪽 카메라에 비춰 주세요';
     });
+  },
+
+  // 사진으로 들어가기: 고른 사진에서 회원 번호를 읽는다
+  async fromPhoto(file) {
+    const msg = document.getElementById('lg-photo-msg');
+    msg.className = 'lg-photo-msg';
+    msg.textContent = '사진을 읽는 중…';
+    let id = null;
+    try {
+      id = Members.parse((await QrScanner.readImage(file)) || '');
+    } catch (e) { }
+    if (this.app.state !== 'login') return;
+    if (id) {
+      msg.textContent = '';
+      this.login(id);
+    } else {
+      msg.className = 'lg-photo-msg bad';
+      msg.textContent = '이 사진에서 회원 카드를 찾지 못했어요. 저장해 둔 회원 카드 사진을 골라 주세요';
+    }
   },
 
   asGuest() {
@@ -516,7 +575,33 @@ export const MemberUI = {
       look: (a.log && a.log.meta.landmark) || null,
     });
     document.getElementById('dr-id').textContent = `회원 ${Members.format(id)}`;
-    if (fresh) {
+    if (fresh && onPhone()) {
+      // 휴대폰: 이 휴대폰으로 QR 을 비출 수 없으니 회원 카드 그림을 바로 갤러리에 저장한다 (app/card.html 과 같은 그림).
+      // 그림은 미리 그려 둔다: iPhone 의 공유 창(navigator.share)은 누른 순간 곧바로 불러야 열린다
+      screen.classList.add('with-card');
+      box.innerHTML = `
+        <div class="dm-new dm-phone">
+          <h4><em>새 회원</em>회원 카드를 이 휴대폰에 저장하세요</h4>
+          <button class="dm-save" type="button" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            회원 카드 저장
+          </button>
+          <p class="dm-save-msg" aria-live="polite"></p>
+          <p class="dm-id">다음에는 '회원 카드가 있으신가요?' 화면에서 <strong>사진으로 들어가기</strong>를 누르고 저장한 카드를 고르세요. 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
+        </div>`;
+      const btn = box.querySelector('.dm-save');
+      const msg = box.querySelector('.dm-save-msg');
+      let blob = null;
+      drawCard(id).then((b) => {
+        blob = b;
+        btn.disabled = false;
+      });
+      btn.onclick = async () => {
+        if (!blob) return;
+        const m = await saveCard(blob, id);
+        if (m) msg.textContent = m;
+      };
+    } else if (fresh) {
       screen.classList.add('with-card');
       // 사진으로 찍어 두면 QR 이 작아 태블릿이 잘 못 읽는다. 휴대폰 카메라로 비춰 링크를 열고, 회원 카드 화면(app/card.html)에서
       // '갤러리에 저장' 한 큰 QR 그림을 쓰도록 안내한다. 결과 화면에서 눈에 잘 띄도록 따로 강조한 칸에 둔다

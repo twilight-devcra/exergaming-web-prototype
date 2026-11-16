@@ -1864,7 +1864,13 @@ body.demo #op-corner {
 .op-sessions { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--bg); }
 .op-sessions h2 { font-size: 16px; }
 .op-log { max-height: 34vh; }
-@media (max-width: 700px) { .op-box { flex-direction: column; overflow-y: auto; } }
+/* 좁은 화면(휴대폰): 두 칸을 위아래로 쌓고 상자를 스크롤한다. 칸이 상자 높이에 맞춰 줄어들면(flex: 1 · min-height: 0)
+   내용이 칸 밖으로 넘쳐 서로 겹치므로, 칸은 내용 높이 그대로 둔다 */
+@media (max-width: 700px) {
+  .op-box { flex-direction: column; overflow-y: auto; padding: 20px 18px; gap: 20px; }
+  .op-col { flex: none; }
+  .op-col + .op-col { padding-top: 16px; border-top: 1px solid var(--bg); }
+}
 #op-set { z-index: 410; background: var(--scrim); }
 .op-set-box {
   display: flex;

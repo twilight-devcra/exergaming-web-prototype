@@ -477,6 +477,10 @@ body[data-theme="scenic"] {
 .lg-guest { background: var(--accent); color: var(--on-accent); }
 .lg-guest small { color: rgba(255, 255, 255, 0.85); }
 .lg-opt:active { transform: scale(0.98); }
+.lg-opt[hidden] { display: none; }
+.lg-photo-msg { margin: 0; min-height: 1.4em; font-size: 15px; color: var(--ink-soft); text-align: center; }
+.lg-photo-msg:empty { display: none; }
+.lg-photo-msg.bad { color: var(--bad); font-weight: 700; }
 .lg-pad { display: flex; flex-direction: column; align-items: stretch; gap: 10px; background: var(--panel); border-radius: 24px; padding: 18px; box-shadow: var(--card-shadow); }
 .lg-pad[hidden], .lg-choices[hidden] { display: none; }
 .lg-digits { display: flex; justify-content: center; gap: 6px; }
@@ -565,6 +569,17 @@ body[data-theme="scenic"] {
 #demo-result.with-card .dr-grid { grid-template-columns: 1.55fr 1.15fr 0.95fr; }
 #demo-result.with-card .dr-score { justify-content: flex-start; }
 #demo-result.with-card .dr-total { font-size: clamp(48px, 9vh, 88px); }
+/* 휴대폰의 새 회원 카드: QR 대신 '회원 카드 저장' 단추 (app/members.js onResult) */
+.dm-save {
+  width: 100%; padding: 14px 18px; border: 0; border-radius: 16px; background: var(--accent); color: var(--on-accent);
+  font: 700 19px var(--font); display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+}
+.dm-save svg { width: 22px; height: 22px; }
+.dm-save:disabled { opacity: 0.6; }
+.dm-save:active { transform: translateY(1px); }
+.dm-save-msg { margin: 8px 0 0; font-size: 14px; font-weight: 700; color: var(--good, #15803d); }
+.dm-save-msg:empty { display: none; }
+.dm-phone .dm-id strong { color: var(--accent); }
 .dm-saved { margin: 0; font-size: 18px; color: var(--ink); }
 .dm-saved span { font-size: 15px; color: var(--ink-soft); }
 .dm-note { margin: 0; color: var(--ink-soft); }

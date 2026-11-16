@@ -22,7 +22,7 @@ const OUT = path.join(ROOT, 'docs/games');
 globalThis.document = { documentElement: { dataset: {} }, querySelector: () => null, createElement: () => ({}) };
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.matchMedia = () => ({ matches: false, addEventListener() {} });
-globalThis.location = { pathname: '/', search: '', hash: '' }; // js/dev-storage.js 가 /dev/ 인지 본다
+globalThis.location = { pathname: '/', search: '', hash: '', hostname: 'localhost' }; // js/dev-storage.js · js/config.js 가 주소를 본다
 
 const load = (rel) => import(pathToFileURL(path.join(ROOT, rel)).href);
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');

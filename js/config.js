@@ -1,6 +1,6 @@
 // 조절 가능한 설정값. 테스트 화면(메뉴)의 설정 탭에서 바꾼 값은 localStorage에 저장된다.
 // 시험용 배포(/dev/)는 저장소 이름을 따로 쓴다. 다른 모든 코드보다 먼저 적용되도록 맨 먼저 불러온다
-import './dev-storage.js';
+import { DEV_BUILD } from './dev-storage.js';
 
 // 난이도 단계. Lv1·Lv2 는 50~60대에게 원래의 첫 단계도 버겁다는 의견을 받고 그 아래에 더한 쉬운 단계다 (2026-10-21).
 // 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이다. 점수 배율은 Lv1 부터 오른다 (levelMult).
@@ -189,7 +189,16 @@ const MUSIC_KEY = 'exergame.music';
 //   GET <historyUrl>?user=<회원 번호> 에 그 회원의 세션 요약 목록으로 답해야 한다 (docs/SERVER.md)
 // localHistory: 시험용. true 면 historyUrl 대신 이 태블릿의 세션 로그가 회원 기록 서버 노릇을 한다 (app/members.js 의 Members.localServer).
 //   주소 칸이 비었다고 저절로 켜지지 않는다. 운영 메뉴의 체크 칸이나 여기서 일부러 켜야 한다
-export const SESSION_UPLOAD = { url: '', key: '', historyUrl: '', localHistory: false };
+// 서버: api/ (docs/SERVER.md). env 로 데이터를 나눈다 — dev 브랜치 미리 보기(/dev/)는 dev, 로컬 서버(localhost)는 local, 배포는 prod.
+// 그래야 시험한 판이 운영 회원 기록과 밸런스 집계에 섞이지 않는다 (관리 화면에서 env 를 골라 볼 수 있다)
+const API = 'https://exergame-api.devcra.com';
+const API_ENV = DEV_BUILD ? 'dev' : /^(localhost|127\.)/.test(location.hostname) ? 'local' : 'prod';
+export const SESSION_UPLOAD = {
+  url: `${API}/sessions?env=${API_ENV}`,
+  key: '5889289582df21471042c592bceb257e', // 업로드 · 회원 기록 요약 읽기만 되는 키 (서버의 UPLOAD_KEY)
+  historyUrl: `${API}/history?env=${API_ENV}`,
+  localHistory: false,
+};
 
 // 운영 메뉴를 여는 PIN (왼쪽 위 모서리를 2초 길게 누른 뒤 입력). 비워 두면 PIN 없이 바로 열린다 (2026-11-05: 지금은 필요 없음). 다시 쓰려면 네 자리 숫자를 넣는다
 export const APP_OPERATOR_PIN = '';

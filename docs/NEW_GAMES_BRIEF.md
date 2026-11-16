@@ -27,6 +27,7 @@ These match the eight existing games (`js/games/*.js`), so a new game slots into
 3. In `app/app.css`, add the game's board wrapper to the "판 바탕" selector list, so the app's dotted card texture stays out of the playing field. This works when the wrapper is sized to the board. If the board fills the card width, report the field's rectangle as `--mat-x/y/w/h` the way `js/games/path.js` does. If the game has a problem plus answer buttons, tray them separately instead (the problem element and the answers container both go in that list), and read the gap between them with `U.gapOf(wrap, fallback)` in the size math, since the app widens it (see `js/games/count.js`).
 4. Add a `questionTime` entry in `js/config.js` and say in its comment what the "load" is.
 5. Add `ABILITY_WEIGHTS` in `js/abilities.js`, and `ABILITY_PACE` if the game feeds the speed axis.
+   Also list the cognitive subdomains the game targets in `GAME_TARGETS` in `tools/targets.js` (prefix `~` for partly). Before designing a game, check [docs/games/TARGETS.md](games/TARGETS.md) for the gaps.
 6. Log through the host:
    - `host.question(...)` with everything needed to replay the question
    - `host.input(...)` for picks along the way

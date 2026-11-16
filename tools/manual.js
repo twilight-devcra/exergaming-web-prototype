@@ -8,18 +8,21 @@
 //   - 고정값         — 'static 대문자_이름 = 값; // 설명' 줄
 //   - 제한 시간      — js/config.js 의 questionTime 과 그 위 '일의 양' 주석
 //   - 능력 그래프    — js/abilities.js 의 ABILITY_WEIGHTS · ABILITY_PACE
+//   - 노리는 능력    — tools/targets.js (이것으로 점검표 TARGETS.md 도 만든다: 아직 노리지 않은 능력 찾기)
 // 그래서 설명서를 고치려면 게임 파일의 주석이나 값을 고친 뒤 이 스크립트를 다시 돌린다.
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..');
+const { DOMAINS, GAME_TARGETS, PLANNED } = require('./targets.js');
 const OUT = path.join(ROOT, 'docs/games');
 
 // 게임 모듈은 브라우저용이라 불러오는 순간 몇 가지 전역을 찾는다. 읽기만 하므로 빈 껍데기로 충분하다
 globalThis.document = { documentElement: { dataset: {} }, querySelector: () => null, createElement: () => ({}) };
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.matchMedia = () => ({ matches: false, addEventListener() {} });
+globalThis.location = { pathname: '/', search: '', hash: '' }; // js/dev-storage.js 가 /dev/ 인지 본다
 
 const load = (rel) => import(pathToFileURL(path.join(ROOT, rel)).href);
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -144,41 +147,60 @@ function fmt(key, v) {
   const abilityName = Object.fromEntries(ABILITIES.map((a) => [a.id, a.name]));
   const LV = GAME_TYPES[0].levels.length;
 
+  // ---- 노리는 능력 (tools/targets.js) ----
+  // '~id' 는 일부. 없는 id 를 적으면 멈춘다 (오타가 점검표에서 조용히 빠지지 않게)
+  const SUBS = new Map(DOMAINS.flatMap((d) => d.subs.map((s) => [s.id, { ...s, domain: d }])));
+  const parseTargets = (list, who) => (list || []).map((t) => {
+    const part = t.startsWith('~');
+    const id = part ? t.slice(1) : t;
+    if (!SUBS.has(id)) throw new Error(`tools/targets.js: ${who} 의 '${t}' — 없는 세부 영역`);
+    return { id, part };
+  });
+  const gameTargets = Object.fromEntries(GAME_TYPES.map((T) => [T.id, parseTargets(GAME_TARGETS[T.id], T.id)]));
+  const unclassified = GAME_TYPES.filter((T) => !GAME_TARGETS[T.id]);
+  const builtIds = new Set(GAME_TYPES.map((T) => T.id));
+  const planned = Object.entries(PLANNED).filter(([id]) => !builtIds.has(id))
+    .map(([id, p]) => ({ id, ...p, targets: parseTargets(p.targets, id) }));
+  const targetText = (ts) => ts.map((t) => `${SUBS.get(t.id).name}${t.part ? ' (부분)' : ''}`).join(' · ');
+
+  const LEGEND = '레벨 표의 `–`는 해당 레벨에서 값을 지정하지 않았다는 뜻입니다 (변수 설명의 기본값을 쓰거나 기능이 꺼짐). `a~b`는 그 범위에서 무작위로 정한다는 뜻입니다.';
   const md = [];
   const GENERATED = [
-    '> 이 폴더의 문서는 `node tools/manual.js` 가 게임 코드에서 만듭니다. 직접 고치지 마세요.',
-    '> 바꾸려면 게임 파일(`js/games/*.js`)의 머리 주석·`levels`·고정값 주석을 고친 뒤 스크립트를 다시 돌립니다.',
+    '> 이 문서는 `node tools/manual.js`가 게임 코드에서 자동으로 생성합니다. 직접 수정하지 마세요.',
+    '> 내용을 바꾸려면 게임 파일(`js/games/*.js`)의 상단 주석, `levels`, 상수 주석을 수정한 뒤 스크립트를 다시 실행하세요.',
   ];
-  md.push('# 미니게임 난이도 설명서');
+  md.push('# 미니게임 난이도 문서');
   md.push('');
   md.push(...GENERATED);
   md.push('');
-  md.push('모든 미니게임은 Lv1~8 의 난이도가 있고, 레벨마다 몇 가지 **손잡이**(난이도를 정하는 값)를 다르게 둡니다.');
-  md.push('게임마다 손잡이의 뜻과 레벨별 값, 문제 수, 제한 시간, 능력 그래프에 들어가는 몫을 적었습니다.');
+  md.push('모든 미니게임은 Lv1~8의 난이도가 있으며, 레벨마다 몇 가지 **난이도 변수** 값이 달라집니다.');
+  md.push('게임별로 난이도 변수의 의미와 레벨별 값, 문제 수, 제한 시간, 능력 그래프 가중치를 정리했습니다.');
   md.push('');
 
   // ---- 공통 ----
-  md.push('## 공통');
+  md.push('## 공통 규칙');
   md.push('');
-  md.push(`- **레벨**: Lv1·Lv2 는 쉬운 단계(어르신용으로 나중에 더함), **Lv${BASE_LEVEL}** 가 기본 시작 레벨입니다. 쉬운 단계는 문제 제한 시간을 Lv1 ×${EASY_TIME[0]}, Lv2 ×${EASY_TIME[1]} 로 늘립니다.`);
-  md.push(`- **제한 시간** = (base + per × 일의 양) 초 × 쉬운 단계 배율 × 라운드 난이도의 \`questionTimeScale\`. 입력을 받기 시작한 때부터 게임 시계로 잽니다. 게임마다 base·per 와 '일의 양' 이 무엇인지 게임 쪽에 적었습니다 (\`js/config.js\` 의 \`questionTime\`).`);
+  md.push(`- **레벨**: Lv1·Lv2는 고령자용으로 추가한 쉬운 단계이고, 기본 시작 레벨은 **Lv${BASE_LEVEL}**입니다. 쉬운 단계에서는 문제 제한 시간이 늘어납니다 (Lv1 ×${EASY_TIME[0]}, Lv2 ×${EASY_TIME[1]}).`);
+  md.push(`- **제한 시간** = (기본 시간 + 단위 시간 × N)초 × 쉬운 단계 배율 × 라운드 난이도의 \`questionTimeScale\`. N은 게임마다 정한 문제 크기(빈칸 수, 조각 수 등)이며, 게임별 문서에 적었습니다. 입력을 받기 시작한 시점부터 게임 시계 기준으로 잽니다 (\`js/config.js\`의 \`questionTime\`).`);
   const mults = Array.from({ length: LV }, (_, i) => `Lv${i + 1} ×${Config.levelMult(DEFAULT_CONFIG, i + 1).toFixed(2)}`);
   md.push(`- **점수 배율** (기본 설정): ${mults.join(' · ')}`);
-  md.push(`- **난이도 계기판** (기본 \`adaptive\`): 모든 게임이 같이 씁니다. 정답마다 +${DEFAULT_CONFIG.diffUp}, 오답·시간 초과마다 −${DEFAULT_CONFIG.diffDown}, 다음 게임 레벨은 계기판의 정수 부분입니다. 켠 게임이 ${DEFAULT_CONFIG.diffGamesRef}종보다 많으면 두 값을 ${DEFAULT_CONFIG.diffGamesRef} / 게임 수 로 줄입니다. 운영 버전은 세션 길이·난이도로 이 값을 따로 정합니다 (\`Config.session\`).`);
-  md.push(`- **능력 그래프**: 게임마다 능력 축(${ABILITIES.map((a) => a.name).join(' · ')})에 몫을 나눠 줍니다. 처리속도 몫이 있는 게임 가운데 몇은 문제당 걸린 시간으로 그 몫을 깎습니다 (느리면 최대 ×${Abilities.PACE_MIN}).`);
-  md.push('- 레벨 표에서 `–` 는 그 레벨에 값을 두지 않았다는 뜻입니다 (손잡이 설명에 적힌 기본값이나 꺼짐). `a~b` 는 그 범위에서 무작위로 고른다는 뜻입니다.');
+  md.push(`- **난이도 자동 조절** (기본 \`adaptive\`): 모든 게임이 하나의 난이도 값을 공유합니다. 정답이면 +${DEFAULT_CONFIG.diffUp}, 오답·시간 초과면 −${DEFAULT_CONFIG.diffDown}이고, 다음 게임의 레벨은 이 값의 정수 부분입니다. 활성화된 게임이 ${DEFAULT_CONFIG.diffGamesRef}종보다 많으면 두 증감 폭에 (${DEFAULT_CONFIG.diffGamesRef} / 게임 수)를 곱합니다. 운영 버전에서는 세션 길이와 난이도 설정에 따라 이 값을 따로 정합니다 (\`Config.session\`).`);
+  md.push(`- **능력 그래프**: 각 게임의 결과를 능력 축(${ABILITIES.map((a) => a.name).join(' · ')})에 가중치를 나눠 반영합니다. 처리속도 가중치가 있는 게임 중 일부는 문제당 소요 시간에 따라 그 가중치를 줄입니다 (느리면 최대 ×${Abilities.PACE_MIN}).`);
+  md.push(`- ${LEGEND}`);
   md.push('');
 
   // ---- 목차 ----
-  md.push('## 게임');
+  md.push('## 게임 목록');
   md.push('');
   GAME_TYPES.forEach((T, i) => md.push(`${i + 1}. [${T.title}](${T.id}.md) — \`${T.id}\``));
+  md.push('');
+  md.push('새 게임을 기획할 때는 [인지 영역 점검표](TARGETS.md)에서 아직 다루지 않은 영역을 확인하세요.');
   md.push('');
 
   // ---- 게임마다 한 쪽 ----
   // 예전에 만든 쪽 가운데 지금 게임 목록에 없는 것(이름을 바꾸거나 뺀 게임)은 지운다. 이 폴더는 통째로 이 스크립트 것이다
   fs.mkdirSync(OUT, { recursive: true });
-  const pages = new Set(['README.md', ...GAME_TYPES.map((T) => `${T.id}.md`)]);
+  const pages = new Set(['README.md', 'TARGETS.md', ...GAME_TYPES.map((T) => `${T.id}.md`)]);
   fs.readdirSync(OUT).filter((f) => f.endsWith('.md') && !pages.has(f)).forEach((f) => fs.unlinkSync(path.join(OUT, f)));
   fs.writeFileSync(path.join(OUT, 'README.md'), md.join('\n'));
 
@@ -197,7 +219,7 @@ function fmt(key, v) {
 
     const prev = GAME_TYPES[gi - 1];
     const next = GAME_TYPES[gi + 1];
-    md.push(`[← 설명서 목차·공통 규칙](README.md)${prev ? ` · [← ${prev.title}](${prev.id}.md)` : ''}${next ? ` · [${next.title} →](${next.id}.md)` : ''}`);
+    md.push(`[← 목차·공통 규칙](README.md)${prev ? ` · [← ${prev.title}](${prev.id}.md)` : ''}${next ? ` · [${next.title} →](${next.id}.md)` : ''}`);
     md.push('');
     md.push(`# ${T.title} (\`${T.id}\`)`);
     md.push('');
@@ -205,11 +227,13 @@ function fmt(key, v) {
     md.push('');
     md.push(summary(head));
     md.push('');
-    md.push(`- 파일: [${file}](../../${file}) — 머리 주석에 왜 그렇게 정했는지가 더 있습니다`);
-    md.push(`- 한 게임: 문제 ${questions}개${T.tags ? ` · 꼬리표: ${T.tags.join(', ')} (꼬리표가 겹치는 게임은 연달아 나오지 않음)` : ''}`);
-    if (qt) md.push(`- 제한 시간: ${qt.base}초 + ${qt.per}초 × 일의 양${loadText[T.id] ? ` — 일의 양: ${loadText[T.id]}` : ''}`);
-    md.push(`- 능력 그래프: ${Object.entries(w).map(([k, v]) => `${abilityName[k]} ${v}`).join(' · ') || '없음'}` +
+    md.push(`- 파일: [${file}](../../${file}) — 설계 의도는 파일 상단 주석에 더 자세히 있습니다`);
+    md.push(`- 문제 수: 게임당 ${questions}개`);
+    if (T.tags) md.push(`- 태그: ${T.tags.join(', ')} (태그가 겹치는 게임은 연달아 나오지 않음)`);
+    if (qt) md.push(`- 제한 시간: ${qt.base}초 + ${qt.per}초 × N${loadText[T.id] ? `, N = ${loadText[T.id]}` : ''}`);
+    md.push(`- 능력 그래프 가중치: ${Object.entries(w).map(([k, v]) => `${abilityName[k]} ${v}`).join(' · ') || '없음'}` +
       (pace ? ` (처리속도: 문제당 ${pace.fast}초 이하면 그대로, ${pace.slow}초 이상이면 ×${Abilities.PACE_MIN})` : ''));
+    md.push(`- 인지 영역: ${targetText(gameTargets[T.id]) || '*지정하지 않음 — tools/targets.js*'} ([점검표](TARGETS.md))`);
     md.push('');
 
     // 손잡이 설명: 레벨에 실제로 쓰인 것 + 설명만 있는 것. 쓰인 순서는 설명 순서를 따르고, 설명이 없는 것은 뒤에
@@ -218,12 +242,12 @@ function fmt(key, v) {
     const described = ks.flatMap((k) => k.names);
     const cols = [...described.filter((k) => used.includes(k)), ...used.filter((k) => !described.includes(k))];
 
-    md.push('## 손잡이');
+    md.push('## 난이도 변수');
     md.push('');
-    md.push('| 손잡이 | 뜻 |');
+    md.push('| 변수 | 설명 |');
     md.push('|---|---|');
-    ks.forEach((k) => md.push(`| ${k.names.map((n) => `\`${n}\``).join(' · ')} | ${esc(k.text)}${k.names.some((n) => used.includes(n)) ? '' : ' *(지금은 어느 레벨에도 두지 않음)*'} |`));
-    used.filter((k) => !described.includes(k)).forEach((k) => md.push(`| \`${k}\` | *(머리 주석에 설명 없음 — 소스 참고)* |`));
+    ks.forEach((k) => md.push(`| ${k.names.map((n) => `\`${n}\``).join(' · ')} | ${esc(k.text)}${k.names.some((n) => used.includes(n)) ? '' : ' *(현재 어느 레벨에서도 쓰지 않음)*'} |`));
+    used.filter((k) => !described.includes(k)).forEach((k) => md.push(`| \`${k}\` | *(상단 주석에 설명 없음 — 소스 참고)* |`));
     md.push('');
 
     md.push('## 레벨별 값');
@@ -237,18 +261,87 @@ function fmt(key, v) {
     md.push('');
 
     if (consts.length) {
-      md.push('## 고정값 (모든 레벨 공통)');
+      md.push('## 상수 (모든 레벨 공통)');
       md.push('');
-      md.push('| 이름 | 값 | 뜻 |');
+      md.push('| 이름 | 값 | 설명 |');
       md.push('|---|---|---|');
       consts.forEach((c) => md.push(`| \`${c.name}\` | \`${esc(c.value)}\` | ${esc(c.text)} |`));
       md.push('');
     }
-    md.push('레벨 표의 `–` 는 그 레벨에 값을 두지 않았다는 뜻(손잡이 설명에 적힌 기본값이나 꺼짐), `a~b` 는 그 범위에서 무작위로 고른다는 뜻입니다.');
+    md.push(LEGEND);
     md.push('');
     fs.writeFileSync(path.join(OUT, `${T.id}.md`), md.join('\n'));
   }
-  console.log(`${path.relative(ROOT, OUT)}: README.md + 게임 ${GAME_TYPES.length}쪽`);
+  writeTargets();
+  console.log(`${path.relative(ROOT, OUT)}: README.md + TARGETS.md + 게임 ${GAME_TYPES.length}쪽`);
+  if (unclassified.length) console.warn(`인지 영역을 지정하지 않은 게임: ${unclassified.map((T) => T.id).join(', ')} (tools/targets.js)`);
+
+  // ---- 노릴 능력 점검표 ----
+  function writeTargets() {
+    const md = [];
+    const link = (T) => `[${T.title}](${T.id}.md)`;
+    const cover = (id) => {
+      const main = GAME_TYPES.filter((T) => gameTargets[T.id].some((t) => t.id === id && !t.part));
+      const part = GAME_TYPES.filter((T) => gameTargets[T.id].some((t) => t.id === id && t.part));
+      const plan = planned.filter((p) => p.targets.some((t) => t.id === id));
+      const mark = main.length >= 2 ? '☑' : main.length || part.length ? '△' : '☐';
+      return { main, part, plan, mark };
+    };
+    const PRI = ['높음', '중간', '낮음'];
+    const all = DOMAINS.flatMap((d) => d.subs.map((s) => ({ s, d, c: cover(s.id) })));
+
+    md.push('[← 목차·공통 규칙](README.md)');
+    md.push('');
+    md.push('# 인지 영역 점검표');
+    md.push('');
+    md.push('> 이 문서는 `node tools/manual.js`가 `tools/targets.js`와 게임 목록에서 자동으로 생성합니다. 직접 수정하지 마세요.');
+    md.push('> 게임을 추가하면 `tools/targets.js`의 `GAME_TARGETS`에 그 게임이 다루는 세부 영역을 적은 뒤 스크립트를 다시 실행하세요.');
+    md.push('');
+    md.push('새 미니게임을 기획할 때, 기존 게임이 아직 다루지 않는 인지 영역을 찾기 위한 표입니다.');
+    md.push('DSM-5의 신경인지 영역과 세부 영역을 바탕으로 계산, 일상생활 과제, 이중 과제를 추가했습니다. 결과 화면의 능력 그래프(5개 축)와는 별개입니다.');
+    md.push('');
+    md.push('**☑** 주 영역으로 다루는 게임 2종 이상 · **△** 1종뿐이거나 부분적으로만 다룸 · **☐** 없음 · *계획*: [NEW_GAMES_BRIEF.md](../NEW_GAMES_BRIEF.md)에만 있는 게임');
+    md.push('');
+
+    const n = (m) => all.filter((x) => x.c.mark === m).length;
+    md.push(`## 요약: ☑ ${n('☑')} · △ ${n('△')} · ☐ ${n('☐')} (세부 영역 ${all.length}개, 게임 ${GAME_TYPES.length}종)`);
+    md.push('');
+    if (unclassified.length) {
+      md.push(`**영역을 지정하지 않은 게임:** ${unclassified.map(link).join(', ')} — 이 표에 반영되지 않았습니다.`);
+      md.push('');
+    }
+    const gaps = all.filter((x) => x.c.mark !== '☑').sort((a, b) => PRI.indexOf(a.s.priority) - PRI.indexOf(b.s.priority) || (a.c.mark === '☐' ? -1 : 1) - (b.c.mark === '☐' ? -1 : 1));
+    md.push('### 보완이 필요한 영역 (우선순위순)');
+    md.push('');
+    md.push('| | 세부 영역 | 영역 | 우선순위 | 현재 게임 |');
+    md.push('|---|---|---|---|---|');
+    gaps.forEach(({ s, d, c }) => {
+      const now = [...c.main.map(link), ...c.part.map((T) => `${link(T)} (부분)`), ...c.plan.map((p) => `*계획: ${p.title}*`)].join(', ') || '–';
+      md.push(`| ${c.mark} | [${s.name}](#${s.id}) | ${d.name} | ${s.priority} | ${esc(now)} |`);
+    });
+    md.push('');
+    const crowded = all.filter((x) => x.c.main.length >= 4);
+    if (crowded.length) {
+      md.push(`**편중된 영역** (주 영역으로 다루는 게임 4종 이상): ${crowded.map(({ s, c }) => `${s.name} ${c.main.length}종`).join(' · ')}. 이 영역의 게임을 더 만들기보다 빈 영역을 먼저 채우는 편이 좋습니다.`);
+      md.push('');
+    }
+
+    for (const d of DOMAINS) {
+      md.push(`## ${d.name} (${d.en})`);
+      md.push('');
+      for (const s of d.subs) {
+        const c = cover(s.id);
+        md.push(`- ${c.mark} <a id="${s.id}"></a>**${s.name}** — ${s.what}. 대표 검사: ${s.test}`);
+        if (c.main.length) md.push(`  - 주 영역: ${c.main.map(link).join(', ')}`);
+        if (c.part.length) md.push(`  - 부분: ${c.part.map(link).join(', ')}`);
+        if (c.plan.length) md.push(`  - 계획: ${c.plan.map((p) => `[${p.title}](${p.doc}) (\`${p.id}\`)`).join(', ')}`);
+        if (s.note) md.push(`  - 참고: ${s.note}`);
+        if (s.idea && c.mark !== '☑') md.push(`  - 게임 아이디어 (우선순위 ${s.priority}): ${s.idea}`);
+      }
+      md.push('');
+    }
+    fs.writeFileSync(path.join(OUT, 'TARGETS.md'), md.join('\n'));
+  }
 })().catch((e) => {
   console.error(e);
   process.exit(1);

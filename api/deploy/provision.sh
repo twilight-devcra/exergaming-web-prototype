@@ -59,27 +59,34 @@ echo "security group $SG"
 AMI=$(aws ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id --query Parameter.Value --output text)
 # 지금 폴더의 상대 경로로 둔다: Windows 의 aws.exe 는 Git Bash 의 /tmp 를 못 읽는다. 줄 끝의 CR 도 지운다 (서버의 bash 가 못 읽는다)
 USERDATA=".exergame-userdata-$$.sh"
+trap 'rm -f "$USERDATA"' EXIT
 sed -e 's/\r$//' -e "s|__DOMAIN__|$DOMAIN|" -e "s|__BRANCH__|$BRANCH|" -e "s|__UPLOAD_KEY__|$UPLOAD_KEY|" "$HERE/setup.sh" > "$USERDATA"
 ID=$(aws ec2 run-instances --image-id "$AMI" --instance-type "$TYPE" --count 1 \
   --security-group-ids "$SG" --iam-instance-profile "Name=$NAME-ec2" \
   --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=20,VolumeType=gp3,Encrypted=true,DeleteOnTermination=false}' \
   --metadata-options 'HttpTokens=required,HttpEndpoint=enabled' \
   --tag-specifications "ResourceType=instance,Tags=[{$TAGS},{Key=Name,Value=$NAME}]" "ResourceType=volume,Tags=[{$TAGS},{Key=Name,Value=$NAME},{Key=Backup,Value=$NAME}]" \
-  --user-data "file://$USERDATA" --query 'Instances[0].InstanceId' --output text)
+  --user-data "fileb://$USERDATA" --query 'Instances[0].InstanceId' --output text)
 rm -f "$USERDATA"
 echo "instance $ID — waiting until running"
 aws ec2 wait instance-running --instance-ids "$ID"
 
 # ---- 고정 IP + DNS ----
-ALLOC=$(aws ec2 allocate-address --domain vpc --tag-specifications "ResourceType=elastic-ip,Tags=[{$TAGS},{Key=Name,Value=$NAME}]" --query AllocationId --output text)
-aws ec2 associate-address --instance-id "$ID" --allocation-id "$ALLOC" >/dev/null
-IP=$(aws ec2 describe-addresses --allocation-ids "$ALLOC" --query 'Addresses[0].PublicIp' --output text)
+# 탄력적 IP 한도에 걸리면 인스턴스의 자동 공인 IP 를 쓴다. 이 IP 는 재부팅해도 같지만 중지 → 시작하면 바뀌므로
+# 그때는 DNS 를 다시 맞춰야 한다 (한도를 늘린 뒤 탄력적 IP 로 옮기는 방법: api/README.md)
+if ALLOC=$(aws ec2 allocate-address --domain vpc --tag-specifications "ResourceType=elastic-ip,Tags=[{$TAGS},{Key=Name,Value=$NAME}]" --query AllocationId --output text); then
+  aws ec2 associate-address --instance-id "$ID" --allocation-id "$ALLOC" >/dev/null
+  IP=$(aws ec2 describe-addresses --allocation-ids "$ALLOC" --query 'Addresses[0].PublicIp' --output text)
+else
+  IP=$(aws ec2 describe-instances --instance-ids "$ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+  echo "!! elastic ip not available (quota?) — using the instance's public ip $IP. It changes if the instance is stopped and started."
+fi
 ZONE=$(aws route53 list-hosted-zones-by-name --dns-name "$ZONE_NAME" --query 'HostedZones[0].Id' --output text)
 aws route53 change-resource-record-sets --hosted-zone-id "$ZONE" --change-batch "{
   \"Comment\": \"exergame API\",
   \"Changes\": [{ \"Action\": \"UPSERT\", \"ResourceRecordSet\": { \"Name\": \"$DOMAIN\", \"Type\": \"A\", \"TTL\": 300, \"ResourceRecords\": [{ \"Value\": \"$IP\" }] } }]
 }" >/dev/null
-echo "elastic ip $IP → $DOMAIN"
+echo "ip $IP → $DOMAIN"
 
 # ---- 매일 스냅샷 (태그 Backup=exergame-api 인 디스크, 7개 보관) ----
 aws dlm create-default-role >/dev/null 2>&1 || true

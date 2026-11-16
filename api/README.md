@@ -53,6 +53,17 @@ bash api/deploy/deploy.sh               # 서버가 받아 둔 브랜치를 최�
 BRANCH=main bash api/deploy/deploy.sh   # 브랜치 바꾸기
 ```
 
+### 고정 IP
+
+계정의 탄력적 IP 한도가 차 있으면 `provision.sh` 는 인스턴스의 자동 공인 IP 로 DNS 를 맞춥니다. 이 IP 는 재부팅해도 같지만 **인스턴스를 중지했다 시작하면 바뀝니다**. 그때는 Route 53 의 `exergame-api.devcra.com` A 레코드를 새 IP 로 고칩니다.
+한도를 늘린 뒤 탄력적 IP 로 옮기려면:
+
+```bash
+ALLOC=$(aws ec2 allocate-address --domain vpc --tag-specifications 'ResourceType=elastic-ip,Tags=[{Key=Project,Value=exergaming},{Key=Name,Value=exergame-api}]' --query AllocationId --output text)
+aws ec2 associate-address --instance-id <인스턴스 id> --allocation-id $ALLOC
+# 그다음 Route 53 의 A 레코드를 새 IP 로 (공인 IP 가 바뀌므로 몇 분 끊긴다)
+```
+
 ### 서버에 들어가기 (SSH 대신 Session Manager)
 
 22번 포트는 닫혀 있습니다. 이 AWS 계정에 IAM 로그인이 있으면 어디서든 들어갈 수 있습니다 (IP 목록 없음).

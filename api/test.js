@@ -16,7 +16,7 @@ const ORIGIN = 'https://twilight-devcra.github.io';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'exergame-api-'));
 
 // 문서 형식의 세션 하나 (문제 정답률은 게임·레벨마다 다르게 해서 관리 화면 색이 보이게)
-const GAMES = ['path', 'symbol', 'arith', 'count', 'fit', 'seek', 'cover', 'ladder', 'novel', 'track', 'follow', 'pair', 'box', 'compare', 'coin', 'recall'];
+const GAMES = ['path', 'symbol', 'arith', 'count', 'fit', 'seek', 'cover', 'ladder', 'novel', 'track', 'follow', 'pair', 'box', 'compare', 'coin', 'recall', 'chain'];
 function fakeSession({ device, id, user = null, ended = 'complete', days = 0, difficulty = 'normal' }) {
   const startedAt = new Date(Date.now() - days * 864e5).toISOString();
   const events = [{ t: 0, clock: 0, type: 'calib_start' }, { t: 9000, clock: 0, type: 'play_start' }];

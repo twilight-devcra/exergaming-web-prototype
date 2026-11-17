@@ -1,4 +1,4 @@
-[← 목차·공통 규칙](README.md) · [← 동전 세기](coin.md)
+[← 목차·공통 규칙](README.md) · [← 동전 세기](coin.md) · [조각 잇기 →](chain.md)
 
 # 차례대로 외우기 (`recall`)
 

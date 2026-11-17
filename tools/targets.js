@@ -111,6 +111,7 @@ const GAME_TARGETS = {
   compare: ['discrim', 'speed'],
   coin: ['calc', 'selective', 'iadl'],
   recall: ['sequence', 'verbal'],
+  chain: ['planning'],
 };
 
 // 기획만 된 게임 (아직 js/games 에 없다)

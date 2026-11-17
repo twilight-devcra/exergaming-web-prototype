@@ -33,5 +33,6 @@
 14. [두 그림 비교하기](compare.md) — `compare`
 15. [동전 세기](coin.md) — `coin`
 16. [차례대로 외우기](recall.md) — `recall`
+17. [조각 잇기](chain.md) — `chain`
 
 새 게임을 기획할 때는 [인지 영역 점검표](TARGETS.md)에서 아직 다루지 않은 영역을 확인하세요.

@@ -1126,6 +1126,40 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   .rc-fig, .rc-slot.filled, .rc-fix, .ar-cand.rc-opt.tapped { animation: none; }
 }
 
+/* 조각 잇기: 위에 벽과 벽 사이의 빈칸 줄, 아래에 조각 단추 (js/games/chain.js).
+   조각은 모두 같은 종이 질감(그림 안의 그러데이션)이고, 돌기·홈의 윤곽만으로 모양을 가린다 */
+.ch-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+.ch-rowbox { display: flex; justify-content: center; padding: 8px; }
+.ch-row { display: block; overflow: visible; }
+.ch-body { stroke: #8a6232; stroke-width: 2; stroke-linejoin: round; }
+.ch-put, .ch-piece svg { filter: drop-shadow(0 2px 1.5px rgba(60, 35, 5, 0.3)); }
+.ch-wall { fill: var(--line); stroke: var(--ink-soft); stroke-width: 2; stroke-linejoin: round; }
+.ch-slot { fill: none; stroke: var(--line); stroke-width: 2.5; stroke-dasharray: 7 6; }
+.ch-next { transition: transform 0.22s ease-out; }
+.ch-next.gone { opacity: 0; }
+.ch-arrow { fill: var(--accent); stroke: var(--panel); stroke-width: 2; stroke-linejoin: round; animation: ch-bob 1s ease-in-out infinite; }
+@keyframes ch-bob { 50% { transform: translateY(-5px); } }
+.ch-put { animation: pop 0.18s ease-out; transform-box: fill-box; transform-origin: center; }
+/* 길이 처음 막힌 조각 (그 앞까지는 끝까지 갈 수 있었다) */
+.ch-put.culprit .ch-body { fill: color-mix(in srgb, var(--bad) 35%, #fff); stroke: var(--bad); stroke-width: 5; }
+.ch-end.right .ch-wall { stroke: var(--good); stroke-width: 5; }
+.ch-tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+/* 단추 비율은 조각 그림 비율에 맞춰 chain.js 가 정한다 (aspect-ratio) */
+.ch-piece {
+  width: var(--tw); padding: 4px; box-sizing: border-box;
+  border: 3px solid transparent; border-radius: 12px; background: var(--cell);
+}
+.ch-piece svg { width: 100%; height: 100%; display: block; }
+.ch-piece:disabled { opacity: 0.5; } /* 흐리게만: 지금 못 붙이는 조각도 모양은 또렷해야 미리 생각할 수 있다 */
+.ch-piece.used { visibility: hidden; } /* 자리는 남겨 두어 다른 단추가 움직이지 않게 */
+@media (hover: hover) {
+  .ch-piece:hover:not(:disabled) { background: var(--cell-hover); border-color: var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ch-put, .ch-arrow { animation: none; }
+  .ch-next { transition: none; }
+}
+
 /* 짝 없는 것 찾기: 빨랫줄의 양말 */
 .pr-wrap { display: flex; align-items: center; justify-content: center; }
 .pr-board { display: block; touch-action: none; overflow: visible; }

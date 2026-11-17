@@ -1673,6 +1673,9 @@ body.demo #op-corner {
   z-index: 310;
   -webkit-tap-highlight-color: transparent;
 }
+/* 로그인·기록·준비 화면에서는 끈다: 휴대폰에서는 왼쪽 위의 '‹ 처음으로' 단추가 이 72px 안에 들어가 눌리지 않았다.
+   이 화면들에서는 처음으로 돌아가 대기 화면의 ⚙ 운영 단추로 운영 메뉴를 연다 */
+body.demo:has(#login.active, #history.active, #setup.active) #op-corner { display: none; }
 
 /* ---------- 대기 화면 ---------- */
 #attract {

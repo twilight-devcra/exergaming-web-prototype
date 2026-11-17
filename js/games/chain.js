@@ -155,7 +155,6 @@ export class ChainGame {
       const [l, r] = p.pieces[pi];
       const b = U.el('button', 'ch-piece',
         `<svg viewBox="${-PAD} ${-PAD} ${W + KNOB + 2 * PAD} ${H + 2 * PAD}">${ChainGame.defs()}${ChainGame.piece(0, this.kind(l), this.kind(r))}</svg>`);
-      b.style.aspectRatio = `${W + KNOB + 2 * PAD} / ${H + 2 * PAD}`;
       b.addEventListener('pointerdown', () => this.pick(pi));
       this.tray.append(b);
       return b;
@@ -217,7 +216,10 @@ export class ChainGame {
       const byH = ((availH - tg * (rows - 1)) / rows) * ar;
       best = Math.max(best, Math.min(byW, byH));
     }
-    this.wrap.style.setProperty('--tw', `${U.clamp(best, 56, 170)}px`);
+    const tw = U.clamp(best, 56, 170);
+    // 높이도 직접 준다. aspect-ratio 에 맡기면 Safari 는 안의 svg(height:100%)와 맞물려 단추를 길게 늘인다
+    this.wrap.style.setProperty('--tw', `${tw}px`);
+    this.wrap.style.setProperty('--th', `${tw / ar}px`);
   }
 
   pick(pi) {

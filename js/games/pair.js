@@ -165,11 +165,13 @@ export class PairGame {
         const t = (x + leg) / this.W;
         const sag = 14 * 4 * t * (1 - t);   // 줄이 처진 만큼 내려 건다 (2차 곡선의 높이)
         const tilt = (U.rand(9) - 4) * 1.2;
-        socks.push(`<g class="pr-sock" data-k="${k}" transform="translate(${x.toFixed(1)} ${(y + sag - 4).toFixed(1)}) rotate(${tilt} ${leg} 0)">` +
+        // 자리는 바깥 g 의 transform 속성으로, 걸리는 움직임(css pr-hang)은 안쪽 g 에 준다.
+        // 한 요소에 둘 다 주면 Safari 는 애니메이션의 transform 이 속성을 덮어써 양말이 모두 한 자리에 겹친다
+        socks.push(`<g transform="translate(${x.toFixed(1)} ${(y + sag - 4).toFixed(1)}) rotate(${tilt} ${leg} 0)"><g class="pr-sock" data-k="${k}">` +
           `<rect class="pr-hit" x="0" y="0" width="${CELL_W}" height="112" fill="transparent"/>` +
           PairGame.sock(s.d, s.flip, clip.id) +
           `<rect class="pr-pin" x="${leg - 5.5}" y="-8" width="11" height="18" rx="2.5"/>` +
-          `<g class="pr-mark" transform="translate(${s.flip ? 6 : 50} 2)"><circle r="13" cx="13" cy="13"/><text x="13" y="14" text-anchor="middle" dominant-baseline="central"></text></g></g>`);
+          `<g class="pr-mark" transform="translate(${s.flip ? 6 : 50} 2)"><circle r="13" cx="13" cy="13"/><text x="13" y="14" text-anchor="middle" dominant-baseline="central"></text></g></g></g>`);
       }
     });
     html += lines.join('') + socks.join('');

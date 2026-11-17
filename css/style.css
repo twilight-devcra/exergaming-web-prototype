@@ -1063,8 +1063,22 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .cn-val small, .cn-opt small { font-size: 0.55em; font-weight: 700; margin-left: 0.06em; }
 .cn-n { min-width: 2em; font-size: 0.75em; color: var(--accent); }
 /* 보기: 값 표 아래 한 줄 (옆 칸이 낮아야 태블릿에서 탁자가 위아래를 다 쓴다) */
-.cn-opts { flex: none; flex-wrap: nowrap; }
-.cn-opt { width: auto; min-width: clamp(72px, 12vh, 104px); padding: 0 10px; white-space: nowrap; animation: pop 0.18s ease-out; }
+/* .ar-cands 의 줄바꿈(wrap)보다 앞서도록 두 클래스로 쓴다. 보기는 늘 한 줄 */
+.ar-cands.cn-opts { flex: none; flex-wrap: nowrap; max-width: 100%; }
+/* 쌓는 배치(좁은 화면)에서는 단추를 줄여 한 줄에 넣는다. 세 자리 값(Lv8 최대 162점) 4개가 휴대폰 너비에 들어가는 크기 */
+.cn-wrap:not(.side) .cn-opts { gap: 10px; }
+.cn-wrap:not(.side) .cn-opt { flex: none; min-width: clamp(60px, 10vh, 104px); height: clamp(60px, 10vh, 104px); padding: 0 8px; font-size: min(clamp(30px, 5.5vh, 46px), 6.4vw); }
+/* mix: [탁자 | 값 표] 아래에 보기. .cn-side 를 풀어 값 표와 보기를 따로 놓는다 */
+.cn-wrap.mix { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: center; }
+.cn-wrap.mix .cn-side { display: contents; }
+.cn-wrap.mix .cn-opts { grid-column: 1 / -1; justify-self: center; }
+.cn-wrap.mix .cn-rows { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
+/* 탁자 옆 자리는 너비가 귀하다: 제목을 빼고 (아이콘 = 값 만으로 뜻이 통한다) 여백을 줄인다 */
+.cn-wrap.mix .cn-legend { padding: 8px 10px; justify-self: center; } /* 칸을 채워 늘어나지 않게: 보기 줄이 두 칸에 걸쳐 칸을 넓히면 값 표가 따라 넓어져 탁자 자리를 잘못 잰다 */
+.cn-wrap.mix .cn-legend-title { display: none; }
+.cn-wrap.mix .cn-row { gap: 4px; }
+.cn-wrap.mix .cn-n:empty { min-width: 0; } /* 개수 칸은 답한 뒤에만 채워진다. 그 전에는 자리를 비워 두지 않는다 */
+.ar-cand.cn-opt { width: auto; min-width: clamp(72px, 12vh, 104px); padding: 0 10px; white-space: nowrap; animation: pop 0.18s ease-out; }
 .cn-opt:disabled:not(.right, .wrong, .answer) { opacity: 0.25; }
 .cn-opt.right { background: var(--good); color: var(--on-accent); opacity: 1; }
 
@@ -1143,10 +1157,10 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 /* 길이 처음 막힌 조각 (그 앞까지는 끝까지 갈 수 있었다) */
 .ch-put.culprit .ch-body { fill: color-mix(in srgb, var(--bad) 35%, #fff); stroke: var(--bad); stroke-width: 5; }
 .ch-end.right .ch-wall { stroke: var(--good); stroke-width: 5; }
-.ch-tray { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-/* 단추 비율은 조각 그림 비율에 맞춰 chain.js 가 정한다 (aspect-ratio) */
+.ch-tray { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12px; }
+/* 단추 크기(--tw, --th)는 조각 그림 비율에 맞춰 chain.js 가 정한다 */
 .ch-piece {
-  width: var(--tw); padding: 4px; box-sizing: border-box;
+  width: var(--tw); height: var(--th); padding: 4px; box-sizing: border-box;
   border: 3px solid transparent; border-radius: 12px; background: var(--cell);
 }
 .ch-piece svg { width: 100%; height: 100%; display: block; }

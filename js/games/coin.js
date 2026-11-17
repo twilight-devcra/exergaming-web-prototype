@@ -24,7 +24,7 @@
 // 밀어낸 자리까지 쓸어 만든 모양이다.
 //
 // 배치: 넓은 화면은 탁자 오른쪽에 값 표와 그 아래 보기를 세워 탁자가 위아래를 다 쓰게 하고,
-// 좁은 화면(세로로 세운 휴대폰 등)은 탁자 · 값 표 · 보기를 위에서 아래로 쌓는다. 두 가지를 다 재 보고 탁자가 더 커지는 쪽을 고른다 (layout).
+// 좁은 화면(세로로 세운 휴대폰 등)은 탁자 · 값 표 · 보기를 위에서 아래로 쌓거나, 값 표만 탁자 옆에 둔다. 모두 재 보고 탁자가 가장 커지는 쪽을 고른다 (layout).
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
 
@@ -217,7 +217,10 @@ export class CoinGame {
     this.h.timer(this.valueMode ? Math.round(n * 1.3) + p.kinds.length : n, () => this.pick(null, null));
   }
 
-  // 가로 배치([탁자 | 값 표·보기])와 세로 배치(위에서 아래로)를 둘 다 재 보고 탁자가 더 커지는 쪽을 쓴다
+  // 세 가지 배치를 재 보고 탁자가 가장 커지는 쪽을 쓴다
+  //   side : [탁자 | 값 표·보기]          (가로로 넓은 화면)
+  //   stack: 탁자 / 값 표 / 보기         (세로로 긴 화면)
+  //   mix  : [탁자 | 값 표] / 보기        (좁고 낮은 화면. 휴대폰 세로 화면처럼 쌓으면 탁자 자리가 모자랄 때)
   layout() {
     const s = this.body;
     if (!this.btns) return;
@@ -225,16 +228,23 @@ export class CoinGame {
     const bw = s.clientWidth - 40;
     const bh = s.clientHeight - 10;
     const gap = U.gapOf(this.wrap, 22);
-    const fit = (side) => {
-      this.wrap.classList.toggle('side', side);
-      if (side) return Math.min(bw - this.side.offsetWidth - gap, bh * ar);
+    const set = (m) => {
+      this.wrap.classList.toggle('side', m === 'side');
+      this.wrap.classList.toggle('mix', m === 'mix');
+    };
+    const fit = (m) => {
+      set(m);
+      if (m === 'side') return Math.min(bw - this.side.offsetWidth - gap, bh * ar);
+      if (m === 'mix') return Math.min(bw - this.legend.offsetWidth - gap, (bh - this.opts.offsetHeight - gap) * ar);
       return Math.min(bw, (bh - this.side.offsetHeight - gap) * ar);
     };
-    const across = fit(true);
-    const stacked = fit(false);
-    const side = across >= stacked;
-    this.wrap.classList.toggle('side', side);
-    const w = Math.max(200, Math.min(side ? across : stacked, 1100));
+    let best = null;
+    for (const m of this.legend ? ['side', 'stack', 'mix'] : ['side', 'stack']) {
+      const w = fit(m);
+      if (!best || w > best.w) best = { m, w };
+    }
+    set(best.m);
+    const w = Math.max(120, Math.min(best.w, 1100));
     this.svg.style.width = `${w}px`;
     this.svg.style.height = `${w / ar}px`;
   }

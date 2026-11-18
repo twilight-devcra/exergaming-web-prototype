@@ -1,4 +1,4 @@
-[← 목차·공통 규칙](README.md) · [← 차례대로 외우기](recall.md)
+[← 목차·공통 규칙](README.md) · [← 차례대로 외우기](recall.md) · [같은 글자 넣기 →](blank.md)
 
 # 조각 잇기 (`chain`)
 

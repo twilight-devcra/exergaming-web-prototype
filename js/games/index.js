@@ -16,5 +16,6 @@ import { CompareGame } from './compare.js';
 import { CoinGame } from './coin.js';
 import { RecallGame } from './recall.js';
 import { ChainGame } from './chain.js';
+import { BlankGame } from './blank.js';
 
-export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame, RecallGame, ChainGame];
+export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame, RecallGame, ChainGame, BlankGame];

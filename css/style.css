@@ -1174,6 +1174,32 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   .ch-next { transition: none; }
 }
 
+/* 같은 글자 넣기: 위에 빈칸이 하나씩 있는 낱말들, 아래에 글자 보기 (js/games/blank.js).
+   글자 칸 크기 --ch 는 화면 높이에 맞춘다. 4낱말은 조금 작게, 좁은 화면에서는 두 줄로 넘어간다 */
+.bl-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; max-width: 100%; }
+.bl-board {
+  --ch: clamp(46px, 9.5vh, 80px);
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: calc(var(--ch) * 0.3) calc(var(--ch) * 0.4);
+  padding: calc(var(--ch) * 0.22) calc(var(--ch) * 0.3);
+  max-width: 100%; box-sizing: border-box;
+}
+.bl-board.many { --ch: clamp(42px, 8.2vh, 68px); }
+/* 낱말마다 옅은 카드에 담는다: 낱말 사이 간격만으로는 좁은 화면에서 '□가 연□'처럼 이어 읽혔다 */
+.bl-word { display: flex; gap: calc(var(--ch) * 0.06); padding: calc(var(--ch) * 0.14); border-radius: calc(var(--ch) * 0.24); background: var(--cell); }
+.bl-ch {
+  width: var(--ch); height: var(--ch); box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-size: calc(var(--ch) * 0.74); font-weight: 800; line-height: 1; color: var(--ink);
+}
+.bl-ch.hole { border-radius: 12px; border: 4px solid var(--accent); background: var(--panel); box-shadow: 0 0 0 5px var(--accent-soft); }
+.bl-ch.hole:is(.right, .wrong, .fixed) { box-shadow: none; }
+.bl-ch.hole.right, .bl-ch.hole.fixed { border-color: var(--good); color: var(--good); }
+.bl-ch.hole.wrong { border-color: var(--bad); color: var(--bad); }
+.bl-ch.hole.fixed { animation: pop 0.18s ease-out; }
+.ar-cand.bl-opt.right { background: var(--good); color: var(--on-accent); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .bl-ch.hole.fixed { animation: none; } }
+
 /* 짝 없는 것 찾기: 빨랫줄의 양말 */
 .pr-wrap { display: flex; align-items: center; justify-content: center; }
 .pr-board { display: block; touch-action: none; overflow: visible; }

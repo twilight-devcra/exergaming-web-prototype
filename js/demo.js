@@ -451,7 +451,7 @@ export const Demo = {
     const cfg = a.cfg;
     const m = a.meter;
     const no = sim ? 0 : this.nextSeq();
-    const { abil, kcal } = a.fillReport($('#demo-result'));
+    const { abil, kcal, keep, gameAcc, rec } = a.fillReport($('#demo-result'));
 
     $('#dr-id').textContent = sim ? '가상 결과 · 기록 안 됨' : `참가 번호 ${this.label(no)}`;
     $('#dr-id').classList.toggle('sim', sim);
@@ -470,6 +470,12 @@ export const Demo = {
       a.log.meta.participant = this.label(no);
       a.log.meta.summary.abilities = Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.stars : null]));
       a.log.meta.summary.abilitiesRaw = Object.fromEntries(abil.map((x) => [x.id, x.raw]));
+      // 결과 화면의 별점 (js/stars.js): 운동 정확도(속도 유지율, 두뇌 게임만이면 null)·게임 정확도와 권한 다음 난이도
+      a.log.meta.summary.accuracy = {
+        exercise: a.brainOnly ? null : keep / 100,
+        game: gameAcc == null ? null : Math.round(gameAcc * 1000) / 1000,
+        recommend: rec.kind, recommendTo: rec.to ? rec.to.id : null, // up · keep · down 과 권한 난이도
+      };
       this.storeLog(a.log);
     }
 

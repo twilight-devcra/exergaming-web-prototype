@@ -76,11 +76,19 @@ function summarize(log) {
   const sum = m.summary || {};
   const ex = sum.exercise || {};
   const levels = Object.values(sum.stats || {}).map((s) => (s && s.level) || 0);
+  // 게임 정확도 = 맞힌 문제 / 낸 문제 (js/stars.js Stars.gameAcc 와 같다)
+  let correct = 0, total = 0;
+  for (const s of Object.values(sum.stats || {})) {
+    if (!s) continue;
+    correct += num(s.correct) || 0;
+    total += num(s.total) || 0;
+  }
   return {
     at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
     track: m.track || 'dual',
     score: sum.score, device: m.device || null, sid: m.id,
     level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
+    gameAcc: total > 0 ? Math.round((correct / total) * 100) / 100 : null,
     look: m.landmark || null,
   };
 }

@@ -6,6 +6,7 @@
 // 흐름: 대기 화면 → 로그인(카메라로 QR · 번호 입력 · 손님) → 회원이면 기록(달력) → 세션 설정 → … → 결과
 //       손님은 결과 화면에서 새 회원 번호와 QR 코드를 받는다 (오늘 기록이 그 번호로 저장된다)
 import { SESSION_DIFFICULTIES } from '../js/config.js';
+import { Stars } from '../js/stars.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
 import { drawCard, saveCard } from './member-card.js';
@@ -92,7 +93,7 @@ const Members = {
 
   // ---------------- 서버의 회원 기록 (SESSION_UPLOAD.historyUrl) ----------------
   // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목은 이 태블릿 기록과 같은 모양
-  // ({ at, min, difficulty, track, score, distM, kcal, level, device, sid, look }). 형식은 docs/SERVER.md
+  // ({ at, min, difficulty, track, score, distM, kcal, level, gameAcc, device, sid, look }). 형식은 docs/SERVER.md
   remote: {},      // 회원 번호 → 서버에서 받은 목록 (이 화면을 여는 동안만)
   TIMEOUT_MS: 6000,
 
@@ -128,14 +129,25 @@ const Members = {
     const sum = m.summary || {};
     const ex = sum.exercise || {};
     const levels = Object.values(sum.stats || {}).map((s) => s.level || 0);
+    const acc = Stars.gameAcc(sum.stats);
     return {
       at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
       // 운동 방식: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). meta.track 이 없는 예전 세션은 모두 dual
       track: m.track || 'dual',
       score: sum.score, device: m.device || null, sid: m.id,
       level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
+      // 게임 정확도 (0~1, 소수 둘째 자리). 높으면 다음 세션 설정에 한 단계 높은 난이도를 골라 둔다 (js/stars.js)
+      gameAcc: acc == null ? null : Math.round(acc * 100) / 100,
       look: m.landmark || null,
     };
+  },
+
+  // 다음 세션 설정에 미리 골라 둘 것: 지난번과 같은 시간·운동 방식, 난이도는 지난번 결과 화면이 권한 대로 (js/stars.js —
+  // 게임 정확도가 높았으면 한 단계 위, 낮았으면 한 단계 아래). shift = 'up' · 'down' · 'keep'
+  nextSetup(last) {
+    if (!last) return null;
+    const rec = Stars.nextSession(last.difficulty, last.gameAcc);
+    return { min: last.min, difficulty: rec.to ? rec.to.id : last.difficulty, track: last.track || 'dual', shift: rec.kind };
   },
 
   // 시험용 회원 기록 서버 (SESSION_UPLOAD.localHistory): 바깥 서버 대신 이 태블릿의 세션 로그(IndexedDB)에서
@@ -311,7 +323,8 @@ export const MemberUI = {
     $('#hs-go').onclick = () => {
       if (app.state !== 'history') return;
       const last = Members.merged(this.user).slice(-1)[0];
-      demo.openSetup(this.via, last ? { min: last.min, difficulty: last.difficulty, track: last.track || 'dual' } : null);
+      const next = Members.nextSetup(last);
+      demo.openSetup(this.via, next && { min: next.min, difficulty: next.difficulty, track: next.track });
     };
     return this;
   },
@@ -507,8 +520,13 @@ export const MemberUI = {
       : `<li class="empty">${Members.hasRemote() ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
     // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'
     const ro = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c < 11172 && c % 28 && c % 28 !== 8 ? '으로' : '로'; };
-    const dl = last ? diffLabel(last.difficulty) : '';
-    const sum = last ? `지난번처럼 ${last.min}분 · ${dl}${last.track === 'brain' ? ' · 두뇌 게임만' : ''}${ro(last.track === 'brain' ? '만' : dl)} 골라 둘게요` : '다음 화면에서 시간과 난이도를 골라요';
+    const next = Members.nextSetup(last);
+    const dl = next ? diffLabel(next.difficulty) : '';
+    const tail = `${next && next.track === 'brain' ? ' · 두뇌 게임만' : ''}${next ? ro(next.track === 'brain' ? '만' : dl) : ''} 골라 둘게요`;
+    const sum = !next ? '다음 화면에서 시간과 난이도를 골라요'
+      : next.shift === 'up' ? `지난번에 아주 잘하셔서 난이도를 올려 ${next.min}분 · ${dl}${tail}`
+      : next.shift === 'down' ? `이번엔 조금 편하게 ${next.min}분 · ${dl}${tail}`
+      : `지난번처럼 ${next.min}분 · ${dl}${tail}`;
     document.getElementById('hs-sum').textContent = sum;
     void monthCount;
   },
@@ -568,6 +586,7 @@ export const MemberUI = {
       at: new Date().toISOString(), min: s ? s.min : Math.round(a.cfg.durationSec / 60), difficulty: s ? s.difficulty : 'normal',
       track: a.brainOnly ? 'brain' : 'dual', // 두뇌 게임만 한 판인가 (페달 + 두뇌 게임이면 dual)
       score: a.score, distM: Math.round(a.meter.distM), kcal: Math.round(a.meter.kcal * 10) / 10, level: lv,
+      gameAcc: (() => { const acc = Stars.gameAcc(a.stats); return acc == null ? null : Math.round(acc * 100) / 100; })(),
       ended: a.log ? a.log.meta.ended : null,
       // 서버 기록과 겹치는지 가리는 열쇠 (세션 로그의 meta.device + meta.id)
       device: a.log ? a.log.meta.device : null, sid: a.log ? a.log.meta.id : null,

@@ -159,7 +159,7 @@
         </dl>
         <div class="rs-games" id="res-cog-sub"></div>
       </div>
-      <!-- 두뇌 그래프·운동량 (#tpl-report) -->
+      <!-- 세션 성과·운동량 (#tpl-report) -->
       <div class="rp-slot"></div>
       <div class="dr-card rs-rank">
         <h3>순위</h3>
@@ -172,12 +172,22 @@
     </div>
   </section>
 
-  <!-- 두뇌 그래프·운동량 카드: 결과 화면에 붙인다 (App.fillReport 가 채운다). 운영 버전(app/index.html)에도 같은 카드가 있다 -->
+  <!-- 세션 성과·운동량 카드: 결과 화면에 붙인다 (App.fillReport 가 채운다). 운영 버전(app/index.html)에도 같은 카드가 있다 -->
   <template id="tpl-report">
-    <div class="dr-card dr-brain">
-      <h3>나의 두뇌 그래프</h3>
-      <svg class="radar rp-radar"></svg>
-      <div class="dr-best rp-best"></div>
+    <div class="dr-card dr-stars">
+      <h3>이번 세션 성과</h3>
+      <div class="st-rows">
+        <div class="st-row rp-st-ex">
+          <div class="st-head"><span>운동</span><b class="st-pct"></b></div>
+          <div class="st-stars"></div>
+        </div>
+        <div class="st-row rp-st-game">
+          <div class="st-head"><span>인지</span><b class="st-pct"></b></div>
+          <div class="st-stars"></div>
+        </div>
+      </div>
+      <!-- 게임 정확도가 높으면 다음 난이도를 권한다 (js/stars.js) -->
+      <div class="st-rec rp-rec"></div>
     </div>
     <div class="dr-card dr-ex">
       <h3>오늘의 운동량</h3>

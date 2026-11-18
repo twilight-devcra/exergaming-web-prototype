@@ -122,7 +122,8 @@ CardioArcade 안드로이드 앱과 같은 Cardio 페달(`Cardio-P xxxx`)을 Web
 | `js/cadence-est.js` | 원시 파형 lz 로 케이던스 추정 (영교차 · 파형 모양 · 결합) |
 | `pedal-debug.html`, `js/pedal-debug.js` | 페달 센서 디버그 페이지 |
 | `js/demo.js` | 운영 버전의 스테이션 흐름: 대기·결과·운영 메뉴, 무인 운영 장치 |
-| `js/abilities.js` | 게임 성적 → 능력 축 가중치, 레이더 그래프 |
+| `js/abilities.js` | 게임 성적 → 능력 축 점수 (세션 로그·참가 기록용) |
+| `js/stars.js` | 결과 화면의 이번 세션 성과 (운동·인지 별), 다음 난이도 권하기 |
 | `js/exercise.js` | 운동량: RPM → 거리, MET → 열량 |
 | `css/themes.css`, `js/themes.js`, `js/fx.js` | 화면 스타일과 연출 효과 |
 | `js/session-log.js` | 세션 로그 (문제·답·입력 장치 원시 입력). 형식: `docs/SESSION_LOG.md` |

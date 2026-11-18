@@ -1753,23 +1753,10 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 .station-tag .st-name { font-weight: 700; }
 .station-tag .pedal-status { max-width: 40vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ---------- 레이더 그래프 ---------- */
-.radar .rd-grid { fill: none; stroke: var(--line); stroke-width: 1.5; }
-.radar .rd-grid.outer { fill: var(--panel); }
-.radar .rd-axis { stroke: var(--line); stroke-width: 1.5; }
-.radar .rd-shape { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent); stroke-width: 4; stroke-linejoin: round; }
-.radar .rd-dot { fill: var(--accent); stroke: var(--panel); stroke-width: 3; }
-.radar .rd-label { font-size: 20px; font-weight: 700; fill: var(--ink); }
-.radar .rd-value { font-size: 22px; font-weight: 800; fill: var(--accent); font-variant-numeric: tabular-nums; }
-.radar .nodata { fill: var(--ink-soft); }
-.radar .rd-star { stroke-linejoin: round; }
-.radar .rd-star.on { fill: var(--warn); }
-.radar .rd-star.off { fill: var(--line); }
-.radar .rd-star.half { fill: url(#rd-half); }
-.radar .rd-half-on { stop-color: var(--warn); }
-.radar .rd-half-off { stop-color: var(--line); }
-#demo-result .radar .rd-shape { animation: radarin 0.9s cubic-bezier(0.2, 1.2, 0.4, 1) both; transform-origin: 200px 190px; }
-@keyframes radarin { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+/* ---------- 세션 성과 별 (결과 화면, js/stars.js) ---------- */
+.st-svg { display: block; width: 100%; max-width: 240px; height: auto; }
+.st-svg .st-off { fill: var(--line); }
+.st-svg .st-on { fill: var(--warn); }
 
 /* ---------- 스테이션 결과 ---------- */
 #demo-result {
@@ -1820,13 +1807,27 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 }
 .dr-break { font-size: clamp(14px, 2.3vh, 18px); color: var(--ink-soft); font-weight: 600; }
 .dr-note { margin-top: clamp(8px, 2vh, 20px); font-size: clamp(13px, 2vh, 16px); line-height: 1.5; color: var(--ink-soft); }
-.dr-brain { align-items: center; }
-.dr-brain h3 { align-self: flex-start; }
-.dr-brain .radar { flex: 1; min-height: 0; width: 100%; }
-.dr-best { font-size: clamp(15px, 2.5vh, 20px); color: var(--ink-soft); }
-.dr-best { text-align: center; }
-.dr-best b { color: var(--accent); }
-.dr-best small { display: block; margin-top: 4px; font-size: 0.8em; }
+.dr-stars { gap: clamp(10px, 2.4vh, 22px); }
+/* 운동 · 인지 두 칸을 한 줄에 나란히 */
+.st-rows { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(14px, 2.4vw, 28px); margin: auto 0; }
+/* 칸 하나 = 이름 / 퍼센트 / 별 (가운데 맞춤). 좁은 카드에서도 이름이 줄바꿈되지 않게 세로로 쌓는다 */
+.st-row { display: flex; flex-direction: column; align-items: center; gap: clamp(6px, 1.2vh, 10px); min-width: 0; text-align: center; }
+.st-head { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: clamp(17px, 2.8vh, 24px); font-weight: 800; white-space: nowrap; }
+.st-pct { font-size: clamp(30px, 5.6vh, 52px); line-height: 1.05; color: var(--accent); font-variant-numeric: tabular-nums; }
+.st-row.nodata .st-pct { color: var(--ink-soft); }
+.st-row.nodata .st-svg { opacity: 0.5; }
+/* 늘 보인다. 올리기는 노랑, 이대로는 파랑, 쉬어 가기는 초록 바탕 */
+.st-rec {
+  padding: clamp(10px, 1.8vh, 16px) clamp(12px, 2vh, 18px);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--warn) 18%, var(--panel));
+  font-size: clamp(15px, 2.5vh, 20px); line-height: 1.45; font-weight: 700; word-break: keep-all;
+}
+.st-rec b { color: var(--accent); }
+.st-rec.keep { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.st-rec.down { background: color-mix(in srgb, var(--good) 16%, var(--panel)); }
+#demo-result .st-rec { animation: recin 0.6s 0.7s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+@keyframes recin { from { transform: scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
 .dr-ex { gap: clamp(6px, 1.4vh, 12px); }
 .dr-stat { display: flex; align-items: baseline; gap: 8px; margin-top: clamp(4px, 1.5vh, 16px); }
 .dr-stat b { font-size: clamp(48px, 10vh, 96px); line-height: 1; color: var(--good); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
@@ -1882,7 +1883,6 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 @media (max-width: 860px), (max-aspect-ratio: 1/1) {
   #demo-result { overflow-y: auto; }
   .dr-grid { grid-template-columns: 1fr; flex: none; }
-  .dr-brain .radar { height: min(60vh, 420px); flex: none; }
   #attract { flex-direction: column-reverse; }
   .att-visual { width: min(70vw, 40vh); }
 }
@@ -2027,7 +2027,6 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
   /* 결과: 카드를 한 줄에 하나씩 쌓는다 */
   #result, #demo-result { overflow-y: auto; }
   #result .dr-grid, #demo-result .dr-grid { grid-template-columns: minmax(0, 1fr); flex: none; }
-  .dr-brain .radar { height: min(78vw, 340px); flex: none; }
   .rs-rank .board-list, .rs-games { overflow: visible; }
   .result-actions { flex-wrap: wrap; width: 100%; }
   .result-actions .btn { flex: 1; padding: 12px 14px; font-size: 16px; white-space: nowrap; }

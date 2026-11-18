@@ -109,6 +109,7 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 | `track` | `meta.track` (`dual` · `brain`, 없으면 `dual`) | 최근 기록의 '두뇌만' 표시, 미리 골라 둘 운동 방식. 두뇌 게임만 한 판(`brain`)도 회원 기록에 들어간다 |
 | `score` | `meta.summary.score` | 최근 기록 |
 | `device`, `sid` | `meta.device`, `meta.id` (문자열) | 태블릿에 있는 같은 세션과 겹치지 않게. 둘이 같으면 한 번만 센다. 빠지면 같은 판이 두 번 보일 수 있다 |
+| `gameAcc` (선택) | `meta.summary.stats` 의 `correct` 합 ÷ `total` 합 (0~1, 소수 둘째 자리. 문제가 없으면 `null`) | 지난번 게임 정확도가 85% 이상이면 다음 세션 설정에 한 단계 높은 난이도를, 50% 아래면 한 단계 낮은 난이도를 골라 둔다 (`js/stars.js`). 없으면 지난번 난이도 그대로 |
 | `level`, `distM`, `kcal` (선택) | `meta.summary.stats` 의 `level` 최댓값, `meta.summary.exercise.distM` · `kcal` | 지금은 쓰지 않음 (나중에 그래프용) |
 | `look` (선택) | `meta.landmark` 그대로 | 풍경 길가에 세운 기념물(건물)의 생김새. 그대로 돌려주면 다른 태블릿에서도 같은 건물로 선다. 없으면(이 필드를 더하기 전 세션) 태블릿이 난이도·시간으로 정한다 |
 

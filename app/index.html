@@ -6,14 +6,14 @@
   <!-- 파일 주소 끝의 ?v= 는 고칠 때마다 바꾼다 (node tools/stamp.js). 브라우저가 예전 파일과 새 파일을 섞어 쓰다 멈추는 일을 막는다 -->
   <!-- 체육관 설치용 운영 버전. 게임 코드(../js, ../css)는 프로토타입과 같이 쓰고, 화면은 여기서 다듬는다 -->
   <title>두뇌 PT</title>
-  <link rel="icon" href="logo.svg?v=20261117d" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=20261118" type="image/svg+xml">
   <!-- 글꼴 (풍경 라이딩 스타일). 못 받아도 시스템 글꼴로 돌아간다 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
-  <link rel="stylesheet" href="../css/style.css?v=20261117d">
-  <link rel="stylesheet" href="../css/themes.css?v=20261117d">
-  <link rel="stylesheet" href="app.css?v=20261117d">
+  <link rel="stylesheet" href="../css/style.css?v=20261118">
+  <link rel="stylesheet" href="../css/themes.css?v=20261118">
+  <link rel="stylesheet" href="app.css?v=20261118">
 </head>
 <body>
   <!-- 메뉴 -->
@@ -159,7 +159,7 @@
         </dl>
         <div class="rs-games" id="res-cog-sub"></div>
       </div>
-      <!-- 두뇌 그래프·운동량 (#tpl-report) -->
+      <!-- 세션 성과·운동량 (#tpl-report) -->
       <div class="rp-slot"></div>
       <div class="dr-card rs-rank">
         <h3>순위</h3>
@@ -177,7 +177,7 @@
   <section id="attract" class="screen">
     <div class="att-main">
       <div class="att-logo">
-        <img src="logo.svg?v=20261117d" alt="">
+        <img src="logo.svg?v=20261118" alt="">
         <h1>두뇌 <span>PT</span></h1>
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
@@ -303,17 +303,27 @@
         <!-- 회원: 손님이면 새 회원 QR 카드, 회원이면 기록 저장 안내 (app/members.js) -->
         <div class="dr-member" id="dr-member"></div>
       </div>
-      <!-- 두뇌 그래프·운동량 (#tpl-report) -->
+      <!-- 세션 성과·운동량 (#tpl-report) -->
     </div>
     <button class="hold-btn" id="dr-next"><i></i><span>길게 눌러서 시작 화면으로</span></button>
   </section>
 
-  <!-- 두뇌 그래프·운동량 카드: 시연 결과와 테스트 결과 화면이 함께 쓴다 (App.fillReport 가 채운다) -->
+  <!-- 세션 성과·운동량 카드: 시연 결과와 테스트 결과 화면이 함께 쓴다 (App.fillReport 가 채운다) -->
   <template id="tpl-report">
-    <div class="dr-card dr-brain">
-      <h3>나의 두뇌 그래프</h3>
-      <svg class="radar rp-radar"></svg>
-      <div class="dr-best rp-best"></div>
+    <div class="dr-card dr-stars">
+      <h3>이번 세션 성과</h3>
+      <div class="st-rows">
+        <div class="st-row rp-st-ex">
+          <div class="st-head"><span>운동</span><b class="st-pct"></b></div>
+          <div class="st-stars"></div>
+        </div>
+        <div class="st-row rp-st-game">
+          <div class="st-head"><span>인지</span><b class="st-pct"></b></div>
+          <div class="st-stars"></div>
+        </div>
+      </div>
+      <!-- 게임 정확도가 높으면 다음 난이도를 권한다 (js/stars.js) -->
+      <div class="st-rec rp-rec"></div>
     </div>
     <div class="dr-card dr-ex">
       <h3>오늘의 운동량</h3>
@@ -440,53 +450,54 @@
   <div id="debug"></div>
 
   <!-- QR 그리기 라이브러리는 모듈이 아닌 보통 스크립트다 (전역 qrcode) -->
-  <script src="vendor/qrcode.js?v=20261117d"></script>
+  <script src="vendor/qrcode.js?v=20261118"></script>
   <!-- 게임 코드는 ES 모듈이다. import 주소에도 ?v= 가 붙도록 모든 모듈을 이 지도에 적는다.
        node tools/stamp.js 가 만들므로 직접 고치지 않는다 -->
   <script type="importmap">
   {
     "imports": {
-      "./attract-visual.js": "./attract-visual.js?v=20261117d",
-      "./calib-visual.js": "./calib-visual.js?v=20261117d",
-      "./member-card.js": "./member-card.js?v=20261117d",
-      "./members.js": "./members.js?v=20261117d",
-      "../js/abilities.js": "../js/abilities.js?v=20261117d",
-      "../js/audio.js": "../js/audio.js?v=20261117d",
-      "../js/band.js": "../js/band.js?v=20261117d",
-      "../js/cadence-est.js": "../js/cadence-est.js?v=20261117d",
-      "../js/config.js": "../js/config.js?v=20261117d",
-      "../js/demo.js": "../js/demo.js?v=20261117d",
-      "../js/dev-storage.js": "../js/dev-storage.js?v=20261117d",
-      "../js/diagram.js": "../js/diagram.js?v=20261117d",
-      "../js/exercise.js": "../js/exercise.js?v=20261117d",
-      "../js/fx.js": "../js/fx.js?v=20261117d",
-      "../js/games/arith.js": "../js/games/arith.js?v=20261117d",
-      "../js/games/box.js": "../js/games/box.js?v=20261117d",
-      "../js/games/chain.js": "../js/games/chain.js?v=20261117d",
-      "../js/games/coin.js": "../js/games/coin.js?v=20261117d",
-      "../js/games/compare.js": "../js/games/compare.js?v=20261117d",
-      "../js/games/count.js": "../js/games/count.js?v=20261117d",
-      "../js/games/cover.js": "../js/games/cover.js?v=20261117d",
-      "../js/games/fit.js": "../js/games/fit.js?v=20261117d",
-      "../js/games/follow.js": "../js/games/follow.js?v=20261117d",
-      "../js/games/index.js": "../js/games/index.js?v=20261117d",
-      "../js/games/ladder.js": "../js/games/ladder.js?v=20261117d",
-      "../js/games/novel.js": "../js/games/novel.js?v=20261117d",
-      "../js/games/pair.js": "../js/games/pair.js?v=20261117d",
-      "../js/games/path.js": "../js/games/path.js?v=20261117d",
-      "../js/games/recall.js": "../js/games/recall.js?v=20261117d",
-      "../js/games/seek.js": "../js/games/seek.js?v=20261117d",
-      "../js/games/symbol.js": "../js/games/symbol.js?v=20261117d",
-      "../js/games/track.js": "../js/games/track.js?v=20261117d",
-      "../js/main.js": "../js/main.js?v=20261117d",
-      "../js/pedal-link.js": "../js/pedal-link.js?v=20261117d",
-      "../js/pedal.js": "../js/pedal.js?v=20261117d",
-      "../js/session-log.js": "../js/session-log.js?v=20261117d",
-      "../js/session-upload.js": "../js/session-upload.js?v=20261117d",
-      "../js/themes.js": "../js/themes.js?v=20261117d"
+      "./attract-visual.js": "./attract-visual.js?v=20261118",
+      "./calib-visual.js": "./calib-visual.js?v=20261118",
+      "./member-card.js": "./member-card.js?v=20261118",
+      "./members.js": "./members.js?v=20261118",
+      "../js/abilities.js": "../js/abilities.js?v=20261118",
+      "../js/audio.js": "../js/audio.js?v=20261118",
+      "../js/band.js": "../js/band.js?v=20261118",
+      "../js/cadence-est.js": "../js/cadence-est.js?v=20261118",
+      "../js/config.js": "../js/config.js?v=20261118",
+      "../js/demo.js": "../js/demo.js?v=20261118",
+      "../js/dev-storage.js": "../js/dev-storage.js?v=20261118",
+      "../js/diagram.js": "../js/diagram.js?v=20261118",
+      "../js/exercise.js": "../js/exercise.js?v=20261118",
+      "../js/fx.js": "../js/fx.js?v=20261118",
+      "../js/games/arith.js": "../js/games/arith.js?v=20261118",
+      "../js/games/box.js": "../js/games/box.js?v=20261118",
+      "../js/games/chain.js": "../js/games/chain.js?v=20261118",
+      "../js/games/coin.js": "../js/games/coin.js?v=20261118",
+      "../js/games/compare.js": "../js/games/compare.js?v=20261118",
+      "../js/games/count.js": "../js/games/count.js?v=20261118",
+      "../js/games/cover.js": "../js/games/cover.js?v=20261118",
+      "../js/games/fit.js": "../js/games/fit.js?v=20261118",
+      "../js/games/follow.js": "../js/games/follow.js?v=20261118",
+      "../js/games/index.js": "../js/games/index.js?v=20261118",
+      "../js/games/ladder.js": "../js/games/ladder.js?v=20261118",
+      "../js/games/novel.js": "../js/games/novel.js?v=20261118",
+      "../js/games/pair.js": "../js/games/pair.js?v=20261118",
+      "../js/games/path.js": "../js/games/path.js?v=20261118",
+      "../js/games/recall.js": "../js/games/recall.js?v=20261118",
+      "../js/games/seek.js": "../js/games/seek.js?v=20261118",
+      "../js/games/symbol.js": "../js/games/symbol.js?v=20261118",
+      "../js/games/track.js": "../js/games/track.js?v=20261118",
+      "../js/main.js": "../js/main.js?v=20261118",
+      "../js/pedal-link.js": "../js/pedal-link.js?v=20261118",
+      "../js/pedal.js": "../js/pedal.js?v=20261118",
+      "../js/session-log.js": "../js/session-log.js?v=20261118",
+      "../js/session-upload.js": "../js/session-upload.js?v=20261118",
+      "../js/stars.js": "../js/stars.js?v=20261118",
+      "../js/themes.js": "../js/themes.js?v=20261118"
     }
   }
   </script>
-  <script type="module" src="../js/main.js?v=20261117d"></script>
+  <script type="module" src="../js/main.js?v=20261118"></script>
 </body>
 </html>

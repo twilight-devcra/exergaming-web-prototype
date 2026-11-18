@@ -61,6 +61,8 @@ const DOMAINS = [
     id: 'language', name: '언어', en: 'Language',
     subs: [
       { id: 'comprehension', name: '언어 이해', what: '읽거나 들은 말을 이해하고 따르는 능력', test: '토큰 검사, 지시 따르기', priority: '중간' },
+      { id: 'fluency', name: '낱말 인출 · 유창성', what: '단서(첫 글자 등)에 맞는 낱말을 머릿속에서 찾아 꺼내는 능력', test: '음소 유창성 검사(COWAT: ㄱ으로 시작하는 낱말 말하기)', priority: '중간',
+        idea: '빈칸 낱말 여러 개에 공통으로 들어갈 글자 고르기. 말하기 대신 보기에서 고른다.' },
       { id: 'naming', name: '이름 대기', what: '그림을 보고 이름을 떠올리는 능력', test: '보스턴 이름 대기 검사(K-BNT)', priority: '중간',
         idea: '그림 하나를 보여 주고 낱말 3개 중 맞는 이름 고르기, 또는 초성을 보고 맞는 그림 고르기. 음성 입력이 없으므로 보기에서 고르는 방식으로 한다.' },
       { id: 'semantic', name: '의미 기억 · 범주화', what: '낱말과 사물의 뜻을 알고 같은 범주끼리 묶는 능력', test: '범주 유창성 검사, 의미 연합 검사', priority: '중간',
@@ -112,6 +114,7 @@ const GAME_TARGETS = {
   coin: ['calc', 'selective', 'iadl'],
   recall: ['sequence', 'verbal'],
   chain: ['planning'],
+  blank: ['fluency', '~naming', '~wm'],
 };
 
 // 기획만 된 게임 (아직 js/games 에 없다)

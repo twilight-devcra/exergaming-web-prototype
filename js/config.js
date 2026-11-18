@@ -60,7 +60,7 @@ export const DEFAULT_CONFIG = {
   introMs: { first: 4500, again: 2200 }, // 게임 소개(설명 그림) 시간: 라운드에서 처음 나올 때 / 다시 나올 때. 누르면 바로 넘어간다
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
   // 쉬운 단계(Lv1·Lv2)는 여기에 EASY_TIME 을 곱한다. 아래 범위는 Lv3~8 의 값이다.
-  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수 · track: 고를 공 수 · follow: 지시의 양 (버튼 하나 1 · 스위치·차례 누를 수 · 바로 옆 2 · 램프 조건 3 · 이어진 지시 단계 수 + 1) · pair: 양말 수 · box: 세어 둬야 할 과일 종류 수 (상자가 둘이면 +1) · compare: 왼쪽 그림의 선 수 · coin: 동전 수 (값을 더하는 Lv4~ 는 동전 수 × 1.3 + 종류 수) · recall: 눌러야 할 칸 수 · chain: 조각 수
+  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수 · track: 고를 공 수 · follow: 지시의 양 (버튼 하나 1 · 스위치·차례 누를 수 · 바로 옆 2 · 램프 조건 3 · 이어진 지시 단계 수 + 1) · pair: 양말 수 · box: 세어 둬야 할 과일 종류 수 (상자가 둘이면 +1) · compare: 왼쪽 그림의 선 수 · coin: 동전 수 (값을 더하는 Lv4~ 는 동전 수 × 1.3 + 종류 수) · recall: 눌러야 할 칸 수 · chain: 조각 수 · blank: 낱말 수
   questionTime: {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
     symbol: { base: 6, per: 0 },     // 6초
@@ -79,6 +79,7 @@ export const DEFAULT_CONFIG = {
     coin: { base: 4, per: 0.6 },     // 개수: 동전 10개 10초 · 값: 2종 7개 10.6초 ~ 5종 18개 20.8초
     recall: { base: 4, per: 1.3 },   // 다 보여 준 뒤부터: 3칸 7.9초 ~ 7칸 13.1초
     chain: { base: 6, per: 2.5 },    // 조각 4개 16초 ~ 7개 23.5초 (미리 생각할 시간을 넉넉히)
+    blank: { base: 4, per: 2.5 },    // 낱말 3개 11.5초 · 4개 14초 (낱말마다 들어갈 글자를 떠올려 볼 시간)
   },
   fallbackRpm: 60,           // 측정 실패 시 사용할 기준 RPM. 두뇌 게임만 하는 판(brainOnly)은 음악을 이 속도의 박자로 튼다
   minRpm: 25,

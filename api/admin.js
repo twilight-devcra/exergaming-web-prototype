@@ -5,12 +5,14 @@
 //   GET /admin/api/balance?…        게임 × 레벨: 문제 수 · 정답률 · 시간 초과율 · 걸린 시간
 //   GET /admin/export/<표>.csv?…    sessions · games · questions 를 거른 그대로
 //   GET /admin/raw/<env>/<device>/<sid>   원본 세션 (.json.gz)
+//   GET /admin/replay?env=&device=&sid=   세션 재생 화면 (replay.html). 원본을 받아 브라우저에서 다시 그린다
 // 거르기(쿼리): env(기본 prod) · edition · mode · track · difficulty · device · from · to(YYYY-MM-DD, 시작 시각 기준) · all=1(중단한 판도)
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 const PAGE = path.join(__dirname, 'admin.html');
+const REPLAY = path.join(__dirname, 'replay.html');
 
 // 게임 id → 이름 (js/games/*.js 의 static title). 서버는 같은 저장소에서 돌므로 그대로 읽는다
 function titles() {
@@ -115,6 +117,7 @@ module.exports = (db, { rawPath, safe }) => {
   return (req, res, u, send) => {
     const p = u.pathname;
     if (p === '/admin' || p === '/admin/') return send(res, 200, fs.readFileSync(PAGE), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    if (p === '/admin/replay') return send(res, 200, fs.readFileSync(REPLAY), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     if (p === '/admin/api/options') return send(res, 200, options());
     if (p === '/admin/api/overview') return send(res, 200, overview(u));
     if (p === '/admin/api/balance') return send(res, 200, balance(u));

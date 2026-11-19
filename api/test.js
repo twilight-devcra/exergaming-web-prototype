@@ -222,6 +222,10 @@ async function main() {
       assert.strictEqual(raw.status, 200);
       assert.strictEqual(raw.headers.get('content-type'), 'application/gzip');
       assert.strictEqual((await req('/admin/raw/prod/..%2F..%2Fetc/passwd', { headers: adminAuth })).status, 404);
+      assert.strictEqual((await req('/admin/replay?env=prod&device=tab-a&sid=1000')).status, 401);
+      const replay = await req('/admin/replay?env=prod&device=tab-a&sid=1000', { headers: adminAuth });
+      assert.strictEqual(replay.status, 200);
+      assert.match(await replay.text(), /세션 재생/);
       const opts = await (await req('/admin/api/options', { headers: adminAuth })).json();
       assert.strictEqual(opts.titles.coin, '동전 세기');
     });

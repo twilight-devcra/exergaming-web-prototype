@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>엑서게임 세션 재생</title>
+<!-- 세션 하나를 다시 본다: 페달 타임라인 + 문제마다 판을 세션 로그에서 다시 그린다. 관리 화면 최근 세션의 '재생' 에서 연다.
+     주소: /admin/replay?env=<env>&device=<device>&sid=<id>  → /admin/raw/... 의 원본(.json.gz)을 받아 푼다.
+     게임 그림은 DRAW 에 게임마다 하나. 그림이 없는 게임은 기록된 문제 내용을 글로 보여 준다. 형식은 docs/SESSION_LOG.md -->
+<style>
+  /* 관리 화면(admin.html)과 같은 색·글꼴. 요약 칸 → 타임라인 → 판 + 문제 목록 */
+  :root {
+    --page: #f9f9f7; --surface: #fcfcfb; --sunk: #f1f0ec; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --series: #2a78d6; --zone: rgba(31,157,85,0.14); --zone-edge: rgba(31,157,85,0.45);
+    --good: #1f8a4c; --bad: #c8372f; --late: #a66a00; --on-strong: #ffffff; --hollow-in: #fcfcfb;
+    --g1: #2a78d6; --g2: #c2569b; --g3: #1f9d8a; --g4: #d98a1c; --g5: #7a5cc7; --g6: #5f7d3a;
+    --font: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", Consolas, "D2Coding", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --sunk: #232321; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #45453f; --border: rgba(255,255,255,0.10);
+      --series: #5a9ff0; --zone: rgba(60,190,110,0.16); --zone-edge: rgba(60,190,110,0.5);
+      --good: #47c27a; --bad: #ec6a62; --late: #e0a33a; --on-strong: #0b0b0b; --hollow-in: #1a1a19;
+      --g1: #5a9ff0; --g2: #e07fbd; --g3: #3cc4ae; --g4: #eba54a; --g5: #a28aeb; --g6: #8fb35f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --sunk: #232321; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #45453f; --border: rgba(255,255,255,0.10);
+    --series: #5a9ff0; --zone: rgba(60,190,110,0.16); --zone-edge: rgba(60,190,110,0.5);
+    --good: #47c27a; --bad: #ec6a62; --late: #e0a33a; --on-strong: #0b0b0b; --hollow-in: #1a1a19;
+    --g1: #5a9ff0; --g2: #e07fbd; --g3: #3cc4ae; --g4: #eba54a; --g5: #a28aeb; --g6: #8fb35f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 var(--font); }
+  main { max-width: 1200px; margin: 0 auto; padding-block: 20px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 20px; margin: 0; text-wrap: balance; }
+  h2 { font-size: 15px; margin: 0; }
+  .head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+  .sub { color: var(--ink-2); margin: 4px 0 0; }
+  .back { color: var(--series); font-size: 13px; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  .tag { display: inline-block; font-size: 11px; letter-spacing: 0.04em; color: var(--late); border: 1px solid currentColor; border-radius: 4px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+  .open { display: flex; gap: 8px; align-items: center; color: var(--ink-2); font-size: 12px; }
+  .open label { cursor: pointer; color: var(--series); border: 1px solid var(--axis); background: var(--surface); border-radius: 6px; padding: 5px 10px; font-size: 13px; }
+  .open label:focus-within { outline: 2px solid var(--series); outline-offset: 2px; }
+  .open input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 16px; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .k { color: var(--ink-2); font-size: 12px; }
+  .tile .v { font-size: 22px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .v small { font-size: 13px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
+  .tile .x { font-size: 12px; color: var(--ink-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .bar-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  button, select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button:focus-visible, select:focus-visible, .q-row:focus-visible, svg.tl:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
+  #play { min-width: 74px; }
+  .clock { font: 600 15px/1 var(--mono); font-variant-numeric: tabular-nums; min-width: 92px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--ink-2); font-size: 12px; }
+  .legend i { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+  .tl-wrap { overflow-x: auto; }
+  svg.tl { display: block; width: 100%; min-width: 640px; height: auto; touch-action: none; cursor: col-resize; user-select: none; }
+  .tl .lbl { fill: var(--muted); font-size: 11px; }
+  .tl .lbl-ink { fill: var(--ink-2); font-size: 11px; }
+  .tl .band-lbl { fill: var(--on-strong); font-size: 11px; font-weight: 600; }
+  .stage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .stage > section { margin-top: 0; }
+  .wrap-stage { margin-top: 16px; }
+  .card-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; justify-content: space-between; }
+  .meta { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; color: var(--on-strong); }
+  .chip.good { background: var(--good); } .chip.bad { background: var(--bad); } .chip.late { background: var(--late); } .chip.wait { background: var(--axis); color: var(--ink); }
+  .board { margin-top: 12px; background: var(--sunk); border-radius: 8px; padding: 14px; display: flex; justify-content: center; min-height: 260px; align-items: center; }
+  .board svg { display: block; max-width: 100%; height: auto; max-height: 340px; }
+  .board .empty { color: var(--muted); text-align: center; }
+  .board pre { font: 11px/1.4 var(--mono); color: var(--ink-2); white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; text-align: left; max-height: 220px; overflow: auto; }
+  .b-ink { fill: var(--ink); } .b-ink2 { fill: var(--ink-2); } .b-mut { fill: var(--muted); } .b-surf { fill: var(--surface); } .b-grid { fill: var(--grid); }
+  .s-ink { stroke: var(--ink); } .s-axis { stroke: var(--axis); } .s-good { stroke: var(--good); } .s-bad { stroke: var(--bad); } .s-series { stroke: var(--series); }
+  .f-good { fill: var(--good); } .f-bad { fill: var(--bad); } .f-series { fill: var(--series); } .f-on { fill: var(--on-strong); }
+  .board text { font-family: var(--font); }
+  .think { margin-top: 14px; }
+  .think .k { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .think svg { display: block; width: 100%; height: 34px; }
+  .think .lbl { fill: var(--ink-2); font-size: 10px; }
+  .q-list { max-height: 560px; overflow: auto; margin: 10px -16px -16px; border-top: 1px solid var(--grid); }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--ink-2); font-weight: 500; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
+  th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+  .q-row { cursor: pointer; }
+  .q-row:hover { background: var(--sunk); }
+  .q-row.cur { background: var(--sunk); box-shadow: inset 3px 0 0 var(--series); }
+  .q-row .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .dot.good { background: var(--good); } .dot.bad { background: var(--bad); } .dot.late { background: var(--late); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .err { color: var(--bad); font-size: 13px; }
+  @media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } .q-list { max-height: 360px; } }
+  @media (max-width: 600px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .tile .v { font-size: 19px; } section { padding: 12px; } .q-list { margin: 10px -12px -12px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <div>
+      <a class="back" id="back" href="./">← 관리 화면</a>
+      <h1>세션 재생</h1>
+      <p class="sub" id="sess-meta">관리 화면 최근 세션의 '재생' 으로 열거나, 세션 파일을 여세요.</p>
+    </div>
+    <div class="open">
+      <span id="open-msg">관리 화면의 원본(.json.gz) 또는 내보낸 .json · .jsonl</span>
+      <label>세션 파일 열기<input type="file" id="file" accept=".json,.jsonl,.gz,application/json,application/gzip"></label>
+    </div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section id="tl-sec" hidden>
+    <div class="bar-row">
+      <div class="controls">
+        <button id="play" type="button">▶ 재생</button>
+        <select id="speed" aria-label="재생 속도">
+          <option value="1">1×</option><option value="4" selected>4×</option><option value="10">10×</option>
+        </select>
+        <span class="clock" id="clock">0:00.0</span>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="tl-wrap"><svg class="tl" id="tl" tabindex="0" aria-label="세션 타임라인. 좌우 화살표로 이동"></svg></div>
+    <p class="note">시각은 게임 시계(일시정지 동안 멈춤)입니다. 타임라인을 누르거나 끌어서 옮기고, 아래 목록에서 문제를 고를 수 있어요.</p>
+  </section>
+
+  <div class="stage wrap-stage" id="stage" hidden>
+    <section aria-live="polite">
+      <div class="card-head">
+        <h2 id="b-title">–</h2>
+        <span id="b-chip"></span>
+      </div>
+      <div class="meta" id="b-meta"></div>
+      <div class="board" id="board"></div>
+      <div class="think" id="think"></div>
+    </section>
+    <section>
+      <div class="card-head"><h2>문제</h2><span class="meta" id="q-count"></span></div>
+      <div class="q-list"><table><thead><tr><th>#</th><th>게임</th><th>Lv</th><th>결과</th><th>첫 입력</th><th>답까지</th></tr></thead><tbody id="q-body"></tbody></table></div>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  // 서버가 /admin/api/options 로 모든 게임 이름을 주면 덮어쓴다
+  const TITLES = {
+    path: '길 따라 그리기', symbol: '심볼 위치 외우기', arith: '사칙연산 역산', count: '우세한 색 찾기', fit: '빈자리 채우기',
+    seek: '숨은 순서 찾기', cover: '가린 숫자 더하기', ladder: '사다리 타기', novel: '새로 나타난 그림', track: '공 따라가기',
+    follow: '지시 따르기', pair: '짝 없는 양말', box: '상자 속 과일', compare: '두 그림 비교하기', coin: '동전 세기',
+    recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기',
+  };
+  const fmt = (ms, tenths = true) => {
+    if (ms == null || !isFinite(ms)) return '–';
+    const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60), r = s - m * 60;
+    return `${m}:${(tenths ? r.toFixed(1) : Math.floor(r).toString()).padStart(tenths ? 4 : 2, '0')}`;
+  };
+  const sec = (ms) => (ms == null ? '–' : `${(ms / 1000).toFixed(1)}초`);
+
+  // ---------- 세션 → 재생용 모델 ----------
+  function model(log) {
+    const ev = log.events || [];
+    const end = ev.length ? ev[ev.length - 1].clock : 0;
+    const games = [], qs = [], pauses = [];
+    let g = null, q = null, pauseAt = null;
+    for (const e of ev) {
+      if (e.type === 'game_start') { g = { game: e.game, level: e.level, start: e.clock, open: null, end: end, qs: [] }; games.push(g); }
+      else if (e.type === 'intro_end' && g) g.open = e.clock;
+      else if ((e.type === 'game_end' || e.type === 'game_abort') && g) { g.end = e.clock; g.aborted = e.type === 'game_abort'; g = null; }
+      else if (e.type === 'question') { q = { n: e.q, game: e.game, level: e.level, at: e.clock, open: e.clock, data: e, inputs: [], answer: null, limit: null, g }; qs.push(q); if (g) g.qs.push(q); }
+      else if (e.type === 'input_open' && q && q.n === e.q) q.open = e.clock;
+      else if (e.type === 'timer_start' && q && !q.answer && q.limit == null) q.limit = e.limitMs;
+      else if (e.type === 'input' && q && q.n === e.q) q.inputs.push(e);
+      else if (e.type === 'answer' && q && q.n === e.q) {
+        q.answer = e;
+        if (!('first' in e)) e.first = q.inputs.length ? q.inputs[0].ms : e.timedOut ? null : e.ms;
+      }
+      else if (e.type === 'pause') pauseAt = e.clock;
+      else if (e.type === 'resume' && pauseAt != null) { pauses.push([pauseAt, e.clock]); pauseAt = null; }
+    }
+    const order = [];
+    for (const x of games) if (!order.includes(x.game)) order.push(x.game);
+    const samples = (log.samples || []).map((s) => ({ c: s[1], rpm: s[2], target: s[3], inZone: s[5], score: s[6] }));
+    return { log, end, games, qs, order, samples, pauses, tol: (log.meta && log.meta.config && log.meta.config.tolerance) || 0.12,
+      playStart: (ev.find((e) => e.type === 'play_start') || {}).clock ?? 0 };
+  }
+  const result = (q) => !q.answer ? 'wait' : q.answer.timedOut ? 'late' : q.answer.correct ? 'good' : 'bad';
+  const RESULT = { good: '정답', bad: '오답', late: '시간 초과', wait: '푸는 중' };
+  const gColor = (M, id) => `var(--g${(M.order.indexOf(id) % 6) + 1})`;
+
+  // ---------- 그림 도우미 ----------
+  const SHAPES = {
+    circle: (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r * 0.85}"/>`,
+    square: (x, y, r) => `<rect x="${x - r * 0.78}" y="${y - r * 0.78}" width="${r * 1.56}" height="${r * 1.56}" rx="${r * 0.15}"/>`,
+    triangle: (x, y, r) => `<polygon points="${x},${y - r} ${x + r * 0.95},${y + r * 0.75} ${x - r * 0.95},${y + r * 0.75}"/>`,
+    diamond: (x, y, r) => `<polygon points="${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}"/>`,
+    plus: (x, y, r) => { const a = r * 0.32; return `<path d="M${x - a} ${y - r}h${2 * a}v${r - a}h${r - a}v${2 * a}h${-(r - a)}v${r - a}h${-2 * a}v${-(r - a)}h${-(r - a)}v${-2 * a}h${r - a}z"/>`; },
+    star: (x, y, r) => { let p = ''; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; p += `${(x + rr * Math.cos(a)).toFixed(1)},${(y + rr * Math.sin(a)).toFixed(1)} `; } return `<polygon points="${p}"/>`; },
+    moon: (x, y, r) => `<path d="M${x + r * 0.3} ${y - r} a${r} ${r} 0 1 0 0 ${2 * r} a${r * 0.75} ${r * 0.75} 0 1 1 0 ${-2 * r}z"/>`,
+    heart: (x, y, r) => `<path d="M${x} ${y + r * 0.85} C${x - r * 1.3} ${y - r * 0.1} ${x - r * 0.6} ${y - r * 1.1} ${x} ${y - r * 0.35} C${x + r * 0.6} ${y - r * 1.1} ${x + r * 1.3} ${y - r * 0.1} ${x} ${y + r * 0.85}z"/>`,
+  };
+  const SEEK_GLYPHS = ['circle', 'triangle', 'square', 'diamond', 'star', 'plus', 'heart', 'moon'];
+  const COUNT = { red: '#e5484d', blue: '#2f6fed', green: '#1f9d55', yellow: '#f5b301', purple: '#8e4ec6' };
+  const COUNT_GLYPH = { red: 'circle', blue: 'square', green: 'triangle', yellow: 'diamond', purple: 'plus' };
+  const svg = (w, h, body, label) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="${esc(label)}">${body}</svg>`;
+  const badge = (x, y, n, cls = 'f-series') => `<circle cx="${x}" cy="${y}" r="9" class="${cls}"/><text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="10" font-weight="700" class="f-on">${n}</text>`;
+
+  // 각 그리기는 (문제, 지금까지의 입력, 보이는 답 또는 null) → SVG
+  const DRAW = {
+    count(q, inputs, ans) {
+      const d = q.data, [rows, cols] = d.grid, S = 46, pad = 8;
+      let b = '';
+      d.cells.forEach((ci, k) => {
+        const x = pad + (k % cols) * S, y = pad + Math.floor(k / cols) * S;
+        if (ci < 0) { b += `<rect x="${x + 2}" y="${y + 2}" width="${S - 4}" height="${S - 4}" rx="6" class="b-grid"/>`; return; }
+        const id = d.colors[ci];
+        b += `<rect x="${x + 2}" y="${y + 2}" width="${S - 4}" height="${S - 4}" rx="6" fill="${COUNT[id]}"/>`;
+        b += `<g fill="#fff" opacity="0.9">${SHAPES[COUNT_GLYPH[id]](x + S / 2, y + S / 2, 10)}</g>`;
+      });
+      const gw = cols * S + pad * 2, oy = rows * S + pad * 2 + 10, ow = 64;
+      const ox = Math.max(pad, (gw - d.colors.length * ow) / 2);
+      d.colors.forEach((id, i) => {
+        const x = ox + i * ow, picked = ans && ans.picked === id, right = i === 0;
+        b += `<rect x="${x + 4}" y="${oy}" width="${ow - 8}" height="40" rx="8" fill="${COUNT[id]}" opacity="${ans ? (picked || right ? 1 : 0.35) : 0.85}"/>`;
+        b += `<g fill="#fff">${SHAPES[COUNT_GLYPH[id]](x + 20, oy + 20, 8)}</g>`;
+        b += `<text x="${x + ow - 16}" y="${oy + 25}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">${ans ? d.counts[i] : '?'}</text>`;
+        if (picked) b += `<rect x="${x + 1}" y="${oy - 3}" width="${ow - 2}" height="46" rx="10" fill="none" stroke-width="3" class="${right ? 's-good' : 's-bad'}"/>`;
+      });
+      return svg(Math.max(gw, ox * 2 + d.colors.length * ow), oy + 48, b, '색 격자와 보기');
+    },
+
+    path(q, inputs, ans) {
+      const d = q.data, [rows, cols] = d.grid, S = 54, pad = 10;
+      const cx = (c) => pad + c * S + S / 2, cy = (r) => pad + r * S + S / 2;
+      let b = '';
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) b += `<rect x="${pad + c * S + 3}" y="${pad + r * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" class="b-surf s-axis" stroke-width="1"/>`;
+      // 보여 준 길 (점선)
+      b += `<polyline points="${d.path.map(([r, c]) => `${cx(c)},${cy(r)}`).join(' ')}" fill="none" class="s-axis" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>`;
+      const [sr, sc] = d.path[0];
+      b += `<rect x="${pad + sc * S + 3}" y="${pad + sr * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" class="b-ink2"/><text x="${cx(sc)}" y="${cy(sr) + 4}" text-anchor="middle" font-size="11" font-weight="700" class="b-surf">출발</text>`;
+      inputs.forEach((e, i) => {
+        const [r, c] = e.cell;
+        b += `<rect x="${pad + c * S + 3}" y="${pad + r * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" class="f-series" opacity="0.18"/>`;
+        b += badge(cx(c), cy(r), i + 1);
+      });
+      if (ans && ans.wrongCell) {
+        const [r, c] = ans.wrongCell;
+        b += `<rect x="${pad + c * S + 3}" y="${pad + r * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" fill="none" class="s-bad" stroke-width="3"/>`;
+        b += `<text x="${cx(c)}" y="${cy(r) + 6}" text-anchor="middle" font-size="18" font-weight="700" class="f-bad">✕</text>`;
+      }
+      return svg(cols * S + pad * 2, rows * S + pad * 2, b, '길 격자와 누른 칸');
+    },
+
+    arith(q, inputs, ans) {
+      const d = q.data, n = d.ops.length + 1, W = 52, gap = 30;
+      const fill = Array(n).fill(null);
+      (d.given || []).forEach((i) => (fill[i] = d.sol[i]));
+      for (const e of inputs) { if ('put' in e) fill[e.slot] = e.put; else if ('remove' in e) fill[e.slot] = null; }
+      if (ans && ans.fill) ans.fill.forEach((v, i) => (fill[i] = v));
+      let b = '', x = 10;
+      for (let i = 0; i < n; i++) {
+        const given = (d.given || []).includes(i);
+        b += `<rect x="${x}" y="10" width="${W}" height="${W}" rx="8" class="${given ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1.5"/>`;
+        if (fill[i] != null) b += `<text x="${x + W / 2}" y="${10 + W / 2 + 8}" text-anchor="middle" font-size="24" font-weight="700" class="b-ink">${fill[i]}</text>`;
+        x += W;
+        if (i < n - 1) { b += `<text x="${x + gap / 2}" y="${10 + W / 2 + 8}" text-anchor="middle" font-size="22" class="b-ink2">${d.ops[i] === '+' ? '+' : '−'}</text>`; x += gap; }
+      }
+      b += `<text x="${x + gap / 2}" y="${10 + W / 2 + 8}" text-anchor="middle" font-size="22" class="b-ink2">=</text>`;
+      x += gap;
+      b += `<text x="${x + 4}" y="${10 + W / 2 + 9}" font-size="26" font-weight="700" class="b-ink">${d.ans}</text>`;
+      const w = x + 60;
+      // 보기
+      const cw = 44, cx0 = Math.max(10, (w - d.cands.length * (cw + 8)) / 2);
+      d.cands.forEach((v, i) => {
+        const used = fill.includes(v), xx = cx0 + i * (cw + 8);
+        b += `<rect x="${xx}" y="${W + 34}" width="${cw}" height="38" rx="8" class="${used ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1"/>`;
+        b += `<text x="${xx + cw / 2}" y="${W + 59}" text-anchor="middle" font-size="16" font-weight="600" class="${used ? 'b-mut' : 'b-ink'}">${v}</text>`;
+      });
+      if (ans && !ans.correct) b += `<text x="10" y="${W + 98}" font-size="12" class="b-ink2">풀이 예: ${d.sol.map((v, i) => (i ? ` ${d.ops[i - 1] === '+' ? '+' : '−'} ` : '') + v).join('')} = ${d.ans}</text>`;
+      return svg(w, W + (ans && !ans.correct ? 108 : 86), b, '식과 보기');
+    },
+
+    compare(q, inputs, ans) {
+      const d = q.data, n = d.grid, S = 36, pad = 16, side = (n - 1) * S + pad * 2, gap = 34;
+      const key = (l) => l.slice(0, 4).join(',');
+      const same4 = (a, b) => key(a) === key(b) || key(a) === [b[2], b[3], b[0], b[1]].join(',');
+      const c = d.change || {};
+      let right = d.left.filter((l) => !(c.removed && same4(l, c.removed))).map((l) => l.slice());
+      if (c.added) right.push(c.added.slice());
+      if (c.restyled) right = right.map((l) => (same4(l, c.restyled) ? c.restyled.slice() : l));
+      const isChanged = (l, onLeft) => ans && d.change && ((onLeft && c.removed && same4(l, c.removed)) || (!onLeft && ((c.added && same4(l, c.added)) || (c.restyled && same4(l, c.restyled)))) || (c.restyled && same4(l, c.restyled)));
+      const card = (ox, lines, onLeft) => {
+        let b = `<rect x="${ox}" y="0" width="${side}" height="${side}" rx="10" class="b-surf s-axis" stroke-width="1"/>`;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) b += `<circle cx="${ox + pad + x * S}" cy="${pad + y * S}" r="2.2" class="b-mut"/>`;
+        for (const l of lines) {
+          const [x1, y1, x2, y2, st] = l, hl = isChanged(l, onLeft);
+          const p = `x1="${ox + pad + x1 * S}" y1="${pad + y1 * S}" x2="${ox + pad + x2 * S}" y2="${pad + y2 * S}" stroke-linecap="round"`;
+          const col = hl ? 'var(--late)' : 'var(--ink)';
+          b += `<line ${p} stroke="${col}" stroke-width="${st === 'h' ? 8 : 5}"/>`;
+          if (st === 'h') b += `<line ${p} stroke="var(--hollow-in)" stroke-width="3.5"/>`;
+        }
+        return b;
+      };
+      let b = card(0, d.left, true) + card(side + gap, right, false);
+      b += `<text x="${side + gap / 2}" y="${side / 2 + 6}" text-anchor="middle" font-size="16" class="b-mut">↔</text>`;
+      const h = side + 44, mid = side + gap / 2;
+      const opt = (x, label, v) => {
+        const picked = ans && ans.picked === v, rightAns = (v === 'same') === d.same;
+        const cls = picked ? (rightAns ? 's-good' : 's-bad') : 's-axis';
+        return `<rect x="${x}" y="${side + 12}" width="96" height="30" rx="15" class="b-surf ${cls}" stroke-width="${picked ? 3 : 1}"/><text x="${x + 48}" y="${side + 32}" text-anchor="middle" font-size="13" font-weight="600" class="${ans && rightAns ? 'b-ink' : 'b-ink2'}">${label}</text>`;
+      };
+      b += opt(mid - 104, '같아요', 'same') + opt(mid + 8, '달라요', 'diff');
+      return svg(side * 2 + gap, h, b, '두 그림과 보기');
+    },
+
+    ladder(q, inputs, ans) {
+      const d = q.data, L = d.lanes, X = 70, H = 230, top = 42, pad = 30;
+      const lx = (i) => pad + i * X, ly = (v) => top + v * H;
+      let b = '';
+      for (let i = 0; i < L; i++) b += `<line x1="${lx(i)}" y1="${top}" x2="${lx(i)}" y2="${top + H}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
+      for (const [i, yl, yr] of d.rungs) b += `<line x1="${lx(i)}" y1="${ly(yl)}" x2="${lx(i + 1)}" y2="${ly(yr)}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
+      const trace = (start) => {
+        let lane = start, y = 0; const pts = [[lx(lane), ly(0)]];
+        for (let guard = 0; guard < 99; guard++) {
+          let best = null;
+          for (const [i, yl, yr] of d.rungs) {
+            if (i === lane && yl > y + 1e-9 && (!best || yl < best.y)) best = { y: yl, to: i + 1, ty: yr };
+            if (i + 1 === lane && yr > y + 1e-9 && (!best || yr < best.y)) best = { y: yr, to: i, ty: yl };
+          }
+          if (!best) break;
+          pts.push([lx(lane), ly(best.y)], [lx(best.to), ly(best.ty)]);
+          lane = best.to; y = best.ty;
+        }
+        pts.push([lx(lane), ly(1)]);
+        return pts.map((p) => p.join(',')).join(' ');
+      };
+      if (ans) {
+        if (ans.picked !== d.answer) b += `<polyline points="${trace(d.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
+        if (ans.picked != null) b += `<polyline points="${trace(ans.picked)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+      d.pegs.forEach((s, i) => {
+        const picked = ans && ans.picked === i;
+        b += `<g class="${picked ? (ans.correct ? 'f-good' : 'f-bad') : 'b-ink2'}">${(SHAPES[s] || SHAPES.circle)(lx(i), top - 22, 11)}</g>`;
+      });
+      d.holes.forEach((s, i) => {
+        if (!s) return;
+        b += `<g fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="3 2">${(SHAPES[s] || SHAPES.circle)(lx(i), top + H + 22, 11)}</g>`;
+      });
+      return svg(pad * 2 + (L - 1) * X, top + H + 44, b, '사다리');
+    },
+
+    seek(q, inputs, ans) {
+      const d = q.data, S = 24, r3 = Math.sqrt(3);
+      const cs = d.cells.map(([qq, r]) => [r3 * (qq + r / 2) * S, 1.5 * r * S]);
+      const xs = cs.map((c) => c[0]), ys = cs.map((c) => c[1]);
+      const minX = Math.min(...xs) - S, minY = Math.min(...ys) - S, w = Math.max(...xs) - minX + S, top = 56;
+      const hex = (x, y, s) => Array.from({ length: 6 }, (_, k) => { const a = Math.PI / 180 * (60 * k - 30); return `${(x + s * Math.cos(a)).toFixed(1)},${(y + s * Math.sin(a)).toFixed(1)}`; }).join(' ');
+      let b = '';
+      // 찾을 순서
+      const sx = w / 2 - (d.seq.length * 34) / 2;
+      b += `<text x="${w / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">찾을 순서</text>`;
+      d.seq.forEach((s, i) => { b += `<rect x="${sx + i * 34 + 2}" y="18" width="30" height="30" rx="6" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${SHAPES[SEEK_GLYPHS[s % 8]](sx + i * 34 + 17, 33, 9)}</g>`; });
+      cs.forEach(([x, y], i) => {
+        const X = x - minX, Y = y - minY + top, onAns = ans && d.answer.includes(i), picked = ans && ans.cell === i;
+        b += `<polygon points="${hex(X, Y, S * 0.95)}" class="${onAns ? 'f-good' : 'b-surf'} s-axis" stroke-width="1" ${onAns ? 'fill-opacity="0.22"' : ''}/>`;
+        b += `<g class="b-ink">${SHAPES[SEEK_GLYPHS[d.syms[i] % 8]](X, Y, 8.5)}</g>`;
+        if (picked) b += `<polygon points="${hex(X, Y, S * 0.82)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="3"/>`;
+      });
+      return svg(w, Math.max(...ys) - minY + S + top, b, '육각 판과 찾을 순서');
+    },
+  };
+
+  // ---------- 화면 ----------
+  let M = null, t = 0, playing = false, speed = 4, cur = null;
+
+  function load(log) {
+    M = model(log);
+    $('#tl-sec').hidden = false;
+    $('#stage').hidden = false;
+    const m = log.meta || {}, s = m.summary || {};
+    const when = m.startedAt ? new Date(m.startedAt).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    const ended = { complete: '끝까지 함', user: '그만하기', operator: '운영자가 끝냄', idle: '자리 비움', abandoned: '중단' }[m.ended] || m.ended || '';
+    $('#sess-meta').textContent = [when, m.station ? `스테이션 ${m.station}` : null, m.participant ? `참가 ${m.participant}` : null,
+      m.track === 'brain' ? '두뇌 게임만' : '페달 + 두뇌 게임', m.input === 'pedal' ? '페달' : '키보드', ended, `로그 v${m.version ?? '?'}`].filter(Boolean).join(' · ');
+
+    const done = M.qs.filter((q) => q.answer);
+    const inTime = done.filter((q) => !q.answer.timedOut && q.answer.ms != null);
+    const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    const play = M.samples.filter((x) => x.c >= M.playStart && x.target != null);
+    const zone = play.length ? Math.round((100 * play.filter((x) => x.inZone).length) / play.length) : null;
+    const tile = (k, v, small = '', extra = '') => `<div class="tile"><div class="k">${k}</div><div class="v">${v}<small>${small}</small></div>${extra ? `<div class="x">${extra}</div>` : ''}</div>`;
+    $('#tiles').innerHTML = [
+      tile('총점', s.score ?? '–', '', s.exScore != null ? `운동 ${s.exScore} · 인지 ${s.cogScore}` : ''),
+      tile('정답', `${done.filter((q) => q.answer.correct).length}/${done.length}`, '', done.some((q) => q.answer.timedOut) ? `시간 초과 ${done.filter((q) => q.answer.timedOut).length}번` : ''),
+      tile('첫 입력까지 (평균)', inTime.length ? (avg(inTime.map((q) => q.answer.first ?? q.answer.ms)) / 1000).toFixed(1) : '–', '초'),
+      tile('답까지 (평균)', inTime.length ? (avg(inTime.map((q) => q.answer.ms)) / 1000).toFixed(1) : '–', '초'),
+      tile('초록 구역 안', zone == null ? '–' : zone, zone == null ? '' : '%'),
+      tile('플레이 시간', s.elapsedSec != null ? fmt(s.elapsedSec * 1000, false) : fmt(M.end - M.playStart, false)),
+    ].join('');
+
+    $('#legend').innerHTML = M.order.map((id) => `<span><i style="background:${gColor(M, id)}"></i>${esc(TITLES[id] || id)}</span>`).join('') +
+      `<span><i style="background:var(--zone);outline:1px solid var(--zone-edge)"></i>목표 구역</span><span><i style="background:var(--series);height:2px"></i>RPM</span>`;
+
+    $('#q-count').textContent = `${M.qs.length}개 · ${M.games.length}판`;
+    $('#q-body').innerHTML = M.qs.map((q, i) => {
+      const r = result(q), a = q.answer;
+      return `<tr class="q-row" tabindex="0" data-i="${i}"><td>${q.n}</td><td><span class="sw" style="background:${gColor(M, q.game)}"></span>${esc(TITLES[q.game] || q.game)}</td><td>${q.level}</td>
+        <td><span class="dot ${r}"></span> ${RESULT[r]}</td><td>${a ? sec(a.first) : '–'}</td><td>${a ? sec(a.ms) : '–'}</td></tr>`;
+    }).join('');
+    const first = M.qs[0];
+    seek(first && first.answer ? first.answer.clock : M.end / 3);
+    drawTimeline();
+    render();
+  }
+
+  // 타임라인 좌표
+  const TL = { W: 1000, H: 196, l: 40, r: 12, band: [6, 26], chart: [40, 148], qrow: [160, 172], axis: 190 };
+  const tx = (c) => TL.l + (c / Math.max(1, M.end)) * (TL.W - TL.l - TL.r);
+  function drawTimeline() {
+    const el = $('#tl');
+    el.setAttribute('viewBox', `0 0 ${TL.W} ${TL.H}`);
+    const sm = M.samples.filter((x) => x.rpm != null);
+    const hi = Math.max(10, ...sm.map((x) => x.rpm), ...sm.filter((x) => x.target != null).map((x) => x.target * (1 + M.tol))) * 1.08;
+    const ry = (v) => TL.chart[1] - (v / hi) * (TL.chart[1] - TL.chart[0]);
+    let b = '';
+    // 눈금
+    const step = M.end > 240000 ? 60000 : 30000;
+    for (let c = 0; c <= M.end; c += step) b += `<line x1="${tx(c)}" y1="${TL.chart[0] - 4}" x2="${tx(c)}" y2="${TL.qrow[1]}" stroke="var(--grid)"/><text x="${tx(c)}" y="${TL.axis}" text-anchor="middle" class="lbl">${fmt(c, false)}</text>`;
+    for (const v of [0, Math.round(hi / 2 / 10) * 10]) b += `<text x="${TL.l - 6}" y="${ry(v) + 4}" text-anchor="end" class="lbl">${v}</text>`;
+    b += `<text x="${TL.l - 6}" y="${TL.chart[0] + 2}" text-anchor="end" class="lbl">RPM</text>`;
+    // 측정 구간
+    if (M.playStart > 0) b += `<rect x="${tx(0)}" y="${TL.band[0]}" width="${tx(M.playStart) - tx(0)}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="var(--grid)"/><text x="${(tx(0) + tx(M.playStart)) / 2}" y="${TL.band[0] + 14}" text-anchor="middle" class="lbl-ink">측정</text>`;
+    // 게임 띠 (소개 부분은 옅게)
+    for (const g of M.games) {
+      const x0 = tx(g.start), x1 = tx(g.end), xo = tx(g.open ?? g.start), col = gColor(M, g.game);
+      b += `<rect x="${x0}" y="${TL.band[0]}" width="${Math.max(1, x1 - x0 - 1)}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="${col}" opacity="0.35"/>`;
+      b += `<rect x="${xo}" y="${TL.band[0]}" width="${Math.max(1, x1 - xo - 1)}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="${col}"/>`;
+      const name = TITLES[g.game] || g.game;
+      if (x1 - xo > name.length * 11 + 8) b += `<text x="${xo + 6}" y="${TL.band[0] + 14}" class="band-lbl">${esc(name)}</text>`;
+    }
+    // 목표 구역 + RPM
+    const zs = sm.filter((x) => x.target != null);
+    if (zs.length) {
+      const up = zs.map((x) => `${tx(x.c).toFixed(1)},${ry(x.target * (1 + M.tol)).toFixed(1)}`), dn = zs.slice().reverse().map((x) => `${tx(x.c).toFixed(1)},${ry(x.target * (1 - M.tol)).toFixed(1)}`);
+      b += `<polygon points="${up.join(' ')} ${dn.join(' ')}" fill="var(--zone)" stroke="var(--zone-edge)" stroke-width="0.8"/>`;
+      b += `<polyline points="${zs.map((x) => `${tx(x.c).toFixed(1)},${ry(x.target).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--zone-edge)" stroke-dasharray="4 3"/>`;
+    }
+    b += `<polyline points="${sm.map((x) => `${tx(x.c).toFixed(1)},${ry(x.rpm).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--series)" stroke-width="1.6" stroke-linejoin="round"/>`;
+    for (const [a, z] of M.pauses) b += `<rect x="${tx(a)}" y="${TL.chart[0]}" width="${Math.max(2, tx(z) - tx(a))}" height="${TL.chart[1] - TL.chart[0]}" fill="var(--axis)" opacity="0.5"/>`;
+    // 문제: 입력이 열린 때 ~ 답, 점 색 = 결과
+    const qy = (TL.qrow[0] + TL.qrow[1]) / 2;
+    b += `<text x="${TL.l - 6}" y="${qy + 4}" text-anchor="end" class="lbl">문제</text>`;
+    for (const q of M.qs) {
+      const r = result(q), endC = q.answer ? q.answer.clock : q.g ? q.g.end : q.open;
+      b += `<line x1="${tx(q.open)}" y1="${qy}" x2="${tx(endC)}" y2="${qy}" stroke="var(--axis)" stroke-width="3" stroke-linecap="round"/>`;
+      if (q.answer) b += `<circle cx="${tx(endC)}" cy="${qy}" r="4.5" fill="var(--${r === 'wait' ? 'axis' : r})"/>`;
+    }
+    b += `<g id="ph"><line id="ph-line" y1="2" y2="${TL.qrow[1] + 4}" stroke="var(--ink)" stroke-width="1.5"/><circle id="ph-dot" cy="2" r="4" fill="var(--ink)"/></g>`;
+    el.innerHTML = b;
+    placeHead();
+  }
+  function placeHead() {
+    const x = tx(t);
+    const l = $('#ph-line'), d = $('#ph-dot');
+    if (l) { l.setAttribute('x1', x); l.setAttribute('x2', x); d.setAttribute('cx', x); }
+    $('#clock').textContent = fmt(t);
+  }
+
+  // 지금 시각의 문제: 지금 게임(소개가 끝난 뒤)의 마지막으로 열린 문제
+  function current() {
+    const g = M.games.find((x) => t >= x.start && t < x.end) || (t >= M.end ? M.games[M.games.length - 1] : null);
+    if (!g) return { phase: t < M.playStart ? 'calib' : 'between' };
+    if (g.open == null || t < g.open) return { phase: 'intro', g };
+    const qs = g.qs.filter((q) => q.at <= t);
+    return qs.length ? { phase: 'q', g, q: qs[qs.length - 1] } : { phase: 'intro', g };
+  }
+
+  function render() {
+    placeHead();
+    const c = current(), board = $('#board'), think = $('#think');
+    const q = c.q || null;
+    document.querySelectorAll('.q-row').forEach((r) => r.classList.toggle('cur', q && M.qs[r.dataset.i] === q));
+    if (q !== cur) {
+      cur = q;
+      const row = q && document.querySelector(`.q-row[data-i="${M.qs.indexOf(q)}"]`);
+      if (row && playing) row.scrollIntoView({ block: 'nearest' });
+    }
+    if (!q) {
+      $('#b-title').textContent = c.phase === 'calib' ? '속도 측정' : c.g ? TITLES[c.g.game] || c.g.game : '–';
+      $('#b-chip').innerHTML = '';
+      $('#b-meta').textContent = c.g ? `Lv${c.g.level} · 게임 소개 화면` : c.phase === 'calib' ? '기준 RPM을 재는 중' : '';
+      board.innerHTML = `<div class="empty">${c.phase === 'calib' ? '페달 속도를 재고 있어요' : c.g ? '소개 화면 — 문제는 곧 나와요' : '게임 사이'}</div>`;
+      think.innerHTML = '';
+      return;
+    }
+    const inputs = q.inputs.filter((e) => e.clock <= t);
+    const shown = q.answer && q.answer.clock <= t ? q.answer : null;
+    const r = shown ? result(q) : 'wait';
+    $('#b-title').textContent = `${TITLES[q.game] || q.game}`;
+    $('#b-chip').innerHTML = `<span class="chip ${r}">${RESULT[r]}</span>`;
+    const nth = q.g ? `${q.g.qs.indexOf(q) + 1}/${q.g.qs.length}번째 문제` : '';
+    $('#b-meta').textContent = [`Lv${q.level}`, nth, `세션 문제 #${q.n}`, q.open !== q.at ? '지시를 띄운 뒤 입력이 열림' : null].filter(Boolean).join(' · ');
+    const draw = DRAW[q.game];
+    if (draw) {
+      try { board.innerHTML = draw(q, inputs, shown); }
+      catch (e) { board.innerHTML = `<div class="empty">그림을 그리지 못했어요 (${esc(e.message)})</div>`; }
+    } else {
+      const { t: _t, clock, type, ...rest } = q.data;
+      board.innerHTML = `<div class="empty">이 게임은 아직 그림이 없어요. 기록된 문제 내용:<pre>${esc(JSON.stringify(rest, null, 1))}</pre></div>`;
+    }
+    // 생각한 시간 막대: 입력이 열린 때 → 첫 입력 → 답, 제한 시간 표시
+    const now = Math.max(0, t - q.open), ms = shown ? shown.ms : null, first = shown ? shown.first : (q.inputs.find((e) => e.clock <= t) || {}).ms;
+    const full = Math.max(q.limit || 0, q.answer ? q.answer.ms || 0 : 0, now, 1000);
+    const W = 600, X = (v) => (Math.min(v, full) / full) * W;
+    const live = ms ?? now;
+    let b = `<rect x="0" y="6" width="${W}" height="12" rx="6" fill="var(--grid)"/>`;
+    if (first != null) b += `<rect x="0" y="6" width="${X(first)}" height="12" rx="6" fill="var(--series)"/>`;
+    b += `<rect x="${first != null ? X(first) : 0}" y="6" width="${Math.max(0, X(live) - (first != null ? X(first) : 0))}" height="12" rx="6" fill="var(--series)" opacity="0.4"/>`;
+    for (const e of inputs) b += `<line x1="${X(e.ms)}" y1="3" x2="${X(e.ms)}" y2="21" stroke="var(--ink)" stroke-width="1.5"/>`;
+    if (q.limit) b += `<line x1="${X(q.limit) - 1}" y1="0" x2="${X(q.limit) - 1}" y2="24" stroke="var(--bad)" stroke-width="2"/><text x="${X(q.limit) - 5}" y="32" text-anchor="end" class="lbl">제한 ${sec(q.limit)}</text>`;
+    think.innerHTML = `<div class="k"><span>생각한 시간 — 첫 입력까지 <b>${sec(first)}</b> · 답까지 <b>${shown ? sec(ms) : sec(now) + '…'}</b></span><span>${inputs.length ? `입력 ${inputs.length}번` : ''}</span></div>
+      <svg viewBox="0 0 ${W} 34" preserveAspectRatio="none" aria-hidden="true">${b}</svg>`;
+  }
+
+  function seek(c) { t = Math.max(0, Math.min(M.end, c)); }
+
+  // 재생
+  let last = 0;
+  function tick(now) {
+    if (!playing) return;
+    const dt = Math.min(100, now - last); last = now;
+    seek(t + dt * speed);
+    if (t >= M.end) setPlaying(false);
+    render();
+    requestAnimationFrame(tick);
+  }
+  function setPlaying(on) {
+    playing = on;
+    $('#play').textContent = on ? '❚❚ 멈춤' : '▶ 재생';
+    if (on) { if (t >= M.end) seek(0); last = performance.now(); requestAnimationFrame(tick); }
+  }
+  $('#play').addEventListener('click', () => setPlaying(!playing));
+  $('#speed').addEventListener('change', (e) => (speed = Number(e.target.value)));
+
+  // 타임라인 끌기
+  const tl = $('#tl');
+  const fromEvent = (e) => { const r = tl.getBoundingClientRect(); const x = ((e.clientX - r.left) / r.width) * TL.W; return ((x - TL.l) / (TL.W - TL.l - TL.r)) * M.end; };
+  let drag = false;
+  tl.addEventListener('pointerdown', (e) => { drag = true; tl.setPointerCapture(e.pointerId); seek(fromEvent(e)); render(); });
+  tl.addEventListener('pointermove', (e) => { if (drag) { seek(fromEvent(e)); render(); } });
+  tl.addEventListener('pointerup', () => (drag = false));
+  tl.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { seek(t + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10000 : 1000)); render(); e.preventDefault(); }
+    if (e.key === ' ') { setPlaying(!playing); e.preventDefault(); }
+  });
+  // 목록에서 고르기: 그 문제의 답이 나온 순간으로 (답이 없으면 연 순간)
+  const pickRow = (row) => { const q = M.qs[row.dataset.i]; setPlaying(false); seek(q.answer ? q.answer.clock : q.open + 1); render(); };
+  $('#q-body').addEventListener('click', (e) => { const row = e.target.closest('.q-row'); if (row) pickRow(row); });
+  $('#q-body').addEventListener('keydown', (e) => { const row = e.target.closest('.q-row'); if (row && (e.key === 'Enter' || e.key === ' ')) { pickRow(row); e.preventDefault(); } });
+
+  // 파일 열기 (.json · .jsonl 첫 줄 · .json.gz)
+  $('#file').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const msg = $('#open-msg');
+    try {
+      let text;
+      const head = new Uint8Array(await f.slice(0, 2).arrayBuffer());
+      if (head[0] === 0x1f && head[1] === 0x8b) text = await new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+      else text = await f.text();
+      const line = text.trim().split('\n')[0];
+      const log = JSON.parse(text.trim().startsWith('{') && text.trim().split('\n').length > 1 && f.name.endsWith('.jsonl') ? line : text);
+      if (!log.events) throw new Error('events 가 없어요');
+      setPlaying(false);
+      load(log);
+      msg.textContent = `${f.name}${f.name.endsWith('.jsonl') ? ' (첫 세션)' : ''}`;
+      msg.className = '';
+    } catch (err) {
+      msg.textContent = `열지 못했어요: ${err.message}. 세션 로그(.json, .json.gz, .jsonl)인지 확인하세요.`;
+      msg.className = 'err';
+    }
+  });
+
+  // 관리 화면에서 열었으면 원본을 받아 온다 (같은 출처라 관리 화면 비밀번호가 그대로 쓰인다)
+  const BASE = `${location.origin}/admin/`;
+  $('#back').href = BASE;
+  async function gunzipJSON(res) {
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const gz = buf[0] === 0x1f && buf[1] === 0x8b;
+    const text = gz ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(buf);
+    return JSON.parse(text);
+  }
+  (async () => {
+    try {
+      const o = await (await fetch(BASE + 'api/options', { cache: 'no-store' })).json();
+      Object.assign(TITLES, o.titles || {});
+    } catch (e) { }
+    const p = new URLSearchParams(location.search);
+    const env = p.get('env'), device = p.get('device'), sid = p.get('sid');
+    if (!device || !sid) return;
+    $('#sess-meta').textContent = '불러오는 중…';
+    try {
+      const r = await fetch(`${BASE}raw/${encodeURIComponent(env || 'prod')}/${encodeURIComponent(device)}/${encodeURIComponent(sid)}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status === 404 ? '원본이 없어요' : `서버 응답 ${r.status}`);
+      const log = await gunzipJSON(r);
+      if (!log.events) throw new Error('세션 로그 형식이 아니에요');
+      load(log);
+      document.title = `세션 재생 · ${device.slice(0, 8)} ${(log.meta && log.meta.startedAt || '').slice(0, 10)}`;
+    } catch (err) {
+      $('#sess-meta').innerHTML = `<span class="err">세션을 열지 못했어요: ${esc(err.message)}</span>`;
+    }
+  })();
+})();
+</script>
+</body>
+</html>

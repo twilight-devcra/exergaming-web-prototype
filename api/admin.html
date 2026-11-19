@@ -258,7 +258,7 @@ function recent(list, env) {
       <td class="l">${esc(s.edition || '–')} · ${esc(s.mode || '–')}</td><td class="l">${esc(s.track || '–')} · ${esc(s.difficulty || '–')}</td><td>${fmt(s.min)}</td>
       <td class="l">${esc(s.user || '')}</td><td class="l">${esc(s.ended || '')}</td><td>${s.games}</td><td>${fmt(s.score)}</td><td>${fmt(s.ex_score)}</td><td>${fmt(s.cog_score)}</td>
       <td>${pct(s.in_zone)}</td><td>${fmt(s.bytes / 1024)} KB</td>
-      <td><a href="${BASE}raw/${encodeURIComponent(env)}/${encodeURIComponent(s.device)}/${encodeURIComponent(s.sid)}">원본</a></td></tr>`).join('')
+      <td class="links"><a href="${BASE}replay?env=${encodeURIComponent(env)}&amp;device=${encodeURIComponent(s.device)}&amp;sid=${encodeURIComponent(s.sid)}" target="_blank" rel="noopener">재생</a><a href="${BASE}raw/${encodeURIComponent(env)}/${encodeURIComponent(s.device)}/${encodeURIComponent(s.sid)}">원본</a></td></tr>`).join('')
       : '<tr><td class="l" colspan="14">아직 없습니다.</td></tr>');
 }
 

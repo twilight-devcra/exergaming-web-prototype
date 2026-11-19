@@ -1,7 +1,7 @@
 # 세션 로그 형식
 
 한 판(속도 측정 ~ 결과)의 기록 형식입니다. 만드는 코드는 `js/session-log.js`, 기록하는 곳은 `js/main.js`(판 흐름·입력 장치)와 `js/games/*.js`(문제·답)입니다.
-형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **4** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함, 4: `meta.track` 과 두뇌 게임만 하는 판을 더함).
+형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **5** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함, 4: `meta.track` 과 두뇌 게임만 하는 판을 더함, 5: 생각한 시간 — `answer.first`, `input_open`, `stats.think` 를 더하고 지시 따르기의 `ms` 가 조작판이 풀린 뒤부터로 바뀜).
 
 운영 버전은 저장한 세션을 서버로 자동 업로드할 수도 있습니다 — 서버 요구 사항은 [SERVER.md](SERVER.md).
 
@@ -36,7 +36,7 @@
 
 | 필드 | 내용 |
 |---|---|
-| `version` | 형식 버전 (지금 4) |
+| `version` | 형식 버전 (지금 5) |
 | `id` | 기록 시작 시각 (epoch ms, 문자열). IndexedDB 의 키. 태블릿 안에서만 겹치지 않는다 |
 | `device` | 태블릿(브라우저)마다 처음 한 번 만드는 고유 번호 (UUID, localStorage `exergame.device`). 서버에서는 `device` + `id` 가 세션 하나 |
 | `edition` | `prototype` (index.html) \| `app` (운영 버전 app/) |
@@ -67,7 +67,7 @@
 | `baseline` | 측정한 기준 RPM (실패하면 `config.fallbackRpm`) |
 | `bestStreak` | 최고 연속 정답 |
 | `elapsedSec` | 플레이한 시간 (게임 시계) |
-| `stats` | 게임별 `{ plays, cleared, correct, total, points, level, runs, ms }`. `level` 은 도달한 최고 난이도, `runs` 는 판마다 `[레벨, 맞힌 수, 문제 수]`, `ms` 는 문제를 푼 시간 합 |
+| `stats` | 게임별 `{ plays, cleared, correct, total, points, level, runs, ms }`. `level` 은 도달한 최고 난이도, `runs` 는 판마다 `[레벨, 맞힌 수, 문제 수]`, `ms` 는 게임마다 소개 화면이 끝난 뒤부터 게임이 끝날 때까지의 시간 합 (정답 피드백·문제 사이 연출 포함). `think` 는 생각한 시간 `{ n, ms, first, out, outMs }` (게임 시계 ms): 제때 답한 문제 `n` 개의 `answer.ms` 합(`ms`)과 `answer.first` 합(`first`), 시간 초과한 문제 수(`out`)와 그 `ms` 합(`outMs`). 평균은 `ms / n` 처럼 나눠서 구한다. 버전 5부터 |
 | `exercise` | `{ kcal, distM, revs, avgRpm, activeSec }` RPM 으로 어림한 운동량 (`js/exercise.js`). `kcal` 은 MET 표·체중 65 kg 기준, `distM` 은 한 바퀴 6 m |
 | `abilities` | 스테이션 결과(`mode: demo`)만. 능력 축별 별 수 1~5 (0.5 단위), 데이터가 없는 축은 null (`js/abilities.js`) |
 | `abilitiesRaw` | 스테이션 결과(`mode: demo`)만. 별로 바꾸기 전 '해낸 레벨' (판마다 `레벨 − 1 + 정확도`, 게임 가중치 × 레벨로 가중 평균), 데이터가 없는 축은 null |
@@ -103,15 +103,23 @@
 
 ### 문제
 
-문제 하나는 `question` → (`timer_start`) → `input`* → (`timeout`) → `answer` 순서입니다.
+문제 하나는 `question` → (`input_open`) → (`timer_start`) → `input`* → (`timeout`) → `answer` 순서입니다.
 
 | `type` | 공통 필드 | 언제 |
 |---|---|---|
-| `question` | `game`, `level`, `q` + 게임별 내용 | 문제가 **입력을 받기 시작한** 순간. 외우기·길 보여 주기 같은 보여 주는 단계는 끝난 뒤다 |
+| `question` | `game`, `level`, `q` + 게임별 내용 | 문제가 **입력을 받기 시작한** 순간. 외우기·길 보여 주기 같은 보여 주는 단계는 끝난 뒤다. 지시 따르기(`follow`)만 지시를 띄운 순간이고, 입력이 열리는 순간은 `input_open` 이다 |
+| `input_open` | `game`, `q` | 지시 따르기만. 조작판이 풀린 순간 (읽는 단계가 끝남, 또는 기다리기 지시에서 램프가 켜짐). 생각한 시간은 여기서부터 잰다 |
 | `timer_start` | `game`, `load`, `limitMs` | 제한 시간 시작. `limitMs = (base + per × load) × 1000` (`config.questionTime`). 제한 시간이 꺼져 있으면 없다 |
 | `input` | `game`, `q`, `ms` + 게임별 내용 | 답 도중의 입력 (길 따라 그리기의 맞은 칸, 사칙연산의 숫자 넣기/빼기) |
 | `timeout` | | 제한 시간이 다 됨. 바로 뒤에 `timedOut: true` 인 `answer` 가 온다 |
-| `answer` | `game`, `q`, `ms`, `correct`, `timedOut` + 게임별 내용 | 답이 정해짐. `ms` = `question` 부터 걸린 시간 (게임 시계) |
+| `answer` | `game`, `q`, `ms`, `first`, `correct`, `timedOut` + 게임별 내용 | 답이 정해짐. `ms` = 입력이 열린 뒤 답이 정해질 때까지 (게임 시계), `first` = 입력이 열린 뒤 처음 입력할 때까지 |
+
+**생각한 시간.** 시작은 입력이 열린 순간(`question`, 지시 따르기는 `input_open`)이고 게임 시계로 재므로 일시정지·소개·보여 주는 단계·정답 피드백은 들어가지 않습니다.
+끝은 두 가지입니다: `ms` 는 답이 정해질 때까지, `first` 는 처음 입력할 때까지. 한 번 눌러 답하는 게임은 둘이 같고,
+여러 번 입력해 답하는 게임(사칙연산 역산 `arith`, 조각 잇기 `chain`, 길 따라 그리기 `path`, 차례대로 외우기 `recall`, 공 따라가기 `track`, 지시 따르기 `follow`)은
+`first` 가 처음 입력하기 전까지 궁리한 시간, `ms` 가 입력까지 모두 마친 시간입니다. 아무것도 누르지 않고 시간이 다 되면 `first` 는 null 입니다.
+지시 따르기에서 램프가 켜지기 전에 누르면(오답) 입력이 열리기 전이라 `ms` · `first` 가 null 입니다.
+`input` 의 `ms` 도 같은 시작점에서 잽니다.
 
 `q` 는 세션 안의 문제 번호(1부터)로 `question` · `input` · `answer` 를 잇습니다.
 시간 초과는 오답으로 칩니다 (`correct: false`, `timedOut: true`).

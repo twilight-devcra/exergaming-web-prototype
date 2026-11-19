@@ -232,7 +232,7 @@ function fmt(key, v) {
     if (T.tags) md.push(`- 태그: ${T.tags.join(', ')} (태그가 겹치는 게임은 연달아 나오지 않음)`);
     if (qt) md.push(`- 제한 시간: ${qt.base}초 + ${qt.per}초 × N${loadText[T.id] ? `, N = ${loadText[T.id]}` : ''}`);
     md.push(`- 능력 그래프 가중치: ${Object.entries(w).map(([k, v]) => `${abilityName[k]} ${v}`).join(' · ') || '없음'}` +
-      (pace ? ` (처리속도: 문제당 ${pace.fast}초 이하면 그대로, ${pace.slow}초 이상이면 ×${Abilities.PACE_MIN})` : ''));
+      (pace ? ` (처리속도: 문제당 생각한 시간이 ${pace.fast}초 이하면 그대로, ${pace.slow}초 이상이면 ×${Abilities.PACE_MIN})` : ''));
     md.push(`- 인지 영역: ${targetText(gameTargets[T.id]) || '*지정하지 않음 — tools/targets.js*'} ([점검표](TARGETS.md))`);
     md.push('');
 

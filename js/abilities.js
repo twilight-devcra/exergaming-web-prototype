@@ -37,15 +37,18 @@ export const ABILITY_WEIGHTS = {
   blank: { memory: 0.5, logic: 0.3, attention: 0.2 }, // 언어 축이 없어 낱말 인출(의미 기억)을 기억력에, 모든 낱말에 맞춰 보는 것을 논리에 둔다
 };
 
-// 처리속도 축에 들어가는 게임은 문제당 걸린 시간도 본다 (정답 피드백·연출 시간 포함, 초).
-// fast 이하면 그대로, slow 이상이면 그 게임의 처리속도 몫을 PACE_MIN 배로 깎는다. 문제를 고르는 동안의 시간만 따로 재지 않으므로 대략값이다.
+// 처리속도 축에 들어가는 게임은 문제당 생각한 시간도 본다 (초). 입력이 열린 뒤 답할 때까지이고 정답 피드백·연출 시간은 빠진다
+// (App.stats[id].think, 시간 초과한 문제는 쓴 시간 그대로 넣는다). fast 이하면 그대로, slow 이상이면 그 게임의 처리속도 몫을 PACE_MIN 배로 깎는다.
+// 예전(피드백 포함 게임 시간) 기준에서 문제당 피드백 시간(1~1.5초)을 뺀 값이다. 플레이해 보며 다듬는다.
+// think 가 없는 예전 기록은 게임 시간(stats.ms, 피드백 포함)으로 재고 PACE_FEEDBACK 초를 빼서 같은 기준에 맞춘다
 export const ABILITY_PACE = {
-  count: { fast: 4, slow: 14 },
-  seek: { fast: 5, slow: 18 },
-  ladder: { fast: 5, slow: 15 },
-  pair: { fast: 4, slow: 12 },
-  compare: { fast: 4, slow: 10 },
+  count: { fast: 3, slow: 13 },
+  seek: { fast: 4, slow: 17 },
+  ladder: { fast: 3.5, slow: 13.5 },
+  pair: { fast: 3, slow: 11 },
+  compare: { fast: 3, slow: 9 },
 };
+const PACE_FEEDBACK = 1.2;
 
 export const Abilities = {
   MAX_STARS: 5,
@@ -57,6 +60,14 @@ export const Abilities = {
   // (쉬운 단계를 더하기 전과 같은 판이면 같은 별이 나온다)
   effLevel(lv) {
     return lv >= BASE_LEVEL ? lv - BASE_LEVEL + 1 : lv / BASE_LEVEL;
+  },
+
+  // 문제당 생각한 시간 (초). 시간 초과한 문제도 쓴 시간 그대로 넣는다. 데이터가 없으면 null
+  perQuestionSec(s) {
+    const k = s.think;
+    if (k && k.n + k.out > 0) return (k.ms + k.outMs) / 1000 / (k.n + k.out);
+    if (s.ms > 0 && s.total > 0) return Math.max(0, s.ms / 1000 / s.total - PACE_FEEDBACK);
+    return null;
   },
 
   // 판 하나에서 해낸 레벨 = (레벨 − 1) + 정확도 (레벨은 effLevel, 0 아래로는 내려가지 않는다): Lv5 를 다 맞히면 3, 절반이면 2.5, Lv3 을 다 틀리면 0.
@@ -74,8 +85,8 @@ export const Abilities = {
       // 처리속도 몫은 그 게임의 문제당 평균 시간으로 깎는다
       const pace = ABILITY_PACE[T.id];
       let paceK = 1;
-      if (pace && s.ms > 0 && s.total > 0) {
-        const per = s.ms / 1000 / s.total;
+      const per = pace ? this.perQuestionSec(s) : null;
+      if (per != null) {
         const f = U.clamp((pace.slow - per) / (pace.slow - pace.fast), 0, 1);
         paceK = this.PACE_MIN + (1 - this.PACE_MIN) * f;
       }

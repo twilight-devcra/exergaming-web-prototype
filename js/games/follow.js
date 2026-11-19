@@ -195,7 +195,7 @@ export class FollowGame {
       n: this.answered + 1, kind: q.kind, parts: q.parts || null, text: q.text,
       buttons: q.buttons.map((s) => s.id), swOn: q.swOn, lamps: q.lamps, go: q.go || null,
       answer: q.answer, groups: q.steps ? null : q.groups, read: !!this.spec.read,
-    });
+    }, false); // 생각한 시간은 조작판이 풀린 뒤부터 잰다 (읽는 단계 · 램프 기다리기는 빼고). unlock · wait 가 open() 을 부른다
     this.present(q.steps ? q.steps[0].html : q.html, true);
   }
 
@@ -225,6 +225,7 @@ export class FollowGame {
     if (q.steps && !first) return;
     if (q.go) return this.wait(q);
     U.say(this.msg, '지시대로 조작하세요', 'act');
+    this.h.open();
     this.h.timer(this.limit(q.load), () => this.finishQ(false, true));
   }
 
@@ -238,6 +239,7 @@ export class FollowGame {
       if (l !== q.go.lamp) return;
       this.goReady = true;
       U.say(this.msg, '지시대로 조작하세요', 'act');
+      this.h.open();
       this.h.timer(this.limit(q.load), () => this.finishQ(false, true));
     }));
   }

@@ -12,7 +12,7 @@ import { Config, EDITION } from './config.js';
 import { Theme } from './themes.js';
 
 export class SessionLog {
-  static VERSION = 4;
+  static VERSION = 5;
   static SAMPLE_SEC = 0.1;
 
   constructor(app) {
@@ -82,24 +82,45 @@ export class SessionLog {
     this.events.push({ t: this.now(), clock: Math.round(this.app.clock), type, ...data });
   }
 
-  // 문제가 입력을 받기 시작한 순간. 걸린 시간은 여기서부터 잰다
-  question(game, level, data) {
+  // 문제가 입력을 받기 시작한 순간. 생각한 시간은 여기서부터 잰다.
+  // open: false 면 문제만 남기고, 입력이 실제로 열리는 순간 open() 을 부른다 (지시 따르기: 지시를 읽는 단계 · 램프 기다리기)
+  question(game, level, data, open = true) {
     if (this.done) return;
-    this.q = { game, n: ++this.qn, clock: this.app.clock, t: this.now() };
+    this.q = { game, n: ++this.qn, clock: open ? this.app.clock : null, first: null };
     this.ev('question', { game, level, q: this.q.n, ...data });
   }
 
-  // 답이 끝까지 정해진 순간 (시간 초과 포함). ms = 게임 시계 기준 걸린 시간
+  // question(..., false) 로 띄운 문제의 입력이 열린 순간
+  open(game) {
+    const q = this.q;
+    if (!q || q.clock != null) return;
+    q.clock = this.app.clock;
+    this.ev('input_open', { game, q: q.n });
+  }
+
+  // 입력이 열린 뒤 지금까지 걸린 시간 (게임 시계 ms). 열리기 전이면 null
+  since(q) {
+    return q && q.clock != null ? Math.round(this.app.clock - q.clock) : null;
+  }
+
+  // 답이 끝까지 정해진 순간 (시간 초과 포함). ms = 입력이 열린 뒤 답이 정해질 때까지,
+  // first = 입력이 열린 뒤 처음 입력할 때까지 (한 번 눌러 답하는 게임은 ms 와 같다. 아무것도 누르지 않고 시간이 다 되면 null)
+  // 반환: { ms, first } — App 이 게임별 생각한 시간(stats.think)에 더한다
   answer(game, data) {
     const q = this.q;
-    this.ev('answer', { game, q: q ? q.n : null, ms: q ? Math.round(this.app.clock - q.clock) : null, ...data });
+    const ms = this.since(q);
+    const first = q && q.first != null ? q.first : data.timedOut ? null : ms;
+    this.ev('answer', { game, q: q ? q.n : null, ms, first, ...data });
     this.q = null;
+    return { ms, first };
   }
 
   // 답 도중의 입력 하나 (길 따라 그리기의 칸 하나, 사칙연산의 숫자 넣기/빼기)
   input(game, data) {
     const q = this.q;
-    this.ev('input', { game, q: q ? q.n : null, ms: q ? Math.round(this.app.clock - q.clock) : null, ...data });
+    const ms = this.since(q);
+    if (q && q.first == null && ms != null) q.first = ms;
+    this.ev('input', { game, q: q ? q.n : null, ms, ...data });
   }
 
   key(code) {

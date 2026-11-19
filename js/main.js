@@ -628,8 +628,10 @@ const App = {
     this.renderStreak();
     this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
     this.stats = {};
-    // level = 도달한 최고 난이도, runs = 판마다 [레벨, 맞힌 수, 문제 수], ms = 게임을 푸는 데 쓴 시간 (runs·ms 는 능력 그래프에 쓴다)
-    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0 }));
+    // level = 도달한 최고 난이도, runs = 판마다 [레벨, 맞힌 수, 문제 수], ms = 게임을 푸는 데 쓴 시간 (피드백 포함),
+    // think = 문제별 생각한 시간 (App.think). runs · think 는 능력 점수에 쓴다 (js/abilities.js)
+    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0,
+      think: { n: 0, ms: 0, first: 0, out: 0, outMs: 0 } }));
     this.band.cfg = this.cfg;
     this.band.brainOnly = this.brainOnly;
     $('#game').classList.toggle('brain-only', this.brainOnly);
@@ -778,10 +780,16 @@ const App = {
       // 문제 하나의 제한 시간. load = 그 문제의 일의 양 (config.questionTime 참고). 다 되면 onOut 을 부른다
       timer: (load, onOut) => this.startQTimer(T, stage, level, load, onOut, gen),
       stopTimer: () => this.stopQTimer(),
-      // 세션 기록 (js/session-log.js). question = 입력을 받기 시작한 문제의 내용, input = 답 도중의 입력, answer = 최종 답
-      question: (data) => gen === this.gen && this.log.question(T.id, level, data),
+      // 세션 기록 (js/session-log.js). question = 입력을 받기 시작한 문제의 내용, input = 답 도중의 입력, answer = 최종 답.
+      // 문제를 보여 준 뒤 한참 있다가 입력이 열리는 게임은 question(data, false) 로 띄우고 열리는 순간 open() 을 부른다
+      question: (data, open = true) => gen === this.gen && this.log.question(T.id, level, data, open),
+      open: () => gen === this.gen && this.log.open(T.id),
       input: (data) => gen === this.gen && this.log.input(T.id, data),
-      answer: (data) => gen === this.gen && this.log.answer(T.id, data),
+      answer: (data) => {
+        if (gen !== this.gen) return;
+        const { ms, first } = this.log.answer(T.id, data);
+        if (this.state === 'play') this.think(T, ms, first, !!data.timedOut);
+      },
       // 게임들은 정답에 'good', 오답에 'bad'를 울린다. 그 둘만 가로채 연속 정답을 세고 보상을 키운다.
       // (게임 쪽 코드를 건드리지 않고 한 곳에서 보상을 다룰 수 있다)
       sfx: (n) => {
@@ -985,6 +993,22 @@ const App = {
     if (res.cleared) s.cleared++;
     s.correct += res.correct;
     s.total += res.total;
+  },
+
+  // 문제 하나의 생각한 시간 (게임 시계 ms, 입력이 열린 뒤부터. js/session-log.js 의 answer).
+  // 제때 답한 문제: n 개, ms = 답이 정해질 때까지의 합, first = 처음 입력할 때까지의 합.
+  // 시간 초과: out 개, outMs = 그 문제들에 쓴 시간 합. 입력이 열리기 전에 누른 답(지시 따르기의 램프 전에 누름)은 시간이 없어 세지 않는다
+  think(T, ms, first, timedOut) {
+    if (ms == null) return;
+    const k = this.stats[T.id].think;
+    if (timedOut) {
+      k.out++;
+      k.outMs += ms;
+      return;
+    }
+    k.n++;
+    k.ms += ms;
+    k.first += first ?? ms;
   },
 
   floatAt(anchor, text) {

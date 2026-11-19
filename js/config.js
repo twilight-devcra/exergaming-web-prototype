@@ -191,9 +191,13 @@ const MUSIC_KEY = 'exergame.music';
 //   GET <historyUrl>?user=<회원 번호> 에 그 회원의 세션 요약 목록으로 답해야 한다 (docs/SERVER.md)
 // localHistory: 시험용. true 면 historyUrl 대신 이 태블릿의 세션 로그가 회원 기록 서버 노릇을 한다 (app/members.js 의 Members.localServer).
 //   주소 칸이 비었다고 저절로 켜지지 않는다. 운영 메뉴의 체크 칸이나 여기서 일부러 켜야 한다
-// 서버: api/ (docs/SERVER.md). env 로 데이터를 나눈다 — dev 브랜치 미리 보기(/dev/)는 dev, 로컬 서버(localhost)는 local, 배포는 prod.
+// 서버: api/ (docs/SERVER.md). 서버가 둘이다 (api/README.md '서버 둘'): dev 브랜치 미리 보기(/dev/)는 dev 브랜치 코드가 도는 dev 서버에,
+// 나머지(운영 · 로컬)는 main 이 도는 운영 서버에 올린다. 그래야 서버 변경을 운영 태블릿에 닿기 전에 미리 보기에서 시험할 수 있다.
+// env 로도 데이터를 나눈다 — 미리 보기는 dev, 로컬 서버(localhost)는 local, 배포는 prod.
 // 그래야 시험한 판이 운영 회원 기록과 밸런스 집계에 섞이지 않는다 (관리 화면에서 env 를 골라 볼 수 있다)
-const API = 'https://exergame-api.devcra.com';
+const API_PROD = 'https://exergame-api.devcra.com';
+const API_DEV = 'https://exergame-api-dev.devcra.com';
+const API = DEV_BUILD ? API_DEV : API_PROD;
 const API_ENV = DEV_BUILD ? 'dev' : /^(localhost|127\.)/.test(location.hostname) ? 'local' : 'prod';
 export const SESSION_UPLOAD = {
   url: `${API}/sessions?env=${API_ENV}`,

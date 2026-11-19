@@ -20,13 +20,15 @@ DEV_BRANCH="${DEV_BRANCH:-dev}"
 NAME=exergame-api
 HERE="$(cd "$(dirname "$0")" && pwd)"
 aws() { command aws --region "$REGION" "$@"; }
+# 저장소의 git (cd 로 들어간다: MSYS_NO_PATHCONV 때문에 git -C /d/... 는 Windows 의 git.exe 가 못 읽는다)
+repo_git() { (cd "$HERE" && git "$@"); }
 
 # 운영 서버가 될 $BRANCH 의 서버 코드가 $DEV_BRANCH 와 같은가 (GitHub 기준)
-git -C "$HERE" fetch -q origin "$BRANCH" "$DEV_BRANCH"
+repo_git fetch -q origin "$BRANCH" "$DEV_BRANCH"
 SERVER_CODE=(api js/history-entry.js js/games)
-if ! git -C "$HERE" diff --quiet "origin/$BRANCH" "origin/$DEV_BRANCH" -- "${SERVER_CODE[@]/#/:/}"; then
+if ! repo_git diff --quiet "origin/$BRANCH" "origin/$DEV_BRANCH" -- "${SERVER_CODE[@]/#/:/}"; then
   echo "!! origin/$BRANCH 와 origin/$DEV_BRANCH 의 서버 코드가 다르다 (운영 서버는 $BRANCH 로 맞춰진다):"
-  git -C "$HERE" diff --stat "origin/$BRANCH" "origin/$DEV_BRANCH" -- "${SERVER_CODE[@]/#/:/}"
+  repo_git diff --stat "origin/$BRANCH" "origin/$DEV_BRANCH" -- "${SERVER_CODE[@]/#/:/}"
   if [ "${FORCE:-}" != 1 ]; then
     echo "먼저 $DEV_BRANCH 를 $BRANCH 에 합쳐 push 한다. 그래도 돌리려면 FORCE=1"
     exit 1

@@ -9,6 +9,7 @@ import { SESSION_DIFFICULTIES } from '../js/config.js';
 import { Stars } from '../js/stars.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
+import { summarize, cleanEntry } from '../js/history-entry.js';
 import { drawCard, saveCard } from './member-card.js';
 
 // 휴대폰에서 하는 판인가. 휴대폰은 제 화면을 제 카메라로 비출 수 없으므로 회원 카드를 사진으로 저장하고 사진으로 읽는다.
@@ -92,8 +93,8 @@ const Members = {
   },
 
   // ---------------- 서버의 회원 기록 (SESSION_UPLOAD.historyUrl) ----------------
-  // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목은 이 태블릿 기록과 같은 모양
-  // ({ at, min, difficulty, track, score, distM, kcal, level, gameAcc, device, sid, look }). 형식은 docs/SERVER.md
+  // GET <historyUrl>?user=<번호> → { sessions: [...] } 또는 배열. 항목의 필드와 형은 js/history-entry.js (docs/SERVER.md).
+  // 받은 항목은 cleanEntry 로 형을 맞춘다: 서버 기록은 누구나 올린 세션에서 나오므로 그대로 화면에 그리지 않는다
   remote: {},      // 회원 번호 → 서버에서 받은 목록 (이 화면을 여는 동안만)
   TIMEOUT_MS: 6000,
 
@@ -115,31 +116,13 @@ const Members = {
       const res = await fetch(u, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: ctrl.signal });
       if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
       const body = await res.json();
-      const list = (Array.isArray(body) ? body : body.sessions || []).filter((x) => x && x.at && !isNaN(new Date(x.at)));
+      const raw = Array.isArray(body) ? body : (body && body.sessions) || [];
+      const list = (Array.isArray(raw) ? raw : []).map(cleanEntry).filter(Boolean);
       this.remote[id] = list;
       return list;
     } finally {
       clearTimeout(t);
     }
-  },
-
-  // 세션 로그 하나 → 회원 기록 항목 하나. 서버도 업로드된 세션에서 이렇게 뽑는다 (docs/SERVER.md '회원 기록')
-  summarize(log) {
-    const m = log.meta || {};
-    const sum = m.summary || {};
-    const ex = sum.exercise || {};
-    const levels = Object.values(sum.stats || {}).map((s) => s.level || 0);
-    const acc = Stars.gameAcc(sum.stats);
-    return {
-      at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
-      // 운동 방식: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). meta.track 이 없는 예전 세션은 모두 dual
-      track: m.track || 'dual',
-      score: sum.score, device: m.device || null, sid: m.id,
-      level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
-      // 게임 정확도 (0~1, 소수 둘째 자리). 높으면 다음 세션 설정에 한 단계 높은 난이도를 골라 둔다 (js/stars.js)
-      gameAcc: acc == null ? null : Math.round(acc * 100) / 100,
-      look: m.landmark || null,
-    };
   },
 
   // 다음 세션 설정에 미리 골라 둘 것: 지난번과 같은 시간·운동 방식, 난이도는 지난번 결과 화면이 권한 대로 (js/stars.js —
@@ -156,17 +139,17 @@ const Members = {
     const out = [];
     await SessionStore.scan((log) => {
       const m = log.meta || {};
-      if (m.user === id && m.ended && m.ended !== 'abandoned' && m.ended !== 'user') out.push(this.summarize(log));
+      if (m.user === id && m.ended && m.ended !== 'abandoned' && m.ended !== 'user') out.push(summarize(log));
     });
-    return out.filter((x) => x.at && !isNaN(new Date(x.at)));
+    return out.filter(Boolean);
   },
 
-  // 이 태블릿 기록 + 서버 기록. 같은 세션(태블릿 번호 + 세션 번호)은 한 번만, 시간순
+  // 이 태블릿 기록 + 서버 기록. 같은 세션(태블릿 번호 + 세션 번호)은 한 번만, 시간순.
+  // 화면은 모두 이 목록으로 그리므로 여기서 한 번 더 형을 맞춘다 (예전 태블릿 기록 · 시험용 로컬 서버도)
   merged(id) {
     const out = new Map();
     const keyOf = (x) => (x.sid ? `${x.device || ''}:${x.sid}` : `at:${x.at}`);
-    for (const x of this.remote[id] || []) out.set(keyOf(x), x);
-    for (const x of this.history(id)) out.set(keyOf(x), x);
+    for (const x of [...(this.remote[id] || []), ...this.history(id)].map(cleanEntry)) if (x) out.set(keyOf(x), x);
     return [...out.values()].sort((a, b) => new Date(a.at) - new Date(b.at));
   },
 
@@ -515,7 +498,7 @@ export const MemberUI = {
     document.getElementById('hs-recent').innerHTML = hist.length
       ? hist.slice(-4).reverse().map((x) => {
         const d = new Date(x.at);
-        return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min}분 · ${diffLabel(x.difficulty)}${x.track === 'brain' ? ' · 두뇌만' : ''}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
+        return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min ?? '–'}분 ·${diffLabel(x.difficulty)}${x.track === 'brain' ? ' · 두뇌만' : ''}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
       }).join('')
       : `<li class="empty">${Members.hasRemote() ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
     // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'

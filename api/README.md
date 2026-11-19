@@ -5,7 +5,7 @@
 | 주소 | 하는 일 |
 |---|---|
 | `POST /sessions` | 세션 로그 하나 받기. `meta.device` + `meta.id` 로 덮어쓴다. 형식이 이상해도 2xx |
-| `GET /history?user=<번호>` | 회원 기록 (`Members.summarize` 와 같은 모양). IP 마다 1분에 30번까지 |
+| `GET /history?user=<번호>` | 회원 기록 (항목의 필드·형은 `js/history-entry.js`, 태블릿과 같은 파일). IP 마다 1분에 30번까지 |
 | `GET /health` | 살아 있는지 |
 | `/admin` | 관리 화면 (비밀번호). 세션 목록, 게임 × 레벨 정답률, 게임별 통계, CSV, 원본 내려받기 |
 
@@ -41,17 +41,21 @@ node api/server.js --reindex   # 원본(raw/)에서 색인(SQLite)을 다시 만
 
 ```bash
 bash api/deploy/provision.sh
-# 바꿀 수 있는 값: DOMAIN(기본 exergame-api.devcra.com) BRANCH(기본 dev) TYPE(기본 t4g.small) UPLOAD_KEY(기본 무작위)
+# 바꿀 수 있는 값: DOMAIN(기본 exergame-api.devcra.com) BRANCH(기본 main) TYPE(기본 t4g.small) UPLOAD_KEY(기본 무작위)
 ```
+
+**서버는 `main` 을 따릅니다.** 서버는 하나뿐이라 운영 태블릿(`main`)과 dev 미리 보기(`/dev/`)가 같은 서버 코드를 씁니다. `?env=dev` 는 데이터만 나눌 뿐입니다. 서버가 `dev` 를 따르면 아직 내보내지 않은 서버 변경이 운영 태블릿에 바로 닿습니다 (업로드가 실패하면 그 태블릿의 업로드가 멈추고, 회원 기록은 로그인 화면에 쓰인다). 서버를 고칠 때는 `dev` 에서 `node api/test.js` (화면까지 보려면 `--keep`) 로 확인하고, `main` 에 합친 뒤 올립니다.
 
 IAM 역할, 보안 그룹(80·443 만), EC2(Ubuntu 24.04 ARM, 20 GB 암호화 디스크), 탄력적 IP, Route 53 레코드, 매일 스냅샷(7개 보관)을 만들고, 인스턴스가 처음 켜질 때 [deploy/setup.sh](deploy/setup.sh) 가 Node·Caddy 를 깔고 저장소를 받아 서비스를 띄웁니다. HTTPS 인증서는 Caddy 가 알아서 받고 갱신합니다. 끝나면 업로드 키와 태블릿에 적을 주소를 출력합니다.
 
-코드 고친 뒤 (먼저 `git push`):
+코드 고친 뒤 (먼저 `main` 에 합쳐 `git push`):
 
 ```bash
 bash api/deploy/deploy.sh               # 서버가 받아 둔 브랜치를 최신으로 맞추고 다시 띄운다
-BRANCH=main bash api/deploy/deploy.sh   # 브랜치 바꾸기
+BRANCH=main bash api/deploy/deploy.sh   # 브랜치 바꾸기 (예전 기본값 dev 로 만든 서버를 main 으로 옮길 때 한 번)
 ```
+
+지금 서버가 어느 브랜치인지는 서버에 들어가 `git -C /opt/exergame branch --show-current` 로 봅니다.
 
 ### 고정 IP
 

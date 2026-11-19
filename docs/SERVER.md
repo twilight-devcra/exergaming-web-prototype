@@ -99,19 +99,24 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 [ { "at": "…", "min": 10, … } ]
 ```
 
-항목 하나가 세션 하나이고, 업로드된 세션에서 이렇게 뽑습니다.
+항목 하나가 세션 하나이고, 업로드된 세션에서 이렇게 뽑습니다. 뽑는 코드와 형은 `js/history-entry.js` 하나이고, 이 서버(`api/server.js`)와 태블릿이 함께 씁니다.
 
-| 필드 | 뽑는 곳 | 쓰는 곳 |
-|---|---|---|
-| `at` (필수) | `meta.startedAt` | 달력의 날짜, 최근 기록, '지난번'. 날짜로 읽히지 않는 항목은 버린다 |
-| `min` | `meta.session.min` | 최근 기록, 다음 세션 설정에 미리 골라 둘 시간 |
-| `difficulty` | `meta.session.difficulty` (`relax` · `normal` · `challenge`) | 최근 기록, 미리 골라 둘 난이도 |
-| `track` | `meta.track` (`dual` · `brain`, 없으면 `dual`) | 최근 기록의 '두뇌만' 표시, 미리 골라 둘 운동 방식. 두뇌 게임만 한 판(`brain`)도 회원 기록에 들어간다 |
-| `score` | `meta.summary.score` | 최근 기록 |
-| `device`, `sid` | `meta.device`, `meta.id` (문자열) | 태블릿에 있는 같은 세션과 겹치지 않게. 둘이 같으면 한 번만 센다. 빠지면 같은 판이 두 번 보일 수 있다 |
-| `gameAcc` (선택) | `meta.summary.stats` 의 `correct` 합 ÷ `total` 합 (0~1, 소수 둘째 자리. 문제가 없으면 `null`) | 지난번 게임 정확도가 85% 이상이면 다음 세션 설정에 한 단계 높은 난이도를, 50% 아래면 한 단계 낮은 난이도를 골라 둔다 (`js/stars.js`). 없으면 지난번 난이도 그대로 |
-| `level`, `distM`, `kcal` (선택) | `meta.summary.stats` 의 `level` 최댓값, `meta.summary.exercise.distM` · `kcal` | 지금은 쓰지 않음 (나중에 그래프용) |
-| `look` (선택) | `meta.landmark` 그대로 | 풍경 길가에 세운 기념물(건물)의 생김새. 그대로 돌려주면 다른 태블릿에서도 같은 건물로 선다. 없으면(이 필드를 더하기 전 세션) 태블릿이 난이도·시간으로 정한다 |
+| 필드 | 형 | 뽑는 곳 | 쓰는 곳 |
+|---|---|---|---|
+| `at` (필수) | `date` | `meta.startedAt` | 달력의 날짜, 최근 기록, '지난번'. 날짜로 읽히지 않는 항목은 버린다 |
+| `min` | `number` | `meta.session.min` | 최근 기록, 다음 세션 설정에 미리 골라 둘 시간 |
+| `difficulty` | `string` | `meta.session.difficulty` (`relax` · `normal` · `challenge`) | 최근 기록, 미리 골라 둘 난이도 |
+| `track` | `string` | `meta.track` (`dual` · `brain`, 없으면 `dual`) | 최근 기록의 '두뇌만' 표시, 미리 골라 둘 운동 방식. 두뇌 게임만 한 판(`brain`)도 회원 기록에 들어간다 |
+| `score` | `number` | `meta.summary.score` | 최근 기록 |
+| `device`, `sid` | `string` | `meta.device`, `meta.id` (수면 글로 바꾼다) | 태블릿에 있는 같은 세션과 겹치지 않게. 둘이 같으면 한 번만 센다. 빠지면 같은 판이 두 번 보일 수 있다 |
+| `gameAcc` (선택) | `number` | `meta.summary.stats` 의 `correct` 합 ÷ `total` 합 (0~1, 소수 둘째 자리. 문제가 없으면 `null`) | 지난번 게임 정확도가 85% 이상이면 다음 세션 설정에 한 단계 높은 난이도를, 50% 아래면 한 단계 낮은 난이도를 골라 둔다 (`js/stars.js`). 없으면 지난번 난이도 그대로 |
+| `level`, `distM`, `kcal` (선택) | `number` | `meta.summary.stats` 의 `level` 최댓값, `meta.summary.exercise.distM` · `kcal` | 지금은 쓰지 않음 (나중에 그래프용) |
+| `look` (선택) | `object` | `meta.landmark` 그대로 | 풍경 길가에 세운 기념물(건물)의 생김새. 그대로 돌려주면 다른 태블릿에서도 같은 건물로 선다. 없으면(이 필드를 더하기 전 세션) 태블릿이 난이도·시간으로 정한다 |
+
+**형 지키기**: 업로드 키는 공개라 누구나 세션을 올릴 수 있고, 회원 기록은 다른 태블릿 화면에 그려집니다. 그래서 서버는 저장할 때와 내보낼 때, 태블릿은 받을 때 항목을 위 형으로 맞춥니다 (`cleanEntry`). 형이 다른 값(숫자 칸의 글 등)은 `null` 이 되고, 표에 없는 필드는 버립니다.
+
+- `number`: 유한한 수 · `string`: 글 (수는 글로 바꾼다, 200자까지) · `date`: 날짜로 읽히는 글 · `object`: 배열이 아닌 객체
+- **필드를 더하거나 형을 바꿀 때**는 `js/history-entry.js` 의 `HISTORY_FIELDS` · `summarize` 와 이 표를 함께 고칩니다. 셋이 어긋나면 `node api/test.js` 가 실패합니다. 서버에 올린 뒤에는 `node api/server.js --reindex` 로 저장된 기록을 새 규칙으로 다시 만듭니다
 
 - **어떤 세션을 돌려줄까**: `meta.user` 가 그 번호이고 결과 화면까지 간 것 (`meta.ended` 가 `abandoned` 도 `user` 도 아닌 것). 태블릿 기록도 결과 화면에서만 쌓입니다. `user` 는 참가자가 그만하기로 도중에 마친 판이라 업로드는 되지만 달력·기념물에는 넣지 않습니다
 - **순서·개수**: 순서는 상관없습니다 (태블릿이 시간순으로 다시 정렬한다). 달력은 최근 2년까지만 넘겨 볼 수 있으므로 그보다 오래된 것은 빼도 됩니다
@@ -127,7 +132,7 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 
 서버가 준비되기 전에 회원 기록 흐름을 시험하려면 운영 메뉴 → **자동 업로드** → **시험용: 회원 기록 서버 대신 이 태블릿의 세션 로그 쓰기** 를 켭니다 (또는 `js/config.js` 의 `SESSION_UPLOAD.localHistory: true`).
 
-- 켜면 회원 기록 주소 대신 이 태블릿의 세션 로그(IndexedDB)에서 위 '회원 기록' 의 규칙대로 골라 같은 모양의 목록을 만듭니다 (`app/members.js` 의 `Members.localServer` · `Members.summarize`). 실제 서버를 만들 때 이 두 함수를 참고하면 됩니다
+- 켜면 회원 기록 주소 대신 이 태블릿의 세션 로그(IndexedDB)에서 위 '회원 기록' 의 규칙대로 골라 같은 모양의 목록을 만듭니다 (`app/members.js` 의 `Members.localServer`, 항목은 `js/history-entry.js` 의 `summarize`). 실제 서버를 만들 때 이 둘을 참고하면 됩니다
 - 회원 기록 주소 칸은 꺼지고, 기록 화면에 늘 '시험용: 이 태블릿의 세션 로그를 서버 대신 썼어요 (N건)' 이 나옵니다. 실제 서버로 착각하지 않게 하려는 것입니다
 - **주소 칸을 비워 둔다고 저절로 켜지지 않습니다.** 비어 있으면 지금처럼 서버 없이 이 태블릿의 회원 기록(localStorage)만 씁니다
 - 업로드에는 영향이 없습니다. 업로드 주소가 비어 있으면 아무것도 보내지 않고, '보냄' 표시도 남기지 않으므로 나중에 실제 서버를 적으면 쌓인 세션이 모두 올라갑니다

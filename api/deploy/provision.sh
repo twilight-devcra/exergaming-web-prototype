@@ -14,7 +14,8 @@ export AWS_PAGER=""
 REGION="${REGION:-ap-northeast-2}"
 DOMAIN="${DOMAIN:-exergame-api.devcra.com}"
 ZONE_NAME="${ZONE_NAME:-devcra.com.}"
-BRANCH="${BRANCH:-dev}"
+# 서버 하나가 운영(main) 태블릿과 dev 미리 보기를 함께 받으므로(?env= 는 데이터만 나눈다) 안정 브랜치를 따른다 (api/README.md)
+BRANCH="${BRANCH:-main}"
 TYPE="${TYPE:-t4g.small}"
 NAME=exergame-api
 TAGS="Key=Project,Value=exergaming"

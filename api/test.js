@@ -6,6 +6,22 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const assert = require('assert');
+const { HISTORY_FIELDS } = require('../js/history-entry.js');
+
+// 회원 기록 항목 하나가 HISTORY_FIELDS 를 정확히 지키는가 (필드가 같고, 값은 그 형이거나 null)
+function assertEntry(x) {
+  assert.deepStrictEqual(Object.keys(x).sort(), Object.keys(HISTORY_FIELDS).sort(), '필드가 HISTORY_FIELDS 와 같다');
+  for (const [k, type] of Object.entries(HISTORY_FIELDS)) {
+    const v = x[k];
+    if (v === null) { assert.notStrictEqual(k, 'at', 'at 은 필수'); continue; }
+    const ok = type === 'number' ? typeof v === 'number' && isFinite(v)
+      : type === 'string' ? typeof v === 'string'
+      : type === 'date' ? typeof v === 'string' && !isNaN(Date.parse(v))
+      : type === 'object' ? typeof v === 'object' && !Array.isArray(v)
+      : false;
+    assert.ok(ok, `${k} 는 ${type} 이어야 한다: ${JSON.stringify(v)}`);
+  }
+}
 
 const KEEP = process.argv.includes('--keep');
 const PORT = 18787;
@@ -121,16 +137,56 @@ async function main() {
       assert.strictEqual((await post(body)).status, 200);
     });
 
-    await check('회원 기록: 결과까지 간 판만, 필드는 Members.summarize 와 같게', async () => {
+    await check('회원 기록: 결과까지 간 판만, 필드와 형은 js/history-entry.js 대로', async () => {
       await post(fakeSession({ device: 'tab-b', id: 1001, user: '12345674', days: 1 }));
       await post(fakeSession({ device: 'tab-b', id: 1002, user: '12345674', ended: 'abandoned' }));
       await post(fakeSession({ device: 'tab-b', id: 1003, user: '12345674', ended: 'user' }));
       const h = await (await req('/history?user=12345674', { headers: auth })).json();
       assert.strictEqual(h.sessions.length, 2);
+      h.sessions.forEach(assertEntry);
       const s = h.sessions.find((x) => x.sid === '1001');
-      assert.deepStrictEqual(Object.keys(s).sort(), ['at', 'device', 'difficulty', 'distM', 'kcal', 'level', 'look', 'min', 'score', 'sid', 'track']);
       assert.strictEqual(s.device, 'tab-b');
+      assert.strictEqual(s.min, 5);
+      assert.strictEqual(typeof s.score, 'number');
+      assert.strictEqual(typeof s.gameAcc, 'number');
       assert.strictEqual(s.look.kind, 'cottage');
+    });
+
+    await check('회원 기록: 형이 다른 값은 null, 없는 필드는 버린다 (XSS 막기)', async () => {
+      const bad = fakeSession({ device: 'tab-x', id: 7000, user: '76543214' });
+      const html = '<img src=x onerror=alert(1)>';
+      Object.assign(bad.meta, { track: [html], landmark: html, extra: html });
+      bad.meta.session.min = html;
+      bad.meta.session.difficulty = { toString: html };
+      Object.assign(bad.meta.summary, { score: html });
+      bad.meta.summary.exercise.kcal = '30';
+      bad.meta.summary.stats = { a: { level: html, correct: '9', total: 3 }, b: null };
+      await post(bad);
+      await post(fakeSession({ device: 'tab-x', id: 7001, user: '76543214', ended: 'complete' }));
+      const noDate = fakeSession({ device: 'tab-x', id: 7002, user: '76543214' });
+      noDate.meta.startedAt = html;
+      await post(noDate);
+      const h = await (await req('/history?user=76543214', { headers: auth })).json();
+      assert.strictEqual(h.sessions.length, 2, '날짜가 아닌 at 은 버린다');
+      h.sessions.forEach(assertEntry);
+      const s = h.sessions.find((x) => x.sid === '7000');
+      for (const k of ['min', 'difficulty', 'track', 'score', 'kcal', 'look']) assert.strictEqual(s[k], null, k);
+      assert.strictEqual(s.level, 0);
+      assert.strictEqual(s.gameAcc, 0); // 글 '9' 는 맞힌 수로 세지 않는다
+      assert.ok(!JSON.stringify(h).includes('<'), 'HTML 이 응답에 남지 않는다');
+    });
+
+    await check('docs/SERVER.md 회원 기록 표 = js/history-entry.js HISTORY_FIELDS', async () => {
+      const md = fs.readFileSync(path.join(__dirname, '..', 'docs', 'SERVER.md'), 'utf8');
+      const sec = md.split(/^## /m).find((s) => s.startsWith('회원 기록'));
+      const table = sec.split(/\r?\n/).filter((l) => /^\| `/.test(l));
+      const doc = {};
+      for (const row of table) {
+        const [names, type] = row.split('|').slice(1, 3);
+        const t = (/`(\w+)`/.exec(type) || [])[1];
+        for (const [, f] of names.matchAll(/`(\w+)`/g)) doc[f] = t;
+      }
+      assert.deepStrictEqual(doc, { ...HISTORY_FIELDS }, '필드나 형을 바꿨으면 문서 표의 형 칸도 함께 고친다');
     });
 
     await check('기록이 없는 번호·이상한 번호는 빈 목록', async () => {

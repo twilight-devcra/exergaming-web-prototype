@@ -68,30 +68,11 @@ const safe = (s, fallback) => {
 };
 const rawPath = (env, device, sid) => path.join(C.dataDir, 'raw', env, device || '_', `${sid}.json.gz`);
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
-const str = (v) => (v === undefined || v === null ? null : String(v));
+// 객체는 JSON 으로 (String() 은 {"toString": "x"} 같은 본문에서 던진다 → 500 이 되면 그 태블릿의 업로드가 멈춘다)
+const str = (v) => (v === undefined || v === null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
-// 세션 로그 하나 → 회원 기록 항목 하나. app/members.js 의 Members.summarize 와 같아야 한다 (docs/SERVER.md '회원 기록')
-function summarize(log) {
-  const m = log.meta || {};
-  const sum = m.summary || {};
-  const ex = sum.exercise || {};
-  const levels = Object.values(sum.stats || {}).map((s) => (s && s.level) || 0);
-  // 게임 정확도 = 맞힌 문제 / 낸 문제 (js/stars.js Stars.gameAcc 와 같다)
-  let correct = 0, total = 0;
-  for (const s of Object.values(sum.stats || {})) {
-    if (!s) continue;
-    correct += num(s.correct) || 0;
-    total += num(s.total) || 0;
-  }
-  return {
-    at: m.startedAt, min: m.session ? m.session.min : null, difficulty: m.session ? m.session.difficulty : null,
-    track: m.track || 'dual',
-    score: sum.score, device: m.device || null, sid: m.id,
-    level: levels.length ? Math.max(...levels) : 0, distM: ex.distM, kcal: ex.kcal,
-    gameAcc: total > 0 ? Math.round((correct / total) * 100) / 100 : null,
-    look: m.landmark || null,
-  };
-}
+// 세션 로그 하나 → 회원 기록 항목 하나 (형을 지킨 것, 또는 null). 태블릿(app/members.js)과 같은 파일을 쓴다 (docs/SERVER.md '회원 기록')
+const { summarize, cleanEntry } = require('../js/history-entry.js');
 
 // 이벤트에서 게임 한 판·문제 하나씩 뽑는다 (docs/SESSION_LOG.md 'events')
 function extract(log) {
@@ -319,7 +300,8 @@ async function handle(req, res) {
     const user = u.searchParams.get('user') || '';
     if (!/^\d{8}$/.test(user)) return send(res, 200, { sessions: [] });
     const since = new Date(Date.now() - 2 * 366 * 864e5).toISOString(); // 달력은 최근 2년까지만 넘겨 본다
-    const sessions = history.all(envOf(u), user, since).map((r) => JSON.parse(r.history));
+    // 저장할 때 이미 형을 맞췄지만, 고치기 전에 저장된 줄(--reindex 전)도 있을 수 있으므로 내보낼 때 한 번 더 맞춘다
+    const sessions = history.all(envOf(u), user, since).map((r) => cleanEntry(JSON.parse(r.history))).filter(Boolean);
     return send(res, 200, { sessions });
   }
 

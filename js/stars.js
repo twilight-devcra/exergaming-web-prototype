@@ -2,7 +2,7 @@
 // 운동(목표 속도를 지킨 비율 = 운동 점수 / 만점)과 인지(게임에서 맞힌 문제 / 낸 문제)를 별 5개(반 개 단위)로 나란히 보여 준다.
 // 그 아래 상자는 늘 보인다: 게임 정확도가 RECOMMEND_UP 이상이면 한 단계 올리기(up), RECOMMEND_DOWN 아래면 한 단계 내리기(down),
 // 그 사이이거나 오르내릴 난이도가 없으면 이대로 계속하기(keep).
-// 운영 버전은 회원이 다음에 들어올 때 올리거나 내린 난이도를 미리 골라 둔다 (app/members.js). 서버도 같은 식으로 gameAcc 를 뽑는다 (api/server.js summarize)
+// 운영 버전은 회원이 다음에 들어올 때 올리거나 내린 난이도를 미리 골라 둔다 (app/members.js). 서버도 같은 식으로 gameAcc 를 뽑는다 (js/history-entry.js summarize, 서버와 태블릿이 함께 쓴다)
 import { SESSION_DIFFICULTIES, ROUND_PRESETS, U } from './config.js';
 
 export const Stars = {

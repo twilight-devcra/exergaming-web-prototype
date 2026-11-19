@@ -182,7 +182,8 @@
       if (e.type === 'game_start') { g = { game: e.game, level: e.level, start: e.clock, open: null, end: end, qs: [] }; games.push(g); }
       else if (e.type === 'intro_end' && g) g.open = e.clock;
       else if ((e.type === 'game_end' || e.type === 'game_abort') && g) { g.end = e.clock; g.aborted = e.type === 'game_abort'; g = null; }
-      else if (e.type === 'question') { q = { n: e.q, game: e.game, level: e.level, at: e.clock, open: e.clock, data: e, inputs: [], answer: null, limit: null, g }; qs.push(q); if (g) g.qs.push(q); }
+      // 문제 번호는 1씩 늘어난다. 로그 버전 5 까지는 상자 속 과일의 문제 내용(q)이 번호를 덮어써서, 그때는 앞 번호 + 1 로 메운다
+      else if (e.type === 'question') { const n = Number.isInteger(e.q) ? e.q : (qs.length ? qs[qs.length - 1].n : 0) + 1; q = { n, game: e.game, level: e.level, at: e.clock, open: e.clock, data: e, inputs: [], answer: null, limit: null, g }; qs.push(q); if (g) g.qs.push(q); }
       else if (e.type === 'input_open' && q && q.n === e.q) q.open = e.clock;
       else if (e.type === 'timer_start' && q && !q.answer && q.limit == null) q.limit = e.limitMs;
       else if (e.type === 'input' && q && q.n === e.q) q.inputs.push(e);
@@ -196,7 +197,7 @@
     const order = [];
     for (const x of games) if (!order.includes(x.game)) order.push(x.game);
     const samples = (log.samples || []).map((s) => ({ c: s[1], rpm: s[2], target: s[3], inZone: s[5], score: s[6] }));
-    return { log, end, games, qs, order, samples, pauses, tol: (log.meta && log.meta.config && log.meta.config.tolerance) || 0.12,
+    return { log, end, games, qs, order, samples, pauses, brain: !!(log.meta && log.meta.track === 'brain'), tol: (log.meta && log.meta.config && log.meta.config.tolerance) || 0.12,
       playStart: (ev.find((e) => e.type === 'play_start') || {}).clock ?? 0 };
   }
   const result = (q) => !q.answer ? 'wait' : q.answer.timedOut ? 'late' : q.answer.correct ? 'good' : 'bad';
@@ -414,7 +415,7 @@
     ].join('');
 
     $('#legend').innerHTML = M.order.map((id) => `<span><i style="background:${gColor(M, id)}"></i>${esc(TITLES[id] || id)}</span>`).join('') +
-      `<span><i style="background:var(--zone);outline:1px solid var(--zone-edge)"></i>목표 구역</span><span><i style="background:var(--series);height:2px"></i>RPM</span>`;
+      (M.brain ? '' : `<span><i style="background:var(--zone);outline:1px solid var(--zone-edge)"></i>목표 구역</span><span><i style="background:var(--series);height:2px"></i>RPM</span>`);
 
     $('#q-count').textContent = `${M.qs.length}개 · ${M.games.length}판`;
     $('#q-body').innerHTML = M.qs.map((q, i) => {
@@ -434,6 +435,8 @@
   function drawTimeline() {
     const el = $('#tl');
     el.setAttribute('viewBox', `0 0 ${TL.W} ${TL.H}`);
+    // 두뇌 게임만 한 판은 페달 기록이 없어(rpm 0, 목표 없음) RPM 그래프 대신 한 줄 안내만 둔다
+    const brain = M.brain;
     const sm = M.samples.filter((x) => x.rpm != null);
     const hi = Math.max(10, ...sm.map((x) => x.rpm), ...sm.filter((x) => x.target != null).map((x) => x.target * (1 + M.tol))) * 1.08;
     const ry = (v) => TL.chart[1] - (v / hi) * (TL.chart[1] - TL.chart[0]);
@@ -441,10 +444,15 @@
     // 눈금
     const step = M.end > 240000 ? 60000 : 30000;
     for (let c = 0; c <= M.end; c += step) b += `<line x1="${tx(c)}" y1="${TL.chart[0] - 4}" x2="${tx(c)}" y2="${TL.qrow[1]}" stroke="var(--grid)"/><text x="${tx(c)}" y="${TL.axis}" text-anchor="middle" class="lbl">${fmt(c, false)}</text>`;
-    for (const v of [0, Math.round(hi / 2 / 10) * 10]) b += `<text x="${TL.l - 6}" y="${ry(v) + 4}" text-anchor="end" class="lbl">${v}</text>`;
-    b += `<text x="${TL.l - 6}" y="${TL.chart[0] + 2}" text-anchor="end" class="lbl">RPM</text>`;
-    // 측정 구간
-    if (M.playStart > 0) b += `<rect x="${tx(0)}" y="${TL.band[0]}" width="${tx(M.playStart) - tx(0)}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="var(--grid)"/><text x="${(tx(0) + tx(M.playStart)) / 2}" y="${TL.band[0] + 14}" text-anchor="middle" class="lbl-ink">측정</text>`;
+    if (brain) b += `<text x="${(TL.l + TL.W - TL.r) / 2}" y="${(TL.chart[0] + TL.chart[1]) / 2 + 4}" text-anchor="middle" class="lbl">두뇌 게임만 한 판 — 페달 기록 없음</text>`;
+    else for (const v of [0, Math.round(hi / 2 / 10) * 10]) b += `<text x="${TL.l - 6}" y="${ry(v) + 4}" text-anchor="end" class="lbl">${v}</text>`;
+    if (!brain) b += `<text x="${TL.l - 6}" y="${TL.chart[0] + 2}" text-anchor="end" class="lbl">RPM</text>`;
+    // 측정(두뇌 게임만이면 카운트다운) 구간. 이름은 들어갈 만큼 넓을 때만
+    if (M.playStart > 0) {
+      const w = tx(M.playStart) - tx(0);
+      b += `<rect x="${tx(0)}" y="${TL.band[0]}" width="${w}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="var(--grid)"/>`;
+      if (w > 36) b += `<text x="${tx(0) + w / 2}" y="${TL.band[0] + 14}" text-anchor="middle" class="lbl-ink">${brain ? '준비' : '측정'}</text>`;
+    }
     // 게임 띠 (소개 부분은 옅게)
     for (const g of M.games) {
       const x0 = tx(g.start), x1 = tx(g.end), xo = tx(g.open ?? g.start), col = gColor(M, g.game);
@@ -454,13 +462,13 @@
       if (x1 - xo > name.length * 11 + 8) b += `<text x="${xo + 6}" y="${TL.band[0] + 14}" class="band-lbl">${esc(name)}</text>`;
     }
     // 목표 구역 + RPM
-    const zs = sm.filter((x) => x.target != null);
+    const zs = brain ? [] : sm.filter((x) => x.target != null);
     if (zs.length) {
       const up = zs.map((x) => `${tx(x.c).toFixed(1)},${ry(x.target * (1 + M.tol)).toFixed(1)}`), dn = zs.slice().reverse().map((x) => `${tx(x.c).toFixed(1)},${ry(x.target * (1 - M.tol)).toFixed(1)}`);
       b += `<polygon points="${up.join(' ')} ${dn.join(' ')}" fill="var(--zone)" stroke="var(--zone-edge)" stroke-width="0.8"/>`;
       b += `<polyline points="${zs.map((x) => `${tx(x.c).toFixed(1)},${ry(x.target).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--zone-edge)" stroke-dasharray="4 3"/>`;
     }
-    b += `<polyline points="${sm.map((x) => `${tx(x.c).toFixed(1)},${ry(x.rpm).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--series)" stroke-width="1.6" stroke-linejoin="round"/>`;
+    if (!brain) b += `<polyline points="${sm.map((x) => `${tx(x.c).toFixed(1)},${ry(x.rpm).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--series)" stroke-width="1.6" stroke-linejoin="round"/>`;
     for (const [a, z] of M.pauses) b += `<rect x="${tx(a)}" y="${TL.chart[0]}" width="${Math.max(2, tx(z) - tx(a))}" height="${TL.chart[1] - TL.chart[0]}" fill="var(--axis)" opacity="0.5"/>`;
     // 문제: 입력이 열린 때 ~ 답, 점 색 = 결과
     const qy = (TL.qrow[0] + TL.qrow[1]) / 2;

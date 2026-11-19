@@ -79,6 +79,7 @@ function extract(log) {
   const games = [];
   const qs = new Map();
   let cur = null;
+  let lastQ = 0; // 문제 번호는 1씩 늘어난다. 로그 버전 5 까지는 상자 속 과일의 문제 내용(q)이 번호를 덮어써서, 그때는 앞 번호 + 1 로 메운다
   for (const e of Array.isArray(log.events) ? log.events : []) {
     if (!e || typeof e !== 'object') continue;
     if (e.type === 'game_start') {
@@ -89,8 +90,10 @@ function extract(log) {
       cur = null;
     } else if (e.type === 'points' && games.length) {
       games[games.length - 1].points += num(e.pts) || 0;
-    } else if (e.type === 'question' && e.q != null) {
-      qs.set(e.q, { q: e.q, game: str(e.game), level: num(e.level), correct: null, timed_out: 0, answered: 0, ms: null, load: null, limit_ms: null });
+    } else if (e.type === 'question') {
+      const n = Number.isInteger(e.q) ? e.q : lastQ + 1;
+      lastQ = n;
+      qs.set(n, { q: n, game: str(e.game), level: num(e.level), correct: null, timed_out: 0, answered: 0, ms: null, load: null, limit_ms: null });
     } else if (e.type === 'timer_start') {
       const q = [...qs.values()].pop();
       if (q && q.answered === 0) Object.assign(q, { load: num(e.load), limit_ms: num(e.limitMs) });

@@ -12,7 +12,7 @@ import { Config, EDITION } from './config.js';
 import { Theme } from './themes.js';
 
 export class SessionLog {
-  static VERSION = 5;
+  static VERSION = 6;
   static SAMPLE_SEC = 0.1;
 
   constructor(app) {
@@ -87,7 +87,8 @@ export class SessionLog {
   question(game, level, data, open = true) {
     if (this.done) return;
     this.q = { game, n: ++this.qn, clock: open ? this.app.clock : null, first: null };
-    this.ev('question', { game, level, q: this.q.n, ...data });
+    // 문제 번호(q)는 맨 뒤에 둬서 게임이 보낸 내용의 같은 이름 칸이 덮어쓰지 못하게 한다 (예전에 상자 속 과일의 q 가 덮어썼다)
+    this.ev('question', { game, level, ...data, q: this.q.n });
   }
 
   // question(..., false) 로 띄운 문제의 입력이 열린 순간

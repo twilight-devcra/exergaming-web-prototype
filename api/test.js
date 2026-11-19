@@ -209,6 +209,22 @@ async function main() {
       assert.strictEqual((await req('/admin/api/overview', { headers: { Authorization: `Bearer ${KEY}` } })).status, 401);
     });
 
+    await check('로그 버전 5 까지: 상자 속 과일의 문제 내용(q)이 번호를 덮어쓴 문제도 색인에 들어간다', async () => {
+      const log = fakeSession({ device: 'tab-box', id: 9100 });
+      const ev = (type, x) => ({ t: 0, clock: 0, type, ...x });
+      log.events = [
+        ev('question', { game: 'count', level: 3, q: 1 }), ev('answer', { game: 'count', q: 1, ms: 2000, correct: true, timedOut: false }),
+        ev('question', { game: 'box', level: 3, q: { type: 'total', box: 'A', kinds: [] } }), ev('answer', { game: 'box', q: 2, ms: 3000, correct: true, timedOut: false }),
+        ev('question', { game: 'count', level: 3, q: 3 }), ev('answer', { game: 'count', q: 3, ms: 2500, correct: false, timedOut: false }),
+        ev('session_end', { ended: 'complete' }),
+      ];
+      await post(log);
+      const rows = (await (await req('/admin/export/questions.csv?device=tab-box', { headers: adminAuth })).text()).trim().split('\n');
+      const head = rows[0].replace(/^﻿/, '').split(',');
+      const got = rows.slice(1).map((r) => Object.fromEntries(r.split(',').map((v, i) => [head[i], v])));
+      assert.deepStrictEqual(got.map((r) => [r.q, r.game, r.answered]), [['1', 'count', '1'], ['2', 'box', '1'], ['3', 'count', '1']]);
+    });
+
     await check('관리 집계 · CSV · 원본 내려받기', async () => {
       for (let i = 0; i < 40; i++) await post(fakeSession({ device: `tab-${i % 3}`, id: 5000 + i, user: '12345674', days: i % 9, difficulty: ['relax', 'normal', 'challenge'][i % 3] }));
       const o = await (await req('/admin/api/overview', { headers: adminAuth })).json();

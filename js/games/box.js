@@ -304,7 +304,7 @@ export class BoxGame {
     this.layout();
     this.h.question({
       boxes: p.boxes, kinds: p.kinds, start: p.start, steps: p.steps,
-      q: { type: q.type, box: q.box, kinds: q.kinds }, ans: q.ans, opts: q.opts, end: p.end,
+      ask: { type: q.type, box: q.box, kinds: q.kinds }, ans: q.ans, opts: q.opts, end: p.end,
     });
     // 일의 양 = 머릿속에서 세어 둬야 하는 과일 종류 수 (상자가 둘이면 하나 더)
     const load = { total: p.kinds.length, kind: 1, most: p.kinds.length, diff: 2 }[q.type] + (p.boxes.length > 1 ? 1 : 0);

@@ -1,7 +1,7 @@
 # 세션 로그 형식
 
 한 판(속도 측정 ~ 결과)의 기록 형식입니다. 만드는 코드는 `js/session-log.js`, 기록하는 곳은 `js/main.js`(판 흐름·입력 장치)와 `js/games/*.js`(문제·답)입니다.
-형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **5** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함, 4: `meta.track` 과 두뇌 게임만 하는 판을 더함, 5: 생각한 시간 — `answer.first`, `input_open`, `stats.think` 를 더하고 지시 따르기의 `ms` 가 조작판이 풀린 뒤부터로 바뀜).
+형식을 바꾸면 이 문서와 `SessionLog.VERSION` 을 함께 고칩니다. 지금 버전은 **5** 입니다 (2: `meta.edition` · `device` · `session` 을 더함, 3: `meta.landmark` 를 더함, 4: `meta.track` 과 두뇌 게임만 하는 판을 더함, 5: 생각한 시간 — `answer.first`, `input_open`, `stats.think` 를 더하고 지시 따르기의 `ms` 가 조작판이 풀린 뒤부터로 바뀜, 6: 상자 속 과일(`box`)의 `question` 에서 묻는 내용 칸 `q` 를 `ask` 로 바꿈. 5 까지는 그 칸이 문제 번호 `q` 를 덮어써서 상자 속 과일의 `question` 에 번호가 없다 — 문제 번호는 1씩 늘어나므로 앞 `question` 의 번호 + 1 로 메운다).
 
 운영 버전은 저장한 세션을 서버로 자동 업로드할 수도 있습니다 — 서버 요구 사항은 [SERVER.md](SERVER.md).
 

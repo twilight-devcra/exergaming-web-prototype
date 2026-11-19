@@ -5,7 +5,7 @@
 #   IAM 역할·인스턴스 프로필 exergame-api-ec2 (Session Manager 접속용, SSH 키 없음)
 #   보안 그룹 exergame-api (80·443 만 열림. 22 는 닫힘)
 #   EC2 t4g.small · Ubuntu 24.04 ARM · 20 GB gp3 암호화 · user-data = setup.sh
-#   탄력적 IP + Route 53 A 레코드 ($DOMAIN)
+#   탄력적 IP + Route 53 A 레코드 ($DOMAIN, $DEV_DOMAIN — 한 인스턴스에 운영·dev 서버 둘, api/README.md '서버 둘')
 #   매일 디스크 스냅샷 (7개 보관, Data Lifecycle Manager)
 set -euo pipefail
 export MSYS_NO_PATHCONV=1 # Git Bash 가 /aws/... 같은 인자를 Windows 경로로 바꾸지 않게
@@ -13,9 +13,11 @@ export AWS_PAGER=""
 
 REGION="${REGION:-ap-northeast-2}"
 DOMAIN="${DOMAIN:-exergame-api.devcra.com}"
+DEV_DOMAIN="${DEV_DOMAIN:-exergame-api-dev.devcra.com}"
 ZONE_NAME="${ZONE_NAME:-devcra.com.}"
-# 서버 하나가 운영(main) 태블릿과 dev 미리 보기를 함께 받으므로(?env= 는 데이터만 나눈다) 안정 브랜치를 따른다 (api/README.md)
+# 운영 서버는 안정 브랜치, dev 서버는 dev 브랜치를 따른다 (dev 미리 보기 /dev/ 가 dev 서버에 올린다)
 BRANCH="${BRANCH:-main}"
+DEV_BRANCH="${DEV_BRANCH:-dev}"
 TYPE="${TYPE:-t4g.small}"
 NAME=exergame-api
 TAGS="Key=Project,Value=exergaming"
@@ -23,7 +25,7 @@ UPLOAD_KEY="${UPLOAD_KEY:-$(openssl rand -hex 16)}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 aws() { command aws --region "$REGION" "$@"; }
 
-echo "== region $REGION · domain $DOMAIN · branch $BRANCH · type $TYPE"
+echo "== region $REGION · $DOMAIN ($BRANCH) · $DEV_DOMAIN ($DEV_BRANCH) · type $TYPE"
 
 # 이미 있으면 멈춘다 (두 번 만들지 않게)
 if [ -n "$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$NAME" "Name=instance-state-name,Values=pending,running,stopping,stopped" --query 'Reservations[].Instances[].InstanceId' --output text)" ]; then
@@ -61,7 +63,7 @@ AMI=$(aws ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/st
 # 지금 폴더의 상대 경로로 둔다: Windows 의 aws.exe 는 Git Bash 의 /tmp 를 못 읽는다. 줄 끝의 CR 도 지운다 (서버의 bash 가 못 읽는다)
 USERDATA=".exergame-userdata-$$.sh"
 trap 'rm -f "$USERDATA"' EXIT
-sed -e 's/\r$//' -e "s|__DOMAIN__|$DOMAIN|" -e "s|__BRANCH__|$BRANCH|" -e "s|__UPLOAD_KEY__|$UPLOAD_KEY|" "$HERE/setup.sh" > "$USERDATA"
+sed -e 's/\r$//' -e "s|__DOMAIN__|$DOMAIN|" -e "s|__DEV_DOMAIN__|$DEV_DOMAIN|" -e "s|__BRANCH__|$BRANCH|" -e "s|__DEV_BRANCH__|$DEV_BRANCH|" -e "s|__UPLOAD_KEY__|$UPLOAD_KEY|" "$HERE/setup.sh" > "$USERDATA"
 ID=$(aws ec2 run-instances --image-id "$AMI" --instance-type "$TYPE" --count 1 \
   --security-group-ids "$SG" --iam-instance-profile "Name=$NAME-ec2" \
   --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=20,VolumeType=gp3,Encrypted=true,DeleteOnTermination=false}' \
@@ -83,11 +85,13 @@ else
   echo "!! elastic ip not available (quota?) — using the instance's public ip $IP. It changes if the instance is stopped and started."
 fi
 ZONE=$(aws route53 list-hosted-zones-by-name --dns-name "$ZONE_NAME" --query 'HostedZones[0].Id' --output text)
-aws route53 change-resource-record-sets --hosted-zone-id "$ZONE" --change-batch "{
-  \"Comment\": \"exergame API\",
-  \"Changes\": [{ \"Action\": \"UPSERT\", \"ResourceRecordSet\": { \"Name\": \"$DOMAIN\", \"Type\": \"A\", \"TTL\": 300, \"ResourceRecords\": [{ \"Value\": \"$IP\" }] } }]
-}" >/dev/null
-echo "ip $IP → $DOMAIN"
+for D in "$DOMAIN" "$DEV_DOMAIN"; do
+  aws route53 change-resource-record-sets --hosted-zone-id "$ZONE" --change-batch "{
+    \"Comment\": \"exergame API\",
+    \"Changes\": [{ \"Action\": \"UPSERT\", \"ResourceRecordSet\": { \"Name\": \"$D\", \"Type\": \"A\", \"TTL\": 300, \"ResourceRecords\": [{ \"Value\": \"$IP\" }] } }]
+  }" >/dev/null
+  echo "ip $IP → $D"
+done
 
 # ---- 매일 스냅샷 (태그 Backup=exergame-api 인 디스크, 7개 보관) ----
 aws dlm create-default-role >/dev/null 2>&1 || true
@@ -104,12 +108,13 @@ cat <<EOF
 
 == done
 instance   $ID ($TYPE, $IP)
-url        https://$DOMAIN   (첫 부팅 설치와 인증서 발급에 몇 분 걸린다: curl https://$DOMAIN/health)
-upload key $UPLOAD_KEY
-admin pw   aws ssm start-session --target $ID  →  sudo grep ADMIN /etc/exergame-api.env
+url        https://$DOMAIN   (운영, $BRANCH. 첫 부팅 설치와 인증서 발급에 몇 분 걸린다: curl https://$DOMAIN/health)
+dev url    https://$DEV_DOMAIN   (dev 미리 보기, $DEV_BRANCH)
+upload key $UPLOAD_KEY   (두 서버가 같다)
+admin pw   aws ssm start-session --target $ID  →  sudo grep ADMIN /etc/exergame-api.env   (dev: /etc/exergame-api-dev.env)
 
-태블릿 설정 (js/config.js 의 SESSION_UPLOAD 또는 운영 메뉴 자동 업로드):
-  url        https://$DOMAIN/sessions
-  historyUrl https://$DOMAIN/history
+태블릿 설정 (js/config.js 의 API_PROD · API_DEV 와 SESSION_UPLOAD.key, 또는 운영 메뉴 자동 업로드):
+  url        https://$DOMAIN/sessions       (dev 미리 보기: https://$DEV_DOMAIN/sessions)
+  historyUrl https://$DOMAIN/history        (dev 미리 보기: https://$DEV_DOMAIN/history)
   key        $UPLOAD_KEY
 EOF

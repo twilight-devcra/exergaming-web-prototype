@@ -101,6 +101,16 @@ async function launch({ port = 9333, width = 1600, height = 1000, args = [] } = 
       } catch (e) {
         proc.kill();
       }
+      // 임시 프로필(캐시 포함)을 지운다. 남겨 두면 실행할 때마다 쌓여 디스크를 채운다 (2026-11-20, 100여 개 · 7GB 넘게 쌓였다).
+      // 브라우저가 파일을 잠깐 더 쥐고 있을 수 있어 몇 번 다시 해 본다
+      for (let i = 0; i < 10; i++) {
+        try {
+          fs.rmSync(profile, { recursive: true, force: true });
+          break;
+        } catch (e) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
     },
   };
   return page;

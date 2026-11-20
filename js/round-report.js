@@ -21,9 +21,11 @@ export const RoundReport = {
     const keep = U.clamp(Math.round((app.exScore / exMax) * 100), 0, 100);
     const abil = Abilities.compute(games, app.brainOnly ? null : keep / 100);
     Radar.render(field('radar'), abil);
-    // 가장 잘한 영역을 칭찬한다 (데이터가 없으면 비운다)
+    // 가장 잘한 영역을 칭찬한다. 칭찬할 만큼 잘한 영역이 없으면 북돋는 말 한 줄 (푼 문제가 하나도 없으면 비운다)
     const best = Abilities.best(abil);
-    field('best').innerHTML = best ? `오늘 가장 돋보인 능력 <b>${best.name}</b><small>${best.praise}</small>` : '';
+    const played = abil.some((axis) => axis.hasData && axis.id !== 'exercise');
+    field('best').innerHTML = best ? `오늘 가장 돋보인 능력 <b>${best.name}</b><small>${best.praise}</small>`
+      : played ? '처음엔 누구나 어려워요<small>꾸준히 하면 그래프가 점점 넓어져요</small>' : '';
     const kcal = meter.kcal;
     const gameAcc = Stars.gameAcc(games);
     const rec = fillRecommendation(app, root, gameAcc);

@@ -78,9 +78,11 @@ export const Abilities = {
     return AXES.map((axis) => ({ ...axis, acc: acc[axis.id], hasData: acc[axis.id] != null }));
   },
 
-  // 칭찬할 축: 데이터가 있는 인지 영역·답하는 속도 가운데 정답률이 가장 높은 것 (운동은 별점 칸에서 따로 보여 준다)
+  // 칭찬할 축: 데이터가 있는 인지 영역·답하는 속도 가운데 정답률이 가장 높은 것 (운동은 운동량 카드에서 따로 보여 준다).
+  // PRAISE_MIN 에 못 미치면 칭찬하지 않는다 — 0% 인 영역을 '가장 돋보인 능력'이라 하면 오히려 힘이 빠진다
+  PRAISE_MIN: 0.4,
   best(list) {
-    const has = list.filter((axis) => axis.hasData && axis.id !== 'exercise');
+    const has = list.filter((axis) => axis.hasData && axis.id !== 'exercise' && axis.acc >= this.PRAISE_MIN);
     if (!has.length) return null;
     return has.reduce((best, axis) => (axis.acc > best.acc ? axis : best));
   },

@@ -15,12 +15,15 @@
 //   show   — 외우는 시간의 기본 몫(ms). 쉬운 단계만 따로 정하고, 나머지는 SHOW_MS 다
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 const COVER_MARKS = (() => {
   const star = Array.from({ length: 10 }, (_, i) => {
-    const a = ((-90 + i * 36) * Math.PI) / 180;
+    const angle = ((-90 + i * 36) * Math.PI) / 180;
     const rad = i % 2 ? 12 : 28;
-    return `${(50 + Math.cos(a) * rad).toFixed(1)},${(53 + Math.sin(a) * rad).toFixed(1)}`;
+    return `${(50 + Math.cos(angle) * rad).toFixed(1)},${(53 + Math.sin(angle) * rad).toFixed(1)}`;
   }).join(' ');
   // 색만으로 구분하지 않도록 상자마다 모양이 다르다 (색약 대응)
   return [
@@ -35,7 +38,7 @@ const COVER_MARKS = (() => {
 
 export class CoverGame {
   static id = 'cover';
-  static tags = ['memory', 'number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.MEMORY, Tag.NUMBER];
   static title = '가린 숫자 더하기';
   static hint = '상자가 닫히기 전에 속에 든 숫자를 외워 두었다가<br>두 숫자를 더한 값을 고르세요';
   static levels = [
@@ -60,15 +63,15 @@ export class CoverGame {
 
   // 소개 그림: ① 상자 속 숫자를 외워 두었다가 ② 두 수를 더한 값을 고른다
   static diagram() {
-    const m = COVER_MARKS[0];
-    const tok = (x, y, s, v) => Dg.rect(x, y, s, s, 'dg-slot') + Dg.text(x + s / 2, y + s / 2, v, s * 0.55);
-    const box = (x, y, s) => `<rect fill="${m.fill}" x="${x}" y="${y}" width="${s}" height="${s}" rx="8"/>` +
-      Dg.glyph(m.glyph, x + s / 2, y + s / 2, s, 'fill="rgba(255,255,255,0.92)"');
+    const mark0 = COVER_MARKS[0];
+    const tok = (x, y, size, value) => Dg.rect(x, y, size, size, 'dg-slot') + Dg.text(x + size / 2, y + size / 2, value, size * 0.55);
+    const box = (x, y, size) => `<rect fill="${mark0.fill}" x="${x}" y="${y}" width="${size}" height="${size}" rx="8"/>` +
+      Dg.glyph(mark0.glyph, x + size / 2, y + size / 2, size, 'fill="rgba(255,255,255,0.92)"');
     // 열린 상자: 숫자가 보이고, 표시가 찍힌 뚜껑이 왼쪽 위 모서리를 축으로 젖혀져 있다
-    const open = (x, y, s, v) => `<rect class="dg-slot" style="stroke:${m.fill}" x="${x}" y="${y}" width="${s}" height="${s}" rx="7"/>` +
-      Dg.text(x + s / 2, y + s / 2, v, s * 0.55) +
-      `<g transform="rotate(-38 ${x} ${y})">${box(x, y - s * 0.62, s).replace(`height="${s}"`, `height="${s * 0.62}"`)}</g>`;
-    const opts = [[11, 40], [12, 82], [13, 124]].map(([v, x]) => Dg.rect(x, 82, 38, 38) + Dg.text(x + 19, 101, v, 19)).join('');
+    const open = (x, y, size, value) => `<rect class="dg-slot" style="stroke:${mark0.fill}" x="${x}" y="${y}" width="${size}" height="${size}" rx="7"/>` +
+      Dg.text(x + size / 2, y + size / 2, value, size * 0.55) +
+      `<g transform="rotate(-38 ${x} ${y})">${box(x, y - size * 0.62, size).replace(`height="${size}"`, `height="${size * 0.62}"`)}</g>`;
+    const opts = [[11, 40], [12, 82], [13, 124]].map(([value, x]) => Dg.rect(x, 82, 38, 38) + Dg.text(x + 19, 101, value, 19)).join('');
     return [
       { svg: Dg.svg('0 0 200 136', tok(22, 66, 44, 3) + open(78, 66, 44, 7) + tok(134, 66, 44, 5)), caption: '상자 속 숫자를 외워 두었다가' },
       {
@@ -79,35 +82,37 @@ export class CoverGame {
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = CoverGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
-    this.phase = 'show';
-    this.last = null; // 지난 문제의 두 숫자 (같은 짝을 연달아 묻지 않게)
+    this.phase = Phase.SHOW;
+    this.lastPair = null; // 지난 문제의 두 숫자 (같은 짝을 연달아 묻지 않게)
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg look', '상자 속 숫자를 외우세요');
-    const { body, dots } = U.frame(stage, `${CoverGame.title} · Lv.${level}`, this.msg, CoverGame.ROUNDS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg look', '상자 속 숫자를 외우세요');
+    const { body, dots } = U.frame(stage, `${CoverGame.title} · Lv.${level}`, this.message, CoverGame.ROUNDS);
     this.progress = dots;
     this.board = U.el('div', 'cv-board');
     this.row = U.el('div', 'cv-row');
     this.center = U.el('div', 'cv-center');
     // 처음부터 빈 식을 흐리게 보여 줘서 '두 숫자를 더하는 게임'이라는 것이 먼저 보이게 한다
-    this.eq = U.el('div', 'cv-eq idle');
+    this.equation = U.el('div', 'cv-eq idle');
     this.slots = [U.el('div', 'cv-slot'), U.el('div', 'cv-slot')];
-    this.ansBox = U.el('div', 'cv-ans', '?');
-    this.eq.append(this.slots[0], U.el('div', '', '+'), this.slots[1], U.el('div', '', '='), this.ansBox);
-    this.opts = U.el('div', 'cv-opts');
-    this.center.append(this.eq, this.opts);
+    this.answerBox = U.el('div', 'cv-ans', '?');
+    this.equation.append(this.slots[0], U.el('div', '', '+'), this.slots[1], U.el('div', '', '='), this.answerBox);
+    this.optionRow = U.el('div', 'cv-opts');
+    this.center.append(this.equation, this.optionRow);
     this.board.append(this.row, this.center);
     body.append(this.board);
 
-    this.toks = CoverGame.deal(this.spec);
-    this.toks.forEach((t) => {
+    this.tokens = CoverGame.deal(this.spec);
+    this.tokens.forEach((t) => {
       t.home = U.el('div', 'cv-home');
       t.el = U.el('div', 'cv-tok', `<div class="cv-face">${t.v}</div>`);
       if (t.mark) {
@@ -119,88 +124,88 @@ export class CoverGame {
       this.row.append(t.home);
       this.board.append(t.el);
     });
-    this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(stage);
+    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver.observe(stage);
     this.layout();
-    this.h.sfx('blink');
+    this.host.sfx(Sfx.BLINK);
 
-    const hid = this.toks.filter((t) => t.mark);
+    const hid = this.tokens.filter((t) => t.mark);
     const show = (this.spec.show || CoverGame.SHOW_MS) + CoverGame.SHOW_PER * hid.length;
-    hid.forEach((t, i) => this.h.after(show + i * CoverGame.LID_GAP, () => {
+    hid.forEach((t, i) => this.host.after(show + i * CoverGame.LID_GAP, () => {
       t.el.classList.remove('open');
-      this.h.sfx('blink');
+      this.host.sfx(Sfx.BLINK);
     }));
-    this.h.after(show + hid.length * CoverGame.LID_GAP + 450, () => this.ask());
+    this.host.after(show + hid.length * CoverGame.LID_GAP + 450, () => this.ask());
   }
 
   // 숫자 크기는 판 높이(줄 + 식 + 보기)와 너비(숫자 n개) 둘 다에 맞춘다. 숫자는 줄의 제자리(.cv-home) 또는 식의 빈칸 위에 놓인다.
   layout() {
-    const b = this.board;
-    const W = b.clientWidth;
-    const H = b.clientHeight;
-    if (!W || !H) return;
+    const board = this.board;
+    const width = board.clientWidth;
+    const height = board.clientHeight;
+    if (!width || !height) return;
     // 안내 문구와 제한 시간 막대가 쓰는 높이(약 70px)를 빼고 맞춘다. 운영 버전은 식과 보기 사이를 더 띄우므로 그만큼도 뺀다
-    const prevTk = parseFloat(b.style.getPropertyValue('--tk'));
+    const prevTk = parseFloat(board.style.getPropertyValue('--tk'));
     const extra = prevTk ? Math.max(0, U.gapOf(this.center, prevTk * 0.3) - prevTk * 0.3) : 0;
-    const tk = Math.round(U.clamp(Math.min((H - 70 - extra) / 5.6, W / (this.toks.length * 1.3 + 0.5)), 36, 110));
-    b.style.setProperty('--tk', `${tk}px`);
-    const br = b.getBoundingClientRect();
+    const tk = Math.round(U.clamp(Math.min((height - 70 - extra) / 5.6, width / (this.tokens.length * 1.3 + 0.5)), 36, 110));
+    board.style.setProperty('--tk', `${tk}px`);
+    const boardRect = board.getBoundingClientRect();
     // 숫자 줄과 식을 함께 감싼 자리 (문제): 운영 버전은 여기에 판 바탕을 깐다 (app/app.css .cv-board::before). 보기는 따로 감싼다
-    const rr = this.row.getBoundingClientRect();
-    const cr = this.eq.getBoundingClientRect();
-    const mx = Math.min(rr.left, cr.left) - br.left;
-    const my = Math.min(rr.top, cr.top) - br.top;
-    b.style.setProperty('--mat-x', `${mx}px`);
-    b.style.setProperty('--mat-y', `${my}px`);
-    b.style.setProperty('--mat-w', `${Math.max(rr.right, cr.right) - br.left - mx}px`);
-    b.style.setProperty('--mat-h', `${Math.max(rr.bottom, cr.bottom) - br.top - my}px`);
-    const er = this.slots.map((s) => s.getBoundingClientRect());
-    this.toks.forEach((t) => {
-      const r = t.at != null ? er[t.at] : t.home.getBoundingClientRect();
-      t.el.style.left = `${r.left - br.left}px`;
-      t.el.style.top = `${r.top - br.top}px`;
+    const rowRect = this.row.getBoundingClientRect();
+    const eqRect = this.equation.getBoundingClientRect();
+    const mx = Math.min(rowRect.left, eqRect.left) - boardRect.left;
+    const my = Math.min(rowRect.top, eqRect.top) - boardRect.top;
+    board.style.setProperty('--mat-x', `${mx}px`);
+    board.style.setProperty('--mat-y', `${my}px`);
+    board.style.setProperty('--mat-w', `${Math.max(rowRect.right, eqRect.right) - boardRect.left - mx}px`);
+    board.style.setProperty('--mat-h', `${Math.max(rowRect.bottom, eqRect.bottom) - boardRect.top - my}px`);
+    const slotRects = this.slots.map((slot) => slot.getBoundingClientRect());
+    this.tokens.forEach((t) => {
+      const rect = t.at != null ? slotRects[t.at] : t.home.getBoundingClientRect();
+      t.el.style.left = `${rect.left - boardRect.left}px`;
+      t.el.style.top = `${rect.top - boardRect.top}px`;
     });
   }
 
   ask() {
-    const [a, b] = this.pickPair();
-    const ans = a.v + b.v;
-    this.q = { a, b, ans };
-    U.say(this.msg, '두 수를 더한 값을 고르세요', 'act');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
-    this.eq.classList.remove('idle');
-    this.ansBox.className = 'cv-ans';
-    this.ansBox.textContent = '?';
+    const [first, second] = this.pickPair();
+    const ans = first.v + second.v;
+    this.question = { first, second, ans };
+    U.say(this.message, '두 수를 더한 값을 고르세요', 'act');
+    Progress.current(this.progress, this.round);
+    this.equation.classList.remove('idle');
+    this.answerBox.className = 'cv-ans';
+    this.answerBox.textContent = '?';
 
-    [a, b].forEach((t, i) => {
+    [first, second].forEach((t, i) => {
       t.at = i;
       t.el.classList.add('away');
       t.home.classList.add('empty');
     });
     this.layout();
-    this.h.sfx('tap');
+    this.host.sfx(Sfx.TAP);
 
-    this.h.after(CoverGame.FLY_MS, () => {
-      const opts = CoverGame.options(a, b, this.toks, this.spec.opts);
-      this.opts.innerHTML = '';
-      this.btns = opts.map((v) => {
-        const btn = U.el('button', 'ar-cand cv-opt', String(v));
-        btn.addEventListener('pointerdown', () => this.pick(v, btn));
-        this.opts.append(btn);
+    this.host.after(CoverGame.FLY_MS, () => {
+      const opts = CoverGame.options(first, second, this.tokens, this.spec.opts);
+      this.optionRow.innerHTML = '';
+      this.optionButtons = opts.map((value) => {
+        const btn = U.el('button', 'ar-cand cv-opt', String(value));
+        btn.addEventListener('pointerdown', () => this.pick(value, btn));
+        this.optionRow.append(btn);
         return btn;
       });
-      this.ansBox.classList.add('active');
+      this.answerBox.classList.add('active');
       this.layout();
-      this.phase = 'input';
-      const idx = (t) => this.toks.indexOf(t);
-      this.h.question({
-        values: this.toks.map((t) => t.v),
-        marks: this.toks.map((t) => (t.mark ? t.mark.id : null)),
-        terms: [idx(a), idx(b)],
+      this.phase = Phase.INPUT;
+      const idx = (t) => this.tokens.indexOf(t);
+      this.host.question({
+        values: this.tokens.map((t) => t.v),
+        marks: this.tokens.map((t) => (t.mark ? t.mark.id : null)),
+        terms: [idx(first), idx(second)],
         ans,
         opts,
       });
-      this.h.timer([a, b].filter((t) => t.mark).length, () => this.pick(null, null));
+      this.host.timer([first, second].filter((t) => t.mark).length, () => this.pick(null, null));
     });
   }
 
@@ -209,95 +214,93 @@ export class CoverGame {
   // 바로 앞 문제와 같은 식(좌우만 바꾼 것 포함)은 내지 않는다. 덮인 것이 둘뿐인 판에서 둘 다 덮인 식을 뽑으면
   // 그런 식이 하나뿐이므로, 그때는 하나만 덮인 식으로 넘어간다.
   pickPair() {
-    const hid = U.shuffle(this.toks.filter((t) => t.mark)).sort((x, y) => x.asks - y.asks);
-    const vis = U.shuffle(this.toks.filter((t) => !t.mark));
+    const hid = U.shuffle(this.tokens.filter((t) => t.mark)).sort((x, y) => x.asks - y.asks);
+    const vis = U.shuffle(this.tokens.filter((t) => !t.mark));
     const wantBoth = hid.length >= 2 && (!vis.length || Math.random() < this.spec.both);
-    const same = (p) => this.last && p.every((t) => this.last.includes(t));
+    const same = (candidate) => this.lastPair && candidate.every((t) => this.lastPair.includes(t));
     // 후보는 덜 물어본 덮인 숫자가 앞에 오도록 늘어놓고, 원하는 종류(둘 다 덮인 식 / 하나만 덮인 식)를 먼저 본다
     const both = [];
     const one = [];
-    hid.forEach((a, i) => {
-      hid.slice(i + 1).forEach((b) => both.push([a, b]));
-      vis.forEach((v) => one.push([a, v]));
+    hid.forEach((hidden, i) => {
+      hid.slice(i + 1).forEach((other) => both.push([hidden, other]));
+      vis.forEach((shown) => one.push([hidden, shown]));
     });
-    const pair = (wantBoth ? [...both, ...one] : [...one, ...both]).find((p) => !same(p));
+    const pair = (wantBoth ? [...both, ...one] : [...one, ...both]).find((candidate) => !same(candidate));
     pair.forEach((t) => t.mark && t.asks++);
-    this.last = pair;
+    this.lastPair = pair;
     return U.shuffle(pair);
   }
 
-  // v = 고른 값. null 이면 시간이 다 된 것
-  pick(v, btn) {
-    if (this.phase !== 'input') return;
-    this.phase = 'wait';
-    this.h.stopTimer();
-    const { a, b, ans } = this.q;
-    const ok = v === ans;
-    this.h.answer({ picked: v, correct: ok, timedOut: !btn });
+  // value = 고른 값. null 이면 시간이 다 된 것
+  pick(value, btn) {
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
+    const { first, second, ans } = this.question;
+    const ok = value === ans;
+    this.host.answer({ picked: value, correct: ok, timedOut: !btn });
 
     // 식 안에서 상자를 열어 무엇이 들어 있었는지 보여 준다
-    [a, b].forEach((t) => t.mark && t.el.classList.add('open'));
-    this.ansBox.classList.remove('active');
-    this.ansBox.classList.add(ok ? 'right' : 'wrong');
-    this.ansBox.textContent = btn ? String(v) : '?';
-    this.btns.forEach((x) => {
+    [first, second].forEach((t) => t.mark && t.el.classList.add('open'));
+    this.answerBox.classList.remove('active');
+    this.answerBox.classList.add(ok ? 'right' : 'wrong');
+    this.answerBox.textContent = btn ? String(value) : '?';
+    this.optionButtons.forEach((x) => {
       x.disabled = true;
       if (Number(x.textContent) === ans) x.classList.add(ok ? 'right' : 'answer');
     });
     if (!ok && btn) btn.classList.add('wrong');
-    const d = this.progress.children[this.round];
-    d.classList.remove('cur');
-    d.classList.add(ok ? 'right' : 'wrong');
+    Progress.mark(this.progress, this.round, ok);
 
     if (ok) {
       this.correct++;
-      U.say(this.msg, '정답!', 'good');
-      this.h.award((this.h.base * this.h.mult) / CoverGame.ROUNDS, this.ansBox);
-      this.h.sfx('good');
+      U.say(this.message, '정답!', 'good');
+      this.host.award(pointsPer(this.host, CoverGame.ROUNDS), this.answerBox);
+      this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.msg, `${btn ? '' : '시간 초과 · '}${a.v} + ${b.v} = ${ans}`, 'bad');
-      this.h.sfx('bad');
+      U.say(this.message, `${btn ? '' : '시간 초과 · '}${first.v} + ${second.v} = ${ans}`, 'bad');
+      this.host.sfx(Sfx.BAD);
     }
     this.round++;
     // 마지막 문제는 숫자를 제자리로 돌려보내지 않고 바로 끝낸다
-    if (this.round >= CoverGame.ROUNDS) return this.h.after(ok ? 700 : 1300, () => this.finish());
-    this.h.after(ok ? 650 : 1300, () => this.putBack());
+    if (this.round >= CoverGame.ROUNDS) return this.host.after(ok ? 700 : 1300, () => this.finish());
+    this.host.after(ok ? 650 : 1300, () => this.putBack());
   }
 
   // 상자를 닫으며 두 숫자를 제자리로 돌려보낸다
   putBack() {
-    const { a, b } = this.q;
-    this.opts.innerHTML = '';
-    this.ansBox.className = 'cv-ans';
-    this.ansBox.textContent = '?';
-    U.say(this.msg, '', '');
-    [a, b].forEach((t) => {
+    const { first, second } = this.question;
+    this.optionRow.innerHTML = '';
+    this.answerBox.className = 'cv-ans';
+    this.answerBox.textContent = '?';
+    U.say(this.message, '', '');
+    [first, second].forEach((t) => {
       t.at = null;
       t.el.classList.remove('open');
     });
     this.layout();
-    this.h.after(CoverGame.FLY_MS, () => {
-      [a, b].forEach((t) => {
+    this.host.after(CoverGame.FLY_MS, () => {
+      [first, second].forEach((t) => {
         t.el.classList.remove('away');
         t.home.classList.remove('empty');
       });
-      this.h.after(120, () => this.ask());
+      this.host.after(120, () => this.ask());
     });
   }
 
   finish() {
-    this.ro.disconnect();
-    this.h.done(this.result());
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === CoverGame.ROUNDS, correct: this.correct, total: CoverGame.ROUNDS };
+    return resultOf(this.correct, CoverGame.ROUNDS);
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    this.ro.disconnect();
-    return { cleared: false, correct: this.correct, total: this.round };
+    this.resizeObserver.disconnect();
+    return abortedResult(this.correct, this.round);
   }
 
   // ---- 판 만들기 ----
@@ -305,28 +308,28 @@ export class CoverGame {
   static deal({ n, hidden }) {
     const vals = U.shuffle(Array.from({ length: CoverGame.HI - CoverGame.LO + 1 }, (_, i) => CoverGame.LO + i)).slice(0, n);
     const marks = U.shuffle([...COVER_MARKS]);
-    return U.shuffle(vals.map((v, i) => ({ v, mark: i < hidden ? marks[i] : null, asks: 0 })));
+    return U.shuffle(vals.map((value, i) => ({ v: value, mark: i < hidden ? marks[i] : null, asks: 0 })));
   }
 
   // ---- 보기 ----
   // 오답 보기는 실제로 하기 쉬운 실수에서 먼저 고른다: 상자 속 숫자를 다른 상자의 숫자와 바꿔 기억했을 때의 합.
   // 나머지는 정답 가까이의 값으로 채운다. ±1 을 늘 같이 넣으면 '가운데 것'만 고르면 되므로 거리를 섞어 뽑는다.
   // 화면에는 작은 값부터 늘어놓는다.
-  static options(a, b, toks, k) {
-    const ans = a.v + b.v;
+  static options(first, second, toks, k) {
+    const ans = first.v + second.v;
     const hid = toks.filter((t) => t.mark).map((t) => t.v);
     const out = new Set([ans]);
     const mixups = [];
-    for (const [x, y] of [[a, b], [b, a]]) {
-      if (x.mark) hid.forEach((h) => h !== x.v && h !== y.v && mixups.push(h + y.v));
+    for (const [x, y] of [[first, second], [second, first]]) {
+      if (x.mark) hid.forEach((other) => other !== x.v && other !== y.v && mixups.push(other + y.v));
     }
-    for (const m of U.shuffle(mixups)) {
+    for (const mixup of U.shuffle(mixups)) {
       if (out.size >= k - 1) break; // 가까운 값 하나는 남겨 둔다
-      out.add(m);
+      out.add(mixup);
     }
-    for (const d of U.shuffle([-3, -2, -1, 1, 2, 3])) {
+    for (const delta of U.shuffle([-3, -2, -1, 1, 2, 3])) {
       if (out.size >= k) break;
-      if (ans + d >= CoverGame.LO) out.add(ans + d);
+      if (ans + delta >= CoverGame.LO) out.add(ans + delta);
     }
     return [...out].sort((x, y) => x - y);
   }

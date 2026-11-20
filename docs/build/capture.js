@@ -83,7 +83,7 @@ const HELPERS = `
     await shot('band-ok', BAND);
     await page.eval(`(async () => {
       const g = App.current.game;
-      for (let i = g.k; i < g.path.length; i++) { const [r, c] = g.path[i]; __tap(g.cells[r][c]); await new Promise(r => setTimeout(r, 120)); }
+      for (let i = g.nextStep; i < g.path.length; i++) { const [r, c] = g.path[i]; __tap(g.cells[r][c]); await new Promise(r => setTimeout(r, 120)); }
       return true; })()`);
     await sleep(300);
     await shot('06-path-clear');
@@ -93,7 +93,7 @@ const HELPERS = `
     await page.waitFor(`document.querySelector('.memorize-banner')`);
     await sleep(300);
     await shot('07-symbol-banner');
-    await page.waitFor(`document.querySelectorAll('.sym-grid .sym').length === App.current.game.n`);
+    await page.waitFor(`document.querySelectorAll('.sym-grid .sym').length === App.current.game.symbolCount`);
     await sleep(300);
     await shot('08-symbol-show');
     await page.waitFor(`App.current.game.phase === 'input'`);
@@ -112,12 +112,12 @@ const HELPERS = `
     // 사칙연산 역산 (페달을 느리게 밟아 구역 이탈도 함께 보여준다)
     await page.waitFor(`App.current && App.current.T.id === 'arith' && App.current.game.phase === 'input'`, 15000);
     await page.eval(`__pedalAt(640); (() => { const g = App.current.game;
-      __tap(g.btns.find(b => Number(b.textContent) === g.p.sol[0])); return true; })()`);
+      __tap(g.candidateButtons.find(b => Number(b.textContent) === g.puzzle.sol[0])); return true; })()`);
     await sleep(3200);
     await shot('11-arith-slow');
     await shot('band-slow', BAND);
     await page.eval(`(() => { const g = App.current.game;
-      g.p.sol.slice(1).forEach(v => __tap(g.btns.find(b => Number(b.textContent) === v))); return true; })()`);
+      g.puzzle.sol.slice(1).forEach(v => __tap(g.candidateButtons.find(b => Number(b.textContent) === v))); return true; })()`);
     await sleep(250);
     await page.eval(`__pedalAt(400); true`);
     await shot('12-arith-right');

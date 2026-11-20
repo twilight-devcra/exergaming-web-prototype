@@ -19,20 +19,23 @@
 //   show — 그림 하나를 보여 주는 시간(ms). 그림 사이에는 GAP_MS 동안 빈 카드가 보인다
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase } from './kit.js';
 
 const STAR = Array.from({ length: 10 }, (_, i) => {
-  const a = ((-90 + i * 36) * Math.PI) / 180;
+  const angle = ((-90 + i * 36) * Math.PI) / 180;
   const rad = i % 2 ? 19 : 46;
-  return `${(50 + Math.cos(a) * rad).toFixed(1)},${(54 + Math.sin(a) * rad).toFixed(1)}`;
+  return `${(50 + Math.cos(angle) * rad).toFixed(1)},${(54 + Math.sin(angle) * rad).toFixed(1)}`;
 }).join(' ');
 
 // 모양 (100×100). 칠하는 속성은 f 로 받는다
 const SHAPES = [
-  { id: 'circle', name: '동그라미', d: (f) => `<circle cx="50" cy="50" r="40" ${f}/>` },
-  { id: 'triangle', name: '세모', d: (f) => `<polygon points="50,10 92,86 8,86" ${f}/>` },
-  { id: 'square', name: '네모', d: (f) => `<rect x="13" y="13" width="74" height="74" rx="9" ${f}/>` },
-  { id: 'star', name: '별', d: (f) => `<polygon points="${STAR}" ${f}/>` },
-  { id: 'heart', name: '하트', d: (f) => `<path d="M50 89 L13 53 A21 21 0 0 1 50 22 A21 21 0 0 1 87 53 Z" ${f}/>` },
+  { id: 'circle', name: '동그라미', d: (attrs) => `<circle cx="50" cy="50" r="40" ${attrs}/>` },
+  { id: 'triangle', name: '세모', d: (attrs) => `<polygon points="50,10 92,86 8,86" ${attrs}/>` },
+  { id: 'square', name: '네모', d: (attrs) => `<rect x="13" y="13" width="74" height="74" rx="9" ${attrs}/>` },
+  { id: 'star', name: '별', d: (attrs) => `<polygon points="${STAR}" ${attrs}/>` },
+  { id: 'heart', name: '하트', d: (attrs) => `<path d="M50 89 L13 53 A21 21 0 0 1 50 22 A21 21 0 0 1 87 53 Z" ${attrs}/>` },
 ];
 const COUNTS = [
   { id: 1, name: '하나' },
@@ -55,7 +58,7 @@ let uid = 0;
 // 그러데이션 정의. 그림(svg)마다 따로 넣고 id 가 겹치지 않게 번호를 붙인다
 function holoDefs() {
   const id = `rc${++uid}`;
-  const stops = HOLO.map((c, i) => `<stop offset="${i / (HOLO.length - 1)}" stop-color="${c}"/>`).join('');
+  const stops = HOLO.map((hue, i) => `<stop offset="${i / (HOLO.length - 1)}" stop-color="${hue}"/>`).join('');
   return {
     id,
     defs: `<defs><linearGradient id="${id}-h" x1="0" y1="0" x2="1" y2="1">${stops}</linearGradient>` +
@@ -64,12 +67,12 @@ function holoDefs() {
   };
 }
 // 모양 하나: 무지갯빛 바탕 + 테두리, 그 위에 윤기
-const paintShape = (s, id, w = 4.5) =>
-  s.d(`fill="url(#${id}-h)" stroke="${EDGE}" stroke-width="${w}" stroke-linejoin="round"`) + s.d(`fill="url(#${id}-g)"`);
+const paintShape = (shape, id, strokeWidth = 4.5) =>
+  shape.d(`fill="url(#${id}-h)" stroke="${EDGE}" stroke-width="${strokeWidth}" stroke-linejoin="round"`) + shape.d(`fill="url(#${id}-g)"`);
 
 export class RecallGame {
   static id = 'recall';
-  static tags = ['memory']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.MEMORY];
   static title = '차례대로 외우기';
   static hint(level) {
     return RecallGame.levels[(level || 1) - 1].p > 1
@@ -109,174 +112,176 @@ export class RecallGame {
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = RecallGame.levels[host.level - 1];
-    this.p = RecallGame.make(this.spec);
-    this.phase = 'show';
+    this.puzzle = RecallGame.make(this.spec);
+    this.phase = Phase.SHOW;
     this.picked = [];
   }
 
   start() {
-    const { stage, level } = this.h;
-    const { p } = this;
-    this.msg = U.el('div', 'stage-msg', '');
-    this.body = U.frame(stage, `${RecallGame.title} · Lv.${level}`, this.msg).body;
+    const { stage, level } = this.host;
+    const { puzzle } = this;
+    this.message = U.el('div', 'stage-msg', '');
+    this.body = U.frame(stage, `${RecallGame.title} · Lv.${level}`, this.message).body;
     this.wrap = U.el('div', 'rc-wrap');
     // 보여 줄 때: 카드와 그 아래 몇 번째인지 알려 주는 점. 답할 때: 칸 줄과 보기 단추
     this.show = U.el('div', 'rc-show');
-    const { w, h } = RecallGame.CARD;
-    this.card = U.el('div', 'rc-card', `<svg viewBox="0 0 ${w} ${h}"></svg>`);
+    const { w: cardW, h: cardH } = RecallGame.CARD;
+    this.card = U.el('div', 'rc-card', `<svg viewBox="0 0 ${cardW} ${cardH}"></svg>`);
     this.cardSvg = this.card.firstChild;
-    this.steps = U.el('div', 'rc-steps', p.items.map(() => '<span></span>').join(''));
+    this.steps = U.el('div', 'rc-steps', puzzle.items.map(() => '<span></span>').join(''));
     this.show.append(this.card, this.steps);
     this.slots = U.el('div', 'rc-slots');
-    this.opts = U.el('div', 'ar-cands rc-opts');
+    this.optionRow = U.el('div', 'ar-cands rc-opts');
     this.wrap.append(this.show);
     this.body.append(this.wrap);
-    this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(this.body);
+    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver.observe(this.body);
     this.layout();
 
     const banner = U.el('div', 'memorize-banner', '외우세요!');
     this.card.append(banner);
     // '모양·개수를 차례대로 외우세요' — 조사는 마지막 이름을 따른다
-    const keys = PROP_ORDER.filter((k) => p.props.includes(k));
+    const keys = PROP_ORDER.filter((k) => puzzle.props.includes(k));
     const what = [...keys.slice(0, -1).map((k) => PROPS[k].name), PROPS[keys[keys.length - 1]].obj].join('·');
-    this.h.after(1100, () => {
+    this.host.after(1100, () => {
       banner.remove();
-      U.say(this.msg, `${what} 차례대로 외우세요`, 'look');
+      U.say(this.message, `${what} 차례대로 외우세요`, 'look');
       this.play(0);
     });
   }
 
   // i 번째 그림을 보여 주고, GAP_MS 쉰 뒤 다음 그림. 다 보여 주면 묻는다
   play(i) {
-    const { p } = this;
+    const { puzzle } = this;
     const dots = [...this.steps.children];
-    if (i >= p.items.length) {
-      dots.forEach((d) => d.classList.remove('on'));
-      this.h.after(350, () => this.ask());
+    if (i >= puzzle.items.length) {
+      dots.forEach((dot) => dot.classList.remove('on'));
+      this.host.after(350, () => this.ask());
       return;
     }
-    dots.forEach((d, j) => {
-      d.classList.toggle('on', j === i);
-      d.classList.toggle('past', j < i);
+    dots.forEach((dot, j) => {
+      dot.classList.toggle('on', j === i);
+      dot.classList.toggle('past', j < i);
     });
-    const it = p.items[i];
-    const { w, h } = RecallGame.CARD;
+    const it = puzzle.items[i];
+    const { w: cardW, h: cardH } = RecallGame.CARD;
     // 개수가 바뀌는 판은 셋이 한 줄에 들어가는 크기로, 아니면 하나를 크게 그린다 (한 판 안에서는 크기가 늘 같다)
-    const size = p.props.includes('count') ? 84 : 130;
-    this.cardSvg.innerHTML = `<g class="rc-fig">${RecallGame.objectSvg(it.shape, it.count, w / 2, h / 2, size, 94)}</g>`;
-    this.h.sfx('blink');
-    this.h.after(this.spec.show, () => {
+    const size = puzzle.props.includes('count') ? 84 : 130;
+    this.cardSvg.innerHTML = `<g class="rc-fig">${RecallGame.objectSvg(it.shape, it.count, cardW / 2, cardH / 2, size, 94)}</g>`;
+    this.host.sfx(Sfx.BLINK);
+    this.host.after(this.spec.show, () => {
       this.cardSvg.innerHTML = '';
-      this.h.after(RecallGame.GAP_MS, () => this.play(i + 1));
+      this.host.after(RecallGame.GAP_MS, () => this.play(i + 1));
     });
   }
 
   ask() {
-    const { p } = this;
-    this.phase = 'input';
+    const { puzzle } = this;
+    this.phase = Phase.INPUT;
     this.show.remove();
-    this.wrap.append(this.slots, this.opts);
-    this.slotEls = p.items.map((_, i) => {
-      const s = U.el('div', 'rc-slot', `<span class="rc-num">${i + 1}</span>`);
-      this.slots.append(s);
-      return s;
+    this.wrap.append(this.slots, this.optionRow);
+    this.slotEls = puzzle.items.map((_, i) => {
+      const slot = U.el('div', 'rc-slot', `<span class="rc-num">${i + 1}</span>`);
+      this.slots.append(slot);
+      return slot;
     });
     this.slotEls[0].classList.add('active');
-    this.btns = p.pool.map((v) => {
-      const btn = U.el('button', `ar-cand rc-opt rc-${p.ask}`);
-      RecallGame.fillValue(btn, p.ask, v);
-      btn.addEventListener('pointerdown', () => this.pick(v, btn));
-      this.opts.append(btn);
-      return { v, btn };
+    this.optionButtons = puzzle.pool.map((value) => {
+      const btn = U.el('button', `ar-cand rc-opt rc-${puzzle.ask}`);
+      RecallGame.fillValue(btn, puzzle.ask, value);
+      btn.addEventListener('pointerdown', () => this.pick(value, btn));
+      this.optionRow.append(btn);
+      return { v: value, btn };
     });
-    U.say(this.msg, `${PROPS[p.ask].obj} 나온 차례대로 누르세요`, 'act');
+    U.say(this.message, `${PROPS[puzzle.ask].obj} 나온 차례대로 누르세요`, 'act');
     this.layout();
-    this.h.question({
-      props: p.props, ask: p.ask, pool: p.pool,
-      items: p.items.map((it) => [it.shape, it.count]), // [모양, 개수] 나온 차례대로
-      ans: p.ans,
+    this.host.question({
+      props: puzzle.props, ask: puzzle.ask, pool: puzzle.pool,
+      items: puzzle.items.map((it) => [it.shape, it.count]), // [모양, 개수] 나온 차례대로
+      ans: puzzle.ans,
     });
     // 일의 양 = 눌러야 할 칸 수
-    this.h.timer(p.items.length, () => this.judge(true));
+    this.host.timer(puzzle.items.length, () => this.judge(true));
   }
 
-  pick(v, btn) {
-    if (this.phase !== 'input') return;
+  pick(value, btn) {
+    if (this.phase !== Phase.INPUT) return;
     const i = this.picked.length;
-    this.picked.push(v);
-    this.h.input({ slot: i, picked: v });
-    const s = this.slotEls[i];
-    s.classList.remove('active');
-    s.classList.add('filled', `rc-${this.p.ask}`);
-    RecallGame.fillValue(s, this.p.ask, v, true);
+    this.picked.push(value);
+    this.host.input({ slot: i, picked: value });
+    const slotEl = this.slotEls[i];
+    slotEl.classList.remove('active');
+    slotEl.classList.add('filled', `rc-${this.puzzle.ask}`);
+    RecallGame.fillValue(slotEl, this.puzzle.ask, value, true);
     btn.classList.remove('tapped');
     void btn.offsetWidth;
     btn.classList.add('tapped');
-    if (this.picked.length >= this.p.items.length) this.judge(false);
+    if (this.picked.length >= this.puzzle.items.length) this.judge(false);
     else this.slotEls[i + 1].classList.add('active');
   }
 
   // 다 채웠거나 시간이 다 됐다. 칸마다 맞았는지 보여 주고, 틀린 칸 아래에는 정답을 적는다
   judge(timedOut) {
-    if (this.phase !== 'input') return;
-    this.phase = 'end';
-    this.h.stopTimer();
-    const { p } = this;
-    const n = p.items.length;
-    this.btns.forEach((b) => (b.btn.disabled = true));
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.END;
+    this.host.stopTimer();
+    const { puzzle } = this;
+    const n = puzzle.items.length;
+    this.optionButtons.forEach((b) => (b.btn.disabled = true));
     this.hits = 0;
-    this.slotEls.forEach((s, i) => {
-      s.classList.remove('active');
-      const ok = this.picked[i] === p.ans[i];
-      s.classList.add(ok ? 'right' : 'wrong');
-      s.append(U.el('span', 'mark', ok ? '✓' : '✕'));
+    this.slotEls.forEach((slotEl, i) => {
+      slotEl.classList.remove('active');
+      const ok = this.picked[i] === puzzle.ans[i];
+      slotEl.classList.add(ok ? 'right' : 'wrong');
+      slotEl.append(U.el('span', 'mark', ok ? '✓' : '✕'));
       if (ok) {
         this.hits++;
       } else {
-        const fix = U.el('div', `rc-fix rc-${p.ask}`);
-        RecallGame.fillValue(fix, p.ask, p.ans[i], true);
-        s.append(fix);
+        const fix = U.el('div', `rc-fix rc-${puzzle.ask}`);
+        RecallGame.fillValue(fix, puzzle.ask, puzzle.ans[i], true);
+        slotEl.append(fix);
       }
     });
     const ok = this.hits === n;
     this.cleared = ok;
     // 맞힌 칸 수만큼 한 번에 준다 (칸마다 따로 띄우면 점수 글자가 겹친다)
-    if (this.hits) this.h.award((this.h.base * this.h.mult * this.hits) / n, this.slots);
-    this.h.answer({ picked: [...this.picked], hits: this.hits, of: n, correct: ok, timedOut });
+    if (this.hits) this.host.award((this.host.base * this.host.mult * this.hits) / n, this.slots);
+    this.host.answer({ picked: [...this.picked], hits: this.hits, of: n, correct: ok, timedOut });
     if (ok) {
-      U.say(this.msg, '정답!', 'good');
-      this.h.sfx('good');
+      U.say(this.message, '정답!', 'good');
+      this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.msg, timedOut ? '시간 초과 · 아래가 정답이에요' : `${n}개 중 ${this.hits}개를 맞혔어요`, 'bad');
-      this.h.sfx('bad');
+      U.say(this.message, timedOut ? '시간 초과 · 아래가 정답이에요' : `${n}개 중 ${this.hits}개를 맞혔어요`, 'bad');
+      this.host.sfx(Sfx.BAD);
     }
     this.layout();
-    this.h.after(ok ? 1100 : 2400, () => this.finish());
+    this.host.after(ok ? 1100 : 2400, () => this.finish());
   }
 
   layout() {
-    const s = this.body;
-    const W = s.clientWidth;
-    const H = s.clientHeight;
-    if (this.phase === 'show') {
+    const body = this.body;
+    const availW = body.clientWidth;
+    const availH = body.clientHeight;
+    if (this.phase === Phase.SHOW) {
       const ar = RecallGame.CARD.w / RecallGame.CARD.h;
-      const w = Math.max(200, Math.min(W - 32, (H - 40) * ar, 520));
-      this.card.style.width = `${w}px`;
-      this.card.style.height = `${w / ar}px`;
+      const cardWidth = Math.max(200, Math.min(availW - 32, (availH - 40) * ar, 520));
+      this.card.style.width = `${cardWidth}px`;
+      this.card.style.height = `${cardWidth / ar}px`;
       return;
     }
     // 칸: 한 줄에 n 칸. 높이는 너비의 1.15배이고, 아래에 틀린 칸의 정답을 적을 자리(너비의 0.55)를 둔다.
     // 좁은 화면(휴대폰)에서 칸이 너무 작아지면 두 줄로 나눈다
-    const n = this.p.items.length;
-    const optH = this.opts.offsetHeight || 104;
-    const gap = Math.min(18, W * 0.03); // 맞음·틀림 고리(칸 밖 4px)가 옆 칸에 닿지 않게
+    const n = this.puzzle.items.length;
+    const optH = this.optionRow.offsetHeight || 104;
+    const gap = Math.min(18, availW * 0.03); // 맞음·틀림 고리(칸 밖 4px)가 옆 칸에 닿지 않게
     const fit = (cols, rows) => Math.min(
-      (W - 24 - gap * (cols - 1)) / cols,
-      (H - optH - U.gapOf(this.wrap, 28) - 20 - gap * (rows - 1)) / ((1.15 + 0.55) * rows),
+      (availW - 24 - gap * (cols - 1)) / cols,
+      (availH - optH - U.gapOf(this.wrap, 28) - 20 - gap * (rows - 1)) / ((1.15 + 0.55) * rows),
       112);
     let cols = n;
     let sz = fit(n, 1);
@@ -291,25 +296,25 @@ export class RecallGame {
   }
 
   finish() {
-    this.ro.disconnect();
-    this.h.done(this.result());
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
-    return { cleared: !!this.cleared, correct: this.hits || 0, total: this.p.items.length };
+    return { cleared: !!this.cleared, correct: this.hits || 0, total: this.puzzle.items.length };
   }
 
   // 점수는 채점할 때 주므로 중단될 때 따로 줄 것이 없다
   abort() {
-    const answered = this.phase === 'end';
-    this.phase = 'end';
-    this.ro.disconnect();
-    return { cleared: false, correct: this.hits || 0, total: answered ? this.p.items.length : 0 };
+    const answered = this.phase === Phase.END;
+    this.phase = Phase.END;
+    this.resizeObserver.disconnect();
+    return { cleared: false, correct: this.hits || 0, total: answered ? this.puzzle.items.length : 0 };
   }
 
   // ---- 그리기 ----
 
-  static shape(id) { return SHAPES.find((s) => s.id === id); }
+  static shape(id) { return SHAPES.find((entry) => entry.id === id); }
 
   // (cx, cy) 가운데에 모양 k 개를 한 줄로. size = 하나의 크기, step = 가운데 사이 거리. 그러데이션 정의도 함께 돌려준다
   static objectSvg(shape, k, cx, cy, size, step) {
@@ -320,19 +325,19 @@ export class RecallGame {
 
   // 보기 단추·칸에 값 하나를 그린다: 모양은 그 모양(카드와 같은 무지갯빛)과 이름을, 개수는 점과 이름을.
   // keep = 칸 번호·표시(.rc-num, .mark, .rc-fix)는 남긴다
-  static fillValue(el, prop, v, keep = false) {
-    if (keep) [...el.children].forEach((c) => !c.matches('.rc-num, .mark, .rc-fix') && c.remove());
+  static fillValue(el, prop, value, keep = false) {
+    if (keep) [...el.children].forEach((child) => !child.matches('.rc-num, .mark, .rc-fix') && child.remove());
     else el.innerHTML = '';
     let ico;
     let name;
     if (prop === 'shape') {
-      const s = RecallGame.shape(v);
+      const shape = RecallGame.shape(value);
       const { id, defs } = holoDefs();
-      ico = `<svg class="rc-ico" viewBox="0 0 100 100">${defs}${paintShape(s, id, 6)}</svg>`;
-      name = s.name;
+      ico = `<svg class="rc-ico" viewBox="0 0 100 100">${defs}${paintShape(shape, id, 6)}</svg>`;
+      name = shape.name;
     } else {
-      ico = `<span class="rc-dots">${'<i></i>'.repeat(v)}</span>`;
-      name = COUNTS.find((c) => c.id === v).name;
+      ico = `<span class="rc-dots">${'<i></i>'.repeat(value)}</span>`;
+      name = COUNTS.find((count) => count.id === value).name;
     }
     el.insertAdjacentHTML('beforeend', `<span class="rc-val">${ico}<span class="rc-name">${name}</span></span>`);
   }
@@ -352,10 +357,10 @@ export class RecallGame {
     const props = shuffle([...PROP_ORDER]).slice(0, spec.p);
     const ask = pick(props);
     // 성질마다 쓸 값: 바뀌는 성질은 모양 vals 가지 · 개수 셋 모두, 바뀌지 않는 성질은 하나 (개수는 하나)
-    const shapes = SHAPES.map((s) => s.id);
+    const shapes = SHAPES.map((shape) => shape.id);
     const pools = {
       shape: shuffle([...shapes]).slice(0, props.includes('shape') ? spec.vals : 1),
-      count: props.includes('count') ? COUNTS.map((c) => c.id) : [1],
+      count: props.includes('count') ? COUNTS.map((count) => count.id) : [1],
     };
     // 한 값이 나오는 횟수의 상한: 그림 수의 절반 (올림). 둘이면 서로 다르다
     const cap = Math.ceil(n / 2);
@@ -371,7 +376,7 @@ export class RecallGame {
       };
       if (!props.every(okProp)) continue;
       // 보기 단추는 값의 정해진 차례로 (모양 표의 차례, 개수는 작은 것부터) — 단추 자리로 외우지 않게 늘 같은 차례다
-      const order = PROPS[ask].values.map((v) => v.id);
+      const order = PROPS[ask].values.map((option) => option.id);
       const pool = pools[ask].slice().sort((a, b) => order.indexOf(a) - order.indexOf(b));
       return { props, ask, pool, items, ans: items.map((it) => it[ask]) };
     }

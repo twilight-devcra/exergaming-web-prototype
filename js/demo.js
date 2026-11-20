@@ -2,16 +2,19 @@
 // 흐름: 대기 화면 → (회원 로그인 → 세션 설정, app/members.js) → 속도 측정 → 라운드 → 결과 → 길게 눌러 초기화 → 대기 화면
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
 // 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '라운드 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
-import { BASE_LEVEL, PRESET_KEYS, ROUND_PRESETS, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_TRACKS, SESSION_DEFAULT, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, U } from './config.js';
+// 운영 메뉴(PIN · 라운드 설정 · 업로드 · 기록 내려받기)는 app/operator-menu.js 에 있다.
+import { BASE_LEVEL, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_TRACKS, SESSION_DEFAULT, Config, $, U } from './config.js';
 import { Exercise } from './exercise.js';
 import { Fx } from './fx.js';
-import { ABILITIES } from './abilities.js';
 import { GAME_TYPES } from './games/index.js';
 import { SessionStore } from './session-log.js';
 import { SessionUpload } from './session-upload.js';
+import { RoundStats } from './round-stats.js';
+import { RoundReport } from './round-report.js';
 import { AttractVisual } from '../app/attract-visual.js';
 import { CalibVisual } from '../app/calib-visual.js';
 import { MemberUI } from '../app/members.js';
+import { OperatorMenu } from '../app/operator-menu.js';
 
 export const Demo = {
   IDLE_SEC: 40,          // 라운드 중 페달도 터치도 없이 이만큼 지나면 '아직 하고 계신가요?'
@@ -21,9 +24,7 @@ export const Demo = {
   PEDAL_START_SEC: 2.5,  // 대기 화면에서 이만큼 계속 밟으면 시작
   ATTRACT_LOCK_SEC: 4,   // 대기 화면이 뜬 직후에는 페달로 시작하지 않는다 (앞 참가자가 아직 밟고 있을 수 있다)
   RPM_ACTIVE: 10,        // 이보다 빠르면 '밟고 있다'로 본다
-  CORNER_HOLD_MS: 2000,  // 운영 메뉴: 왼쪽 위 모서리를 이만큼 누르고 있으면 PIN 입력
   NEXT_HOLD_MS: 500,    // 결과 화면의 '다음 참가자'를 이만큼 누르고 있어야 넘어간다 (참가자가 실수로 지우지 않게)
-  PIN_TIMEOUT_MS: 20000,
   END_ASK_SEC: 30,       // '그만하기' 확인 창에 이만큼 답이 없으면 그대로 마친다 (누르고 자리를 떠난 경우)
   LOG_MAX: 1000,
 
@@ -32,10 +33,10 @@ export const Demo = {
   allowKbd: false,  // 페달 없이 A/D 키로 시작할 수 있게 한다 (점검용). app/?kbd 또는 운영 메뉴에서 켠다. 저장하지 않으므로 새로고침하면 꺼진다
   simResult: false, // 시작하면 라운드 없이 가상 성적으로 바로 결과 화면을 연다 (흐름 점검용). 저장하지 않는다
   kiosk: false,     // 운영 메뉴를 한 번 닫은 뒤부터 전체 화면·화면 꺼짐 방지를 유지한다
-  opOpen: false,
+  menu: null,       // 운영 메뉴 (app/operator-menu.js). menu.isOpen · menu.pinOpen 이면 게임을 멈춘다
   endOpen: false,   // '그만하기' 확인 창이 열려 있다 (게임은 멈춤)
-  pinOpen: false,
-  leaving: false,
+  leaving: false,   // 파일을 내려받는 중이라 beforeunload 경고를 띄우지 않는다
+  storeError: '',   // 세션 로그를 마지막으로 저장하지 못한 까닭 (운영 메뉴에 보인다)
   activeAt: 0,      // 마지막으로 페달을 밟거나 화면을 누른 게임 시계 시각 (ms)
   attractAt: 0,
   prevState: null,
@@ -53,16 +54,21 @@ export const Demo = {
     this.calibVisual = CalibVisual.init();
     // 운영 버전: QR 회원 (app/members.js). 대기 화면 → 로그인 → 기록 → 세션 설정
     this.members = MemberUI.init(this, app);
-    this.bindOp();
+    // 운영 메뉴: ⚙ 버튼·모서리 길게 누르기 → PIN → 메뉴 (app/operator-menu.js)
+    this.menu = OperatorMenu.init(this, app);
     this.bindEnd();
     this.bindSetup();
-    this.bindUpload();
-    this.bindPin();
     this.bindHolds();
     this.bindGuards();
     // 대기 화면에서 시작된 터치만 시작으로 친다. 결과 화면의 '다음 참가자'를 길게 누르고 손을 떼면
     // 터치는 그 자리(이제 대기 화면)에 click 을 만들어서, 그대로 두면 바로 다음 판이 시작돼 버린다.
     let pressed = false;
+    // 대기 화면의 '페달 연결' 버튼을 누른 것은 시작으로 치지 않는다
+    const pedalButton = $('#att-pedal');
+    if (pedalButton) {
+      pedalButton.addEventListener('pointerdown', (e) => e.stopPropagation());
+      pedalButton.addEventListener('click', (e) => e.stopPropagation());
+    }
     $('#attract').addEventListener('pointerdown', () => (pressed = true));
     $('#attract').addEventListener('click', () => {
       if (pressed) this.start();
@@ -138,7 +144,7 @@ export const Demo = {
   // 운영 버전은 먼저 세션 설정 화면에서 시간과 난이도를 고른다
   start(via = 'tap') {
     const a = this.app;
-    if (a.state !== 'attract' || this.opOpen || this.pinOpen || !this.canStart()) return;
+    if (a.state !== 'attract' || this.menu.isOpen || this.menu.pinOpen || !this.canStart()) return;
     this.enterKiosk();
     if (this.simResult) return this.simulateRound();
     if (this.members) return this.members.openLogin(via);
@@ -202,7 +208,7 @@ export const Demo = {
     });
     $('#su-back').onclick = () => this.app.show('attract');
     $('#su-go').onclick = () => {
-      if (this.app.state !== 'setup' || this.opOpen || this.pinOpen) return;
+      if (this.app.state !== 'setup' || this.menu.isOpen || this.menu.pinOpen) return;
       this.beginRound(this.setupVia, this.setup);
     };
   },
@@ -242,53 +248,13 @@ export const Demo = {
       (track === 'brain' ? '두뇌 게임만, 바로 시작합니다' : '페달 속도를 잰 뒤 시작합니다');
   },
 
-  // ---------------- 자동 업로드 (js/session-upload.js) ----------------
-  bindUpload() {
-    SessionUpload.onChange = (state, set) => {
-      const el = $('#op-up-state');
-      if (el) el.textContent = SessionUpload.describe(state, set);
-    };
-    SessionUpload.init();
-    if (!$('#op-up-url')) return;
-    const hist = $('#op-up-hist');
-    const local = $('#op-up-local');
-    const save = () => {
-      SessionUpload.setSettings({
-        url: $('#op-up-url').value, key: $('#op-up-key').value, historyUrl: hist ? hist.value : '',
-        ...(local ? { localHistory: local.checked } : {}),
-      });
-      if (hist && local) hist.disabled = local.checked;
-    };
-    $('#op-up-url').addEventListener('change', save);
-    $('#op-up-key').addEventListener('change', save);
-    if (hist) hist.addEventListener('change', save);
-    if (local) local.addEventListener('change', save);
-    $('#op-up-now').onclick = () => {
-      save();
-      SessionUpload.kick();
-    };
-  },
-
-  renderUpload() {
-    if (!$('#op-up-url')) return;
-    const { url, key, historyUrl, localHistory } = SessionUpload.settings();
-    $('#op-up-url').value = url;
-    $('#op-up-key').value = key;
-    if ($('#op-up-hist')) $('#op-up-hist').value = historyUrl;
-    if ($('#op-up-local')) {
-      $('#op-up-local').checked = localHistory;
-      if ($('#op-up-hist')) $('#op-up-hist').disabled = localHistory;
-    }
-    SessionUpload.refresh();
-  },
-
   // 라운드를 돌리지 않고 그럴듯한 성적을 채워 결과 화면을 연다. 참가 번호를 쓰지 않고 기록에도 남기지 않는다.
   simulateRound() {
     const a = this.app;
     const cfg = a.cfg;
     const R = U.randInt;
     const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
-    a.stats = {};
+    a.roundStats = new RoundStats(GAME_TYPES); // 게임별 성적을 아래에서 가상 값으로 바꿔 넣는다
     a.brainOnly = false;
     let cog = 0;
     for (const T of GAME_TYPES) {
@@ -298,7 +264,7 @@ export const Demo = {
       cog += points;
       const level = R(BASE_LEVEL, BASE_LEVEL + 3);
       const runs = level > BASE_LEVEL ? [[level - 1, Math.ceil(correct / 2), Math.ceil(total / 2)], [level, Math.floor(correct / 2), Math.floor(total / 2)]] : [[level, correct, total]];
-      a.stats[T.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * R(4000, 12000) };
+      a.roundStats.games[T.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * R(4000, 12000) };
     }
     a.exScore = Math.round(exMax * R(55, 95) / 100);
     a.cogScore = cog;
@@ -328,7 +294,7 @@ export const Demo = {
         this.pedalHold = 0;
       }
       if (this.preview) this.preview.tick(dt, rpm);
-      const ready = (a.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.opOpen && this.canStart();
+      const ready = (a.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.menu.isOpen && this.canStart();
       this.pedalHold = ready && rpm > this.RPM_ACTIVE ? this.pedalHold + dt : Math.max(0, this.pedalHold - dt);
       if (this.pedalHold >= this.PEDAL_START_SEC) this.start('pedal');
     } else if (a.state === 'setup') {
@@ -359,7 +325,7 @@ export const Demo = {
 
   openEnd() {
     const a = this.app;
-    if (!a.inRound || this.endOpen || this.opOpen) return;
+    if (!a.inRound || this.endOpen || this.menu.isOpen) return;
     this.endOpen = true;
     a.log.ev('end_ask');
     $('#end-ask').classList.add('active');
@@ -432,9 +398,9 @@ export const Demo = {
   syncPause() {
     const a = this.app;
     const lost = a.inRound && a.roundSensor && a.link.state !== 'ready';
-    const want = a.inRound && (this.opOpen || this.pinOpen || this.endOpen || lost || a.rotated.matches);
+    const want = a.inRound && (this.menu.isOpen || this.menu.pinOpen || this.endOpen || lost || a.rotated.matches);
     if (want !== a.paused) a.setPaused(want);
-    if (lost && !this.opOpen) {
+    if (lost && !this.menu.isOpen) {
       const retrying = a.link.state === 'reconnecting' || a.link.state === 'connecting';
       this.showAlert('link', '페달 연결이 끊겼어요',
         retrying ? '다시 연결하는 중입니다. 잠시만 기다려 주세요.<br>게임 시간은 멈춰 있습니다.' : '진행 요원을 불러 주세요.<br>게임 시간은 멈춰 있습니다.');
@@ -451,7 +417,7 @@ export const Demo = {
     const cfg = a.cfg;
     const m = a.meter;
     const no = sim ? 0 : this.nextSeq();
-    const { abil, kcal, keep, gameAcc, rec } = a.fillReport($('#demo-result'));
+    const { abil, kcal, keep, gameAcc, rec } = RoundReport.fill(a, $('#demo-result'));
 
     $('#dr-id').textContent = sim ? '가상 결과 · 기록 안 됨' : `참가 번호 ${this.label(no)}`;
     $('#dr-id').classList.toggle('sim', sim);
@@ -497,78 +463,6 @@ export const Demo = {
       .catch((e) => (this.storeError = e.message || String(e)));
   },
 
-  async renderSessions() {
-    const el = $('#op-sess-count');
-    try {
-      const n = await SessionStore.count();
-      let size = '';
-      if (navigator.storage && navigator.storage.estimate) {
-        const { usage } = await navigator.storage.estimate();
-        size = ` · 저장 공간 약 ${(usage / 1048576).toFixed(1)} MB`;
-      }
-      el.textContent = `${n}건${size}${this.storeError ? ` · 마지막 저장 실패: ${this.storeError}` : ''}`;
-    } catch (e) {
-      el.textContent = `읽을 수 없음: ${e.message || e}`;
-    }
-  },
-
-  // ---------------- 운영 메뉴 ----------------
-  bindOp() {
-    $('#op-close').onclick = () => this.closeOp();
-    $('#op-end').onclick = () => {
-      this.hideOp();
-      if (this.app.state === 'play') this.app.endRound('operator');
-    };
-    $('#op-abandon').onclick = () => {
-      this.hideOp();
-      this.app.quit();
-      this.syncPause();
-    };
-    $('#op-csv').onclick = () => this.downloadCsv();
-    $('#op-sess-export').onclick = async () => {
-      this.leaving = true; // 내려받기가 beforeunload 를 부를 수 있다
-      try {
-        const n = await SessionStore.exportAll(`exergame-sessions-station${this.station || ''}-${new Date().toISOString().slice(0, 10)}.jsonl`);
-        if (!n) $('#op-sess-count').textContent = '저장된 로그가 없습니다';
-      } catch (e) {
-        $('#op-sess-count').textContent = `내보내기 실패: ${e.message || e}`;
-      }
-      setTimeout(() => (this.leaving = false), 1000);
-    };
-    $('#op-sim').onchange = () => {
-      this.simResult = $('#op-sim').checked;
-      this.updateAttract();
-    };
-    $('#op-kbd').onchange = () => {
-      this.allowKbd = $('#op-kbd').checked;
-      this.updateAttract();
-      if (this.app.state === 'setup') this.pickSetup({});
-    };
-    $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
-    this.bindSettings();
-    // 운영 버전: 대기 화면 오른쪽 아래의 '운영' 버튼 → PIN. 대기 화면을 눌러 시작하는 것과 겹치지 않게 막는다
-    const pb = $('#att-pedal');
-    if (pb) pb.addEventListener('pointerdown', (e) => e.stopPropagation());
-    if (pb) pb.addEventListener('click', (e) => e.stopPropagation());
-    const ob = $('#op-open');
-    if (ob) {
-      ob.addEventListener('pointerdown', (e) => e.stopPropagation());
-      ob.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.openPin();
-      });
-    }
-    // 모서리 길게 누르기 → PIN
-    const corner = $('#op-corner');
-    let timer = null;
-    const cancel = () => { clearTimeout(timer); timer = null; };
-    corner.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      cancel();
-      timer = setTimeout(() => { timer = null; this.openPin(); }, this.CORNER_HOLD_MS);
-    });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => corner.addEventListener(t, cancel));
-  },
 
   // 대기 화면 안내와 운영 메뉴의 설정 요약
   renderCfg() {
@@ -578,239 +472,7 @@ export const Demo = {
     $('#att-dur').textContent = $('#setup')
       ? `${SESSION_LENGTHS[0].min}~${SESSION_LENGTHS[SESSION_LENGTHS.length - 1].min}분`
       : c.durationSec % 60 ? U.fmtTime(c.durationSec) : `${c.durationSec / 60}분`;
-    const changed = Object.keys(Config.demoSaved()).length;
-    const preset = Config.preset(Config.presetOf(c));
-    $('#op-cfg').innerHTML = `설정 코드 <b>${Config.demoCode(c)}</b>${changed ? ` (기본값에서 ${changed}개 바꿈)` : ' (기본값)'} · ` +
-      ($('#setup')
-        ? `라운드 길이·난이도는 참가자가 고름 · `
-        : `라운드 난이도 ${preset ? preset.label : '직접 설정'} · 라운드 ${U.fmtTime(c.durationSec)} · `) +
-      `측정 ${c.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
-      (this.pin ? '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.' : '운영 메뉴는 대기 화면의 ⚙ 운영 버튼이나 왼쪽 위 모서리 2초 누르기로 열립니다 (PIN 없음).');
-  },
-
-  // ---------------- 라운드 설정 (DEMO_SETTINGS) ----------------
-  // 맨 위의 '라운드 난이도'는 저장하는 항목이 아니다. 고르면 프리셋에 든 칸(PRESET_KEYS)을 채우고, 칸을 고치면 맞는 프리셋을 다시 찾아 보여 준다.
-  bindSettings() {
-    const box = $('#op-set-fields');
-    const presets = ROUND_PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
-    box.append(U.el('label', 'setting', `라운드 난이도<select id="op-set-preset">${presets}<option value="custom" disabled>직접 설정</option></select>`));
-    const note = U.el('p', 'setting-note');
-    note.id = 'op-set-preset-note';
-    box.append(note);
-    $('#op-set-preset').addEventListener('change', (e) => {
-      const p = Config.preset(e.target.value);
-      if (p) this.fillSettings({ ...this.readSettings(), ...p.values });
-    });
-    // 두 열로 나눠 놓는다. DEMO_SETTINGS 순서는 설정 코드(Config.demoCode)에 쓰이므로 바꾸지 않고 여기서만 가른다
-    const cols = [U.el('div', 'op-set-col', '<h3>시간·점수·페달</h3>'), U.el('div', 'op-set-col', '<h3>미니게임 난이도</h3>')];
-    box.append(...cols);
-    const right = ['difficulty', 'startLevel', 'maxLevel', 'diffUp', 'diffDown', 'questionTimeScale', 'multiplierTop'];
-    for (const s of DEMO_SETTINGS) {
-      const input = s.options
-        ? `<select data-key="${s.key}">${s.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`
-        : `<input type="number" data-key="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" inputmode="decimal">`;
-      cols[right.includes(s.key) ? 1 : 0].append(U.el('label', 'setting', `${s.label}${input}`));
-    }
-    // 프리셋 선택은 위에서 따로 다룬다 (input 이 change 보다 먼저 와서, 여기서 다시 맞추면 고른 값이 되돌아간다)
-    const mark = (e) => e.target.id !== 'op-set-preset' && this.markSettings();
-    box.addEventListener('input', mark);
-    box.addEventListener('change', mark);
-    $('#op-set-open').onclick = () => this.openSettings();
-    $('#op-set-cancel').onclick = () => $('#op-set').classList.remove('active');
-    $('#op-set-reset').onclick = () => this.fillSettings(Config.demoDefaults());
-    $('#op-set-save').onclick = () => this.saveSettings();
-  },
-
-  openSettings() {
-    if (this.app.inRound) return;
-    this.fillSettings(this.app.cfg);
-    $('#op-set').classList.add('active');
-    // 설명이 프리셋마다 길이가 달라 아래 칸들이 오르내리지 않게 가장 긴 설명만큼 자리를 잡아 둔다 (보이는 동안에만 잴 수 있다)
-    U.reserveHeight($('#op-set-preset-note'), Config.presetNotes());
-  },
-
-  fillSettings(cfg) {
-    for (const s of DEMO_SETTINGS) {
-      const el = $(`#op-set-fields [data-key="${s.key}"]`);
-      const v = cfg[s.key];
-      el.value = s.options ? v : Math.round(v * (s.scale || 1) * 1000) / 1000;
-    }
-    this.markSettings();
-  },
-
-  readSettings() {
-    const out = {};
-    for (const s of DEMO_SETTINGS) {
-      const el = $(`#op-set-fields [data-key="${s.key}"]`);
-      if (s.options) {
-        out[s.key] = el.value;
-        continue;
-      }
-      const v = parseFloat(el.value);
-      const def = Config.demoDefaults()[s.key];
-      // 소수 단계(0.05 등)는 부동소수 찌꺼기 없이 저장한다
-      out[s.key] = Number.isFinite(v) ? Math.round((U.clamp(v, s.min, s.max) / (s.scale || 1)) * 10000) / 10000 : def;
-    }
-    return out;
-  },
-
-  // 기본값과 다른 항목을 표시하고, 저장하면 될 설정 코드를 미리 보여 준다
-  markSettings() {
-    const v = this.readSettings();
-    const def = Config.demoDefaults();
-    for (const s of DEMO_SETTINGS) {
-      $(`#op-set-fields [data-key="${s.key}"]`).parentElement.classList.toggle('changed', v[s.key] !== def[s.key]);
-    }
-    $('#op-set-code').textContent = `설정 코드 ${Config.demoCode(v)}`;
-    const id = Config.presetOf(v);
-    $('#op-set-preset').value = id;
-    $('#op-set-preset-note').textContent = Config.presetNote(id);
-    PRESET_KEYS.forEach((k) => $(`#op-set-fields [data-key="${k}"]`).parentElement.classList.toggle('preset', id !== 'custom'));
-  },
-
-  saveSettings() {
-    const v = this.readSettings();
-    Config.demoSave(v);
-    Object.assign(this.app.cfg, v);
-    this.renderCfg();
-    $('#op-set').classList.remove('active');
-  },
-
-  openOp() {
-    const a = this.app;
-    this.opOpen = true;
-    $('#op-set-open').disabled = a.inRound;
-    $('#op-set-open').textContent = a.inRound ? '라운드 설정 (라운드 중에는 못 바꿈)' : '라운드 설정';
-    $('#op-station').value = this.station;
-    $('#op-kbd').checked = this.allowKbd;
-    $('#op-sim').checked = this.simResult;
-    $('#op-station').classList.remove('invalid');
-    $('#op-round').style.display = a.inRound ? '' : 'none';
-    $('#op-end').style.display = a.state === 'play' ? '' : 'none';
-    if (a.inRound) {
-      const left = a.state === 'play' ? a.cfg.durationSec - a.elapsed : a.cfg.durationSec;
-      $('#op-round-note').textContent = `라운드 진행 중 · 멈춰 있음 (남은 시간 ${U.fmtTime(left)})`;
-    }
-    $('#op-close').textContent = a.inRound ? '이어서 진행' : a.state === 'result' || a.state === 'ending' ? '결과 화면으로 돌아가기' : '대기 화면 열기';
-    this.renderLog();
-    this.renderSessions();
-    this.renderUpload();
-    this.app.renderMusicTry();
-    if (a.inRound) a.log.ev('operator', { open: true });
-    $('#op').classList.add('active');
-    this.syncPause();
-  },
-
-  hideOp() {
-    this.app.audio.endPreview();
-    this.app.renderMusicTry();
-    if (this.app.inRound && this.opOpen) this.app.log.ev('operator', { open: false });
-    this.opOpen = false;
-    $('#op-set').classList.remove('active');
-    $('#op').classList.remove('active');
-    this.syncPause();
-  },
-
-  closeOp() {
-    const v = parseInt($('#op-station').value, 10);
-    if (!(v >= 1 && v <= 99)) {
-      $('#op-station').classList.add('invalid');
-      $('#op-station').focus();
-      return;
-    }
-    this.station = String(v);
-    this.save('station', this.station);
-    this.renderStation();
-    this.enterKiosk();
-    this.hideOp();
-  },
-
-  renderLog() {
-    const log = this.load('log', []);
-    $('#op-log-count').textContent = log.length ? `${log.length}건` : '';
-    const el = $('#op-log');
-    if (!log.length) {
-      el.innerHTML = '<li class="board-empty">아직 기록이 없습니다</li>';
-      return;
-    }
-    el.innerHTML = log.slice(-40).reverse().map((r) => {
-      const t = new Date(r.at);
-      const hm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-      return `<li><b>${r.station || '?'}-${String(r.no).padStart(3, '0')}</b><span>${hm}${r.track === 'brain' ? ' · 두뇌만' : ''}</span><span class="sc">${r.score.toLocaleString('ko-KR')}점</span></li>`;
-    }).join('');
-  },
-
-  downloadCsv() {
-    const log = this.load('log', []);
-    // track: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). 이 열을 더하기 전 기록은 dual
-    const head = ['station', 'no', 'time', 'settings', 'track', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...ABILITIES.map((x) => x.id)];
-    const rows = log.map((r) => [r.station, r.no, r.at, r.cfg ?? '', r.track || 'dual', r.score, r.ex, r.cog, r.kcal, r.distM ?? '', r.revs, ...ABILITIES.map((x) => r.abilities?.[x.id] ?? '')]);
-    const csv = '﻿' + [head, ...rows].map((row) => row.join(',')).join('\r\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `exergame-station${this.station || ''}-${new Date().toISOString().slice(0, 10)}.csv`;
-    this.leaving = true; // 다운로드도 beforeunload 를 부를 수 있다
-    a.click();
-    setTimeout(() => { this.leaving = false; URL.revokeObjectURL(a.href); }, 1000);
-  },
-
-  // ---------------- PIN ----------------
-  bindPin() {
-    $('#pin-pad').addEventListener('pointerdown', (e) => {
-      const b = e.target.closest('button');
-      if (!b) return;
-      e.preventDefault();
-      this.armPinTimeout();
-      const k = b.dataset.k;
-      if (k === 'cancel') return this.closePin();
-      if (k === 'del') this.pinBuf = this.pinBuf.slice(0, -1);
-      else if (this.pinBuf.length < this.pin.length) this.pinBuf += b.textContent;
-      this.renderPin();
-      if (this.pinBuf.length < this.pin.length) return;
-      if (this.pinBuf === this.pin) {
-        this.closePin(true);
-        this.openOp();
-      } else {
-        const dots = $('#pin-dots');
-        dots.classList.remove('shake');
-        void dots.offsetWidth;
-        dots.classList.add('shake');
-        this.pinBuf = '';
-        setTimeout(() => this.renderPin(), 350);
-      }
-    });
-  },
-
-  // 운영 메뉴 PIN (비어 있으면 PIN 없이 연다)
-  get pin() {
-    return APP_OPERATOR_PIN;
-  },
-
-  openPin() {
-    if (this.opOpen || this.pinOpen) return;
-    if (!this.pin) return this.openOp();
-    this.pinOpen = true;
-    this.pinBuf = '';
-    this.renderPin();
-    $('#pin').classList.add('active');
-    this.armPinTimeout();
-    this.syncPause();
-  },
-
-  closePin(keepPaused = false) {
-    clearTimeout(this.pinTimer);
-    this.pinOpen = false;
-    $('#pin').classList.remove('active');
-    if (!keepPaused) this.syncPause();
-  },
-
-  armPinTimeout() {
-    clearTimeout(this.pinTimer);
-    this.pinTimer = setTimeout(() => this.closePin(), this.PIN_TIMEOUT_MS);
-  },
-
-  renderPin() {
-    $('#pin-dots').querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i < this.pinBuf.length));
+    this.menu.renderSummary();
   },
 
   // ---------------- 결과 화면: 길게 눌러 다음 참가자 ----------------
@@ -874,5 +536,44 @@ export const Demo = {
   async requestWakeLock() {
     if (!('wakeLock' in navigator) || (this.wakeLock && !this.wakeLock.released)) return;
     try { this.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  },
+};
+
+// 운영 버전(스테이션)의 판 갈고리 (js/edition.js 의 Edition). 일은 Demo 가 한다
+/** @type {import('./edition.js').Edition} */
+export const StationEdition = {
+  mode: 'demo',
+  homeScreen: 'attract',
+  pauseMenu: false, // 운영 메뉴 · 페달 끊김 · 눕힘으로만 멈춘다 (Demo.syncPause)
+  devKeys: false,
+  loadConfig: () => Config.demo(),
+  bindScreens(app) {
+    // 세션 성과·운동량 카드를 스테이션 결과 화면의 최종 점수 카드 뒤에 붙인다
+    $('#demo-result .dr-grid').append(RoundReport.card());
+    app.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
+  },
+  start: (app) => Demo.init(app),
+  beforeRound() {},
+  onScreen() {},
+  tick: (app, dt, rpm) => Demo.tick(dt, rpm),
+  // App.init 이 처음 상태를 알릴 때(Demo.init 전)에도 App 의 기본 처리는 하지 않는다
+  onLink(app, state, detail) {
+    Demo.onLink(state, detail);
+    return true;
+  },
+  onRotate() {
+    Demo.syncPause();
+    return true;
+  },
+  logClosed(app, log, ended) {
+    // 결과 화면까지 가지 않은 판은 여기서 저장한다 (결과 화면까지 간 판은 Demo.showResult 가 저장)
+    if (ended === 'abandoned' || ended === 'user') Demo.storeLog(log);
+  },
+  plantInfo: () => Demo.plantInfo(),
+  roundPreset: () => null, // 세션 설정 화면에서 고른 세션 난이도로 권한다
+  remembersSetup: () => !!Demo.members,
+  showResult() {
+    Demo.showResult();
+    return true;
   },
 };

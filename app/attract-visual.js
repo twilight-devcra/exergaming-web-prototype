@@ -2,7 +2,7 @@
 // 바퀴가 한 바퀴 돌 때마다 불꽃이 두뇌로 들어가고, 신경망이 이어지며 차례로 밝아진다 — '페달을 밟으면 두뇌가 깨어난다'.
 // 아무도 없으면 천천히 돌고, 대기 화면에서 페달을 밟으면 그 속도로 빨라진다. Demo.tick 이 대기 화면에서 매 프레임 부른다.
 import { U } from '../js/config.js';
-import { Band } from '../js/band.js';
+import { mix } from '../js/paint.js';
 
 export const AttractVisual = {
   // 옆에서 본 두뇌 (왼쪽이 앞). 가로 -1~1, 세로 대략 -0.8~0.8. 로고(app/logo.svg)도 같은 모양을 쓴다
@@ -217,7 +217,7 @@ export const AttractVisual = {
         g.fill();
         g.globalAlpha = 1;
       }
-      g.fillStyle = v > 0.02 ? Band.mix('#b9d7c3', good, v) : '#b9d7c3';
+      g.fillStyle = v > 0.02 ? mix('#b9d7c3', good, v) : '#b9d7c3';
       g.beginPath();
       g.arc(x, y, nr * n.r * (1 + 0.5 * v), 0, Math.PI * 2);
       g.fill();

@@ -11,6 +11,9 @@
 // 1·2위 차이가 1칸인 채로 칸이 늘면 눈대중이 더는 안 통하고 끝까지 세어야 한다.
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 const COUNT_COLORS = [
   // 색만으로 구분하지 않도록 칸마다 색에 딸린 모양을 함께 찍는다 (색약 대응)
@@ -23,7 +26,7 @@ const COUNT_COLORS = [
 
 export class CountGame {
   static id = 'count';
-  static tags = ['search']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.SEARCH];
   static title = '우세한 색 찾기';
   static hint = '격자에 가장 많이 켜진 색을<br>아래 보기에서 고르세요';
   // cells = 켜는 칸 수의 상한 (격자를 가득 채우지 않는다)
@@ -45,41 +48,43 @@ export class CountGame {
   // 소개 그림: ① 가장 많은 색을 찾아 ② 아래 보기에서 고른다
   static diagram() {
     const [red, blue] = COUNT_COLORS;
-    const cell = (col, x, y, s) => (col
-      ? `<rect fill="${col.fill}" x="${x}" y="${y}" width="${s}" height="${s}" rx="7"/>` + Dg.glyph(col.glyph, x + s / 2, y + s / 2, s, 'fill="rgba(255,255,255,0.7)"')
-      : Dg.rect(x, y, s, s));
+    const cell = (col, x, y, size) => (col
+      ? `<rect fill="${col.fill}" x="${x}" y="${y}" width="${size}" height="${size}" rx="7"/>` + Dg.glyph(col.glyph, x + size / 2, y + size / 2, size, 'fill="rgba(255,255,255,0.7)"')
+      : Dg.rect(x, y, size, size));
     const layout = [[red, red, blue], [red, red, null], [red, blue, null]];
     let grid = '';
-    layout.forEach((row, r) => row.forEach((col, c) => (grid += cell(col, 30 + c * 40, 6 + r * 40, 36))));
+    layout.forEach((row, rowIndex) => row.forEach((col, colIndex) => (grid += cell(col, 30 + colIndex * 40, 6 + rowIndex * 40, 36))));
     return [
       { svg: Dg.svg('0 0 180 130', grid), caption: '가장 많은 색을 찾아' },
       { svg: Dg.svg('0 0 180 130', cell(blue, 36, 41, 48) + cell(red, 96, 41, 48) + Dg.tap(120, 65, 30)), caption: '아래 보기에서 고르기' },
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = CountGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
-    this.phase = 'wait';
+    this.phase = Phase.WAIT;
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${CountGame.title} · Lv.${level}`, this.msg, CountGame.ROUNDS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${CountGame.title} · Lv.${level}`, this.message, CountGame.ROUNDS);
     this.body = body;
     this.progress = dots;
     this.wrap = U.el('div', 'cnt-wrap');
     this.grid = U.el('div', 'cnt-grid');
-    this.opts = U.el('div', 'cnt-opts');
-    this.wrap.append(this.grid, this.opts);
+    this.optionRow = U.el('div', 'cnt-opts');
+    this.wrap.append(this.grid, this.optionRow);
     body.append(this.wrap);
-    this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(body);
+    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver.observe(body);
     // 보기 높이가 격자 크기 셈에 들어가므로, 보기가 바뀌면 다시 맞춘다
-    this.ro.observe(this.opts);
+    this.resizeObserver.observe(this.optionRow);
     this.next();
   }
 
@@ -90,8 +95,8 @@ export class CountGame {
     this.palette = U.shuffle([...COUNT_COLORS]).slice(0, this.spec.colors);
     const owner = CountGame.place(this.counts, rows, cols, this.spec.clump);
 
-    U.say(this.msg, '가장 많은 색을 고르세요', 'act');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
+    U.say(this.message, '가장 많은 색을 고르세요', 'act');
+    Progress.current(this.progress, this.round);
 
     this.grid.innerHTML = '';
     this.grid.style.setProperty('--cols', cols);
@@ -108,81 +113,79 @@ export class CountGame {
       return cell;
     });
 
-    this.opts.innerHTML = '';
-    this.btns = U.shuffle(this.palette.map((col, i) => ({ col, i }))).map(({ col, i }) => {
+    this.optionRow.innerHTML = '';
+    this.optionButtons = U.shuffle(this.palette.map((col, i) => ({ col, i }))).map(({ col, i }) => {
       const b = U.el('button', 'cnt-opt', `<svg viewBox="0 0 100 100">${col.glyph}</svg><span class="n"></span>`);
       b.style.background = col.fill;
       b.addEventListener('pointerdown', () => this.pick(i, b));
-      this.opts.append(b);
+      this.optionRow.append(b);
       return { b, i };
     });
 
     this.layout();
-    this.phase = 'input';
-    this.h.question({ grid: [rows, cols], colors: this.palette.map((c) => c.id), counts: this.counts, cells: owner });
-    this.h.timer(this.counts.reduce((a, b) => a + b, 0), () => this.pick(-1, null));
+    this.phase = Phase.INPUT;
+    this.host.question({ grid: [rows, cols], colors: this.palette.map((color) => color.id), counts: this.counts, cells: owner });
+    this.host.timer(this.counts.reduce((a, b) => a + b, 0), () => this.pick(-1, null));
   }
 
   layout() {
-    const s = this.body;
+    const body = this.body;
     const [rows, cols] = this.spec.grid;
     // 보기 버튼과 그 위 간격이 쓰는 높이를 뺀 나머지에 격자를 맞춘다 (보기가 아직 없으면 버튼 한 줄 + 아래 여백 114px 로 친다)
-    const avail = s.clientHeight - (this.opts.offsetHeight || 114) - U.gapOf(this.wrap, 26) - 10;
+    const avail = body.clientHeight - (this.optionRow.offsetHeight || 114) - U.gapOf(this.wrap, 26) - 10;
     const gap = 6;   // css .cnt-grid gap
-    const sz = U.clamp(Math.min((avail - (rows - 1) * gap) / rows, (s.clientWidth - 40 - (cols - 1) * gap) / cols), 22, 92);
+    const sz = U.clamp(Math.min((avail - (rows - 1) * gap) / rows, (body.clientWidth - 40 - (cols - 1) * gap) / cols), 22, 92);
     this.wrap.style.setProperty('--csz', `${sz}px`);
   }
 
   // i = 고른 색 (0 이 정답). -1 이면 시간이 다 된 것
   pick(i, btn) {
-    if (this.phase !== 'input') return;
-    this.phase = 'wait';
-    this.h.stopTimer();
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
     const ok = i === 0;
-    this.h.answer({ picked: i >= 0 ? this.palette[i].id : null, count: i >= 0 ? this.counts[i] : null, correct: ok, timedOut: !btn });
+    this.host.answer({ picked: i >= 0 ? this.palette[i].id : null, count: i >= 0 ? this.counts[i] : null, correct: ok, timedOut: !btn });
 
     // 보기마다 실제 개수를 적어 주고, 정답 색이 아닌 칸은 흐리게 해서 왜 그 색인지 보이게 한다
-    this.btns.forEach(({ b, i: j }) => {
+    this.optionButtons.forEach(({ b, i: j }) => {
       b.querySelector('.n').textContent = String(this.counts[j]);
       if (j === 0) b.classList.add('right');
       b.disabled = true;
     });
     if (!ok && btn) btn.classList.add('wrong');
-    this.cells.forEach((c) => {
-      if (c.classList.contains('lit') && c.dataset.c !== '0') c.classList.add('dim');
+    this.cells.forEach((cell) => {
+      if (cell.classList.contains('lit') && cell.dataset.c !== '0') cell.classList.add('dim');
     });
 
-    const d = this.progress.children[this.round];
-    d.classList.remove('cur');
-    d.classList.add(ok ? 'right' : 'wrong');
+    Progress.mark(this.progress, this.round, ok);
 
     if (ok) {
       this.correct++;
-      U.say(this.msg, '정답!', 'good');
-      this.h.award((this.h.base * this.h.mult) / CountGame.ROUNDS, this.grid);
-      this.h.sfx('good');
+      U.say(this.message, '정답!', 'good');
+      this.host.award(pointsPer(this.host, CountGame.ROUNDS), this.grid);
+      this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.msg, `${btn ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`, 'bad');
-      this.h.sfx('bad');
+      U.say(this.message, `${btn ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`, 'bad');
+      this.host.sfx(Sfx.BAD);
     }
-    this.h.after(ok ? 1000 : 1600, () => this.advance());
+    this.host.after(ok ? 1000 : 1600, () => this.advance());
   }
 
   advance() {
     this.round++;
     if (this.round < CountGame.ROUNDS) return this.next();
-    this.ro.disconnect();
-    this.h.done(this.result());
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === CountGame.ROUNDS, correct: this.correct, total: CountGame.ROUNDS };
+    return resultOf(this.correct, CountGame.ROUNDS);
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    this.ro.disconnect();
-    return { cleared: false, correct: this.correct, total: this.round };
+    this.resizeObserver.disconnect();
+    return abortedResult(this.correct, this.round);
   }
 
   // ---- 개수 배분 ----
@@ -191,8 +194,8 @@ export class CountGame {
   // '제일 많은 색 고르기'가 아니라 '7개짜리 찾기'가 되어 버린다. 2위 개수도 라운드마다 흔들어
   // 정답의 절대 개수를 외울 수 없게 한다.
   static makeCounts({ colors, cells, margin, spread }) {
-    const floor = (s) => Math.max(1, s - spread);                       // 비우승 색이 내려갈 수 있는 하한
-    const least = (s) => s + margin + s + (colors - 2) * floor(s);      // 그 2위 개수로 가능한 최소 총량
+    const floor = (second) => Math.max(1, second - spread);                       // 비우승 색이 내려갈 수 있는 하한
+    const least = (second) => second + margin + second + (colors - 2) * floor(second);      // 그 2위 개수로 가능한 최소 총량
     let hi = 1;
     while (least(hi + 1) <= cells) hi++;
 
@@ -221,9 +224,9 @@ export class CountGame {
         if (mine.length && Math.random() < clump) {
           const nbrs = [];
           for (const idx of mine) {
-            const r = Math.floor(idx / cols);
-            const c = idx % cols;
-            for (const [nr, nc] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
+            const row = Math.floor(idx / cols);
+            const col = idx % cols;
+            for (const [nr, nc] of [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]]) {
               if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
               const n = nr * cols + nc;
               if (free.has(n)) nbrs.push(n);

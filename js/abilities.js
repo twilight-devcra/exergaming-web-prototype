@@ -38,7 +38,7 @@ export const ABILITY_WEIGHTS = {
 };
 
 // 처리속도 축에 들어가는 게임은 문제당 생각한 시간도 본다 (초). 입력이 열린 뒤 답할 때까지이고 정답 피드백·연출 시간은 빠진다
-// (App.stats[id].think, 시간 초과한 문제는 쓴 시간 그대로 넣는다). fast 이하면 그대로, slow 이상이면 그 게임의 처리속도 몫을 PACE_MIN 배로 깎는다.
+// (App.roundStats.games[id].think, 시간 초과한 문제는 쓴 시간 그대로 넣는다). fast 이하면 그대로, slow 이상이면 그 게임의 처리속도 몫을 PACE_MIN 배로 깎는다.
 // 예전(피드백 포함 게임 시간) 기준에서 문제당 피드백 시간(1~1.5초)을 뺀 값이다. 플레이해 보며 다듬는다.
 // think 가 없는 예전 기록은 게임 시간(stats.ms, 피드백 포함)으로 재고 PACE_FEEDBACK 초를 빼서 같은 기준에 맞춘다
 export const ABILITY_PACE = {
@@ -73,7 +73,7 @@ export const Abilities = {
   // 판 하나에서 해낸 레벨 = (레벨 − 1) + 정확도 (레벨은 effLevel, 0 아래로는 내려가지 않는다): Lv5 를 다 맞히면 3, 절반이면 2.5, Lv3 을 다 틀리면 0.
   // 축 하나 = 관련 게임 판들의 가중 평균. 가중치 = 게임 가중치(ABILITY_WEIGHTS) × 레벨 — 높은 레벨에서 해낸(또는 놓친) 판이
   // 몸풀기 첫 단계보다 크게 친다. 라운드 앞쪽 게임은 늘 시작 단계라, 레벨로 가중하지 않으면 모두가 낮게 나온다.
-  // stats: App.stats ({ id: { runs: [[레벨, 맞힌 수, 문제 수]…], total, ms } })
+  // stats: App.roundStats.games ({ id: { runs: [[레벨, 맞힌 수, 문제 수]…], total, ms } })
   // → [{ id, name, praise, stars(1~5, 0.5 단위), value(그래프용 0~100), raw(해낸 레벨, 데이터 없으면 null), hasData }]
   compute(stats) {
     const sum = {};

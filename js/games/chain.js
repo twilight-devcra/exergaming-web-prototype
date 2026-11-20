@@ -20,6 +20,9 @@
 //   pMin   — 같은 확률의 하한 (쉬운 단계).
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 // 돌기 모양. 점은 (u, v): u = 변에서 바깥으로 나온 거리, v = 변을 따라 가운데에서 떨어진 거리 (위가 음수).
 // 돌기와 홈은 같은 점을 쓴다 — 앞 조각의 돌기가 뒤 조각의 홈에 꼭 맞는다.
@@ -29,8 +32,8 @@ import { Dg } from '../diagram.js';
 const circlePts = () => {
   const a0 = Math.atan2(-6, 5 - 13);
   const arc = Array.from({ length: 17 }, (_, k) => {
-    const a = a0 - (2 * a0 * (k + 1)) / 18;
-    return [13 + 10 * Math.cos(a), 10 * Math.sin(a)];
+    const angle = a0 - (2 * a0 * (k + 1)) / 18;
+    return [13 + 10 * Math.cos(angle), 10 * Math.sin(angle)];
   });
   return [[0, -6], [5, -6], ...arc, [5, 6], [0, 6]];
 };
@@ -41,11 +44,11 @@ const SHAPES = [
   { id: 'triangle', name: '세모', pts: [[0, -14], [22, 0], [0, 14]] },
   { id: 'square', name: '네모', pts: [[0, -12], [20, -12], [20, 12], [0, 12]] },
   { id: 'tee', name: '티자', pts: [[0, -5], [11, -5], [11, -14], [22, -14], [22, 14], [11, 14], [11, 5], [0, 5]] },
-].map((s) => ({ ...s, pts: s.pts.map(([u, v]) => [u * KNOB_SCALE, v * KNOB_SCALE]) }));
+].map((shape) => ({ ...shape, pts: shape.pts.map(([px, py]) => [px * KNOB_SCALE, py * KNOB_SCALE]) }));
 
 export class ChainGame {
   static id = 'chain';
-  static tags = ['shape']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.SHAPE];
   static title = '조각 잇기';
   static hint = '모양이 맞는 조각을 이어 끝까지 채우세요<br>놓은 조각은 되돌릴 수 없으니 미리 생각해 보세요';
   static levels = [
@@ -74,36 +77,38 @@ export class ChainGame {
   // 소개 그림: ① 앞 돌기와 모양이 맞는 조각을 골라 ② 끝까지 모두 잇는다
   static diagram() {
     const { W, H, WALL, PAD } = ChainGame;
-    const [c, t, s] = SHAPES;
+    const [circleShape, triangleShape, squareShape] = SHAPES;
     const { ARROW } = ChainGame;
     const vbRow = (n) => `${-WALL - PAD} ${-PAD} ${n * W + 2 * WALL + 2 * PAD} ${H + 2 * PAD}`;
     // ① 벽의 동그라미 돌기 · 다음 칸 · 아래 조각 둘 (동그라미 홈은 누르고, 세모 홈은 흐리게)
     const y2 = H + 30;
-    const pick = ChainGame.defs() + `<g class="ch-row">${ChainGame.slot(0)}${ChainGame.slot(W)}${ChainGame.wallStart(c)}${ChainGame.wallEnd(2 * W, s)}` +
+    const pick = ChainGame.defs() + `<g class="ch-row">${ChainGame.slot(0)}${ChainGame.slot(W)}${ChainGame.wallStart(circleShape)}${ChainGame.wallEnd(2 * W, squareShape)}` +
       `<g transform="translate(${W / 2} 0)">${ChainGame.arrow()}</g></g>` +
-      `<g transform="translate(-20 ${y2})">${ChainGame.piece(0, c, t)}</g>` +
-      `<g transform="translate(${W + 30} ${y2})" opacity="0.5">${ChainGame.piece(0, t, s)}</g>` +
+      `<g transform="translate(-20 ${y2})">${ChainGame.piece(0, circleShape, triangleShape)}</g>` +
+      `<g transform="translate(${W + 30} ${y2})" opacity="0.5">${ChainGame.piece(0, triangleShape, squareShape)}</g>` +
       Dg.tap(30, y2 + H / 2, 18);
     const vb1 = `${-WALL - PAD} ${-PAD - ARROW} ${2 * W + 2 * WALL + 2 * PAD + 20} ${y2 + H + 2 * PAD + ARROW}`;
-    const done = ChainGame.defs() + `<g class="ch-row">${ChainGame.wallStart(c)}${ChainGame.piece(0, c, t)}${ChainGame.piece(W, t, s)}${ChainGame.wallEnd(2 * W, s)}</g>`;
+    const done = ChainGame.defs() + `<g class="ch-row">${ChainGame.wallStart(circleShape)}${ChainGame.piece(0, circleShape, triangleShape)}${ChainGame.piece(W, triangleShape, squareShape)}${ChainGame.wallEnd(2 * W, squareShape)}</g>`;
     return [
       { svg: Dg.svg(vb1, pick), caption: '모양이 맞는 조각을 골라' },
       { svg: Dg.svg(vbRow(2), done), caption: '조각을 모두 써서 끝까지 잇기' },
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = ChainGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
-    this.phase = 'wait';
+    this.phase = Phase.WAIT;
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${ChainGame.title} · Lv.${level}`, this.msg, ChainGame.ROUNDS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${ChainGame.title} · Lv.${level}`, this.message, ChainGame.ROUNDS);
     this.body = body;
     this.progress = dots;
     this.wrap = U.el('div', 'ch-wrap');
@@ -111,66 +116,66 @@ export class ChainGame {
     this.tray = U.el('div', 'ch-tray');
     this.wrap.append(this.rowBox, this.tray);
     body.append(this.wrap);
-    this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(body);
+    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver.observe(body);
     this.next();
   }
 
   next() {
-    const p = ChainGame.make(this.spec);
-    this.p = p;
+    const puzzle = ChainGame.make(this.spec);
+    this.puzzle = puzzle;
     // 이번 문제에 쓸 모양: 네 가지 가운데 shapes 가지를 무작위로
     this.kinds = U.shuffle([...SHAPES]).slice(0, this.spec.shapes);
     // 아래 조각은 섞어 둔다. 늘어놓은 차례가 그대로 정답이면 다시 섞는다
-    const idx = p.pieces.map((_, i) => i);
+    const idx = puzzle.pieces.map((_, i) => i);
     for (let k = 0; k < 20; k++) {
       U.shuffle(idx);
-      if (!ChainGame.solves(p.start, idx.map((i) => p.pieces[i]))) break;
+      if (!ChainGame.solves(puzzle.start, idx.map((i) => puzzle.pieces[i]))) break;
     }
     this.order = idx;               // 단추 차례 → 조각 번호
     this.placed = [];               // 놓은 조각 번호 (차례대로)
-    this.pos = p.start;             // 줄 끝의 돌기 모양
+    this.pos = puzzle.start;             // 줄 끝의 돌기 모양
     this.deadAt = -1;               // 길이 처음 막힌 수 (놓은 차례, 0부터)
 
-    U.say(this.msg, '맞는 조각을 차례로 누르세요', 'act');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
+    U.say(this.message, '맞는 조각을 차례로 누르세요', 'act');
+    Progress.current(this.progress, this.round);
 
     const { W, H, WALL, PAD, ARROW } = ChainGame;
-    const n = p.pieces.length;
+    const n = puzzle.pieces.length;
     this.rowW = n * W + 2 * WALL + 2 * PAD;
     this.rowH = H + 2 * PAD + ARROW;
     this.rowBox.innerHTML = `<svg class="ch-row" viewBox="${-WALL - PAD} ${-PAD - ARROW} ${this.rowW} ${this.rowH}">` +
       `${ChainGame.defs()}<g class="ch-slots"></g><g class="ch-placed"></g>` +
-      `${ChainGame.wallStart(this.kind(p.start))}<g class="ch-end">${ChainGame.wallEnd(n * W, this.kind(p.finish))}</g>` +
+      `${ChainGame.wallStart(this.kind(puzzle.start))}<g class="ch-end">${ChainGame.wallEnd(n * W, this.kind(puzzle.finish))}</g>` +
       `<g class="ch-next">${ChainGame.arrow()}</g></svg>`;
     this.rowSvg = this.rowBox.firstChild;
-    this.slotsG = this.rowSvg.querySelector('.ch-slots');
-    this.placedG = this.rowSvg.querySelector('.ch-placed');
-    this.endG = this.rowSvg.querySelector('.ch-end');
-    this.nextG = this.rowSvg.querySelector('.ch-next');
+    this.slotsGroup = this.rowSvg.querySelector('.ch-slots');
+    this.placedGroup = this.rowSvg.querySelector('.ch-placed');
+    this.endGroup = this.rowSvg.querySelector('.ch-end');
+    this.nextGroup = this.rowSvg.querySelector('.ch-next');
 
     const { KNOB } = ChainGame;
     this.tray.innerHTML = '';
-    this.btns = this.order.map((pi) => {
-      const [l, r] = p.pieces[pi];
+    this.pieceButtons = this.order.map((pi) => {
+      const [sock, knob] = puzzle.pieces[pi];
       const b = U.el('button', 'ch-piece',
-        `<svg viewBox="${-PAD} ${-PAD} ${W + KNOB + 2 * PAD} ${H + 2 * PAD}">${ChainGame.defs()}${ChainGame.piece(0, this.kind(l), this.kind(r))}</svg>`);
+        `<svg viewBox="${-PAD} ${-PAD} ${W + KNOB + 2 * PAD} ${H + 2 * PAD}">${ChainGame.defs()}${ChainGame.piece(0, this.kind(sock), this.kind(knob))}</svg>`);
       b.addEventListener('pointerdown', () => this.pick(pi));
       this.tray.append(b);
       return b;
     });
-    this.btnOf = new Map(this.order.map((pi, k) => [pi, this.btns[k]]));
+    this.buttonOf = new Map(this.order.map((pi, k) => [pi, this.pieceButtons[k]]));
 
     this.refresh();
     this.layout();
-    this.phase = 'input';
-    this.h.question({
-      start: p.start, finish: p.finish,
-      pieces: this.order.map((i) => p.pieces[i]), // 단추 차례대로 [홈, 돌기]
+    this.phase = Phase.INPUT;
+    this.host.question({
+      start: puzzle.start, finish: puzzle.finish,
+      pieces: this.order.map((i) => puzzle.pieces[i]), // 단추 차례대로 [홈, 돌기]
       shapes: this.kinds.map((k) => k.id),       // 모양 번호 → 모양 id
-      sols: p.sols, traps: p.traps, depth: p.depth, pRandom: Math.round(p.p * 1000) / 1000,
+      sols: puzzle.sols, traps: puzzle.traps, depth: puzzle.depth, pRandom: Math.round(puzzle.p * 1000) / 1000,
     });
-    this.h.timer(n, () => this.end('timeout'));
+    this.host.timer(n, () => this.end('timeout'));
   }
 
   kind(k) {
@@ -179,25 +184,25 @@ export class ChainGame {
 
   // 다음 빈칸 표시와 누를 수 있는 조각을 맞춘다
   refresh() {
-    const n = this.p.pieces.length;
+    const n = this.puzzle.pieces.length;
     const k = this.placed.length;
-    this.slotsG.innerHTML = Array.from({ length: n - k }, (_, j) => ChainGame.slot((k + j) * ChainGame.W)).join('');
+    this.slotsGroup.innerHTML = Array.from({ length: n - k }, (_, j) => ChainGame.slot((k + j) * ChainGame.W)).join('');
     // 화살표는 다음 칸 위로 옮긴다 (css transition 으로 미끄러진다). 다 채우면 숨긴다
-    this.nextG.style.transform = `translateX(${(Math.min(k, n - 1) + 0.5) * ChainGame.W}px)`;
-    this.nextG.classList.toggle('gone', k >= n);
-    this.btnOf.forEach((b, pi) => {
+    this.nextGroup.style.transform = `translateX(${(Math.min(k, n - 1) + 0.5) * ChainGame.W}px)`;
+    this.nextGroup.classList.toggle('gone', k >= n);
+    this.buttonOf.forEach((b, pi) => {
       const used = this.placed.includes(pi);
       b.classList.toggle('used', used);
-      b.disabled = used || this.p.pieces[pi][0] !== this.pos;
+      b.disabled = used || this.puzzle.pieces[pi][0] !== this.pos;
     });
   }
 
   layout() {
-    if (!this.p) return;
-    const s = this.body;
-    const BW = s.clientWidth - 16;
-    const BH = s.clientHeight - 16;
-    const n = this.p.pieces.length;
+    if (!this.puzzle) return;
+    const body = this.body;
+    const BW = body.clientWidth - 16;
+    const BH = body.clientHeight - 16;
+    const n = this.puzzle.pieces.length;
     const { W, H, KNOB, PAD } = ChainGame;
     const gap = U.gapOf(this.wrap, 24);
     // 줄: 너비에 맞추되 조각 한 칸이 170px 를 넘지 않게
@@ -223,86 +228,84 @@ export class ChainGame {
   }
 
   pick(pi) {
-    if (this.phase !== 'input') return;
-    const b = this.btnOf.get(pi);
+    if (this.phase !== Phase.INPUT) return;
+    const b = this.buttonOf.get(pi);
     if (!b || b.disabled) return;
-    const [, r] = this.p.pieces[pi];
+    const [, knob] = this.puzzle.pieces[pi];
     const slot = this.placed.length;
     this.placed.push(pi);
-    this.pos = r;
-    const left = this.p.pieces.filter((_, i) => !this.placed.includes(i));
-    const alive = ChainGame.canFinish(r, left);
+    this.pos = knob;
+    const left = this.puzzle.pieces.filter((_, i) => !this.placed.includes(i));
+    const alive = ChainGame.canFinish(knob, left);
     if (!alive && this.deadAt < 0) this.deadAt = slot;
-    this.h.input({ piece: this.order.indexOf(pi), slot, alive });
-    this.h.sfx('tap');
+    this.host.input({ piece: this.order.indexOf(pi), slot, alive });
+    this.host.sfx(Sfx.TAP);
 
-    const [l] = this.p.pieces[pi];
-    this.placedG.insertAdjacentHTML('beforeend',
-      `<g class="ch-put" data-slot="${slot}">${ChainGame.piece(slot * ChainGame.W, this.kind(l), this.kind(r))}</g>`);
+    const [sock] = this.puzzle.pieces[pi];
+    this.placedGroup.insertAdjacentHTML('beforeend',
+      `<g class="ch-put" data-slot="${slot}">${ChainGame.piece(slot * ChainGame.W, this.kind(sock), this.kind(knob))}</g>`);
 
     this.refresh();
     if (!left.length) return this.end('done');
-    if (!left.some(([a]) => a === r)) this.end('stuck');
+    if (!left.some(([nextSock]) => nextSock === knob)) this.end('stuck');
   }
 
   // how = done 다 이음 · stuck 이을 조각이 없음 · timeout 시간 초과
   end(how) {
-    if (this.phase !== 'input') return;
-    this.phase = 'wait';
-    this.h.stopTimer();
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
     const ok = how === 'done';
-    this.btns.forEach((b) => (b.disabled = true));
-    this.h.answer({
+    this.pieceButtons.forEach((b) => (b.disabled = true));
+    this.host.answer({
       placed: this.placed.map((pi) => this.order.indexOf(pi)), // 놓은 차례대로 단추 번호
       correct: ok, stuck: how === 'stuck', timedOut: how === 'timeout',
       deadAt: this.deadAt >= 0 ? this.deadAt : null,
     });
 
-    const d = this.progress.children[this.round];
-    d.classList.remove('cur');
-    d.classList.add(ok ? 'right' : 'wrong');
-    this.nextG.classList.add('gone');
+    Progress.mark(this.progress, this.round, ok);
+    this.nextGroup.classList.add('gone');
 
     if (ok) {
       this.correct++;
-      this.endG.classList.add('right');
-      U.say(this.msg, '끝까지 이었어요!', 'good');
-      this.h.award((this.h.base * this.h.mult) / ChainGame.ROUNDS, this.rowBox);
-      this.h.sfx('good');
+      this.endGroup.classList.add('right');
+      U.say(this.message, '끝까지 이었어요!', 'good');
+      this.host.award(pointsPer(this.host, ChainGame.ROUNDS), this.rowBox);
+      this.host.sfx(Sfx.GOOD);
     } else {
       // 길이 처음 막힌 조각을 표시한다. 그 앞까지는 끝까지 갈 수 있었다
-      const culprit = this.placedG.querySelector(`[data-slot="${this.deadAt}"]`);
+      const culprit = this.placedGroup.querySelector(`[data-slot="${this.deadAt}"]`);
       culprit?.classList.add('culprit');
       // 막혔으면 늘 표시할 조각이 있다. 시간 초과인데 표시할 조각이 없으면 그때까지는 길이 열려 있었다
       const pre = how === 'timeout' ? '시간 초과 · ' : '';
-      U.say(this.msg, culprit ? `${pre}빨간 조각에서 길이 막혔어요` : '시간 초과', 'bad');
-      this.h.sfx('bad');
+      U.say(this.message, culprit ? `${pre}빨간 조각에서 길이 막혔어요` : '시간 초과', 'bad');
+      this.host.sfx(Sfx.BAD);
     }
-    this.h.after(ok ? 1300 : 2800, () => this.advance());
+    this.host.after(ok ? 1300 : 2800, () => this.advance());
   }
 
   advance() {
     this.round++;
     if (this.round < ChainGame.ROUNDS) return this.next();
-    this.ro.disconnect();
-    this.h.done(this.result());
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === ChainGame.ROUNDS, correct: this.correct, total: ChainGame.ROUNDS };
+    return resultOf(this.correct, ChainGame.ROUNDS);
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    this.ro.disconnect();
-    return { cleared: false, correct: this.correct, total: this.round };
+    this.resizeObserver.disconnect();
+    return abortedResult(this.correct, this.round);
   }
 
   // ---- 그리기 ----
-  // 돌기·홈의 점들을 변 위 x 에, 가운데 높이에 맞춰 놓는다 (v 가 작은 쪽 = 위부터)
+  // 돌기·홈의 점들을 변 위 x 에, 가운데 높이에 맞춰 놓는다 (py 가 작은 쪽 = 위부터)
   static edge(kind, x) {
     const cy = ChainGame.H / 2;
-    return kind.pts.map(([u, v]) => [x + u, cy + v]);
+    return kind.pts.map(([px, py]) => [x + px, cy + py]);
   }
 
   static pts(list) {
@@ -319,12 +322,12 @@ export class ChainGame {
       '</linearGradient></defs>';
   }
 
-  // x0 에 놓인 조각: 왼쪽 홈 l, 오른쪽 돌기 r. 몸통·돌기·홈이 하나의 윤곽이고 한 가지로 칠한다.
+  // x0 에 놓인 조각: 왼쪽 홈 sockKind, 오른쪽 돌기 knobKind. 몸통·돌기·홈이 하나의 윤곽이고 한 가지로 칠한다.
   // 칠은 속성으로 주어 css 가 덮을 수 있게 한다 (길이 막힌 조각 .culprit). 바로 앞 defs() 의 질감을 쓴다
-  static piece(x0, l, r) {
+  static piece(x0, sockKind, knobKind) {
     const { W, H } = ChainGame;
-    const knob = ChainGame.edge(r, x0 + W);
-    const sock = ChainGame.edge(l, x0);
+    const knob = ChainGame.edge(knobKind, x0 + W);
+    const sock = ChainGame.edge(sockKind, x0);
     const body = `M${x0},0 H${x0 + W} ${ChainGame.pts(knob)} V${H} H${x0} ${ChainGame.pts([...sock].reverse())} Z`;
     return `<path class="ch-body" d="${body}" fill="url(#${ChainGame.gradId})"/>`;
   }
@@ -358,19 +361,19 @@ export class ChainGame {
   static canFinish(pos, left) {
     if (!left.length) return true;
     const tried = new Set();
-    return left.some(([l, r], i) => {
-      if (l !== pos || tried.has(`${l}${r}`)) return false;
-      tried.add(`${l}${r}`);
-      return ChainGame.canFinish(r, left.filter((_, j) => j !== i));
+    return left.some(([sock, knob], i) => {
+      if (sock !== pos || tried.has(`${sock}${knob}`)) return false;
+      tried.add(`${sock}${knob}`);
+      return ChainGame.canFinish(knob, left.filter((_, j) => j !== i));
     });
   }
 
   // 조각을 이 차례대로 놓으면 끝까지 이어지는가
   static solves(start, seq) {
     let pos = start;
-    for (const [l, r] of seq) {
-      if (l !== pos) return false;
-      pos = r;
+    for (const [sock, knob] of seq) {
+      if (sock !== pos) return false;
+      pos = knob;
     }
     return true;
   }
@@ -409,7 +412,7 @@ export class ChainGame {
       const k = key(pos, mask);
       if (!memo.p.has(k)) {
         const ls = legal(pos, mask);
-        memo.p.set(k, ls.length ? ls.reduce((s, i) => s + pRand(pieces[i][1], mask | (1 << i)), 0) / ls.length : 0);
+        memo.p.set(k, ls.length ? ls.reduce((sum, i) => sum + pRand(pieces[i][1], mask | (1 << i)), 0) / ls.length : 0);
       }
       return memo.p.get(k);
     };
@@ -426,12 +429,12 @@ export class ChainGame {
       let fork = false;
       for (const i of moves(pos, mask)) {
         const m2 = mask | (1 << i);
-        const r = pieces[i][1];
-        if (alive(r, m2)) walk(r, m2);
+        const knob = pieces[i][1];
+        if (alive(knob, m2)) walk(knob, m2);
         else if (first) {
           traps++;
           fork = true;
-          depth = Math.max(depth, 1 + longest(r, m2));
+          depth = Math.max(depth, 1 + longest(knob, m2));
         }
       }
       if (fork) forks++;
@@ -455,12 +458,12 @@ export class ChainGame {
         pieces.push([pos, nx]);
         pos = nx;
       }
-      if (pieces.filter(([a, b]) => a === b).length > 1) continue;
-      const a = ChainGame.analyze(start, pieces);
-      if (!a) continue;
-      last = { start, finish: pos, pieces, ...a };
-      if (a.depth < dMin || a.depth > dMax) continue;
-      if (a.p > (spec.pMax ?? 1) || a.p < (spec.pMin ?? 0)) continue;
+      if (pieces.filter(([sock, knob]) => sock === knob).length > 1) continue;
+      const stats = ChainGame.analyze(start, pieces);
+      if (!stats) continue;
+      last = { start, finish: pos, pieces, ...stats };
+      if (stats.depth < dMin || stats.depth > dMax) continue;
+      if (stats.p > (spec.pMax ?? 1) || stats.p < (spec.pMin ?? 0)) continue;
       return last;
     }
     return last; // 조건에 꼭 맞는 것을 못 찾으면 마지막 것이라도 낸다 (실제로는 일어나지 않는다)

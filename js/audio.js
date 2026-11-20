@@ -1,5 +1,7 @@
 // WebAudio로 합성하는 비트 + 효과음.
 // 비트 1개 = 페달 반 바퀴 (A 또는 D 한 번). 짝수 비트는 킥(A), 홀수 비트는 스네어(D).
+import { Sfx } from './sfx.js';
+
 export class BeatAudio {
   constructor() {
     this.ctx = null;
@@ -663,33 +665,33 @@ export class BeatAudio {
 
   sfx(name) {
     switch (name) {
-      case 'tap': this.tone(660, 0.08, 'sine', 0.2); break;
-      case 'good': this.tone(880, 0.1, 'sine', 0.25); break;
-      case 'bad': this.tone(180, 0.25, 'square', 0.15); break;
+      case Sfx.TAP: this.tone(660, 0.08, 'sine', 0.2); break;
+      case Sfx.GOOD: this.tone(880, 0.1, 'sine', 0.25); break;
+      case Sfx.BAD: this.tone(180, 0.25, 'square', 0.15); break;
       // 길게 이어 온 연속이 끊길 때. 그냥 틀렸을 때보다 아깝게 들리도록 떨어뜨린다.
-      case 'drop':
+      case Sfx.DROP:
         this.tone(392, 0.14, 'triangle', 0.18);
         this.tone(262, 0.28, 'triangle', 0.18, 0.1);
         break;
-      case 'clear':
+      case Sfx.CLEAR:
         this.tone(660, 0.12, 'sine', 0.25);
         this.tone(880, 0.12, 'sine', 0.25, 0.09);
         this.tone(1320, 0.2, 'sine', 0.25, 0.18);
         break;
-      case 'blink': this.tone(520, 0.06, 'sine', 0.12); break;
+      case Sfx.BLINK: this.tone(520, 0.06, 'sine', 0.12); break;
       // 라운드 끝에 건물을 한 층 올릴 때 (나무 블록을 얹는 통통 소리), 지붕을 얹을 때는 한 음 높게
-      case 'build':
+      case Sfx.BUILD:
         this.tone(262, 0.09, 'triangle', 0.28);
         this.tone(392, 0.07, 'triangle', 0.14, 0.03);
         break;
-      case 'buildTop':
+      case Sfx.BUILD_TOP:
         this.tone(392, 0.09, 'triangle', 0.28);
         this.tone(523, 0.1, 'triangle', 0.16, 0.03);
         break;
-      case 'tick': this.tone(1200, 0.04, 'square', 0.06); break;
-      case 'count': this.tone(440, 0.12, 'sine', 0.3); break;
-      case 'go': this.tone(880, 0.25, 'sine', 0.3); break;
-      case 'end':
+      case Sfx.TICK: this.tone(1200, 0.04, 'square', 0.06); break;
+      case Sfx.COUNT: this.tone(440, 0.12, 'sine', 0.3); break;
+      case Sfx.GO: this.tone(880, 0.25, 'sine', 0.3); break;
+      case Sfx.END:
         this.tone(880, 0.15, 'sine', 0.3);
         this.tone(660, 0.15, 'sine', 0.3, 0.15);
         this.tone(440, 0.4, 'sine', 0.3, 0.3);

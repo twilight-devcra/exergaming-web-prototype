@@ -71,7 +71,7 @@ const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
 // 객체는 JSON 으로 (String() 은 {"toString": "x"} 같은 본문에서 던진다 → 500 이 되면 그 태블릿의 업로드가 멈춘다)
 const str = (v) => (v === undefined || v === null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
-// 세션 로그 하나 → 회원 기록 항목 하나 (형을 지킨 것, 또는 null). 태블릿(app/members.js)과 같은 파일을 쓴다 (docs/SERVER.md '회원 기록')
+// 세션 로그 하나 → 회원 기록 항목 하나 (형을 지킨 것, 또는 null). 태블릿(app/member-records.js)과 같은 파일을 쓴다 (docs/SERVER.md '회원 기록')
 const { summarize, cleanEntry } = require('../js/history-entry.js');
 
 // 이벤트에서 게임 한 판·문제 하나씩 뽑는다 (docs/SESSION_LOG.md 'events')

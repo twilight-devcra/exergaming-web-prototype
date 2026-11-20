@@ -189,7 +189,7 @@ const MUSIC_KEY = 'exergame.music';
 // 주의: 이 파일은 누구나 볼 수 있으므로 key 에는 '업로드만 할 수 있는' 키를 넣는다.
 // historyUrl: 회원 기록을 받아 오는 주소 (운영 버전, app/members.js). 비어 있으면 이 태블릿의 기록만 보여 준다.
 //   GET <historyUrl>?user=<회원 번호> 에 그 회원의 세션 요약 목록으로 답해야 한다 (docs/SERVER.md)
-// localHistory: 시험용. true 면 historyUrl 대신 이 태블릿의 세션 로그가 회원 기록 서버 노릇을 한다 (app/members.js 의 Members.localServer).
+// localHistory: 시험용. true 면 historyUrl 대신 이 태블릿의 세션 로그가 회원 기록 서버 노릇을 한다 (app/member-records.js 의 Members.localServer).
 //   주소 칸이 비었다고 저절로 켜지지 않는다. 운영 메뉴의 체크 칸이나 여기서 일부러 켜야 한다
 // 서버: api/ (docs/SERVER.md). 서버가 둘이다 (api/README.md '서버 둘'): dev 브랜치 미리 보기(/dev/)는 dev 브랜치 코드가 도는 dev 서버에,
 // 나머지(운영 · 로컬)는 main 이 도는 운영 서버에 올린다. 그래야 서버 변경을 운영 태블릿에 닿기 전에 미리 보기에서 시험할 수 있다.
@@ -308,7 +308,7 @@ export const Config = {
 };
 
 // 프로토타입(index.html)은 테스트 화면, 운영 버전(app/index.html, <html data-edition="app">)은 스테이션 흐름 (js/demo.js).
-// 스테이션 흐름은 같은 라운드에 대기·결과·운영 화면만 바꿔 끼운다. DEMO(App.demo) 가 이 흐름인지를 뜻한다 (세션 로그의 mode: 'demo')
+// 스테이션 흐름은 같은 라운드에 대기·결과·운영 화면만 바꿔 끼운다. DEMO 이면 App.edition 이 StationEdition 이다 (js/edition.js · 세션 로그의 mode: 'demo')
 export const EDITION = document.documentElement.dataset.edition || 'prototype';
 // 가로로 눕힌 휴대폰. 게임 판이 들어갈 높이가 없어 css/style.css 가 '세로로 돌려 주세요'로 덮고, 그동안 라운드를 멈춘다 (App.onRotate).
 // 이 값을 바꾸면 css/style.css 의 같은 @media 도 고친다

@@ -23,7 +23,7 @@ export class SessionLog {
     this.meta = {
       version: SessionLog.VERSION,
       id: this.id,
-      mode: app.demo ? 'demo' : 'test',
+      mode: app.edition.mode,
       // 운동 방식: dual = 페달 + 두뇌 게임 · brain = 두뇌 게임만 (페달 없이, 속도 측정·운동 점수 없음)
       track: app.cfg.brainOnly ? 'brain' : 'dual',
       startedAt: d.toISOString(),
@@ -243,7 +243,7 @@ export const SessionStore = {
     return this.run('readwrite', (s) => s.put({ id, at: new Date().toISOString() }), 'uploaded');
   },
 
-  // 세션을 하나씩 fn(log) 에 넘긴다 (시험용 회원 기록 서버, app/members.js)
+  // 세션을 하나씩 fn(log) 에 넘긴다 (시험용 회원 기록 서버, app/member-records.js)
   scan(fn) {
     return this.run('readonly', (s) => {
       const req = s.openCursor();

@@ -66,7 +66,7 @@
   <script type="module">
     import { drawCard, saveCard } from './member-card.js';
 
-    // 회원 번호 확인 (app/members.js 의 Members.valid 와 같은 규칙: 8자리, 끝자리는 Luhn 검사 숫자)
+    // 회원 번호 확인 (app/member-records.js 의 Members.valid 와 같은 규칙: 8자리, 끝자리는 Luhn 검사 숫자)
     const id = (location.hash.match(/\d{8}/) || [''])[0];
     const luhn = (b) => { let s = 0; for (let i = 0; i < b.length; i++) { let d = +b[b.length - 1 - i]; if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; } s += d; } return String((10 - (s % 10)) % 10); };
     const $ = (s) => document.getElementById(s);

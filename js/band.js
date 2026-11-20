@@ -3,6 +3,10 @@
 // 지면은 페달 속도가 아니라 점수만큼 흘러간다. 초록 구역 안에서는 꾸준히 나아가고, 벗어나면 느려지다 멈추며,
 // 인지 게임을 맞히면 한꺼번에 쭉 나아간다. 일정 점수마다 깃발이 서 있어 점수가 '달린 거리'로 보인다.
 import { U } from './config.js';
+import { Landmarks } from './landmarks.js';
+import { hash, mix } from './paint.js';
+import { footprint, heightOf, drawLandmark, drawSign } from './landmark-art.js';
+import { drawPine, drawRoundTree, drawHouse, drawWindmill, drawFlowerPatch, drawRoadside, drawRoadsideHill, drawBrainBadge, drawBike } from './scenery-art.js';
 
 export class Band {
   static RING_SEC = 0.7;
@@ -30,7 +34,7 @@ export class Band {
     this.rpm = 0;
     this.time = 0;        // 흐른 시간 (s). 구름·풍차처럼 점수와 상관없이 움직이는 것에 쓴다
     this.dayT = 0;        // 라운드 진행 0~1. 풍경 라이딩에서 아침 → 해 질 녘 (main.js 가 넣는다)
-    // 기념물 (풍경 라이딩, 운영 버전의 회원): 지난 세션마다 그 최종 점수 자리에 하나씩 서 있다 (Band.LANDMARKS).
+    // 기념물 (풍경 라이딩, 운영 버전의 회원): 지난 세션마다 그 최종 점수 자리에 하나씩 서 있다 (js/landmarks.js).
     // 점수가 오르면 자전거가 지난 기록들을 지나가고, 비슷한 점수로 여러 번 하면 그 자리에 모인다. 라운드가 끝나면 이번 점수 자리에 세운다
     this.landmarks = [];    // [{ score, seed, best, pop, tag, kind, size }] 점수 순. tag = 팻말 글자 (날짜)
     this.onLandmark = null; // (lm) 지난 기념물을 지나는 순간
@@ -115,72 +119,19 @@ export class Band {
     this.landmarks.forEach((lm) => (lm.pop = 0));
   }
 
-  // 기념물 종류는 세션 난이도로, 크기는 세션 길이로 정한다 (5분 0 · 10분 1 · 15분 2).
-  // village (기본): 집 · 가게 · 탑. 크기 = 층수 1~3. 같은 점수대에 여러 번 하면 마을이 생긴다. 벽·지붕 색은 세션마다 다르다
-  // objects: 바람개비(페달 속도로 돈다) · 풍선(수 1~3, 흔들린다) · 돌탑(돌 3~5). 주소에 ?marks=objects 로 비교해 본다
-  static LANDMARK_SETS = {
-    village: {
-      relax: { kind: 'cottage', verb: '집을 지었어요' },
-      normal: { kind: 'shop', verb: '가게를 열었어요' },
-      challenge: { kind: 'tower', verb: '탑을 세웠어요' },
-    },
-    objects: {
-      relax: { kind: 'pinwheel', verb: '바람개비를 꽂았어요' },
-      normal: { kind: 'balloon', verb: '풍선을 달았어요' },
-      challenge: { kind: 'cairn', verb: '돌탑을 쌓았어요' },
-    },
-  };
-  static get LANDMARKS() {
-    const q = new URLSearchParams(location.search).get('marks');
-    return Band.LANDMARK_SETS[q] || Band.LANDMARK_SETS.village;
-  }
-  static LM_COLORS = ['#e5484d', '#f5b301', '#2f6fed', '#e93d82', '#12a594'];
-  static WALLS = ['#fff1d6', '#ffe0c7', '#f9d8df', '#dfeef8', '#e7f1d4'];
-  static ROOFS = ['#e2574c', '#4a7fd4', '#f09a2c', '#2fae94', '#9b62c9'];
-
-  static landmarkOf(difficulty, min) {
-    const L = Band.LANDMARKS[difficulty] || Band.LANDMARKS.normal;
-    const size = !(min > 0) ? 1 : min <= 7 ? 0 : min <= 12 ? 1 : 2;
-    return { ...L, size };
-  }
-
-  // 기념물의 생김새 { kind, size, seed, wall, roof }. 세울 때 정해 세션과 함께 저장하고(회원 기록 look, 세션 로그 meta.landmark),
-  // 다음 라운드부터는 저장한 그대로 그린다 — 종류 표·색 목록을 나중에 고쳐도 이미 세운 건물은 바뀌지 않게 색은 값으로 적는다.
-  // seed 는 색 말고도 창가 꽃 색, 탑 돌무늬, 연기·깃발 박자 같은 작은 차이를 정한다
-  static lookOf(kind, size, seed) {
-    return { v: 1, kind, size, seed, wall: Band.WALLS[seed % Band.WALLS.length], roof: Band.ROOFS[(seed * 3 + 1) % Band.ROOFS.length] };
-  }
-
-  // 지난 세션들 [{ score, key, at, difficulty, min, look }] (at = 날짜 → 팻말). look 이 있으면 그대로,
-  // 없으면(생김새를 저장하기 전 기록) 난이도·시간과 key(세션마다 다른 값)로 정한다. 가장 높은 점수의 기념물에는 별을 단다
-  setLandmarks(list) {
-    const seedOf = (k) => [...String(k)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 100003, 7);
-    const tagOf = (at) => {
-      const d = new Date(at);
-      return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()}`;
-    };
-    const lms = (list || []).filter((x) => x.score > 0).map((x) => {
-      let look = x.look && x.look.kind ? x.look : null;
-      if (!look) {
-        const { kind, size } = Band.landmarkOf(x.difficulty, x.min);
-        look = Band.lookOf(kind, size, seedOf(x.key));
-      }
-      const { kind, size, seed, wall, roof } = look;
-      return { score: x.score, best: false, pop: 0, tag: tagOf(x.at), kind, size, seed: seed || 0, wall, roof };
-    });
-    lms.sort((a, b) => a.score - b.score);
-    if (lms.length) lms[lms.length - 1].best = true;
-    this.landmarks = lms;
+  // 지난 세션들 → 풍경의 기념물 (무엇을 세우는가는 js/landmarks.js). pop = 지나갈 때 커졌다 돌아오는 연출
+  setLandmarks(sessions) {
+    this.landmarks = Landmarks.fromHistory(sessions).map((landmark) => ({ ...landmark, pop: 0 }));
   }
 
   // 라운드 끝: 이번 점수 자리에 기념물을 세운다 (main.js 의 마무리 화면). 자전거는 앞으로 비켜 가며 멈춘다.
   // info = { n: 이 회원의 몇 번째 기록인가, difficulty, min }. 돌려주는 값 = 생김새 (main.js 가 세션 로그에 적는다)
   plant(score, { n = 1, difficulty, min } = {}) {
-    const { kind, size, verb } = Band.landmarkOf(difficulty, min);
+    const { kind, size, verb } = Landmarks.forSession(difficulty, min);
     const label = `${n === 1 ? '첫' : `${n}번째`} 기록 · ${verb}`;
-    const look = Band.lookOf(kind, size, Math.floor(Math.random() * 100000));
+    const look = Landmarks.look(kind, size, Math.floor(Math.random() * 100000));
     // 짓는 단계: 건물은 층마다 한 단계 + 지붕 (그 밖의 기념물은 한 번에)
-    const steps = Band.isBuilding(kind) ? size + 2 : 1;
+    const steps = Landmarks.isBuilding(kind) ? size + 2 : 1;
     this.planting = {
       score: Math.max(score, this.dist), t: 0, label, ...look,
       steps, step: -1, done: false, doneAt: Band.BUILD_DELAY + Band.BUILD_LEAD + steps * Band.BUILD_STEP,
@@ -193,18 +144,6 @@ export class Band {
   static BUILD_DELAY = 0.9;
   static BUILD_LEAD = 0.35;
   static BUILD_STEP = 0.5;
-  static isBuilding(kind) {
-    return kind === 'cottage' || kind === 'shop' || kind === 'tower';
-  }
-
-  // 기념물 전체 높이 어림 (밑동에서 지붕·깃발 끝까지). 짓는 동안 아래부터 보이게 자르고 이름표 자리를 미리 잡는 데 쓴다
-  static heightOf(kind, size, h) {
-    const f = size + 1;
-    if (kind === 'cottage') return h * (0.44 * f + 0.55);
-    if (kind === 'shop') return h * (0.44 * f + 0.24);
-    if (kind === 'tower') return h * (0.44 * (f + 0.55) + 1.0);
-    return h * 1.6;
-  }
 
   // deviation: (rpm - target) / target
   // score: 지금까지의 점수 (틱 사이에도 이어지도록 진행 중인 틱의 몫까지 더한 값)
@@ -353,7 +292,7 @@ export class Band {
     const br = r * (1 + 0.25 * this.pop);
     const by = -br - 2;
     if (this.brainOnly) {
-      this.drawBrainBadge(bx, by, br);
+      drawBrainBadge(this, bx, by, br);
       this.drawFloaters(trackHalf, -r * 2 - 6, r, glow);
       noGlow();
       g.globalAlpha = 1;
@@ -524,18 +463,6 @@ export class Band {
   // ---------- 풍경 라이딩 (운영 버전 app/ 의 화면 스타일, look.scenic) ----------
   // 하늘과 언덕이 점수만큼 흘러가고(먼 것일수록 느리게) 길 위에서 자전거가 달린다. 공 대신 자전거 배지,
   // 허용 구역은 길 위의 초록 구간이다. 배지 위 말풍선이 RPM 과 할 일을 글로 알려 준다 (색만으로 알리지 않는다).
-  static hash(i) {
-    const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-    return s - Math.floor(s);
-  }
-
-  // '#rrggbb' 두 색을 t 만큼 섞는다
-  static mix(a, b, t) {
-    const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
-    const [x, y] = [p(a), p(b)];
-    return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',')})`;
-  }
-
   // 라운드가 흐르는 동안 하루가 지나간다: 아침 → 한낮 → 늦은 오후 → 해 질 녘 (dayT 0~1).
   // 하늘은 위와 지평선 두 색. 파랑에서 주황으로 바로 섞으면 중간이 잿빛이 되어서, 위는 파랑 계열로 두고 지평선만 물든다
   skyAt(p) {
@@ -545,7 +472,7 @@ export class Band {
       if (p <= keys[i][0]) {
         const [p0, top0, low0] = keys[i - 1];
         const t = (p - p0) / (keys[i][0] - p0);
-        return [Band.mix(top0, keys[i][1], t), Band.mix(low0, keys[i][2], t)];
+        return [mix(top0, keys[i][1], t), mix(low0, keys[i][2], t)];
       }
     }
     return [pal.skyDusk, pal.skyDuskLow];
@@ -554,7 +481,7 @@ export class Band {
   // 가까운 언덕의 구간 (나무 칸 i 기준). 숲 → 과수원 → 마을 → 풍차 들판을 돈다.
   // 경계에서는 칸마다 조금씩 섞여서 다음 풍경이 오른쪽에서부터 차츰 들어온다
   static region(i) {
-    const n = Math.floor((i + Band.hash(i + 3) * 8) / Band.REGION_SLOTS);
+    const n = Math.floor((i + hash(i + 3) * 8) / Band.REGION_SLOTS);
     return ((n % 4) + 4) % 4;
   }
 
@@ -583,18 +510,18 @@ export class Band {
     const sunR = U.clamp(H * 0.11, 18, 64) * (1 + 0.3 * dusk);
     const sx = W * U.lerp(0.46, 0.84, day);
     const sy = roadTop - U.lerp(H * 0.2, H * 0.62, Math.sin(Math.PI * U.lerp(0.12, 0.92, day)));
-    g.fillStyle = Band.mix(pal.sun, pal.sunDusk, dusk);
+    g.fillStyle = mix(pal.sun, pal.sunDusk, dusk);
     g.beginPath();
     g.arc(sx, Math.max(sunR + 6, sy), sunR, 0, Math.PI * 2);
     g.fill();
     // 구름: 바람에 천천히 흐르고, 달릴수록 조금 더 빨리 지나간다
-    const cloud = Band.mix(pal.cloud, pal.cloudDusk, dusk);
+    const cloud = mix(pal.cloud, pal.cloudDusk, dusk);
     g.fillStyle = cloud;
     for (let k = 0; k < 4; k++) {
       const span = W + 360;
-      const cxk = W + 180 - ((k * 397 + Band.hash(k) * 200 + this.time * 7 + scroll * 0.05) % span);
-      const cyk = H * (0.1 + 0.16 * Band.hash(k + 11)) + roadTop * 0.1;
-      const cs = U.clamp(H * 0.07, 12, 40) * (0.8 + 0.5 * Band.hash(k + 5));
+      const cxk = W + 180 - ((k * 397 + hash(k) * 200 + this.time * 7 + scroll * 0.05) % span);
+      const cyk = H * (0.1 + 0.16 * hash(k + 11)) + roadTop * 0.1;
+      const cs = U.clamp(H * 0.07, 12, 40) * (0.8 + 0.5 * hash(k + 5));
       g.globalAlpha = 0.85;
       g.beginPath();
       g.arc(cxk - cs, cyk, cs * 0.7, 0, Math.PI * 2);
@@ -625,15 +552,15 @@ export class Band {
     const size = U.clamp(H * 0.1, 14, 60);
     for (let i = Math.floor((nearOff - 160) / sp); i * sp - nearOff < W + 100; i++) {
       const reg = Band.region(i);
-      if (Band.hash(i) < [0.45, 0.22, 0.28, 0.35][reg]) continue; // 구간마다 빽빽한 정도가 다르다
-      const x = i * sp - nearOff + Band.hash(i + 99) * 60;
-      const th = size * (0.75 + 0.5 * Band.hash(i + 7));
+      if (hash(i) < [0.45, 0.22, 0.28, 0.35][reg]) continue; // 구간마다 빽빽한 정도가 다르다
+      const x = i * sp - nearOff + hash(i + 99) * 60;
+      const th = size * (0.75 + 0.5 * hash(i + 7));
       const y = near(x) + th * 0.15;
-      const pick = Band.hash(i + 31);
-      if (reg === 0) this.drawPine(x, y, th);
-      else if (reg === 1) this.drawRoundTree(x, y, th, pick > 0.5);
-      else if (reg === 2) pick > 0.35 ? this.drawHouse(x, y, th, pick) : this.drawRoundTree(x, y, th, false);
-      else pick > 0.45 ? this.drawWindmill(x, y, th * 1.35, i) : this.drawFlowerPatch(x, y, th, i);
+      const pick = hash(i + 31);
+      if (reg === 0) drawPine(this, x, y, th);
+      else if (reg === 1) drawRoundTree(this, x, y, th, pick > 0.5);
+      else if (reg === 2) pick > 0.35 ? drawHouse(this, x, y, th, pick) : drawRoundTree(this, x, y, th, false);
+      else pick > 0.45 ? drawWindmill(this, x, y, th * 1.35, i) : drawFlowerPatch(this, x, y, th, i);
     }
     // 해 질 녘에는 풍경 전체가 노을빛으로 물든다 (길과 자전거는 그대로 또렷하게)
     if (dusk > 0) {
@@ -658,13 +585,13 @@ export class Band {
     g.fillRect(-ext, roadH / 2, ext * 2, H);
     // 길 아래에 자리가 넉넉하면(속도 전환 구간) 길가의 꽃과 덤불이 가장 빨리 지나간다
     const below = H - gy - roadH / 2;
-    if (below > 40) this.drawRoadside(ext, roadH / 2, below, scroll * 1.25, U.clamp((below - 40) / 80, 0, 1));
+    if (below > 40) drawRoadside(this, ext, roadH / 2, below, scroll * 1.25, U.clamp((below - 40) / 80, 0, 1));
     // 길 건너편의 낮은 언덕 (길과 함께 기울고 점수만큼 흘러간다). 입체 언덕의 앞쪽 비탈을 보는 것으로 여긴다:
     // 기념물(마을)은 그 앞 비탈, 꼭대기보다 아래·길보다 위에 선다. 언덕을 먼저 그리고 기념물을 그 앞에 그려 가려지지 않는다.
     // 꼭대기는 길 윗선에서 verge × 0.9 ~ 2.0 위, 밑동은 verge × 0.45 위라 건물 아랫부분 뒤로 늘 언덕 비탈이 보인다
     const verge = U.clamp(r * 0.85, 10, 32);
     const crest = (x) => -roadH / 2 - verge * (1.45 + 0.35 * Math.sin((x + scroll) * 0.009) + 0.2 * Math.sin((x + scroll) * 0.023 + 1.7));
-    this.drawRoadsideHill(ext, -roadH / 2, crest, verge);
+    drawRoadsideHill(this, ext, -roadH / 2, crest, verge);
     this.drawLandmarks(this.landmarkItems(r, ext), r, -roadH / 2 - verge * 0.45);
     // 점수 깃발도 같은 비탈에 똑바로 (기념물 앞에 그려 가려지지 않게)
     this.drawScenicFlags(ext, r, -roadH / 2 - verge * 0.45);
@@ -708,7 +635,7 @@ export class Band {
     const fs = Math.round(U.clamp(r * 0.62, 13, 30));
     if (this.brainOnly) {
       // 두뇌 배지만. 말풍선(RPM)과 '여기에 맞춰 달려요' 없이, 알림(최고 기록 등)은 말풍선이 있던 자리 위에 뜬다
-      this.drawBrainBadge(bx, by, br);
+      drawBrainBadge(this, bx, by, br);
       this.drawFloaters(trackHalf, by - r - fs * 0.6 - Math.round(fs * 1.9) - 4, r);
       g.restore();
       return;
@@ -726,7 +653,7 @@ export class Band {
     g.lineWidth = Math.max(3, br * 0.15);
     g.strokeStyle = this.inZone ? pal.accent : pal.warn;
     g.stroke();
-    this.drawBike(bx, by, br);
+    drawBike(this, bx, by, br);
 
     // 말풍선: RPM 과 할 일
     const tip = this.inZone ? '좋아요' : this.slowSide ? '더 빠르게 ›' : '‹ 조금 천천히';
@@ -787,15 +714,6 @@ export class Band {
   }
 
   // ----- 기념물 -----
-  // 밑면 너비의 절반(body)과 팻말을 세울 자리(sign, 지붕 처마 바깥). h = 기념물 크기
-  static footprint(kind, size, h) {
-    if (kind === 'cottage') return { body: 0.4 * h, sign: 0.544 * h };
-    if (kind === 'shop') return { body: 0.46 * h, sign: 0.51 * h };
-    if (kind === 'tower') return { body: 0.28 * h, sign: 0.36 * h };
-    if (kind === 'cairn') return { body: (0.26 + 0.03 * size) * h, sign: 0.32 * h };
-    return { body: 0.08 * h, sign: 0.32 * h };
-  }
-
   // 화면 근처의 기념물과 그 터 [L, R] (밑면 + 팻말). 길가 언덕 앞 비탈에 그린다
   landmarkItems(r, ext) {
     const { g, W, pal } = this;
@@ -817,7 +735,7 @@ export class Band {
     g.font = `800 ${fs}px ${pal.font}`;
     const items = [];
     const add = (lm, x, tag, extra) => {
-      const fp = Band.footprint(lm.kind, lm.size, h);
+      const fp = footprint(lm.kind, lm.size, h);
       const tw = tag ? g.measureText(tag).width + fs * 0.7 : 0;
       const R = tag ? fp.sign + h * 0.06 + tw : fp.body;
       items.push({ lm, x, tag, L: x - fp.body - h * 0.12, R: x + R + h * 0.12, ...extra });
@@ -838,7 +756,7 @@ export class Band {
   // 색: 아직 안 지난 깃발은 크림색, 1000점마다 큰 깃발은 강조색, 지난 깃발은 금색 (초록은 언덕에 묻힌다). 지나는 순간 커졌다 돌아온다
   drawScenicFlags(ext, r, baseY) {
     const { g, W, pal } = this;
-    const tone = (c) => Band.mix(c, '#3a2a20', 0.3);
+    const tone = (c) => mix(c, '#3a2a20', 0.3);
     const first = Math.max(Band.MARK_EVERY, Math.ceil((this.dist - ext / Band.PX_PER_POINT) / Band.MARK_EVERY) * Band.MARK_EVERY);
     for (let m = first; (m - this.dist) * Band.PX_PER_POINT < ext; m += Band.MARK_EVERY) {
       const x = (m - this.dist) * Band.PX_PER_POINT;
@@ -911,22 +829,6 @@ export class Band {
     }
   }
 
-  // 길가 언덕 (길 윗선 roadTop 에서 꼭대기 crest(x) 까지). 기념물보다 먼저 그린다.
-  // 꼭대기는 뒤 언덕(hillNear)에 가까운 밝은 풀색, 길 쪽으로 갈수록 풀밭색 — 앞으로 기운 비탈처럼 보이고 뒤 언덕과 길을 잇는다
-  drawRoadsideHill(ext, roadTop, crest, verge) {
-    const { g, pal } = this;
-    const grad = g.createLinearGradient(0, roadTop - verge * 2, 0, roadTop);
-    grad.addColorStop(0, Band.mix(pal.hillNear, pal.grass, 0.25));
-    grad.addColorStop(1, pal.grass);
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(-ext, roadTop + 1);
-    for (let x = -ext; x <= ext; x += 8) g.lineTo(x, crest(x));
-    g.lineTo(ext, roadTop + 1);
-    g.closePath();
-    g.fill();
-  }
-
   // items = landmarkItems, baseY = 밑동 높이 (길가 언덕의 앞 비탈, 길 윗선에서 조금 위). 화면 가운데가 지금 점수 자리다
   drawLandmarks(items, r, baseY) {
     const { g, pal } = this;
@@ -939,7 +841,7 @@ export class Band {
       }
       if (it.alpha <= 0) continue;
       g.globalAlpha = it.alpha;
-      this.drawLandmark(it.lm, it.x, baseY, h * (1 + 0.35 * it.lm.pop), '', r);
+      drawLandmark(this, it.lm, it.x, baseY, h * (1 + 0.35 * it.lm.pop), '', r);
     }
     // 날짜 팻말은 모든 건물 위에 (이웃 건물에 가려지지 않게)
     for (const it of items) {
@@ -949,7 +851,7 @@ export class Band {
       g.save();
       g.translate(it.x, baseY);
       g.rotate(this.theta);
-      this.drawSign(it.lm, hh, it.tag, r);
+      drawSign(this, it.lm, hh, it.tag, r);
       g.restore();
     }
     g.globalAlpha = 1;
@@ -960,7 +862,7 @@ export class Band {
     // (단계마다 통통 튀며 흙먼지) → 지붕까지 올리면 반짝이며 '오늘' 팻말과 이름표가 바뀐다
     const k = p.t - Band.BUILD_DELAY;
     if (k <= 0) return;
-    const full = Band.heightOf(p.kind, p.size, h);
+    const full = heightOf(p.kind, p.size, h);
     // 터: 흙 둔덕
     const m = U.clamp(k / 0.3, 0, 1);
     g.fillStyle = pal.trunk;
@@ -986,7 +888,7 @@ export class Band {
     }
     const done = p.t >= p.doneAt;
     if (s > 0) {
-      if (Band.isBuilding(p.kind)) {
+      if (Landmarks.isBuilding(p.kind)) {
         // 아래부터 단계만큼 드러낸다 (단계마다 톡 튀어 오른다)
         const step = Math.min(Math.floor(s), p.steps - 1);
         const u = U.clamp((s - step) / 0.75, 0, 1); // 한 단계의 앞 3/4 동안 올라간다
@@ -999,19 +901,19 @@ export class Band {
         g.restore();
         g.save();
         g.clip();
-        this.drawLandmark(p, x, baseY, h, '', r);
+        drawLandmark(this, p, x, baseY, h, '', r);
         g.restore();
         if (done) {
           g.save();
           g.translate(x, baseY);
           g.rotate(this.theta);
-          this.drawSign(p, h, '오늘', r);
+          drawSign(this, p, h, '오늘', r);
           g.restore();
         }
       } else {
         // 바람개비·풍선·돌탑: 한 번에 톡 솟는다
         const grow = back(U.clamp(s, 0, 1));
-        if (grow > 0.02) this.drawLandmark(p, x, baseY, h * grow, done ? '오늘' : '', r);
+        if (grow > 0.02) drawLandmark(this, p, x, baseY, h * grow, done ? '오늘' : '', r);
       }
     }
     // 다 지은 순간 반짝임
@@ -1055,616 +957,5 @@ export class Band {
     }
   }
 
-  // 기념물 하나 { kind, size, seed, best } 를 길 좌표 (x, y) 밑동에 h 크기로. tag = 오른쪽 작은 팻말의 글자 (날짜).
-  // 오르막·내리막에서는 길이 기울지만(theta) 기념물은 똑바로 선다. 밑에는 언덕 비탈에 드리운 옅은 그림자를 깔아 땅에 붙어 보이게 한다.
-  // 돌려주는 값 = 맨 위 높이 (밑동 기준, 똑바로 선 좌표. 별·이름표를 그 위에 둔다)
-  drawLandmark(lm, x, y, h, tag = '', r = h / 1.8) {
-    const { g, pal } = this;
-    g.save();
-    g.translate(x, y);
-    g.rotate(this.theta);
-    let top;
-    const fp = Band.footprint(lm.kind, lm.size, h);
-    g.fillStyle = 'rgba(30, 60, 35, 0.22)';
-    g.beginPath();
-    g.ellipse(h * 0.05, 0, fp.body * 1.25 + h * 0.05, h * 0.07, 0, 0, Math.PI * 2);
-    g.fill();
-    if (lm.kind === 'pinwheel') top = this.drawPinwheel(0, 0, h, lm.size, lm.seed);
-    else if (lm.kind === 'cairn') top = this.drawCairn(0, 0, h, lm.size, lm.seed);
-    else if (lm.kind === 'balloon') top = this.drawBalloons(0, 0, h, lm.size, lm.seed);
-    else ({ top } = this.drawBuilding(lm.kind, 0, 0, h, lm.size, lm.seed, lm));
-    if (lm.best) {
-      this.drawStar(0, top - h * 0.2, h * 0.17);
-      top -= h * 0.37;
-    }
-    if (tag) this.drawSign(lm, h, tag, r);
-    g.restore();
-    return top;
-  }
-
-  // 기념물 오른쪽(지붕 처마 바깥)의 작은 날짜 팻말. 밑동 기준, 똑바로 선 좌표에서 부른다
-  drawSign(lm, h, tag, r) {
-    const { g, pal } = this;
-    const fs = Math.round(U.clamp(r * 0.42, 10, 18));
-    g.font = `800 ${fs}px ${pal.font}`;
-    const w = g.measureText(tag).width + fs * 0.7;
-    const sh = fs * 1.35;
-    const sx = Band.footprint(lm.kind, lm.size, h).sign + h * 0.06;
-    const sy = -h * 0.3 - sh;
-    g.fillStyle = pal.trunk;
-    g.fillRect(sx + w * 0.5 - 1.5, sy + sh, 3, -sy - sh + 1);
-    g.beginPath();
-    g.roundRect(sx, sy, w, sh, 3);
-    g.fill();
-    g.fillStyle = pal.panel;
-    g.beginPath();
-    g.roundRect(sx + 1.5, sy + 1.5, w - 3, sh - 3, 2);
-    g.fill();
-    g.fillStyle = pal.ink;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(tag, sx + w / 2, sy + sh / 2 + 1);
-  }
-
-  // 마을 기념물 (동화책 풍): cottage(편안하게) 불룩한 박공지붕 집 · shop(보통) 줄무늬 차양 가게 · tower(도전) 깃발 단 탑.
-  // size 0~2 = 층수 1~3. 벽·지붕 색은 colors(저장한 생김새의 wall · roof), 없으면 seed 로. 둥근 모서리, 아치 문·창, 창가 화분, 오른쪽 그늘.
-  // 윤곽선은 검은 선이 아니라 칸마다 제 색을 조금 어둡게 한 선이다 (윤곽 없는 풍경 그림과 어울리게).
-  // 길가 언덕의 앞 비탈에 선다. 돌려주는 값 = { top: 맨 위 높이, half: 몸체 너비의 절반 }
-  drawBuilding(kind, x, y, h, size, seed, colors = {}) {
-    const { g } = this;
-    const floors = size + 1;
-    const fh = h * 0.44;                 // 한 층 높이
-    const wall = colors.wall || Band.WALLS[seed % Band.WALLS.length];
-    const roof = colors.roof || Band.ROOFS[(seed * 3 + 1) % Band.ROOFS.length];
-    const glass = '#ffe2a0', woodC = '#8a5a3a', stone = '#e6d6bb', brick = '#c0674a';
-    const tone = (c) => Band.mix(c, '#3a2a20', 0.3);
-    const lw = Math.max(1.2, h * 0.04);
-    g.lineJoin = 'round';
-    g.lineCap = 'round';
-    g.lineWidth = lw;
-    const paint = (fill) => {
-      g.fillStyle = fill;
-      g.fill();
-      g.strokeStyle = tone(fill);
-      g.stroke();
-    };
-    const shade = (bx, by, bw, bh) => {
-      g.fillStyle = 'rgba(80, 50, 30, 0.1)';
-      g.fillRect(bx + bw * 0.72, by, bw * 0.28, bh);
-    };
-    const archWin = (cx, cy, s) => {
-      g.beginPath();
-      g.moveTo(cx - s / 2, cy + s * 0.55);
-      g.lineTo(cx - s / 2, cy - s * 0.1);
-      g.arc(cx, cy - s * 0.1, s / 2, Math.PI, 0);
-      g.lineTo(cx + s / 2, cy + s * 0.55);
-      g.closePath();
-      g.fillStyle = glass;
-      g.fill();
-      g.strokeStyle = tone(wall);
-      g.stroke();
-      g.lineWidth = lw * 0.6;
-      g.beginPath();
-      g.moveTo(cx, cy - s * 0.55);
-      g.lineTo(cx, cy + s * 0.55);
-      g.moveTo(cx - s / 2, cy + s * 0.12);
-      g.lineTo(cx + s / 2, cy + s * 0.12);
-      g.stroke();
-      g.lineWidth = lw;
-      // 창가 화분
-      g.beginPath();
-      g.roundRect(cx - s * 0.6, cy + s * 0.55, s * 1.2, s * 0.22, s * 0.08);
-      paint('#b8704a');
-      for (let i = 0; i < 3; i++) {
-        g.fillStyle = Band.LM_COLORS[(seed + i) % Band.LM_COLORS.length];
-        g.beginPath();
-        g.arc(cx - s * 0.35 + i * s * 0.35, cy + s * 0.52, s * 0.12, 0, Math.PI * 2);
-        g.fill();
-      }
-    };
-    const door = (cx, dw, dh) => {
-      g.beginPath();
-      g.moveTo(cx - dw / 2, y);
-      g.lineTo(cx - dw / 2, y - dh + dw / 2);
-      g.arc(cx, y - dh + dw / 2, dw / 2, Math.PI, 0);
-      g.lineTo(cx + dw / 2, y);
-      g.closePath();
-      paint(woodC);
-      g.fillStyle = '#f5d36b';
-      g.beginPath();
-      g.arc(cx + dw * 0.25, y - dh * 0.42, lw * 0.6, 0, Math.PI * 2);
-      g.fill();
-    };
-    // 불룩한 지붕: 양 처마에서 꼭대기로 곡선
-    const puffyRoof = (ry, hw, rh, bulge) => {
-      g.beginPath();
-      g.moveTo(x - hw, ry + h * 0.04);
-      g.quadraticCurveTo(x - hw * 0.44, ry - rh * bulge, x, ry - rh);
-      g.quadraticCurveTo(x + hw * 0.44, ry - rh * bulge, x + hw, ry + h * 0.04);
-      g.closePath();
-      paint(roof);
-    };
-
-    if (kind === 'tower') {
-      const w = h * 0.5;
-      const bh = fh * (floors + 0.55);
-      g.beginPath();
-      g.moveTo(x - w * 0.56, y);
-      g.lineTo(x - w * 0.46, y - bh);
-      g.lineTo(x + w * 0.46, y - bh);
-      g.lineTo(x + w * 0.56, y);
-      g.closePath();
-      g.fillStyle = stone;
-      g.fill();
-      shade(x - w * 0.5, y - bh, w, bh);
-      g.strokeStyle = tone(stone);
-      g.stroke();
-      // 돌 무늬
-      g.fillStyle = 'rgba(120, 90, 60, 0.22)';
-      for (let i = 0; i < floors * 3; i++) {
-        g.beginPath();
-        g.roundRect(x - w * 0.4 + Band.hash(seed + i) * w * 0.6, y - bh + Band.hash(seed + i * 7) * bh * 0.9, w * 0.16, h * 0.05, 2);
-        g.fill();
-      }
-      for (let i = 1; i <= floors; i++) archWin(x, y - fh * (i + 0.15), h * 0.18);
-      door(x, w * 0.36, fh * 0.6);
-      const ry = y - bh;
-      const rh = h * 0.7;
-      puffyRoof(ry, w * 0.72, rh, 0.25);
-      const pole = ry - rh;
-      g.strokeStyle = tone(roof);
-      g.beginPath();
-      g.moveTo(x, pole);
-      g.lineTo(x, pole - h * 0.3);
-      g.stroke();
-      const flutter = Math.sin(this.time * 4 + seed) * h * 0.03;
-      g.beginPath();
-      g.moveTo(x, pole - h * 0.3);
-      g.quadraticCurveTo(x + h * 0.14, pole - h * 0.3 + flutter, x + h * 0.24, pole - h * 0.22 + flutter);
-      g.lineTo(x, pole - h * 0.16);
-      g.closePath();
-      paint('#f5b301');
-      return { top: pole - h * 0.3, half: w * 0.72 };
-    }
-
-    if (kind === 'shop') {
-      const w = h * 0.92;
-      const bh = fh * floors + h * 0.12;
-      g.beginPath();
-      g.roundRect(x - w / 2, y - bh, w, bh, h * 0.04);
-      g.fillStyle = wall;
-      g.fill();
-      shade(x - w / 2, y - bh, w, bh);
-      g.strokeStyle = tone(wall);
-      g.stroke();
-      g.beginPath();
-      g.roundRect(x - w / 2 - h * 0.05, y - bh - h * 0.12, w + h * 0.1, h * 0.14, h * 0.05);
-      paint(roof);
-      // 1층: 큰 진열창과 문, 그 위 줄무늬 차양
-      g.beginPath();
-      g.roundRect(x - w * 0.42, y - fh * 0.74, w * 0.46, fh * 0.56, h * 0.04);
-      g.fillStyle = glass;
-      g.fill();
-      g.strokeStyle = tone(wall);
-      g.stroke();
-      door(x + w * 0.26, w * 0.24, fh * 0.74);
-      const aw = w + h * 0.1;
-      const ay = y - fh * 0.98;
-      const n = 5;
-      for (let i = 0; i < n; i++) {
-        const sx = x - aw / 2 + (aw / n) * i;
-        g.beginPath();
-        g.moveTo(sx, ay);
-        g.lineTo(sx + aw / n, ay);
-        g.lineTo(sx + aw / n, ay + h * 0.1);
-        g.arc(sx + aw / n / 2, ay + h * 0.1, aw / n / 2, 0, Math.PI);
-        g.closePath();
-        g.fillStyle = i % 2 ? '#fffaf0' : roof;
-        g.fill();
-        g.strokeStyle = tone(roof);
-        g.stroke();
-      }
-      for (let f = 1; f < floors; f++) {
-        archWin(x - w * 0.22, y - fh * (f + 0.45), h * 0.17);
-        archWin(x + w * 0.22, y - fh * (f + 0.45), h * 0.17);
-      }
-      return { top: y - bh - h * 0.12, half: w / 2 + h * 0.05 };
-    }
-
-    // cottage
-    const w = h * 0.8;
-    const bh = fh * floors;
-    g.beginPath();
-    g.roundRect(x - w / 2, y - bh, w, bh, h * 0.03);
-    g.fillStyle = wall;
-    g.fill();
-    shade(x - w / 2, y - bh, w, bh);
-    g.strokeStyle = tone(wall);
-    g.stroke();
-    door(x - w * 0.22, w * 0.26, fh * 0.7);
-    archWin(x + w * 0.2, y - fh * 0.55, h * 0.17);
-    for (let f = 1; f < floors; f++) {
-      archWin(x - w * 0.2, y - fh * (f + 0.45), h * 0.17);
-      archWin(x + w * 0.2, y - fh * (f + 0.45), h * 0.17);
-    }
-    const ry = y - bh;
-    const rh = h * 0.5;
-    // 굴뚝(지붕 뒤)과 피어오르는 연기
-    g.beginPath();
-    g.roundRect(x + w * 0.14, ry - rh * 0.95, w * 0.16, rh * 0.7, h * 0.02);
-    paint(brick);
-    g.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    const a0 = g.globalAlpha;
-    for (let i = 0; i < 3; i++) {
-      const t = (this.time * 0.35 + i / 3 + seed * 0.13) % 1;
-      g.globalAlpha = a0 * (1 - t);
-      g.beginPath();
-      g.arc(x + w * 0.22 + t * h * 0.16, ry - rh - h * (0.04 + t * 0.32), h * (0.035 + t * 0.05), 0, Math.PI * 2);
-      g.fill();
-    }
-    g.globalAlpha = a0;
-    puffyRoof(ry, w * 0.68, rh, 0.6);
-    // 지붕 위 밝은 띠
-    g.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-    g.beginPath();
-    g.moveTo(x - w * 0.42, ry - rh * 0.22);
-    g.quadraticCurveTo(x, ry - rh * 0.55, x + w * 0.42, ry - rh * 0.22);
-    g.stroke();
-    return { top: ry - rh, half: w * 0.68 };
-  }
-
-  // 바람개비 (편안하게): 막대 위의 네 날개. 페달을 밟는 만큼 돈다. size 0~2 = 크기
-  drawPinwheel(x, y, h, size, seed) {
-    const { g, pal } = this;
-    const L = h * (0.8 + 0.18 * size);
-    const R = h * (0.28 + 0.07 * size);
-    const cy = y - L;
-    g.strokeStyle = pal.trunk;
-    g.lineWidth = Math.max(2, h * 0.06);
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x, cy);
-    g.stroke();
-    const a0 = this.roll * 0.7 + seed;
-    const C = Band.LM_COLORS;
-    g.lineWidth = Math.max(1, h * 0.025);
-    g.strokeStyle = 'rgba(0,0,0,0.25)';
-    for (let k = 0; k < 4; k++) {
-      const a = a0 + (k * Math.PI) / 2;
-      g.fillStyle = C[(seed + k) % C.length];
-      g.beginPath();
-      g.moveTo(x, cy);
-      g.lineTo(x + Math.cos(a) * R, cy + Math.sin(a) * R);
-      g.lineTo(x + Math.cos(a + 0.8) * R * 0.72, cy + Math.sin(a + 0.8) * R * 0.72);
-      g.closePath();
-      g.fill();
-      g.stroke();
-    }
-    g.fillStyle = '#ffffff';
-    g.beginPath();
-    g.arc(x, cy, Math.max(1.5, h * 0.045), 0, Math.PI * 2);
-    g.fill();
-    return cy - R;
-  }
-
-  // 풍선 (보통): 말뚝에 묶인 풍선 size+1 개. 천천히 흔들린다
-  drawBalloons(x, y, h, size, seed) {
-    const { g, pal } = this;
-    const n = size + 1;
-    const rx = h * 0.2;
-    const ry = h * 0.25;
-    const peg = y - h * 0.14;
-    g.fillStyle = pal.trunk;
-    g.fillRect(x - h * 0.03, peg, h * 0.06, y - peg);
-    let top = y;
-    const C = Band.LM_COLORS;
-    for (let i = 0; i < n; i++) {
-      const off = n === 1 ? 0 : (i - (n - 1) / 2) * h * 0.34;
-      const cx = x + off + Math.sin(this.time * 1.3 + seed + i * 2.1) * h * 0.05;
-      const cy = y - h * (1.25 + (i % 2) * 0.14) + Math.sin(this.time * 1.7 + seed * 0.7 + i) * h * 0.04;
-      g.strokeStyle = pal.ink;
-      g.globalAlpha *= 0.55;
-      g.lineWidth = Math.max(1, h * 0.02);
-      g.beginPath();
-      g.moveTo(x, peg);
-      g.quadraticCurveTo(x + off * 0.3, (peg + cy) / 2, cx, cy + ry);
-      g.stroke();
-      g.globalAlpha /= 0.55;
-      g.fillStyle = C[(seed + i * 2) % C.length];
-      g.beginPath();
-      g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-      g.fill();
-      g.beginPath();
-      g.moveTo(cx, cy + ry - 1);
-      g.lineTo(cx - rx * 0.22, cy + ry + rx * 0.3);
-      g.lineTo(cx + rx * 0.22, cy + ry + rx * 0.3);
-      g.closePath();
-      g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.45)';
-      g.beginPath();
-      g.ellipse(cx - rx * 0.35, cy - ry * 0.35, rx * 0.22, ry * 0.3, -0.5, 0, Math.PI * 2);
-      g.fill();
-      top = Math.min(top, cy - ry);
-    }
-    return top;
-  }
-
-  // 돌탑 (도전): 납작한 돌을 위로 갈수록 작게 쌓는다. size 0~2 = 돌 3~5 개
-  drawCairn(x, y, h, size, seed) {
-    const { g } = this;
-    const greys = ['#8d949b', '#aeb4ba', '#767d84', '#9da3a9'];
-    let w = h * (0.52 + 0.06 * size);
-    let cy = y;
-    g.strokeStyle = '#4b5157';
-    g.lineWidth = Math.max(1, h * 0.03);
-    for (let i = 0; i < 3 + size; i++) {
-      const sh = w * 0.5;
-      const dx = (Band.hash(seed + i * 13) - 0.5) * w * 0.25;
-      g.fillStyle = greys[(seed + i) % greys.length];
-      g.beginPath();
-      g.ellipse(x + dx, cy - sh / 2, w / 2, sh / 2, 0, 0, Math.PI * 2);
-      g.fill();
-      g.stroke();
-      cy -= sh * 0.85;
-      w *= 0.8;
-    }
-    return cy;
-  }
-
-  drawStar(x, y, s) {
-    const { g, pal } = this;
-    g.fillStyle = pal.sun;
-    g.strokeStyle = pal.ink;
-    g.lineWidth = Math.max(1, s * 0.15);
-    g.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const a = -Math.PI / 2 + (i * Math.PI) / 5;
-      const d = i % 2 ? s * 0.45 : s;
-      g.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d);
-    }
-    g.closePath();
-    g.fill();
-    g.stroke();
-  }
-
   // ----- 풍경 소품. (x, y) = 밑동, h = 크기 -----
-  drawPine(x, y, h) {
-    const { g, pal } = this;
-    g.fillStyle = pal.tree;
-    g.beginPath();
-    g.moveTo(x - h * 0.32, y);
-    g.lineTo(x, y - h);
-    g.lineTo(x + h * 0.32, y);
-    g.closePath();
-    g.fill();
-  }
-
-  drawRoundTree(x, y, h, fruit) {
-    const { g, pal } = this;
-    g.fillStyle = pal.trunk;
-    g.fillRect(x - h * 0.06, y - h * 0.5, h * 0.12, h * 0.5);
-    g.fillStyle = pal.treeRound;
-    g.beginPath();
-    g.arc(x, y - h * 0.66, h * 0.34, 0, Math.PI * 2);
-    g.fill();
-    if (!fruit) return;
-    g.fillStyle = pal.fruit;
-    for (const [dx, dy] of [[-0.14, -0.7], [0.12, -0.6], [0.02, -0.82], [0.17, -0.8]]) {
-      g.beginPath();
-      g.arc(x + dx * h, y + dy * h, Math.max(1.5, h * 0.05), 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-
-  drawHouse(x, y, h, pick) {
-    const { g, pal } = this;
-    const w = h * 0.95;
-    const bh = h * 0.55;
-    g.fillStyle = pal.wall;
-    g.fillRect(x - w / 2, y - bh, w, bh);
-    g.fillStyle = pick > 0.7 ? pal.roofAlt : pal.roof;
-    g.beginPath();
-    g.moveTo(x - w * 0.62, y - bh);
-    g.lineTo(x, y - bh - h * 0.42);
-    g.lineTo(x + w * 0.62, y - bh);
-    g.closePath();
-    g.fill();
-    g.fillStyle = pal.window;
-    g.fillRect(x - w * 0.3, y - bh * 0.72, w * 0.22, bh * 0.3);
-    g.fillRect(x + w * 0.1, y - bh * 0.72, w * 0.22, bh * 0.3);
-  }
-
-  // 풍차 날개는 시간에 따라 돈다
-  drawWindmill(x, y, h, i) {
-    const { g, pal } = this;
-    const top = y - h * 1.15;
-    g.fillStyle = pal.mill;
-    g.beginPath();
-    g.moveTo(x - h * 0.2, y);
-    g.lineTo(x - h * 0.09, top);
-    g.lineTo(x + h * 0.09, top);
-    g.lineTo(x + h * 0.2, y);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = pal.blade;
-    g.lineWidth = Math.max(2, h * 0.07);
-    g.lineCap = 'round';
-    g.beginPath();
-    const a0 = this.time * 1.4 + i;
-    for (let k = 0; k < 4; k++) {
-      const a = a0 + (k * Math.PI) / 2;
-      g.moveTo(x, top);
-      g.lineTo(x + Math.cos(a) * h * 0.6, top + Math.sin(a) * h * 0.6);
-    }
-    g.stroke();
-    g.lineCap = 'butt';
-    g.fillStyle = pal.blade;
-    g.beginPath();
-    g.arc(x, top, Math.max(2, h * 0.07), 0, Math.PI * 2);
-    g.fill();
-  }
-
-  drawFlowerPatch(x, y, h, i) {
-    const { g, pal } = this;
-    const colors = [pal.flowerA, pal.flowerB, pal.flowerC, pal.flowerD];
-    const c = colors[Math.floor(Band.hash(i + 17) * colors.length)];
-    g.fillStyle = c;
-    for (let k = 0; k < 7; k++) {
-      g.beginPath();
-      g.arc(x + (Band.hash(i * 7 + k) - 0.5) * h * 1.6, y - Band.hash(i * 5 + k) * h * 0.35, Math.max(2.5, h * 0.1), 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-
-  // 길 아래 풀밭의 꽃과 덤불 (길과 같이 기운 좌표에서 그린다). off = 흘러간 거리, a = 보이는 정도
-  drawRoadside(ext, top, below, off, a) {
-    const { g, pal } = this;
-    const sp = 64;
-    const s = U.clamp(below * 0.12, 6, 26);
-    const colors = [pal.flowerA, pal.flowerB, pal.flowerC, pal.flowerD];
-    g.globalAlpha = a;
-    for (let j = Math.floor((off - ext) / sp); j * sp - off < ext + sp; j++) {
-      const h = Band.hash(j + 501);
-      if (h < 0.35) continue;
-      const x = j * sp - off + Band.hash(j + 77) * 30;
-      const y = top + below * (0.22 + 0.45 * Band.hash(j + 13));
-      if (h > 0.82) {
-        g.fillStyle = pal.bush;
-        g.beginPath();
-        g.arc(x, y, s * 1.3, Math.PI, 0);
-        g.arc(x + s * 1.2, y, s * 0.95, Math.PI, 0);
-        g.closePath();
-        g.fill();
-        continue;
-      }
-      g.strokeStyle = pal.tree;
-      g.lineWidth = Math.max(1.5, s * 0.14);
-      g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x, y - s * 1.1);
-      g.stroke();
-      g.fillStyle = colors[Math.floor(Band.hash(j + 9) * colors.length)];
-      g.beginPath();
-      g.arc(x, y - s * 1.2, s * 0.42, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.globalAlpha = 1;
-  }
-
-  // 두뇌 배지 (두뇌 게임만 하는 판의 공·자전거 대신, s = 배지 반지름). 두뇌 모양은 로고(app/logo.svg)와 같다.
-  // 정답 직후(pop)에는 초록으로 물들고 신경망 마디가 밝아진다. 달리는 느낌이 나게 박자 없이 살짝 오르내린다
-  static BRAIN = new Path2D('M-0.95 0.05 C-1 -0.45 -0.6 -0.8 -0.1 -0.8 C0.45 -0.82 0.95 -0.5 0.95 -0.05 C0.97 0.25 0.85 0.42 0.62 0.45 C0.7 0.62 0.5 0.75 0.3 0.66 C0.22 0.62 0.18 0.56 0.15 0.52 L0.13 0.8 L0.01 0.8 L0.02 0.5 C-0.2 0.55 -0.45 0.5 -0.55 0.38 C-0.8 0.42 -0.92 0.28 -0.95 0.05 Z');
-  static BRAIN_NODES = [[-0.6, -0.1], [-0.2, -0.45], [0.3, -0.42], [0.55, -0.05], [0.15, 0.2], [-0.35, 0.25]];
-  static BRAIN_LINKS = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [1, 4], [0, 4]];
-  drawBrainBadge(x, y, s) {
-    const { g, pal, look } = this;
-    y += Math.sin(this.time * 5) * s * 0.04;
-    g.fillStyle = pal.panel;
-    g.beginPath();
-    g.arc(x, y, s, 0, Math.PI * 2);
-    g.fill();
-    if (this.pop > 0) {
-      g.globalAlpha = this.pop;
-      g.fillStyle = pal.goodSoft;
-      g.fill();
-      g.globalAlpha = 1;
-    }
-    g.lineWidth = Math.max(3, s * 0.15);
-    g.strokeStyle = pal.accent;
-    if (look.glow) {
-      g.shadowColor = pal.accent;
-      g.shadowBlur = look.glow;
-    }
-    g.stroke();
-    g.shadowBlur = 0;
-    g.save();
-    g.translate(x, y - s * 0.02);
-    const k = s * 0.62;
-    g.scale(k, k);
-    g.fillStyle = pal.accent;
-    g.fill(Band.BRAIN);
-    if (this.pop > 0) {
-      g.globalAlpha = this.pop;
-      g.fillStyle = pal.good;
-      g.fill(Band.BRAIN);
-      g.globalAlpha = 1;
-    }
-    const N = Band.BRAIN_NODES;
-    g.strokeStyle = pal.panel;
-    g.lineWidth = 0.08;
-    g.lineCap = 'round';
-    g.globalAlpha = 0.7;
-    g.beginPath();
-    for (const [a, b] of Band.BRAIN_LINKS) {
-      g.moveTo(...N[a]);
-      g.lineTo(...N[b]);
-    }
-    g.stroke();
-    g.globalAlpha = 1;
-    // 마디 하나씩 차례로 밝아진다 (생각이 도는 느낌). 정답 직후에는 모두 밝다
-    const lit = Math.floor(this.time * 2.5) % N.length;
-    N.forEach(([nx, ny], i) => {
-      g.fillStyle = pal.panel;
-      g.globalAlpha = this.pop > 0 || i === lit ? 1 : 0.75;
-      g.beginPath();
-      g.arc(nx, ny, i === lit ? 0.15 : 0.11, 0, Math.PI * 2);
-      g.fill();
-    });
-    g.globalAlpha = 1;
-    g.lineCap = 'butt';
-    g.restore();
-  }
-
-  // 배지 안의 자전거 (s = 배지 반지름). 바퀴는 페달보다 빨리 돌고, 크랭크는 페달 속도 그대로 돈다
-  drawBike(x, y, s) {
-    const { g, pal } = this;
-    const P = (px, py) => [x + px * s, y + py * s];
-    const wr = s * 0.27;
-    const R = P(-0.4, 0.22), F = P(0.4, 0.22), C = P(-0.02, 0.22), S = P(-0.15, -0.18), Hd = P(0.27, -0.18);
-    g.strokeStyle = pal.ink;
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
-    g.lineWidth = Math.max(2, s * 0.085);
-    g.beginPath();
-    g.arc(R[0], R[1], wr, 0, Math.PI * 2);
-    g.moveTo(F[0] + wr, F[1]);
-    g.arc(F[0], F[1], wr, 0, Math.PI * 2);
-    g.moveTo(...R);
-    g.lineTo(...S);
-    g.lineTo(...C);
-    g.lineTo(...R);
-    g.moveTo(...S);
-    g.lineTo(...Hd);
-    g.lineTo(...C);
-    g.moveTo(...Hd);
-    g.lineTo(...F);
-    const seat = P(-0.17, -0.31);
-    g.moveTo(...S);
-    g.lineTo(...seat);
-    g.moveTo(seat[0] - s * 0.1, seat[1]);
-    g.lineTo(seat[0] + s * 0.08, seat[1]);
-    const bar = P(0.3, -0.33);
-    g.moveTo(...Hd);
-    g.lineTo(...bar);
-    g.lineTo(bar[0] + s * 0.1, bar[1] + s * 0.02);
-    g.stroke();
-    g.lineWidth = Math.max(1.2, s * 0.045);
-    g.beginPath();
-    for (const wh of [R, F]) {
-      for (let k = 0; k < 3; k++) {
-        const a = this.roll * 2 + (k * Math.PI) / 3;
-        g.moveTo(wh[0] + Math.cos(a) * wr, wh[1] + Math.sin(a) * wr);
-        g.lineTo(wh[0] - Math.cos(a) * wr, wh[1] - Math.sin(a) * wr);
-      }
-    }
-    g.stroke();
-    g.lineWidth = Math.max(2, s * 0.07);
-    g.beginPath();
-    const ca = this.roll;
-    g.moveTo(C[0] + Math.cos(ca) * s * 0.13, C[1] + Math.sin(ca) * s * 0.13);
-    g.lineTo(C[0] - Math.cos(ca) * s * 0.13, C[1] - Math.sin(ca) * s * 0.13);
-    g.stroke();
-    g.lineCap = 'butt';
-    g.lineJoin = 'miter';
-  }
 }

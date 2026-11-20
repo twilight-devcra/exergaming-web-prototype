@@ -32,6 +32,9 @@
 //   tricks   — 속임 가로줄 수
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 const LADDER_PEGS = [
   // 색만으로 구분하지 않도록 색마다 모양이 다르다 (색약 대응). 모두 (0, 0) 을 가운데로 그린다
@@ -44,7 +47,7 @@ const LADDER_PEGS = [
 
 export class LadderGame {
   static id = 'ladder';
-  static tags = ['trace']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.TRACE];
   static title = '사다리 타기';
   static hint = '사다리를 타고 내려가 같은 모양 구멍에<br>쏙 들어가는 조각을 위에서 고르세요';
   static levels = [
@@ -75,10 +78,10 @@ export class LadderGame {
 
   // 소개 그림: ① 사다리를 타고 내려가 ② 같은 모양 구멍에 들어가는 조각을 고른다 (바로 위 조각이 답이 아니다)
   static diagram() {
-    const X = [50, 100, 150];
-    const peg = (k, x, y, s = 0.5) => `<g transform="translate(${x} ${y}) scale(${s})" fill="${LADDER_PEGS[k].fill}">${LADDER_PEGS[k].svg}</g>`;
-    const frame = X.map((x) => `<line class="dg-rail" x1="${x}" y1="30" x2="${x}" y2="112"/>`).join('') +
-      [[0, 52], [1, 72], [0, 94]].map(([i, y]) => `<line class="dg-rail" x1="${X[i]}" y1="${y}" x2="${X[i + 1]}" y2="${y}"/>`).join('') +
+    const LANE_X = [50, 100, 150];
+    const peg = (k, x, y, scale = 0.5) => `<g transform="translate(${x} ${y}) scale(${scale})" fill="${LADDER_PEGS[k].fill}">${LADDER_PEGS[k].svg}</g>`;
+    const frame = LANE_X.map((x) => `<line class="dg-rail" x1="${x}" y1="30" x2="${x}" y2="112"/>`).join('') +
+      [[0, 52], [1, 72], [0, 94]].map(([i, y]) => `<line class="dg-rail" x1="${LANE_X[i]}" y1="${y}" x2="${LANE_X[i + 1]}" y2="${y}"/>`).join('') +
       `<g transform="translate(50 126) scale(0.62)" class="dg-hole" stroke="${LADDER_PEGS[2].fill}">${LADDER_PEGS[2].svg}</g>` +
       [100, 150].map((x) => `<circle class="dg-end" cx="${x}" cy="126" r="4"/>`).join('');
     const trace = '<polyline class="dg-trace" points="150,16 150,72 100,72 100,94 50,94 50,124"/>';
@@ -88,18 +91,20 @@ export class LadderGame {
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = LadderGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
-    this.phase = 'wait';
+    this.phase = Phase.WAIT;
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${LadderGame.title} · Lv.${level}`, this.msg, LadderGame.ROUNDS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${LadderGame.title} · Lv.${level}`, this.message, LadderGame.ROUNDS);
     this.progress = dots;
     this.wrap = U.el('div', 'lad-wrap');
     this.board = U.el('div', 'lad-board');
@@ -109,63 +114,63 @@ export class LadderGame {
   }
 
   next() {
-    const p = LadderGame.generate(this.spec);
-    this.p = p;
-    U.say(this.msg, '같은 모양 구멍에 들어갈 조각을 고르세요', 'act');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
+    const puzzle = LadderGame.generate(this.spec);
+    this.puzzle = puzzle;
+    U.say(this.message, '같은 모양 구멍에 들어갈 조각을 고르세요', 'act');
+    Progress.current(this.progress, this.round);
     this.render();
-    this.phase = 'input';
-    const r3 = (v) => Math.round(v * 1000) / 1000;
-    this.h.question({
-      lanes: p.lanes,
-      rungs: p.rungs.map((g) => [g.i, r3(g.yl), r3(g.yr), g.trick ? 1 : 0]),
-      pegs: p.pegs.map((k) => LADDER_PEGS[k].id),
-      holes: p.holes.map((k) => (k == null ? null : LADDER_PEGS[k].id)),
-      answer: p.answer,
-      cross: p.ends[p.answer].cross,
-      load: p.load,
-      flatEnd: p.flatEnds[p.answer].end, // 가로줄을 평평하게 읽었을 때 정답 조각이 닿는 곳
-      trap: p.trap,                      // 평평하게 읽으면 맞는 것처럼 보이는 조각 (없으면 -1)
+    this.phase = Phase.INPUT;
+    const round3 = (value) => Math.round(value * 1000) / 1000;
+    this.host.question({
+      lanes: puzzle.lanes,
+      rungs: puzzle.rungs.map((rung) => [rung.i, round3(rung.yl), round3(rung.yr), rung.trick ? 1 : 0]),
+      pegs: puzzle.pegs.map((k) => LADDER_PEGS[k].id),
+      holes: puzzle.holes.map((k) => (k == null ? null : LADDER_PEGS[k].id)),
+      answer: puzzle.answer,
+      cross: puzzle.ends[puzzle.answer].cross,
+      load: puzzle.load,
+      flatEnd: puzzle.flatEnds[puzzle.answer].end, // 가로줄을 평평하게 읽었을 때 정답 조각이 닿는 곳
+      trap: puzzle.trap,                      // 평평하게 읽으면 맞는 것처럼 보이는 조각 (없으면 -1)
     });
-    this.h.timer(p.load, () => this.pick(-1));
+    this.host.timer(puzzle.load, () => this.pick(-1));
   }
 
   // ---- 그리기 ----
-  x(i) { return LadderGame.PAD + i * LadderGame.S; }
-  // 가로줄 g 의 한쪽 끝 높이. side 0 = 왼쪽 세로줄(g.i), 1 = 오른쪽(g.i + 1). yl, yr 은 사다리 높이에 대한 비율
-  y(g, side) { return LadderGame.TOP + (side ? g.yr : g.yl) * LadderGame.LH; }
+  laneX(i) { return LadderGame.PAD + i * LadderGame.S; }
+  // 가로줄 rung 의 한쪽 끝 높이. side 0 = 왼쪽 세로줄(rung.i), 1 = 오른쪽(rung.i + 1). yl, yr 은 사다리 높이에 대한 비율
+  rungY(rung, side) { return LadderGame.TOP + (side ? rung.yr : rung.yl) * LadderGame.LH; }
   get topY() { return LadderGame.TOP - 40; }
   get botY() { return LadderGame.TOP + LadderGame.LH + 42; }
 
   render() {
-    const { lanes, rungs, pegs, holes } = this.p;
+    const { lanes, rungs, pegs, holes } = this.puzzle;
     const { S, PAD, LH, TOP, BOT } = LadderGame;
     const W = PAD * 2 + (lanes - 1) * S;
     const H = TOP + LH + BOT;
     const bottom = TOP + LH;
     let svg = `<svg class="lad-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
-    for (let i = 0; i < lanes; i++) svg += `<line class="lad-rail" x1="${this.x(i)}" y1="${TOP - 18}" x2="${this.x(i)}" y2="${bottom + 18}"/>`;
-    for (const g of rungs) {
-      svg += `<line class="lad-rung" x1="${this.x(g.i)}" y1="${this.y(g, 0).toFixed(1)}" x2="${this.x(g.i + 1)}" y2="${this.y(g, 1).toFixed(1)}"/>`;
+    for (let i = 0; i < lanes; i++) svg += `<line class="lad-rail" x1="${this.laneX(i)}" y1="${TOP - 18}" x2="${this.laneX(i)}" y2="${bottom + 18}"/>`;
+    for (const rung of rungs) {
+      svg += `<line class="lad-rung" x1="${this.laneX(rung.i)}" y1="${this.rungY(rung, 0).toFixed(1)}" x2="${this.laneX(rung.i + 1)}" y2="${this.rungY(rung, 1).toFixed(1)}"/>`;
     }
     // 구멍: 조각과 같은 모양을 조금 크게, 어두운 속과 그 모양의 색 테두리로 그린다.
     // 자리는 감싼 g 로 옮긴다 (css 애니메이션을 받는 안쪽 요소에 transform 속성이 있으면 서로 부딪친다)
     for (let i = 0; i < lanes; i++) {
       const k = holes[i];
       svg += k == null
-        ? `<g transform="translate(${this.x(i)} ${this.botY})"><circle class="lad-floor lad-end" r="8"/></g>`
-        : `<g transform="translate(${this.x(i)} ${this.botY}) scale(1.18)">`
+        ? `<g transform="translate(${this.laneX(i)} ${this.botY})"><circle class="lad-floor lad-end" r="8"/></g>`
+        : `<g transform="translate(${this.laneX(i)} ${this.botY}) scale(1.18)">`
           + `<g class="lad-floor lad-hole" stroke="${LADDER_PEGS[k].fill}">${LADDER_PEGS[k].svg}</g></g>`;
     }
     svg += '<g class="lad-traces"></g>';
     // 출발점: 조각보다 넓게 세로줄 한 칸 폭을 눌러도 되게 한다. 조각은 고르면 길을 따라 내려가므로 따로 둔다
     for (let i = 0; i < lanes; i++) {
-      svg += `<g class="lad-start"><rect x="${this.x(i) - S / 2}" y="0" width="${S}" height="${TOP}"/>`
-        + `<circle class="lad-halo" cx="${this.x(i)}" cy="${this.topY}" r="31"/></g>`;
+      svg += `<g class="lad-start"><rect x="${this.laneX(i) - S / 2}" y="0" width="${S}" height="${TOP}"/>`
+        + `<circle class="lad-halo" cx="${this.laneX(i)}" cy="${this.topY}" r="31"/></g>`;
     }
     for (let i = 0; i < lanes; i++) {
       const k = pegs[i];
-      svg += `<g class="lad-peg-pos" transform="translate(${this.x(i)} ${this.topY})">`
+      svg += `<g class="lad-peg-pos" transform="translate(${this.laneX(i)} ${this.topY})">`
         + `<g class="lad-peg" fill="${LADDER_PEGS[k].fill}">${LADDER_PEGS[k].svg}</g></g>`;
     }
     svg += '</svg>';
@@ -177,16 +182,16 @@ export class LadderGame {
     this.startEls.forEach((el, i) => el.addEventListener('pointerdown', () => this.pick(i)));
   }
 
-  // 출발점 s 에서 내려가는 길 (SVG 좌표의 꺾은선)
-  points(s) {
-    const { rungs, lanes } = this.p;
-    const pts = [[this.x(s), this.topY]];
-    const t = LadderGame.trace(rungs, lanes, s);
+  // 출발점 start 에서 내려가는 길 (SVG 좌표의 꺾은선)
+  points(start) {
+    const { rungs, lanes } = this.puzzle;
+    const pts = [[this.laneX(start), this.topY]];
+    const t = LadderGame.trace(rungs, lanes, start);
     for (const [k, from] of t.steps) {
-      const g = rungs[k];
-      pts.push([this.x(g.i + from), this.y(g, from)], [this.x(g.i + 1 - from), this.y(g, 1 - from)]);
+      const rung = rungs[k];
+      pts.push([this.laneX(rung.i + from), this.rungY(rung, from)], [this.laneX(rung.i + 1 - from), this.rungY(rung, 1 - from)]);
     }
-    pts.push([this.x(t.end), this.botY]);
+    pts.push([this.laneX(t.end), this.botY]);
     return pts;
   }
 
@@ -204,16 +209,16 @@ export class LadderGame {
 
   // 조각을 길을 따라 같은 빠르기로 옮긴다. 길이 그려지는 속도(선형)와 같아서 조각이 선을 끌고 내려가는 것처럼 보인다
   slide(el, pts) {
-    const seg = pts.slice(1).map((q, i) => Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]));
-    const total = seg.reduce((a, b) => a + b, 0);
+    const segments = pts.slice(1).map((point, i) => Math.hypot(point[0] - pts[i][0], point[1] - pts[i][1]));
+    const total = segments.reduce((a, b) => a + b, 0);
     const t0 = performance.now();
     const step = (now) => {
-      let d = U.clamp((now - t0) / LadderGame.DRAW_MS, 0, 1) * total;
+      let dist = U.clamp((now - t0) / LadderGame.DRAW_MS, 0, 1) * total;
       let i = 0;
-      while (i < seg.length - 1 && d > seg[i]) d -= seg[i++];
-      const f = seg[i] ? Math.min(1, d / seg[i]) : 1;
-      const x = U.lerp(pts[i][0], pts[i + 1][0], f);
-      const y = U.lerp(pts[i][1], pts[i + 1][1], f);
+      while (i < segments.length - 1 && dist > segments[i]) dist -= segments[i++];
+      const frac = segments[i] ? Math.min(1, dist / segments[i]) : 1;
+      const x = U.lerp(pts[i][0], pts[i + 1][0], frac);
+      const y = U.lerp(pts[i][1], pts[i + 1][1], frac);
       el.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
       if (now - t0 < LadderGame.DRAW_MS && el.isConnected) requestAnimationFrame(step);
     };
@@ -222,12 +227,12 @@ export class LadderGame {
 
   // i = 고른 출발점. -1 이면 시간이 다 된 것 (아무것도 내려보내지 않는다)
   pick(i) {
-    if (this.phase !== 'input') return;
-    this.phase = 'wait';
-    this.h.stopTimer();
-    const { answer, ends } = this.p;
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
+    const { answer, ends } = this.puzzle;
     const ok = i === answer;
-    this.h.answer({ picked: i >= 0 ? i : null, end: i >= 0 ? ends[i].end : null, correct: ok, timedOut: i < 0 });
+    this.host.answer({ picked: i >= 0 ? i : null, end: i >= 0 ? ends[i].end : null, correct: ok, timedOut: i < 0 });
 
     this.startEls.forEach((el) => el.classList.add('done'));
     const start = this.startEls[i];
@@ -236,71 +241,69 @@ export class LadderGame {
       const pts = this.points(i);
       trace = this.draw(pts);
       this.slide(this.pegEls[i], pts);
-      this.h.sfx('tap');
+      this.host.sfx(Sfx.TAP);
     }
 
     // 조각이 다 내려온 뒤에 맞고 틀림을 알린다
-    this.h.after(start ? LadderGame.DRAW_MS : 0, () => {
+    this.host.after(start ? LadderGame.DRAW_MS : 0, () => {
       if (start) {
         trace.classList.add(ok ? 'right' : 'wrong');
         this.pegEls[i].firstChild.classList.add(ok ? 'seated' : 'bump');
         this.floorEls[ends[i].end].classList.add(ok ? 'fit' : 'miss');
       }
-      const d = this.progress.children[this.round];
-      d.classList.remove('cur');
-      d.classList.add(ok ? 'right' : 'wrong');
+      Progress.mark(this.progress, this.round, ok);
       if (ok) {
         this.correct++;
-        U.say(this.msg, '정답!', 'good');
-        this.h.award((this.h.base * this.h.mult) / LadderGame.ROUNDS, this.floorEls[ends[i].end]);
-        this.h.sfx('good');
+        U.say(this.message, '정답!', 'good');
+        this.host.award(pointsPer(this.host, LadderGame.ROUNDS), this.floorEls[ends[i].end]);
+        this.host.sfx(Sfx.GOOD);
       } else {
-        U.say(this.msg, start ? '맞는 구멍이 아니에요' : '시간 초과', 'bad');
-        this.h.sfx('bad');
+        U.say(this.message, start ? '맞는 구멍이 아니에요' : '시간 초과', 'bad');
+        this.host.sfx(Sfx.BAD);
       }
-      this.h.after(ok ? 600 : 1000, () => this.advance());
+      this.host.after(ok ? 600 : 1000, () => this.advance());
     });
   }
 
   advance() {
     this.round++;
     if (this.round < LadderGame.ROUNDS) this.next();
-    else this.h.done(this.result());
+    else this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === LadderGame.ROUNDS, correct: this.correct, total: LadderGame.ROUNDS };
+    return resultOf(this.correct, LadderGame.ROUNDS);
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    return { cleared: false, correct: this.correct, total: this.round };
+    return abortedResult(this.correct, this.round);
   }
 
   // ---- 길 따라가기 ----
   // 그려진 그대로 따라간다. flat 이면 가로줄마다 양 끝을 가운데 높이로 펴서 따라간다 (평평하게 잘못 읽은 경우).
   // 반환: { end, cross(지난 가로줄 수), steps: [[가로줄 번호, 들어간 쪽(0 왼쪽 · 1 오른쪽)], ...] }. 같은 가로줄을 두 번 타면(맴돌면) null
-  static trace(rungs, lanes, s, flat = false) {
+  static trace(rungs, lanes, start, flat = false) {
     const at = Array.from({ length: lanes }, () => []); // 세로줄마다 [높이, 가로줄 번호, 쪽]
-    rungs.forEach((g, k) => {
-      const yl = flat ? (g.yl + g.yr) / 2 : g.yl;
-      const yr = flat ? yl : g.yr;
-      at[g.i].push([yl, k, 0]);
-      at[g.i + 1].push([yr, k, 1]);
+    rungs.forEach((rung, k) => {
+      const yl = flat ? (rung.yl + rung.yr) / 2 : rung.yl;
+      const yr = flat ? yl : rung.yr;
+      at[rung.i].push([yl, k, 0]);
+      at[rung.i + 1].push([yr, k, 1]);
     });
     at.forEach((list) => list.sort((a, b) => a[0] - b[0]));
-    let lane = s;
+    let lane = start;
     let y = -Infinity;
     const used = new Set();
     const steps = [];
     for (;;) {
-      const e = at[lane].find((q) => q[0] > y);
-      if (!e) break;
-      const [, k, side] = e;
+      const hit = at[lane].find((entry) => entry[0] > y);
+      if (!hit) break;
+      const [, k, side] = hit;
       if (used.has(k)) return null;
       used.add(k);
       steps.push([k, side]);
-      const other = at[lane + (side ? -1 : 1)].find((q) => q[1] === k);
+      const other = at[lane + (side ? -1 : 1)].find((entry) => entry[1] === k);
       lane += side ? -1 : 1;
       y = other[0];
     }
@@ -326,16 +329,16 @@ export class LadderGame {
   //       pegs = 출발점마다 모양 번호(LADDER_PEGS), holes = 아래 끝마다 모양 번호 또는 null, answer,
   //       ends / flatEnds = 출발점마다 { end, cross } (실제 / 평평하게 읽었을 때), trap,
   //       load = 구멍에 닿는 길들의 가로줄 수 합 (따라 올라가 볼 일의 양)
-  static generate({ lanes, rows, p, minCross, holes: nHoles, kinds, slant, tricks }) {
+  static generate({ lanes, rows, p: density, minCross, holes: nHoles, kinds, slant, tricks }) {
     let best = null;
     const unit = 1 / (rows + 1); // 칸 높이
     const gap = LadderGame.GAP / LadderGame.LH;
     for (let tries = 0; tries < LadderGame.TRIES; tries++) {
       const has = Array.from({ length: rows }, () => new Array(lanes - 1).fill(false));
-      for (let r = 0; r < rows; r++) {
+      for (let rowIx = 0; rowIx < rows; rowIx++) {
         for (const i of U.shuffle([...Array(lanes - 1).keys()])) {
-          if (has[r][i - 1] || has[r][i + 1]) continue;
-          if (Math.random() < p) has[r][i] = true;
+          if (has[rowIx][i - 1] || has[rowIx][i + 1]) continue;
+          if (Math.random() < density) has[rowIx][i] = true;
         }
       }
       if (![...Array(lanes - 1).keys()].every((i) => has.some((row) => row[i]))) continue;
@@ -344,21 +347,21 @@ export class LadderGame {
       const amp = Math.min((slant || LadderGame.JITTER) * unit, (unit - gap) / 2);
       const jit = () => (Math.random() * 2 - 1) * amp;
       const rungs = [];
-      has.forEach((row, r) => row.forEach((on, i) => {
+      has.forEach((row, rowIx) => row.forEach((on, i) => {
         if (!on) return;
-        const base = (r + 1) * unit;
+        const base = (rowIx + 1) * unit;
         const yl = base + jit();
-        rungs.push({ r, i, yl, yr: slant ? base + jit() : yl, trick: false });
+        rungs.push({ r: rowIx, i, yl, yr: slant ? base + jit() : yl, trick: false });
       }));
       const made = tricks ? LadderGame.makeTricks(rungs, lanes, tricks, unit) : 0;
       if (!LadderGame.spaced(rungs, lanes, unit)) continue;
 
-      const ends = Array.from({ length: lanes }, (_, s) => LadderGame.trace(rungs, lanes, s));
-      const flatEnds = Array.from({ length: lanes }, (_, s) => LadderGame.trace(rungs, lanes, s, true));
+      const ends = Array.from({ length: lanes }, (_, start) => LadderGame.trace(rungs, lanes, start));
+      const flatEnds = Array.from({ length: lanes }, (_, start) => LadderGame.trace(rungs, lanes, start, true));
       if (ends.includes(null) || flatEnds.includes(null)) continue;
-      if (new Set(ends.map((e) => e.end)).size !== lanes) continue;
+      if (new Set(ends.map((ending) => ending.end)).size !== lanes) continue;
       const from = [];
-      ends.forEach((e, s) => (from[e.end] = s));
+      ends.forEach((ending, start) => (from[ending.end] = start));
 
       const kindIds = U.shuffle([...LADDER_PEGS.keys()]).slice(0, kinds);
       const holeLanes = U.shuffle([...Array(lanes).keys()]).slice(0, nHoles);
@@ -366,34 +369,34 @@ export class LadderGame {
       U.shuffle([...kindIds]).slice(0, nHoles).forEach((k, j) => (holes[holeLanes[j]] = k));
       const goal = holeLanes[0];
       const answer = from[goal];
-      const pegs = ends.map((e, s) => {
-        if (s === answer) return holes[goal];
-        const others = kindIds.filter((k) => k !== holes[e.end]);
+      const pegs = ends.map((ending, start) => {
+        if (start === answer) return holes[goal];
+        const others = kindIds.filter((k) => k !== holes[ending.end]);
         return others[U.rand(others.length)];
       });
       // 평평하게 읽으면 구멍에 맞아 보이는 조각: 그 구멍 모양을 줄 수 있는 출발점(실제로는 다른 구멍에 닿지 않는 곳)이면 그 모양으로 바꾼다
       let trap = -1;
       if (tricks) {
-        for (const s of U.shuffle([...Array(lanes).keys()])) {
-          const k = holes[flatEnds[s].end];
-          if (s === answer || k == null) continue;
-          const real = holes[ends[s].end];
+        for (const start of U.shuffle([...Array(lanes).keys()])) {
+          const k = holes[flatEnds[start].end];
+          if (start === answer || k == null) continue;
+          const real = holes[ends[start].end];
           if (real != null && real === k) continue;
-          pegs[s] = k;
-          trap = s;
+          pegs[start] = k;
+          trap = start;
           break;
         }
       }
 
       const count = (k) => pegs.filter((x) => x === k).length;
       const miss = (count(holes[goal]) >= 2 ? 0 : 1)
-        + holeLanes.slice(1).filter((h) => count(holes[h]) < 1).length
+        + holeLanes.slice(1).filter((holeLane) => count(holes[holeLane]) < 1).length
         + kindIds.filter((k) => count(k) < 1).length
         + (answer === goal ? 2 : 0)
         + Math.max(0, minCross - ends[answer].cross)
         + (tricks ? (tricks - made) + (flatEnds[answer].end === goal ? 3 : 0) + (trap < 0 ? 1 : 0) : 0);
       if (best && miss >= best.miss) continue;
-      const load = holeLanes.reduce((a, h) => a + ends[from[h]].cross, 0);
+      const load = holeLanes.reduce((sum, holeLane) => sum + ends[from[holeLane]].cross, 0);
       best = { lanes, rungs, pegs, holes, answer, ends, flatEnds, trap, load, miss };
       if (miss === 0) break;
     }
@@ -408,37 +411,37 @@ export class LadderGame {
   static makeTricks(rungs, lanes, n, unit) {
     const { TRICK } = LadderGame;
     const gap = LadderGame.GAP / LadderGame.LH;
-    const endY = (g, lane) => (lane === g.i ? g.yl : g.yr);
+    const endY = (rung, lane) => (lane === rung.i ? rung.yl : rung.yr);
     let made = 0;
-    for (const a of U.shuffle([...rungs])) {
+    for (const rung of U.shuffle([...rungs])) {
       if (made >= n) break;
-      if (a.trick || a.lock) continue;
-      // a 의 끝이 붙은 세로줄과, 그 세로줄 반대편 칸의 가로줄 b (바로 위나 아래 칸)
+      if (rung.trick || rung.lock) continue;
+      // rung 의 끝이 붙은 세로줄과, 그 세로줄 반대편 칸의 가로줄 neighbor (바로 위나 아래 칸)
       const opts = [];
       for (const side of [0, 1]) {
-        const lane = a.i + side;
-        for (const b of rungs) {
-          if (b === a || b.trick || b.lock || Math.abs(b.r - a.r) !== 1) continue;
-          if (b.i !== (side ? lane : lane - 1)) continue;
-          opts.push({ side, lane, b });
+        const lane = rung.i + side;
+        for (const neighbor of rungs) {
+          if (neighbor === rung || neighbor.trick || neighbor.lock || Math.abs(neighbor.r - rung.r) !== 1) continue;
+          if (neighbor.i !== (side ? lane : lane - 1)) continue;
+          opts.push({ side, lane, neighbor });
         }
       }
-      for (const { side, lane, b } of U.shuffle(opts)) {
+      for (const { side, lane, neighbor } of U.shuffle(opts)) {
         const key = side ? 'yr' : 'yl';
-        const keep = a[key];
-        const by = endY(b, lane);
-        const d = gap + U.lerp(TRICK[0], TRICK[1], Math.random()) * unit;
-        a[key] = b.r > a.r ? by + d : by - d;
+        const keep = rung[key];
+        const by = endY(neighbor, lane);
+        const shift = gap + U.lerp(TRICK[0], TRICK[1], Math.random()) * unit;
+        rung[key] = neighbor.r > rung.r ? by + shift : by - shift;
         // 평평하게 읽었을 때의 a 높이(가운데)가 실제와 반대편에 있어야 속임이 된다
-        const mid = (a.yl + a.yr) / 2;
-        const fools = (a[key] > by) !== (mid > by);
+        const mid = (rung.yl + rung.yr) / 2;
+        const fools = (rung[key] > by) !== (mid > by);
         if (fools && LadderGame.spaced(rungs, lanes, unit)) {
-          a.trick = true;
-          b.lock = true;
+          rung.trick = true;
+          neighbor.lock = true;
           made++;
           break;
         }
-        a[key] = keep;
+        rung[key] = keep;
       }
     }
     return made;
@@ -449,14 +452,14 @@ export class LadderGame {
   static spaced(rungs, lanes, unit) {
     const gap = LadderGame.GAP / LadderGame.LH;
     for (let lane = 0; lane < lanes; lane++) {
-      const ys = rungs.filter((g) => g.i === lane || g.i === lane - 1).map((g) => (lane === g.i ? g.yl : g.yr)).sort((a, b) => a - b);
+      const ys = rungs.filter((rung) => rung.i === lane || rung.i === lane - 1).map((rung) => (lane === rung.i ? rung.yl : rung.yr)).sort((a, b) => a - b);
       if (!ys.length) continue;
       if (ys[0] < unit * 0.4 || ys[ys.length - 1] > 1 - unit * 0.4) return false;
       for (let j = 1; j < ys.length; j++) if (ys[j] - ys[j - 1] < gap - 1e-9) return false;
     }
-    for (const a of rungs) {
-      for (const b of rungs) {
-        if (a !== b && a.i === b.i && Math.sign(a.yl - b.yl) !== Math.sign(a.yr - b.yr)) return false;
+    for (const rung of rungs) {
+      for (const other of rungs) {
+        if (rung !== other && rung.i === other.i && Math.sign(rung.yl - other.yl) !== Math.sign(rung.yr - other.yr)) return false;
       }
     }
     return true;

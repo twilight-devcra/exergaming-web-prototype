@@ -11,10 +11,13 @@
 // '큰 수부터 넣고 나머지를 맞춰 보는' 요령이 통하지 않도록 문제를 고른다 (generate 참고).
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 export class ArithGame {
   static id = 'arith';
-  static tags = ['number']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.NUMBER];
   static title = '사칙연산 역산';
   static hint = '아래 숫자를 골라 빈칸을 모두 채워 식을 완성하세요<br>채운 칸을 누르면 숫자를 다시 뺄 수 있습니다';
   static levels = [
@@ -38,10 +41,10 @@ export class ArithGame {
 
   // 소개 그림: ① 빈칸에 들어갈 수를 찾아 ② 아래에서 골라 채운다
   static diagram() {
-    const eq = (a) =>
-      Dg.rect(14, 14, 38, 38, a ? 'dg-slot good' : 'dg-slot active') + Dg.text(33, 33, a || '?', 22, a ? 'dg-txt' : 'dg-txt num') +
+    const eq = (filled) =>
+      Dg.rect(14, 14, 38, 38, filled ? 'dg-slot good' : 'dg-slot active') + Dg.text(33, 33, filled || '?', 22, filled ? 'dg-txt' : 'dg-txt num') +
       Dg.text(68, 33, '+', 22) +
-      Dg.rect(84, 14, 38, 38, a ? 'dg-slot active' : 'dg-slot') + Dg.text(103, 33, '?', 22, 'dg-txt num') +
+      Dg.rect(84, 14, 38, 38, filled ? 'dg-slot active' : 'dg-slot') + Dg.text(103, 33, '?', 22, 'dg-txt num') +
       Dg.text(140, 33, '=', 22) + Dg.text(170, 33, '9', 24);
     const cands = (used) => [[4, 40], [7, 82], [5, 124]].map(([v, x]) =>
       `<g class="${used.includes(v) ? 'dg-dim' : ''}">${Dg.rect(x, 84, 38, 38)}${Dg.text(x + 19, 103, v, 20)}</g>`).join('');
@@ -51,77 +54,79 @@ export class ArithGame {
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = ArithGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
-    this.phase = 'wait';
+    this.phase = Phase.WAIT;
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${ArithGame.title} · Lv.${level}`, this.msg, ArithGame.ROUNDS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${ArithGame.title} · Lv.${level}`, this.message, ArithGame.ROUNDS);
     this.progress = dots;
     this.wrap = U.el('div', 'ar-wrap');
-    this.eq = U.el('div', 'ar-eq');
-    this.eq.classList.toggle('long', this.spec.blanks > 2);
-    this.cands = U.el('div', 'ar-cands');
-    this.wrap.append(this.eq, this.cands);
+    this.equation = U.el('div', 'ar-eq');
+    this.equation.classList.toggle('long', this.spec.blanks > 2);
+    this.candidateRow = U.el('div', 'ar-cands');
+    this.wrap.append(this.equation, this.candidateRow);
     body.append(this.wrap);
     this.next();
   }
 
   next() {
-    const p = ArithGame.generate(this.spec);
-    this.p = p;
-    this.fill = p.sol.map(() => null); // 칸마다 { v, btn } 또는 null. 채워 둔 칸은 { v, given: true }
-    const givenAt = U.shuffle([...p.sol.keys()]).slice(0, this.spec.given || 0);
-    givenAt.forEach((i) => (this.fill[i] = { v: p.sol[i], given: true }));
-    const shown = p.cands.filter((v) => !givenAt.some((i) => p.sol[i] === v));
-    U.say(this.msg, '빈칸에 들어갈 숫자를 고르세요', 'act');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
+    const puzzle = ArithGame.generate(this.spec);
+    this.puzzle = puzzle;
+    this.fill = puzzle.sol.map(() => null); // 칸마다 { value, btn } 또는 null. 채워 둔 칸은 { value, given: true }
+    const givenAt = U.shuffle([...puzzle.sol.keys()]).slice(0, this.spec.given || 0);
+    givenAt.forEach((i) => (this.fill[i] = { value: puzzle.sol[i], given: true }));
+    const shown = puzzle.cands.filter((value) => !givenAt.some((i) => puzzle.sol[i] === value));
+    U.say(this.message, '빈칸에 들어갈 숫자를 고르세요', 'act');
+    Progress.current(this.progress, this.round);
 
-    this.eq.innerHTML = '';
-    this.slots = p.sol.map((_, i) => {
-      const s = U.el('div', `ar-slot${this.fill[i] ? ' given' : ''}`, '?');
-      s.addEventListener('pointerdown', () => this.unpick(i));
-      if (i > 0) this.eq.append(U.el('div', '', p.ops[i - 1] === '+' ? '+' : '−'));
-      this.eq.append(s);
-      return s;
+    this.equation.innerHTML = '';
+    this.slots = puzzle.sol.map((_, i) => {
+      const slot = U.el('div', `ar-slot${this.fill[i] ? ' given' : ''}`, '?');
+      slot.addEventListener('pointerdown', () => this.unpick(i));
+      if (i > 0) this.equation.append(U.el('div', '', puzzle.ops[i - 1] === '+' ? '+' : '−'));
+      this.equation.append(slot);
+      return slot;
     });
-    this.eq.append(U.el('div', '', '='), U.el('div', '', String(p.ans)));
+    this.equation.append(U.el('div', '', '='), U.el('div', '', String(puzzle.ans)));
 
-    this.cands.innerHTML = '';
-    this.btns = shown.map((v) => {
-      const b = U.el('button', 'ar-cand', String(v));
-      b.addEventListener('pointerdown', () => this.pick(v, b));
-      this.cands.append(b);
-      return b;
+    this.candidateRow.innerHTML = '';
+    this.candidateButtons = shown.map((value) => {
+      const button = U.el('button', 'ar-cand', String(value));
+      button.addEventListener('pointerdown', () => this.pick(value, button));
+      this.candidateRow.append(button);
+      return button;
     });
-    this.phase = 'input';
+    this.phase = Phase.INPUT;
     this.render();
-    this.h.question({ ops: p.ops, cands: shown, ans: p.ans, sol: p.sol, solutions: p.count, given: givenAt });
-    this.h.timer(this.spec.blanks - givenAt.length, () => this.judge(true));
+    this.host.question({ ops: puzzle.ops, cands: shown, ans: puzzle.ans, sol: puzzle.sol, solutions: puzzle.count, given: givenAt });
+    this.host.timer(this.spec.blanks - givenAt.length, () => this.judge(true));
   }
 
   // 고른 숫자는 비어 있는 가장 앞 칸에 들어간다
-  pick(v, btn) {
-    if (this.phase !== 'input' || btn.disabled) return;
+  pick(value, btn) {
+    if (this.phase !== Phase.INPUT || btn.disabled) return;
     const slot = this.fill.indexOf(null);
-    this.fill[slot] = { v, btn };
-    this.h.input({ put: v, slot });
+    this.fill[slot] = { value, btn };
+    this.host.input({ put: value, slot });
     btn.disabled = true;
-    this.h.sfx('tap');
+    this.host.sfx(Sfx.TAP);
     this.render();
     // 마지막 칸을 채우는 순간 채점한다. 그 전까지는 얼마든지 뺐다 넣었다 할 수 있다.
     if (!this.fill.includes(null)) this.judge();
   }
 
   unpick(i) {
-    if (this.phase !== 'input' || !this.fill[i] || this.fill[i].given) return;
-    this.h.input({ remove: this.fill[i].v, slot: i });
+    if (this.phase !== Phase.INPUT || !this.fill[i] || this.fill[i].given) return;
+    this.host.input({ remove: this.fill[i].value, slot: i });
     this.fill[i].btn.disabled = false;
     this.fill[i] = null;
     this.render();
@@ -129,60 +134,58 @@ export class ArithGame {
 
   render() {
     const next = this.fill.indexOf(null);
-    this.slots.forEach((s, i) => {
-      const f = this.fill[i];
-      s.textContent = f ? String(f.v) : '?';
-      s.classList.toggle('filled', !!f);
-      s.classList.toggle('active', this.phase === 'input' && i === next);
+    this.slots.forEach((slot, i) => {
+      const entry = this.fill[i];
+      slot.textContent = entry ? String(entry.value) : '?';
+      slot.classList.toggle('filled', !!entry);
+      slot.classList.toggle('active', this.phase === Phase.INPUT && i === next);
     });
   }
 
   // 정해 둔 답과 달라도 식만 맞으면 정답이다. timedOut = 시간이 다 되어 채점하는 경우 (빈칸이 남아 있을 수 있다)
   judge(timedOut = false) {
-    if (this.phase !== 'input') return;
-    this.phase = 'wait';
-    this.h.stopTimer();
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
     this.render();
-    const ok = !timedOut && ArithGame.value(this.fill.map((f) => f.v), this.p.ops) === this.p.ans;
-    this.h.answer({ fill: this.fill.map((f) => (f ? f.v : null)), correct: ok, timedOut });
-    this.slots.forEach((s) => s.classList.add(ok ? 'right' : 'wrong'));
-    const d = this.progress.children[this.round];
-    d.classList.remove('cur');
-    d.classList.add(ok ? 'right' : 'wrong');
+    const ok = !timedOut && ArithGame.value(this.fill.map((entry) => entry.value), this.puzzle.ops) === this.puzzle.ans;
+    this.host.answer({ fill: this.fill.map((entry) => (entry ? entry.value : null)), correct: ok, timedOut });
+    this.slots.forEach((slot) => slot.classList.add(ok ? 'right' : 'wrong'));
+    Progress.mark(this.progress, this.round, ok);
 
     if (ok) {
       this.correct++;
-      U.say(this.msg, '정답!', 'good');
-      this.h.award((this.h.base * this.h.mult) / ArithGame.ROUNDS, this.eq);
-      this.h.sfx('good');
+      U.say(this.message, '정답!', 'good');
+      this.host.award(pointsPer(this.host, ArithGame.ROUNDS), this.equation);
+      this.host.sfx(Sfx.GOOD);
     } else {
-      const { sol, ops } = this.p;
-      U.say(this.msg, `${timedOut ? '시간 초과 · ' : ''}정답: ${sol.map((v, i) => (i ? `${ops[i - 1] === '+' ? '+' : '−'} ${v}` : v)).join(' ')}`, 'bad');
-      this.btns.forEach((b) => {
-        if (sol.includes(Number(b.textContent))) b.classList.add('answer');
+      const { sol, ops } = this.puzzle;
+      U.say(this.message, `${timedOut ? '시간 초과 · ' : ''}정답: ${sol.map((value, i) => (i ? `${ops[i - 1] === '+' ? '+' : '−'} ${value}` : value)).join(' ')}`, 'bad');
+      this.candidateButtons.forEach((button) => {
+        if (sol.includes(Number(button.textContent))) button.classList.add('answer');
       });
-      this.h.sfx('bad');
+      this.host.sfx(Sfx.BAD);
     }
-    this.h.after(ok ? 800 : 1700, () => this.advance());
+    this.host.after(ok ? 800 : 1700, () => this.advance());
   }
 
   advance() {
     this.round++;
     if (this.round < ArithGame.ROUNDS) this.next();
-    else this.h.done(this.result());
+    else this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === ArithGame.ROUNDS, correct: this.correct, total: ArithGame.ROUNDS };
+    return resultOf(this.correct, ArithGame.ROUNDS);
   }
 
   abort() {
-    return { cleared: false, correct: this.correct, total: this.round };
+    return abortedResult(this.correct, this.round);
   }
 
   // ---- 계산 ----
   static value(vals, ops) {
-    return vals.reduce((t, v, i) => (i === 0 ? v : ops[i - 1] === '+' ? t + v : t - v), 0);
+    return vals.reduce((t, value, i) => (i === 0 ? value : ops[i - 1] === '+' ? t + value : t - value), 0);
   }
 
   // ---- 문제 생성 ----
@@ -207,13 +210,13 @@ export class ArithGame {
 
       // 값마다: 풀이들, 조합(순서만 다른 것은 하나) 집합
       const byValue = new Map();
-      ArithGame.fills(cands, blanks).forEach((f) => {
-        const v = ArithGame.value(f, ops);
-        if (v < 1) return;
-        if (!byValue.has(v)) byValue.set(v, { fills: [], sets: new Set() });
-        const e = byValue.get(v);
-        e.fills.push(f);
-        e.sets.add(ArithGame.signature(f, ops));
+      ArithGame.fills(cands, blanks).forEach((fill) => {
+        const value = ArithGame.value(fill, ops);
+        if (value < 1) return;
+        if (!byValue.has(value)) byValue.set(value, { fills: [], sets: new Set() });
+        const entry = byValue.get(value);
+        entry.fills.push(fill);
+        entry.sets.add(ArithGame.signature(fill, ops));
       });
       const values = [...byValue.keys()].sort((a, b) => a - b);
       const mid = values.slice(Math.floor(values.length * 0.25), Math.ceil(values.length * 0.75));
@@ -221,14 +224,14 @@ export class ArithGame {
       for (const ans of U.shuffle(mid)) {
         const { fills, sets } = byValue.get(ans);
         // 왼쪽부터 계산할 때 중간 값이 0 이하로 내려가지 않는 풀이를 보여줄 답으로 삼는다
-        const sol = fills.find((f) => f.every((_, i) => ArithGame.value(f.slice(0, i + 1), ops) >= 1));
+        const sol = fills.find((fill) => fill.every((_, i) => ArithGame.value(fill.slice(0, i + 1), ops) >= 1));
         if (!sol) continue;
-        if (blanks >= 3 && fills.some((f) => top.every((x) => f.includes(x)) || bottom.every((x) => f.includes(x)))) continue;
-        const usesBig = fills.some((f) => f.includes(sorted[n - 1]));
+        if (blanks >= 3 && fills.some((fill) => top.every((x) => fill.includes(x)) || bottom.every((x) => fill.includes(x)))) continue;
+        const usesBig = fills.some((fill) => fill.includes(sorted[n - 1]));
         const miss = Math.max(0, sets.size - maxSols) + (usesBig === wantBig ? 0 : 1);
-        const p = { ops, sol, ans, cands, count: sets.size, miss };
-        if (miss === 0) return p;
-        if (!best || miss < best.miss) best = p;
+        const puzzle = { ops, sol, ans, cands, count: sets.size, miss };
+        if (miss === 0) return puzzle;
+        if (!best || miss < best.miss) best = puzzle;
       }
     }
     return best;
@@ -237,7 +240,7 @@ export class ArithGame {
   // 후보에서 k개를 골라 늘어놓는 모든 방법
   static fills(cands, k) {
     if (k === 0) return [[]];
-    return cands.flatMap((c, i) => ArithGame.fills(cands.filter((_, j) => j !== i), k - 1).map((r) => [c, ...r]));
+    return cands.flatMap((first, i) => ArithGame.fills(cands.filter((_, j) => j !== i), k - 1).map((rest) => [first, ...rest]));
   }
 
   // 더하는 칸끼리, 빼는 칸끼리 순서만 바꾼 풀이는 같은 조합으로 본다

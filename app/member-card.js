@@ -1,7 +1,7 @@
 // 회원 카드 그림: 만들기와 휴대폰에 저장하기. 회원 카드 화면(app/card.html)과, 휴대폰으로 운동한 판의 결과 화면(app/members.js)이 함께 쓴다.
 // 전역 qrcode(app/vendor/qrcode.js)가 먼저 불려 있어야 한다. 로고(logo.svg)는 부르는 문서 기준 주소다 (둘 다 app/ 에 있다).
 // 회원 카드 그림 (1080 × 1440 PNG). 저장해 두고 태블릿 카메라에 보여 주는 그림이라 QR 을 크게, 회원 번호만 담는다:
-// 태블릿은 번호만 있으면 되고(app/members.js Members.parse), 내용이 짧으면 QR 칸이 21 × 21 로 굵어져 멀리서·작게 보여도 잘 읽힌다.
+// 태블릿은 번호만 있으면 되고(app/member-records.js Members.parse), 내용이 짧으면 QR 칸이 21 × 21 로 굵어져 멀리서·작게 보여도 잘 읽힌다.
 // 둘레 여백은 표준대로 4칸 (사진 속 어두운 배경과 붙지 않게)
 export async function drawCard(id) {
   const W = 1080, H = 1440;

@@ -1,29 +1,35 @@
-// 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
-import { BASE_LEVEL, EASY_TIME, ROUND_PRESETS, MUSIC_STYLES, PHONE_LANDSCAPE, Config, EDITION, DEMO, $, U } from './config.js';
+// 앱 본체 (테스트 화면 · 운영 버전 공통): 라운드 흐름(속도 측정 → 카운트다운 → 인지 게임 · 속도 전환 → 마무리),
+// 페달 · 키 입력, 게임 시계, 메인 루프. 판마다 다른 일은 js/edition.js, 화면 위쪽 점수판은 js/score-hud.js
+import { EASY_TIME, MUSIC_STYLES, PHONE_LANDSCAPE, Config, EDITION, DEMO, $, U } from './config.js';
 import { Pedal } from './pedal.js';
 import { NUS, PedalLink } from './pedal-link.js';
 import { LzCadence } from './cadence-est.js';
 import { BeatAudio } from './audio.js';
 import { Band } from './band.js';
-import { Exercise, ExerciseMeter } from './exercise.js';
+import { ExerciseMeter } from './exercise.js';
 import { Fx } from './fx.js';
 import { Theme } from './themes.js';
 import { Dg } from './diagram.js';
 import { GAME_TYPES } from './games/index.js';
-import { Abilities } from './abilities.js';
-import { Stars } from './stars.js';
+import { planPass } from './game-order.js';
+import { Difficulty } from './difficulty.js';
+import { RoundStats } from './round-stats.js';
+import { ScoreHud } from './score-hud.js';
 import { SessionLog } from './session-log.js';
-import { Demo } from './demo.js';
+import { StationEdition } from './demo.js';
+import { TestEdition } from './edition.js';
+import { Sfx } from './sfx.js';
 
-const OPENING_GAMES = ['count', 'ladder'];
+// 이 페이지의 판: 운영 버전(app/)은 스테이션 흐름, 테스트 화면은 메뉴 흐름 (js/edition.js)
+const PAGE_EDITION = DEMO ? StationEdition : TestEdition;
 const SLOPE_PATTERN = [0, 1, 0, -1]; // 평지 → 오르막(빠르게) → 평지 → 내리막(천천히)
 const SLOPE_MSG = { 1: '오르막! 조금 더 빠르게', '-1': '내리막! 조금 더 천천히', 0: '평지! 원래 속도로' };
 const SHIFT_LEAD_SEC = 0.8;  // 화면이 넓어지고 안내를 읽을 시간. 그 뒤에 목표 속도가 움직이기 시작한다
 const SHIFT_OUT_MS = 650;    // 화면이 다시 줄어드는 시간. 그 뒤에 다음 인지 게임이 나온다
 
 const App = {
-  demo: DEMO,
-  cfg: DEMO ? Config.demo() : Config.load(),
+  edition: PAGE_EDITION,
+  cfg: PAGE_EDITION.loadConfig(),
   pedal: new Pedal(),
   link: new PedalLink(),
   lz: new LzCadence(),
@@ -44,54 +50,35 @@ const App = {
     // 큰 깃발을 지날 때만 소리를 낸다. 작은 깃발까지 울리면 박자 소리와 섞여 시끄럽다.
     this.band.onMilestone = (m) => {
       if (m % Band.MARK_BIG !== 0) return;
-      this.audio.sfx('go');
+      this.audio.sfx(Sfx.GO);
       Fx.confetti(0.35);
     };
     // 회원의 지난 기념물을 지날 때 (운영 버전). 가장 높은 기록을 넘는 순간만 알린다
     this.band.onLandmark = (lm) => {
       if (!lm.best || this.state !== 'play') return;
       this.band.addFloater('최고 기록 넘었어요!', 'good');
-      this.audio.sfx('go');
+      this.audio.sfx(Sfx.GO);
       Fx.confetti(0.35);
     };
     // 라운드 끝 짓기 연출 (운영 버전, Band.plant): 한 단계(층·지붕) 올릴 때마다 통통, 다 지으면 축하
-    this.band.onBuildStep = (i, n) => this.audio.sfx(i === n - 1 ? 'buildTop' : 'build');
+    this.band.onBuildStep = (i, n) => this.audio.sfx(i === n - 1 ? Sfx.BUILD_TOP : Sfx.BUILD);
     this.band.onBuilt = () => {
-      this.audio.sfx('clear');
+      this.audio.sfx(Sfx.CLEAR);
       Fx.confetti(0.6);
     };
     Fx.init();
     Theme.init(this.band);
     this.bindMusic();
-    // 세션 성과·운동량 카드를 결과 화면에 붙인다 (스테이션 결과는 최종 점수 카드 뒤, 테스트 결과는 점수와 순위 사이)
-    const report = () => $('#tpl-report').content.cloneNode(true);
-    if (this.demo) $('#demo-result .dr-grid').append(report());
-    $('#result .rp-slot').replaceWith(report());
     this.renderGameToggles();
-    if (!this.demo) {
-      this.bindPresets();
-      this.bindTabs();
-      this.bindMenu();
-    }
-    else this.applySource(); // 메뉴를 거치지 않으므로 속도 측정 방식(lz 파형 사용 여부)만 따로 적용한다
+    this.edition.bindScreens(this);
     this.bindKeys();
     this.bindLink();
     this.rotated.addEventListener('change', () => this.onRotate());
     this.pedal.onStroke = (key) => this.onStroke(key);
-    if (this.demo) Demo.init(this);
+    this.edition.start(this);
     $('#btn-start').onclick = () => this.startRound();
-    $('#btn-again').onclick = () => this.startRound();
-    $('#btn-menu').onclick = () => this.show('menu');
     $('#btn-resume').onclick = () => this.setPaused(false);
     $('#btn-quit').onclick = () => this.quit();
-    $('#btn-save').onclick = () => this.saveScore();
-    $('#btn-log').onclick = () => {
-      if (!this.log) return;
-      this.log.download();
-      $('#btn-log').textContent = '저장됨 · 다시 저장';
-    };
-    $('#res-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.saveScore(); });
-    this.renderBoard($('#menu-board'));
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
   },
@@ -134,101 +121,12 @@ const App = {
     start.textContent = on ? '시작하기' : '게임을 하나 이상 고르세요';
   },
 
-  // 메뉴 설정 탭. 마지막으로 연 탭을 이 브라우저에 기억한다 (못 읽으면 첫 탭)
-  bindTabs() {
-    const KEY = 'exergame.menuTab';
-    const tabs = [...document.querySelectorAll('.menu-tabs [data-tab]')];
-    if (!tabs.length) return;
-    const open = (id) => {
-      if (!tabs.some((t) => t.dataset.tab === id)) id = tabs[0].dataset.tab;
-      tabs.forEach((t) => t.setAttribute('aria-selected', t.dataset.tab === id));
-      document.querySelectorAll('.menu-pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === id));
-      try { localStorage.setItem(KEY, id); } catch (e) { /* 저장 못 해도 탭은 바뀐다 */ }
-    };
-    tabs.forEach((t) => (t.onclick = () => open(t.dataset.tab)));
-    let saved = null;
-    try { saved = localStorage.getItem(KEY); } catch (e) { /* 첫 탭으로 */ }
-    open(saved);
-  },
-
-  // 가장 단계가 많은 게임에 맞춘다 — 그보다 높게 시작하면 모든 게임이 최고 난이도로 고정된다
-  maxStartLevel() {
-    return Math.max(...GAME_TYPES.map((T) => T.maxLevel));
-  },
-
-  // 이번 라운드에서 오를 수 있는 최고 난이도 (cfg.maxLevel, 라운드 난이도 프리셋이 정한다)
-  levelCap() {
-    return Math.min(this.maxStartLevel(), this.cfg.maxLevel || Infinity);
-  },
-
-  // 프리셋이 채우는 값 → 테스트 화면의 칸
-  PRESET_FIELDS: {
-    startLevel: '#cfg-start-level', maxLevel: '#cfg-max-level', diffUp: '#cfg-diff-up', diffDown: '#cfg-diff-down',
-    questionTimeScale: '#cfg-qscale', tolerance: '#cfg-tol', maxDeviation: '#cfg-maxdev', rpmChangeAmount: '#cfg-change-amt',
-  },
-
-  // 라운드 난이도 프리셋: 고르면 프리셋 값을 채우고, 프리셋에 든 칸을 고치면 바로 반영해 '직접 설정'으로 바뀌는 것이 보이게 한다.
-  bindPresets() {
-    const sel = $('#cfg-preset');
-    sel.innerHTML = ROUND_PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join('') +
-      '<option value="custom" disabled>직접 설정</option>';
-    sel.addEventListener('change', () => {
-      const p = Config.preset(sel.value);
-      if (!p) return;
-      this.readMenu();
-      Object.assign(this.cfg, p.values);
-      Config.save(this.cfg);
-      this.bindMenu();
-    });
-    Object.values(this.PRESET_FIELDS).forEach((id) => $(id).addEventListener('change', () => this.readMenu()));
-    // 글꼴(화면 스타일마다 다르다)이 바뀌면 설명 높이를 다시 잰다
-    const remeasure = () => requestAnimationFrame(() => U.reserveHeight($('#cfg-preset-note'), Config.presetNotes()));
-    document.querySelector('[data-theme-picker]').addEventListener('change', remeasure);
-    if (document.fonts) document.fonts.addEventListener('loadingdone', remeasure);
-  },
-
   // 설정에서 켜 둔 게임만, GAME_TYPES에 적힌 순서대로
   enabledTypes() {
     const ids = this.cfg.games;
     if (!ids) return GAME_TYPES;
     const list = GAME_TYPES.filter((T) => ids.includes(T.id));
     return list.length ? list : GAME_TYPES;
-  },
-
-  bindMenu() {
-    const c = this.cfg;
-    $('#cfg-duration').value = c.durationSec;
-    $('#cfg-calib').value = c.calibrationSec;
-    $('#cfg-tol').value = Math.round(c.tolerance * 100);
-    $('#cfg-preset').value = Config.presetOf(c);
-    const p = Config.preset($('#cfg-preset').value);
-    $('#cfg-preset-note').textContent = Config.presetNote($('#cfg-preset').value);
-    // 설명이 프리셋마다 길이가 달라 아래 칸들이 오르내리지 않게 가장 긴 설명만큼 자리를 잡아 둔다
-    U.reserveHeight($('#cfg-preset-note'), Config.presetNotes());
-    // 프리셋이 정한 칸을 칠한다
-    Object.values(this.PRESET_FIELDS).forEach((id) => $(id).parentElement.classList.toggle('preset', !!p));
-    $('#cfg-start-level').max = this.maxStartLevel();
-    $('#cfg-start-level').value = c.startLevel;
-    $('#cfg-max-level').max = this.maxStartLevel();
-    $('#cfg-max-level').value = c.maxLevel;
-    $('#cfg-qscale').value = c.questionTimeScale;
-    $('#cfg-diff-up').value = c.diffUp;
-    $('#cfg-diff-down').value = c.diffDown;
-    $('#cfg-maxdev').value = Math.round(c.maxDeviation * 100);
-    $('#cfg-change-amt').value = Math.round(c.rpmChangeAmount * 100);
-    $('#cfg-mult').value = c.multiplierTop;
-    $('#cfg-difficulty').value = c.difficulty;
-    $('#cfg-change').checked = c.rpmChange;
-    $('#cfg-brain').checked = !!c.brainOnly;
-    $('#cfg-shift').value = c.shiftSec;
-    $('#cfg-sound').checked = c.sound;
-    $('#cfg-qtimer').checked = c.questionTimer;
-    $('#cfg-source').value = c.rpmSource;
-    this.applySource();
-    document.querySelectorAll('#cfg-games input').forEach((b) => {
-      b.checked = !c.games || c.games.includes(b.dataset.game);
-    });
-    this.renderGamesCount();
   },
 
   // 측정 방식은 고르는 즉시 적용한다 (라운드 시작을 기다리지 않고 페달 연결 상태에도 바로 반영)
@@ -243,44 +141,11 @@ const App = {
     }[src] + (src !== 'pedal' ? ' 파형이 끊기면 avg_rpm 으로 돌아갑니다.' : '');
   },
 
-  readMenu() {
-    const num = (id, lo, hi, def) => {
-      const v = parseFloat($(id).value);
-      return Number.isFinite(v) ? U.clamp(v, lo, hi) : def;
-    };
-    const c = this.cfg;
-    c.durationSec = num('#cfg-duration', 30, 900, 180);
-    c.calibrationSec = num('#cfg-calib', 5, 60, 15);
-    c.tolerance = num('#cfg-tol', 3, 40, 12) / 100;
-    c.startLevel = Math.round(num('#cfg-start-level', 1, this.maxStartLevel(), BASE_LEVEL));
-    c.maxLevel = Math.round(num('#cfg-max-level', 1, this.maxStartLevel(), this.maxStartLevel()));
-    c.questionTimeScale = num('#cfg-qscale', 0.5, 3, 1);
-    // 소수 단계는 부동소수 찌꺼기 없이 저장한다 (프리셋 값과 그대로 비교한다)
-    const r = (v) => Math.round(v * 10000) / 10000;
-    c.diffUp = r(num('#cfg-diff-up', 0.05, 2, 0.4));
-    c.diffDown = r(num('#cfg-diff-down', 0.05, 2, 0.6));
-    c.maxDeviation = r(num('#cfg-maxdev', 10, 100, 45) / 100);
-    c.rpmChangeAmount = r(num('#cfg-change-amt', 0, 40, 12) / 100);
-    c.multiplierTop = num('#cfg-mult', 1, 10, 5);
-    c.difficulty = $('#cfg-difficulty').value;
-    c.rpmChange = $('#cfg-change').checked;
-    c.brainOnly = $('#cfg-brain').checked;
-    c.shiftSec = num('#cfg-shift', 4, 30, 8);
-    c.sound = $('#cfg-sound').checked;
-    c.questionTimer = $('#cfg-qtimer').checked;
-    c.rpmSource = $('#cfg-source').value;
-    c.games = [...document.querySelectorAll('#cfg-games input')].filter((b) => b.checked).map((b) => b.dataset.game);
-    Config.save(c);
-    this.bindMenu();
-  },
-
   show(id) {
     document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
-    if (id === 'menu') {
-      this.state = 'menu';
-      this.renderBoard($('#menu-board'));
-    }
+    if (id === 'menu') this.state = 'menu';
     if (id === 'attract') this.state = 'attract';
+    this.edition.onScreen(this, id);
   },
 
   get inRound() {
@@ -293,16 +158,16 @@ const App = {
       if (this.log && !e.repeat) this.log.key(e.code);
       // 스테이션 모드에는 일시정지 메뉴와 디버그 표시가 없다 (운영 메뉴로만 멈춘다)
       if (e.code === 'Escape') {
-        if (!this.demo && this.inRound) this.setPaused(!this.paused);
+        if (this.edition.pauseMenu && this.inRound) this.setPaused(!this.paused);
         return;
       }
       if (e.target.tagName === 'INPUT') return;
-      if (e.code === 'KeyT' && !this.demo && !e.repeat) {
+      if (e.code === 'KeyT' && this.edition.devKeys && !e.repeat) {
         Theme.next();
         return;
       }
       if (e.code === 'Backquote') {
-        if (this.demo) return;
+        if (!this.edition.devKeys) return;
         $('#debug').classList.toggle('active');
         return;
       }
@@ -412,7 +277,7 @@ const App = {
     });
     document.querySelectorAll('[data-pedal-btn]').forEach((b) => (b.textContent = this.link.wantLink ? '연결 해제' : '페달 연결'));
     if (this.log) this.log.ev('link', { state, detail });
-    if (this.demo) return Demo.onLink(state, detail);
+    if (this.edition.onLink(this, state, detail)) return;
 
     // 센서로 하던 라운드 도중 연결이 끊기면 '멈춤'으로 채점하지 않고 시계를 세운다
     const inRound = this.inRound;
@@ -426,10 +291,10 @@ const App = {
   },
 
   // 휴대폰을 가로로 눕히면 화면이 '세로로 돌려 주세요'로 덮이므로 라운드를 멈추고, 다시 세우면 이어 간다.
-  // 운영 버전은 Demo.syncPause 가 다른 멈춤(운영 메뉴·페달 끊김)과 함께 다룬다
+  // 운영 버전은 Demo.syncPause 가 다른 멈춤(운영 메뉴·페달 끊김)과 함께 다룬다 (StationEdition.onRotate)
   onRotate() {
     if (this.log) this.log.ev('rotate', { landscape: this.rotated.matches });
-    if (this.demo) return Demo.syncPause();
+    if (this.edition.onRotate(this)) return;
     if (this.rotated.matches && this.inRound && !this.paused) {
       this.setPaused(true);
       this.rotatePaused = true;
@@ -447,7 +312,7 @@ const App = {
       this.rotatePaused = false;
       $('#pause-note').textContent = '';
     }
-    if (!this.demo) $('#pause').classList.toggle('active', p);
+    if (this.edition.pauseMenu) $('#pause').classList.toggle('active', p);
     if (p) this.audio.pause();
     else this.audio.resume();
   },
@@ -467,7 +332,7 @@ const App = {
     }
     this.clearShift();
     $('#cog').innerHTML = '';
-    this.show(this.demo ? 'attract' : 'menu');
+    this.show(this.edition.homeScreen);
   },
 
   // 참가자가 '그만하기'로 끝냄 (운영 버전, js/demo.js bindEnd). 하던 데까지를 세션 로그에 ended 'user' 로 남기고(업로드됨)
@@ -477,7 +342,7 @@ const App = {
     if (this.current && this.state === 'play') {
       const res = this.current.game.abort();
       const { host } = this.current;
-      if (res.total > 0) this.record(this.current.T, res, host.level, this.clock - host.t0);
+      if (res.total > 0) this.roundStats.record(this.current.T.id, res, host.level, this.clock - host.t0);
       this.log.ev('game_abort', { game: this.current.T.id, ...res });
       this.current = null;
     }
@@ -500,7 +365,7 @@ const App = {
 
   // ---------------- 라운드 흐름 ----------------
   startRound() {
-    if (!this.demo) this.readMenu();
+    this.edition.beforeRound(this);
     this.meter.reset();
     this.audio.ensure();
     this.audio.setMuted(!this.cfg.sound);
@@ -531,21 +396,20 @@ const App = {
     this.log.ev('calib_start');
   },
 
-  // 세션 기록을 닫는다. 스테이션 흐름(운영 버전)에서 결과 없이 끝난 판은 여기서 바로 저장한다 (결과가 있으면 Demo.showResult 가 저장)
+  // 세션 기록을 닫는다. 판에 따라 바로 저장하기도 한다 (StationEdition.logClosed)
   closeLog(ended) {
     const log = this.log;
     if (!log || log.done) return;
     log.finish(ended, this.summary());
-    // 결과 화면까지 가지 않은 판은 여기서 저장한다 (결과 화면까지 간 판은 Demo.showResult 가 저장)
-    if (this.demo && (ended === 'abandoned' || ended === 'user')) Demo.storeLog(log);
+    this.edition.logClosed(this, log, ended);
   },
 
   summary() {
     const m = this.meter;
     return {
       score: this.score ?? 0, exScore: this.exScore ?? 0, cogScore: this.cogScore ?? 0,
-      baseline: this.baseline ?? null, bestStreak: this.bestStreak ?? 0, elapsedSec: Math.round((this.elapsed ?? 0) * 10) / 10,
-      stats: this.stats || null,
+      baseline: this.baseline ?? null, bestStreak: this.roundStats?.bestStreak ?? 0, elapsedSec: Math.round((this.elapsed ?? 0) * 10) / 10,
+      stats: this.roundStats?.games || null,
       exercise: { kcal: Math.round(m.kcal * 100) / 100, distM: Math.round(m.distM), revs: Math.round(m.revs * 10) / 10, avgRpm: Math.round(m.avgRpm * 10) / 10, activeSec: Math.round(m.activeSec) },
     };
   },
@@ -603,9 +467,7 @@ const App = {
   beginCountdown() {
     this.state = 'countdown';
     this.score = 0;
-    this.hudScore = 0;                  // 점수판에 도착한 점수 (날아가는 중인 점수는 아직 빠져 있다 — addScore)
-    this.hudShown = 0;                  // 점수판에 지금 보이는 값 (hudScore 까지 굴러 올라간다)
-    this.scoreEpoch = (this.scoreEpoch || 0) + 1; // 지난 판에 날아가던 점수가 새 판 점수판에 내려앉지 않게
+    ScoreHud.reset();
     this.exScore = 0;
     this.cogScore = 0;
     this.elapsed = 0;
@@ -620,18 +482,12 @@ const App = {
     this.pass = [];                     // 이번 바퀴에 남은 게임 (planPass)
     this.inIntro = false;               // 게임 소개 중이면 라운드 시계·운동 점수가 멈춘다 (updatePlay)
     this.prevType = null;
-    this.diff = Math.min(this.cfg.startLevel, this.levelCap()); // adaptive 난이도 계기판 (cfg.difficulty 참고)
     this.lastLevel = {};                // 게임별 지난번 레벨 (소개 문구용)
     this.current = null;
-    this.streak = 0;
-    this.bestStreak = 0;
-    this.renderStreak();
     this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
-    this.stats = {};
-    // level = 도달한 최고 난이도, runs = 판마다 [레벨, 맞힌 수, 문제 수], ms = 게임을 푸는 데 쓴 시간 (피드백 포함),
-    // think = 문제별 생각한 시간 (App.think). runs · think 는 능력 점수에 쓴다 (js/abilities.js)
-    GAME_TYPES.forEach((T) => (this.stats[T.id] = { plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0,
-      think: { n: 0, ms: 0, first: 0, out: 0, outMs: 0 } }));
+    this.difficulty = new Difficulty(this.cfg, this.types.length); // 다음 게임의 레벨 (js/difficulty.js)
+    this.roundStats = new RoundStats(GAME_TYPES);                   // 게임별 성적 · 연속 정답 (js/round-stats.js)
+    ScoreHud.renderStreak(this.roundStats.streak);
     this.band.cfg = this.cfg;
     this.band.brainOnly = this.brainOnly;
     $('#game').classList.toggle('brain-only', this.brainOnly);
@@ -666,13 +522,13 @@ const App = {
     cog.innerHTML = '';
     cog.append(intro);
     const num = intro.querySelector('.big-count');
-    this.audio.sfx('count');
-    this.after(1000, () => { num.textContent = '2'; this.audio.sfx('count'); }, gen);
-    this.after(2000, () => { num.textContent = '1'; this.audio.sfx('count'); }, gen);
+    this.audio.sfx(Sfx.COUNT);
+    this.after(1000, () => { num.textContent = '2'; this.audio.sfx(Sfx.COUNT); }, gen);
+    this.after(2000, () => { num.textContent = '1'; this.audio.sfx(Sfx.COUNT); }, gen);
     this.after(3000, () => {
       num.textContent = 'GO!';
       num.classList.add('go');
-      this.audio.sfx('go');
+      this.audio.sfx(Sfx.GO);
       Fx.cleared(num);
       this.state = 'play';
       this.log.ev('play_start');
@@ -682,14 +538,10 @@ const App = {
 
   nextGame() {
     if (this.shiftDue()) return this.beginShift();
-    if (!this.pass.length) this.pass = this.planPass(this.prevType, this.gameIndex === 0);
+    if (!this.pass.length) this.pass = planPass(this.types, this.prevType, this.gameIndex === 0);
     const T = this.pass.shift();
     this.prevType = T;
-    const cycle = Math.floor(this.gameIndex / this.types.length);
-    const top = Math.min(T.maxLevel, this.levelCap());
-    const level = this.cfg.difficulty === 'adaptive'
-      ? U.clamp(Math.floor(this.diff), 1, top)
-      : Math.min(cycle + this.cfg.startLevel, top);
+    const level = this.difficulty.levelFor(T, this.gameIndex);
     // Lv1 x1.0 → Lv8 x multiplierTop (config.js 의 Config.levelMult)
     const mult = Config.levelMult(this.cfg, level);
     const prev = this.lastLevel[T.id];
@@ -698,7 +550,7 @@ const App = {
     this.lastLevel[T.id] = level;
     this.gameIndex++;
     this.current = null;
-    this.log.ev('game_start', { game: T.id, level, mult: Math.round(mult * 100) / 100, diff: Math.round(this.diff * 100) / 100 });
+    this.log.ev('game_start', { game: T.id, level, mult: Math.round(mult * 100) / 100, diff: Math.round(this.difficulty.value * 100) / 100 });
 
     const gen = ++this.gen;
     const cog = $('#cog');
@@ -733,39 +585,6 @@ const App = {
     this.after(600, () => intro.addEventListener('pointerdown', () => begin(true)), gen);
   },
 
-  // 한 바퀴 = 켜 둔 게임을 한 번씩. 바퀴마다 순서를 섞되, 바로 앞 게임과 같거나 비슷한(tags 가 겹치는) 게임이
-  // 이어지지 않게 한다 (바퀴가 바뀌는 자리 포함). 그런 순서가 없으면 같은 게임만 피한다.
-  // opening 이면 첫 게임을 OPENING_GAMES 중에서 고른다.
-  planPass(prev, opening) {
-    const types = this.types;
-    const near = (a, b) => a === b || a.tags.some((t) => b.tags.includes(t));
-    const plan = (strict) => {
-      const out = [];
-      const left = new Set(types);
-      let budget = 5000;
-      const dfs = () => {
-        if (!left.size) return true;
-        if (--budget < 0) return false;
-        const last = out.length ? out[out.length - 1] : prev;
-        let cands = U.shuffle([...left]).filter((T) => !last || types.length === 1 || (strict ? !near(last, T) : last !== T));
-        if (opening && !out.length) {
-          const first = cands.filter((T) => OPENING_GAMES.includes(T.id));
-          if (first.length) cands = first;
-        }
-        for (const T of cands) {
-          out.push(T);
-          left.delete(T);
-          if (dfs()) return true;
-          out.pop();
-          left.add(T);
-        }
-        return false;
-      };
-      return dfs() ? out : null;
-    };
-    return plan(true) || plan(false) || U.shuffle([...types]);
-  },
-
   makeHost(T, stage, level, mult, gen) {
     const t0 = this.clock;
     return {
@@ -788,31 +607,31 @@ const App = {
       answer: (data) => {
         if (gen !== this.gen) return;
         const { ms, first } = this.log.answer(T.id, data);
-        if (this.state === 'play') this.think(T, ms, first, !!data.timedOut);
+        if (this.state === 'play') this.roundStats.think(T.id, ms, first, !!data.timedOut);
       },
-      // 게임들은 정답에 'good', 오답에 'bad'를 울린다. 그 둘만 가로채 연속 정답을 세고 보상을 키운다.
+      // 게임들은 정답에 Sfx.GOOD, 오답에 Sfx.BAD 를 울린다. 그 둘만 가로채 연속 정답을 세고 보상을 키운다.
       // (게임 쪽 코드를 건드리지 않고 한 곳에서 보상을 다룰 수 있다)
-      sfx: (n) => {
-        if (n === 'good') return this.hit(true);
-        if (n === 'bad') return this.hit(false);
-        this.audio.sfx(n);
+      sfx: (name) => {
+        if (name === Sfx.GOOD) return this.hit(true);
+        if (name === Sfx.BAD) return this.hit(false);
+        this.audio.sfx(name);
       },
       award: (pts, anchor, prefix = '') => {
         if (gen !== this.gen || this.state !== 'play') return;
         pts = Math.round(pts);
         if (pts <= 0) return;
         this.cogScore += pts;
-        this.stats[T.id].points += pts;
+        this.roundStats.addPoints(T.id, pts);
         this.log.ev('points', { game: T.id, pts });
         this.addScore(pts, anchor, `${prefix}+${pts}`);
       },
       done: (res) => {
         if (gen !== this.gen || this.state !== 'play') return;
-        this.record(T, res, level, this.clock - t0);
+        this.roundStats.record(T.id, res, level, this.clock - t0);
         this.log.ev('game_end', { game: T.id, ...res });
         // 한 게임을 다 맞혔으면 따로 축하한다. 게임마다 넣지 않고 여기서 한 번에 처리한다.
         if (!res.cleared) return this.nextGame();
-        this.audio.sfx('clear');
+        this.audio.sfx(Sfx.CLEAR);
         const b = U.el('div', 'perfect', '완벽!');
         stage.append(b);
         Fx.cleared(stage);
@@ -866,7 +685,7 @@ const App = {
     q.el.classList.toggle('low', frac < 0.18);
     // 마지막 3초는 초마다 작게 똑딱인다
     if (left <= q.tick * 1000 && q.tick > 0) {
-      this.audio.sfx('tick');
+      this.audio.sfx(Sfx.TICK);
       q.tick--;
     }
     if (left > 0) return;
@@ -895,7 +714,7 @@ const App = {
     this.log.ev('shift_start', { from: this.slopeLevel, to });
     $('#shift-name').textContent = SLOPE_MSG[to];
     $('#game').classList.add('shift');
-    this.audio.sfx('go');
+    this.audio.sfx(Sfx.GO);
     this.audio.setRest(true);
     this.after(this.cfg.shiftSec * 1000, () => this.endShift(), gen);
   },
@@ -936,180 +755,41 @@ const App = {
   // '지키고 싶은 것'만 하나 만들어 주는 게 목적이다.
   hit(ok) {
     this.adjustDifficulty(ok);
+    const streakBefore = this.roundStats.answered(ok);
     if (ok) {
-      this.streak++;
-      this.bestStreak = Math.max(this.bestStreak, this.streak);
-      this.audio.reward(this.streak);
+      const { streak } = this.roundStats;
+      this.audio.reward(streak);
       this.band.celebrate();
-      this.flashGlow(this.streak);
-      Fx.hit(this.streak);
+      ScoreHud.flashGlow(streak);
+      Fx.hit(streak);
     } else {
-      this.audio.sfx(this.streak >= 3 ? 'drop' : 'bad');
+      // 길게 이어 온 연속이 끊기면 그냥 틀렸을 때보다 아깝게 들리게
+      this.audio.sfx(streakBefore >= 3 ? Sfx.DROP : Sfx.BAD);
       Fx.miss($('#cog'));
-      this.streak = 0;
     }
-    this.renderStreak();
+    ScoreHud.renderStreak(this.roundStats.streak);
   },
 
-  // adaptive 난이도 계기판. 위는 최고 난이도(levelCap) 바로 아래까지 — 최고 레벨에서 한 번 틀려도 바로 내려가지 않는다
+  // adaptive 난이도 계기판을 옮기고 세션 로그에 적는다 (js/difficulty.js)
   adjustDifficulty(ok) {
-    const c = this.cfg;
-    if (c.difficulty !== 'adaptive') return;
-    const k = this.diffScale();
-    this.diff = U.clamp(this.diff + (ok ? c.diffUp : -c.diffDown) * k, 1, this.levelCap() + 0.99);
-    this.log.ev('difficulty', { ok, diff: Math.round(this.diff * 100) / 100, k: Math.round(k * 1000) / 1000 });
+    const scale = this.difficulty.answered(ok);
+    if (scale == null) return;
+    this.log.ev('difficulty', { ok, diff: Math.round(this.difficulty.value * 100) / 100, k: Math.round(scale * 1000) / 1000 });
   },
 
-  // 계기판 한 걸음의 배율: 켜 둔 게임이 많을수록 작게 (cfg.diffGamesRef 참고)
-  diffScale() {
-    return Math.min(1, (this.cfg.diffGamesRef || Infinity) / this.types.length);
-  },
-
-  renderStreak() {
-    const el = $('#streak');
-    el.classList.toggle('on', this.streak >= 2);
-    if (this.streak < 2) return;
-    el.textContent = `${this.streak} 연속`;
-    el.classList.remove('bump');
-    void el.offsetWidth;
-    el.classList.add('bump');
-  },
-
-  // 맞힌 순간 게임 영역 전체가 한 번 밝아진다. 연속이 쌓일수록 세진다.
-  flashGlow(streak) {
-    const a = Math.min(0.1 + streak * 0.045, 0.34);
-    const el = U.el('div', 'glow');
-    el.style.background = `radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--good) ${Math.round(a * 100)}%, transparent) 0%, transparent 62%)`;
-    $('#cog').append(el);
-    setTimeout(() => el.remove(), 440);
-  },
-
-  record(T, res, level, ms) {
-    const s = this.stats[T.id];
-    s.plays++;
-    s.level = Math.max(s.level, level);
-    s.runs.push([level, res.correct, res.total]);
-    s.ms += ms;
-    if (res.cleared) s.cleared++;
-    s.correct += res.correct;
-    s.total += res.total;
-  },
-
-  // 문제 하나의 생각한 시간 (게임 시계 ms, 입력이 열린 뒤부터. js/session-log.js 의 answer).
-  // 제때 답한 문제: n 개, ms = 답이 정해질 때까지의 합, first = 처음 입력할 때까지의 합.
-  // 시간 초과: out 개, outMs = 그 문제들에 쓴 시간 합. 입력이 열리기 전에 누른 답(지시 따르기의 램프 전에 누름)은 시간이 없어 세지 않는다
-  think(T, ms, first, timedOut) {
-    if (ms == null) return;
-    const k = this.stats[T.id].think;
-    if (timedOut) {
-      k.out++;
-      k.outMs += ms;
-      return;
-    }
-    k.n++;
-    k.ms += ms;
-    k.first += first ?? ms;
-  },
-
-  floatAt(anchor, text) {
-    const cog = $('#cog');
-    const cr = cog.getBoundingClientRect();
-    const r = anchor.getBoundingClientRect();
-    const f = U.el('div', 'floater', text);
-    f.style.left = `${r.left + r.width / 2 - cr.left}px`;
-    f.style.top = `${r.top + r.height / 2 - cr.top}px`;
-    cog.append(f);
-    setTimeout(() => f.remove(), 950);
-  },
-
-  // 점수는 바로 더하고(this.score), 화면의 점수판(hudScore)은 점수가 도착했을 때 올린다.
+  // 점수는 바로 더하고, 화면의 점수판은 점수가 도착했을 때 올린다 (js/score-hud.js).
   // anchor 가 있으면(인지 게임 정답) 그 자리에서 점수 배지가 튀어나와 점수판으로 날아간다
   addScore(pts, anchor, text) {
     this.score += pts;
-    if (!anchor || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      if (anchor) this.floatAt(anchor, text);
-      return this.landScore(pts, !!anchor);
-    }
-    const epoch = this.scoreEpoch;
-    this.flyScore(anchor, text, () => epoch === this.scoreEpoch && this.landScore(pts, true));
-  },
-
-  // 배지: 정답 자리에서 크게 튀어나와 잠깐 떠 있다가, 위로 솟으며 점수판 쪽으로 휘어 날아가 작아진다.
-  // 가로(바깥 상자)와 세로·크기(안쪽 글자)를 다른 곡선으로 움직여서 곧은 선이 아니라 호를 그린다. 연속 정답이 길수록 크다
-  flyScore(anchor, text, onLand) {
-    const a = anchor.getBoundingClientRect();
-    const d = $('#hud-score .value').getBoundingClientRect();
-    const x = a.left + a.width / 2, y = a.top + a.height / 2;
-    const dx = d.right - 30 - x, dy = d.top + d.height / 2 - y;
-    const f = U.el('div', 'score-pop', `<span>${text}</span>`);
-    f.classList.toggle('hot', this.streak >= 3);
-    f.style.left = `${x}px`;
-    f.style.top = `${y}px`;
-    f.style.setProperty('--k', String(1 + Math.min(this.streak, 6) * 0.06));
-    document.body.append(f);
-    const ms = 1150, flyAt = 0.42;
-    f.animate([
-      { transform: 'translateX(0)', offset: 0 },
-      { transform: 'translateX(0)', offset: flyAt, easing: 'cubic-bezier(0.55, 0, 0.9, 0.45)' },
-      { transform: `translateX(${dx}px)`, offset: 1 },
-    ], { duration: ms, fill: 'forwards' });
-    const anim = f.firstChild.animate([
-      { transform: 'translateY(0) scale(0.3)', opacity: 0, offset: 0, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1.3)' },
-      { transform: 'translateY(-6px) scale(1.25)', opacity: 1, offset: 0.12 },
-      { transform: 'translateY(-10px) scale(1)', offset: 0.22 },
-      { transform: 'translateY(-16px) scale(1)', offset: flyAt, easing: 'cubic-bezier(0.25, 0.7, 0.35, 1)' },
-      { transform: `translateY(${dy}px) scale(0.45)`, opacity: 0.9, offset: 1 },
-    ], { duration: ms, fill: 'forwards' });
-    anim.onfinish = () => {
-      f.remove();
-      onLand();
-    };
-  },
-
-  // 점수판이 점수를 받는다: 숫자가 굴러 올라가고(updateHud), 받은 순간 튀어 오른다.
-  // big = 날아온 인지 점수 — 더 크게 튀고 초록으로 번쩍이며 둘레에 고리가 퍼진다
-  landScore(pts, big) {
-    this.hudScore += pts;
-    const v = $('#hud-score .value');
-    v.classList.remove('bump', 'catch');
-    void v.offsetWidth;
-    v.classList.add(big ? 'catch' : 'bump');
-    if (!big) return;
-    const r = v.getBoundingClientRect();
-    const x = r.right - 30, y = r.top + r.height / 2;
-    const ring = U.el('div', 'score-ring');
-    ring.style.left = `${x}px`;
-    ring.style.top = `${y}px`;
-    document.body.append(ring);
-    setTimeout(() => ring.remove(), 600);
-    Fx.burst(x, y, 0.6);
+    ScoreHud.addPoints(pts, anchor, text, this.roundStats.streak);
   },
 
   updateHud(dt = 0) {
-    const left = this.state === 'play' ? this.cfg.durationSec - this.elapsed : this.cfg.durationSec;
-    $('#hud-time .value').textContent = U.fmtTime(left);
-    $('#hud-time').classList.toggle('warn', this.state === 'play' && left <= 10);
-    $('#hud-time').classList.toggle('held', this.state === 'play' && this.inIntro);
-    // 운영 버전(app/)에만 있는 표시: 라운드 진행 막대와 달린 거리
+    const playing = this.state === 'play';
+    const left = playing ? this.cfg.durationSec - this.elapsed : this.cfg.durationSec;
     const done = U.clamp(1 - left / this.cfg.durationSec, 0, 1);
     this.band.dayT = done; // 풍경 라이딩: 라운드가 흐르는 동안 아침에서 해 질 녘으로
-    const prog = $('#hud-progress');
-    if (prog) prog.style.transform = `scaleX(${done})`;
-    const dist = $('#hud-dist .value');
-    if (dist) {
-      const d = Exercise.fmtDist(this.meter.distM);
-      const txt = `${d.value} ${d.unit}`;
-      if (dist.textContent !== txt) dist.textContent = txt;
-    }
-    // 점수판 숫자는 받은 점수까지 굴러 올라간다 (남은 차이의 비율만큼, 너무 느리지 않게 초당 최소 40점)
-    if (!dt || this.hudShown > this.hudScore) this.hudShown = this.hudScore;
-    else if (this.hudShown < this.hudScore) {
-      const gap = this.hudScore - this.hudShown;
-      this.hudShown = Math.min(this.hudScore, this.hudShown + Math.max(40 * dt, gap * (1 - Math.exp(-dt / 0.12))));
-    }
-    const n = String(Math.floor(this.hudShown));
-    const v = $('#hud-score .value');
-    if (v.textContent !== n) v.textContent = n;
+    ScoreHud.render(dt, { left, done, playing, held: this.inIntro, distM: this.meter.distM });
   },
 
   // 목표 RPM 대비 편차로 이번 프레임의 운동 점수(0~max)를 계산
@@ -1171,7 +851,7 @@ const App = {
       const res = this.current.game.abort();
       this.state = 'result';
       const { host } = this.current;
-      if (res.total > 0) this.record(this.current.T, res, host.level, this.clock - host.t0);
+      if (res.total > 0) this.roundStats.record(this.current.T.id, res, host.level, this.clock - host.t0);
       this.log.ev('game_abort', { game: this.current.T.id, ...res });
     }
     this.closeLog(ended);
@@ -1179,7 +859,7 @@ const App = {
     this.timers = [];
     this.clearShift();
     this.audio.stop();
-    this.audio.sfx('end');
+    this.audio.sfx(Sfx.END);
     $('#cog').innerHTML = '';
     this.showEnding(ended);
   },
@@ -1200,7 +880,7 @@ const App = {
     // 운영 버전의 회원 라운드: 먼저 풍경 카드를 화면 가득 키우고 이번 점수 자리에 건물을 한 층씩 짓는다 (Band.plant).
     // 오늘 운동이 건물이 되는 것을 알아볼 수 있게, 다 지은 뒤 BUILD_HOLD_MS 동안 보여 주고 나서야
     // 풍경을 줄이고 마무리 카드를 아래 게임 카드 안에 띄운다. 짓는 동안은 눌러도 넘어가지 않는다
-    const plant = this.demo ? Demo.plantInfo() : null;
+    const plant = this.edition.plantInfo(this);
     let cardAt = 0;
     if (plant) {
       // 생김새를 세션 로그에 남긴다 (회원 기록에도 들어가 다음 라운드부터 같은 모양으로 선다)
@@ -1241,128 +921,9 @@ const App = {
   },
   BUILD_HOLD_MS: 1500, // 건물을 다 지은 뒤 풍경을 그대로 보여 주는 시간
 
-  // 세션 성과·운동량 카드 (#tpl-report) 를 root 안에서 채운다. 스테이션(운영 버전)·테스트 결과 화면이 함께 쓴다.
-  // 능력 점수(abil)는 화면에 그리지 않지만 세션 로그·참가 기록에 남긴다 (js/abilities.js)
-  // 반환: { abil(능력 점수), keep(속도 유지율 %), kcal, gameAcc(게임 정확도 0~1 또는 null), rec(권하는 다음 난이도, js/stars.js) }
-  fillReport(root) {
-    const cfg = this.cfg;
-    const m = this.meter;
-    const $r = (cls) => root.querySelector(`.rp-${cls}`);
-    const abil = Abilities.compute(this.stats);
-    const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
-    const keep = U.clamp(Math.round((this.exScore / exMax) * 100), 0, 100);
-    const kcal = m.kcal;
-    const gameAcc = Stars.gameAcc(this.stats);
-    const rec = this.fillStars(root, keep, gameAcc);
-    const dist = Exercise.fmtDist(m.distM);
-    $r('dist').textContent = dist.value;
-    $r('dist-unit').textContent = dist.unit;
-    $r('kcal').textContent = kcal < 10 ? kcal.toFixed(1) : String(Math.round(kcal));
-    $r('revs').textContent = `${Math.round(m.revs).toLocaleString('ko-KR')}바퀴`;
-    $r('time').textContent = U.fmtTime(m.activeSec);
-    $r('rpm').textContent = `${Math.round(m.avgRpm)} RPM`;
-    $r('keep').textContent = `${keep}%`;
-    // 두뇌 게임만 한 판: 운동량 대신 안내 한 줄 (app.css · style.css 의 .dr-ex.brain-only)
-    root.querySelector('.dr-ex').classList.toggle('brain-only', !!this.brainOnly);
-    return { abil, keep, kcal, gameAcc, rec };
-  },
-
-  // 세션 성과 카드: 운동(속도 유지율 %) · 인지(게임 정답률) 별을 나란히, 그리고 게임 정답률이 높으면 다음 난이도 권하기
-  // 운영 버전은 고른 세션 난이도(SESSION_DIFFICULTIES)로, 테스트 화면은 라운드 난이도 프리셋(ROUND_PRESETS)으로 다음 단계를 찾는다
-  fillStars(root, keep, gameAcc) {
-    const row = (cls, acc) => {
-      const el = root.querySelector(`.rp-${cls}`);
-      el.classList.toggle('nodata', acc == null);
-      el.querySelector('.st-pct').textContent = acc == null ? '–' : `${Math.round(acc * 100)}%`;
-      el.querySelector('.st-stars').innerHTML = Stars.svg(Stars.of(acc));
-    };
-    row('st-ex', this.brainOnly ? null : keep / 100); // 두뇌 게임만 한 판은 '–' 와 흐린 별
-    row('st-game', gameAcc);
-
-    const session = this.demo && this.log && this.log.meta.session;
-    // 세션 난이도를 고르지 않은 판(시연 프로토타입)은 목록이 없으니 오르내리지 않고 이대로 계속하기만 권한다
-    const rec = session ? Stars.nextSession(session.difficulty, gameAcc)
-      : Stars.nextPreset(this.demo ? null : Config.presetOf(this.cfg), gameAcc);
-    const el = root.querySelector('.rp-rec');
-    el.className = `st-rec rp-rec ${rec.kind}`;
-    // 운영 버전의 회원(손님도 결과에서 번호를 받는다)은 다음 세션 설정에 이 난이도가 미리 골라져 있다 (app/members.js)
-    const keepsIt = session && Demo.members;
-    // up·down: '다음엔 <b>보통</b>으로 …' (회원이면 미리 골라 둔다고, 아니면 골라 보라고)
-    const to = rec.to && `다음엔 <b>${rec.to.label}</b>${this.ro(rec.to.label)}`;
-    el.innerHTML = rec.kind === 'up' ? `실력이 늘었어요! ${to} 한 단계 ${keepsIt ? '올려 둘게요' : '올려 보세요'}`
-      : rec.kind === 'down' ? `무리하지 않아도 괜찮아요. ${to} 편하게 ${keepsIt ? '해 볼게요' : '해 보세요'}`
-      : {
-        top: '가장 높은 난이도에서도 아주 잘하셨어요! <b>이대로 계속</b>해요',
-        bottom: '처음엔 누구나 어려워요. <b>천천히 꾸준히</b> 해 봐요',
-        nodata: '다음에도 <b>꾸준히</b> 함께해요',
-        fit: '지금 난이도가 딱 알맞아요. <b>이대로 꾸준히</b> 해 봐요',
-      }[rec.why];
-    return rec;
-  },
-  // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로' (도전으로 · 보통으로 · 편안하게로)
-  ro(w) {
-    const c = w.charCodeAt(w.length - 1) - 0xac00;
-    return c >= 0 && c < 11172 && c % 28 && c % 28 !== 8 ? '으로' : '로';
-  },
-
+  // 결과 화면은 판마다 다르다 (테스트: js/test-results.js, 스테이션: Demo.showResult)
   showResult() {
-    if (this.demo) return Demo.showResult();
-    const cfg = this.cfg;
-    const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
-    $('#res-total').textContent = this.score;
-    $('#res-ex').textContent = this.brainOnly ? '–' : this.exScore;
-    $('#res-ex-sub').textContent = this.brainOnly ? ' 페달 없이 (두뇌 게임만)' : ` / ${exMax}`;
-    $('#res-cog').textContent = this.cogScore;
-    // 이번 라운드에 실제로 나온 게임만 적는다
-    // 게임마다 한 줄 (이름 · 판 수 · 정답 · 점수). 줄바꿈 없이 표로 맞춰 11종이 다 나와도 카드에 들어간다
-    const rows = GAME_TYPES.filter((T) => this.stats[T.id].plays).map((T) => {
-      const s = this.stats[T.id];
-      return `<span class="g">${T.title}</span><span>${s.plays}회</span><span>${s.correct}/${s.total}</span><span>${s.points}점</span>`;
-    });
-    const streak = this.bestStreak >= 2 ? `<b>최고 연속 정답 ${this.bestStreak}회</b>` : '';
-    $('#res-cog-sub').innerHTML = `<div class="rs-table">${rows.join('')}</div>${streak}`;
-    $('#save-row').style.display = '';
-    $('#btn-log').disabled = false;
-    $('#btn-log').textContent = '세션 로그 저장';
-    $('#res-name').value = '';
-    this.savedId = null;
-    this.renderBoard($('#res-board'));
-    this.fillReport($('#result'));
-    this.show('result');
-    Fx.confetti(1);
-    // 터치 화면(휴대폰·태블릿)에서는 바로 자판이 올라와 결과를 가리므로 눌렀을 때만 넣는다
-    if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => $('#res-name').focus(), 50);
-  },
-
-  // ---------------- 순위 ----------------
-  loadBoard() {
-    try { return JSON.parse(localStorage.getItem('exergame.board') || '[]'); } catch (e) { return []; }
-  },
-
-  saveScore() {
-    if (this.savedId) return;
-    const name = $('#res-name').value.trim() || '이름없음';
-    const board = this.loadBoard();
-    this.savedId = Date.now();
-    board.push({ id: this.savedId, name, score: this.score, ex: this.exScore, cog: this.cogScore, dur: this.cfg.durationSec, track: this.brainOnly ? 'brain' : 'dual' });
-    board.sort((a, b) => b.score - a.score);
-    try { localStorage.setItem('exergame.board', JSON.stringify(board.slice(0, 50))); } catch (e) {}
-    $('#save-row').style.display = 'none';
-    this.renderBoard($('#res-board'));
-  },
-
-  renderBoard(el) {
-    const board = this.loadBoard().slice(0, 8);
-    if (!board.length) {
-      el.innerHTML = '<li class="board-empty">아직 기록이 없습니다</li>';
-      return;
-    }
-    el.innerHTML = board.map((b, i) => `
-      <li class="${b.id === this.savedId ? 'me' : ''}">
-        <span class="rank">${i + 1}</span>
-        <span class="name">${b.name.replace(/[<>&]/g, '')}</span>
-        <span>${b.score}점 <small style="color:var(--ink-soft)">(${U.fmtTime(b.dur)}${b.track === 'brain' ? ' · 두뇌만' : ''})</small></span>
-      </li>`).join('');
+    this.edition.showResult(this);
   },
 
   // ---------------- 메인 루프 ----------------
@@ -1380,7 +941,7 @@ const App = {
       if ((this.state === 'calib' && this.calib.started) || this.state === 'countdown' || this.state === 'play') {
         this.meter.add(dt, rpm);
       }
-      if (this.demo) Demo.tick(dt, rpm);
+      this.edition.tick(this, dt, rpm);
       if (this.log && (this.state === 'calib' || this.state === 'countdown' || this.state === 'play')) this.log.sample(dt, rpm);
 
       if (this.state === 'countdown' || this.state === 'play') {

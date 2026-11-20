@@ -2,7 +2,7 @@
 // 둥근 길 위를 게임 속 자전거가 페달 빠르기에 맞춰 돌고(페달 네 바퀴에 한 바퀴), 안쪽 파란 고리가 측정 시간만큼 찬다.
 // 가운데 숫자(남은 초)와 아래 안내 문구는 main.js 의 updateCalib 이 그대로 채운다. Demo.tick 이 측정 중에 매 프레임 부른다.
 import { U } from '../js/config.js';
-import { Band } from '../js/band.js';
+import { drawBike } from '../js/scenery-art.js';
 
 export const CalibVisual = {
   REVS_PER_LAP: 4, // 페달 몇 바퀴에 길을 한 바퀴 도는가 (60 RPM 이면 4초에 한 바퀴)
@@ -109,7 +109,7 @@ export const CalibVisual = {
     g.save();
     g.translate(bx, by);
     if (Math.sin(a) > 0) g.scale(-1, 1); // 아래쪽 반을 돌 때는 왼쪽으로 간다
-    Band.prototype.drawBike.call({ g, pal: { ink: v('--ink') }, roll: this.roll }, 0, br * 0.06, br * 1.3);
+    drawBike({ g, pal: { ink: v('--ink') }, roll: this.roll }, 0, br * 0.06, br * 1.3);
     g.restore();
   },
 };

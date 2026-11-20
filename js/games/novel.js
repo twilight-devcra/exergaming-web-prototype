@@ -23,16 +23,19 @@
 //   similar — 새 그림이 판에 있는 그림과 모양은 같고 무늬만 다를 확률. 그 밖에는 판에 없는 모양으로 고른다
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 const NOVEL_SHAPES = (() => {
-  const poly = (k, r, cy, rot) => Array.from({ length: k }, (_, i) => {
-    const a = ((rot + (360 / k) * i) * Math.PI) / 180;
-    return `${(50 + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`;
+  const poly = (k, radius, cy, rot) => Array.from({ length: k }, (_, i) => {
+    const angle = ((rot + (360 / k) * i) * Math.PI) / 180;
+    return `${(50 + Math.cos(angle) * radius).toFixed(1)},${(cy + Math.sin(angle) * radius).toFixed(1)}`;
   }).join(' ');
   const star = Array.from({ length: 10 }, (_, i) => {
-    const a = ((-90 + i * 36) * Math.PI) / 180;
+    const angle = ((-90 + i * 36) * Math.PI) / 180;
     const rad = i % 2 ? 24 : 48;
-    return `${(50 + Math.cos(a) * rad).toFixed(1)},${(54 + Math.sin(a) * rad).toFixed(1)}`;
+    return `${(50 + Math.cos(angle) * rad).toFixed(1)},${(54 + Math.sin(angle) * rad).toFixed(1)}`;
   }).join(' ');
   // 무늬가 들어가도록 속이 꽉 찬 모양만 쓴다. cy = 무늬를 놓을 가운데 높이. 모양이 모두 달라 색이 겹쳐도 된다
   return [
@@ -57,15 +60,15 @@ const NOVEL_MARKS = [
   { id: 'ring', svg: (cy) => `<circle cx="50" cy="${cy}" r="12" fill="none" stroke="#fff" stroke-width="7"/>` },
   { id: 'tri', svg: (cy) => `<polygon points="50,${cy - 13} 63,${cy + 10} 37,${cy + 10}"/>` },
 ];
-function novelPic(s, m) {
-  const shape = NOVEL_SHAPES[s];
-  const mark = NOVEL_MARKS[m].svg(shape.cy);
+function novelPic(shapeIx, markIx) {
+  const shape = NOVEL_SHAPES[shapeIx];
+  const mark = NOVEL_MARKS[markIx].svg(shape.cy);
   return shape.svg + (mark ? `<g fill="#fff" stroke="rgba(0,0,0,0.22)" stroke-width="2.5" paint-order="stroke">${mark}</g>` : '');
 }
 
 export class NovelGame {
   static id = 'novel';
-  static tags = ['memory']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.MEMORY];
   static title = '없던 그림 찾기';
   static hint = '그림들을 잘 봐 두었다가<br>가림막이 걷히면 새로 나타난 그림을 누르세요';
   // 첫 판(2026-10-22)은 너무 어려웠다: 그림 수를 줄이고, 보여 주는 시간을 늘리고, 무늬를 늦게 들이고, 자리 바꾸기를 뺐다
@@ -90,42 +93,44 @@ export class NovelGame {
 
   // 소개 그림: ① 그림들을 잘 보고 ② 가림막이 걷힌 뒤 새로 나타난 그림을 누른다
   static diagram() {
-    const S = 38, G = 9;
-    const at = (cell) => [10 + (cell % 3) * (S + G), 10 + Math.floor(cell / 3) * (S + G)];
+    const CELL = 38, GAP = 9;
+    const at = (cell) => [10 + (cell % 3) * (CELL + GAP), 10 + Math.floor(cell / 3) * (CELL + GAP)];
     const shape = (id) => NOVEL_SHAPES.findIndex((x) => x.id === id);
-    const board = (items) => [...Array(6).keys()].map((c) => Dg.rect(...at(c), S, S)).join('') +
-      items.map(([c, id]) => Dg.glyph(novelPic(shape(id), 0), ...at(c).map((v) => v + S / 2), 28)).join('');
+    const board = (items) => [...Array(6).keys()].map((cell) => Dg.rect(...at(cell), CELL, CELL)).join('') +
+      items.map(([cell, id]) => Dg.glyph(novelPic(shape(id), 0), ...at(cell).map((coord) => coord + CELL / 2), 28)).join('');
     const before = [[0, 'circle'], [2, 'star'], [4, 'triangle']];
-    const mid = at(5).map((v) => v + S / 2);
+    const mid = at(5).map((coord) => coord + CELL / 2);
     return [
       { svg: Dg.svg('0 0 152 104', board(before)), caption: '그림들을 잘 보고' },
       { svg: Dg.svg('0 0 152 104', board([...before, [5, 'heart']]) + Dg.tap(...mid, 22)), caption: '새로 나타난 그림 누르기' },
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = NovelGame.levels[host.level - 1];
     [this.rows, this.cols] = this.spec.grid;
     this.answered = 0;
     this.correct = 0;
-    this.phase = 'show';
+    this.phase = Phase.SHOW;
     // 판: [{ s(모양), m(무늬), at(칸) }]. 처음 판은 모양이 모두 다르다
     const cells = U.shuffle([...Array(this.rows * this.cols).keys()]);
     this.board = U.shuffle([...NOVEL_SHAPES.keys()]).slice(0, this.spec.n)
-      .map((s, i) => ({ s, m: U.rand(this.spec.marks), at: cells[i] }));
+      .map((shapeIx, i) => ({ s: shapeIx, m: U.rand(this.spec.marks), at: cells[i] }));
     this.seen = new Set(this.board.map(NovelGame.key)); // 한 번이라도 판에 나온 그림
     this.lastAt = -1;
   }
 
-  static key({ s, m }) {
-    return `${s}.${m}`;
+  static key({ s: shapeIx, m: markIx }) {
+    return `${shapeIx}.${markIx}`;
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg look', '잘 보세요');
-    const { body, dots } = U.frame(stage, `${NovelGame.title} · Lv.${level}`, this.msg, NovelGame.QUESTIONS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg look', '잘 보세요');
+    const { body, dots } = U.frame(stage, `${NovelGame.title} · Lv.${level}`, this.message, NovelGame.QUESTIONS);
     this.body = body;
     this.progress = dots;
     this.wrap = U.el('div', 'nv-wrap');
@@ -142,43 +147,43 @@ export class NovelGame {
     this.grid.append(this.curtain);
     this.wrap.append(this.grid);
     body.append(this.wrap);
-    this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(body);
+    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver.observe(body);
     this.layout();
 
     this.render();
-    this.h.sfx('blink');
+    this.host.sfx(Sfx.BLINK);
     this.look(this.spec.show);
   }
 
   layout() {
-    const s = this.body;
+    const body = this.body;
     const gap = 12;
-    const sz = U.clamp(Math.min((s.clientHeight - 12) / this.rows - gap, (s.clientWidth - 40) / this.cols - gap), 48, 130);
+    const sz = U.clamp(Math.min((body.clientHeight - 12) / this.rows - gap, (body.clientWidth - 40) / this.cols - gap), 48, 130);
     this.wrap.style.setProperty('--sz', `${sz}px`);
   }
 
   render() {
-    this.cells.forEach((c) => {
-      c.innerHTML = '';
-      c.className = 'scell';
+    this.cells.forEach((cell) => {
+      cell.innerHTML = '';
+      cell.className = 'scell';
     });
-    this.board.forEach(({ s, m, at }) => this.cells[at].append(U.el('div', 'sym', `<svg viewBox="0 0 100 100">${novelPic(s, m)}</svg>`)));
+    this.board.forEach(({ s: shapeIx, m: markIx, at }) => this.cells[at].append(U.el('div', 'sym', `<svg viewBox="0 0 100 100">${novelPic(shapeIx, markIx)}</svg>`)));
   }
 
   // 지금 판을 ms 동안 보여 준 뒤 가림막을 내리고, 가려진 사이 판을 바꾼 다음 걷어 올린다
   look(ms) {
-    this.phase = 'show';
-    U.say(this.msg, '잘 보세요', 'look');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.answered));
-    this.h.after(ms, () => {
+    this.phase = Phase.SHOW;
+    U.say(this.message, '잘 보세요', 'look');
+    Progress.current(this.progress, this.answered);
+    this.host.after(ms, () => {
       this.curtain.classList.add('closed');
-      U.say(this.msg, '');
-      this.h.after(NovelGame.CLOSE_MS + NovelGame.HOLD_MS, () => {
+      U.say(this.message, '');
+      this.host.after(NovelGame.CLOSE_MS + NovelGame.HOLD_MS, () => {
         const before = this.change();
         this.curtain.classList.remove('closed');
-        this.h.sfx('blink');
-        this.h.after(NovelGame.OPEN_MS, () => this.ask(before));
+        this.host.sfx(Sfx.BLINK);
+        this.host.after(NovelGame.OPEN_MS, () => this.ask(before));
       });
     });
   }
@@ -186,62 +191,60 @@ export class NovelGame {
   // 가림막 뒤에서 새 그림을 넣는다. 반환: 바꾸기 전 판 (기록용)
   change() {
     const before = this.board.map((x) => ({ ...x }));
-    const q = NovelGame.change(this.board, this.seen, this.rows * this.cols, this.spec, this.lastAt);
-    this.board = q.board;
-    this.seen.add(NovelGame.key(q.fresh));
-    this.q = q;
-    this.lastAt = q.at;
+    const change = NovelGame.change(this.board, this.seen, this.rows * this.cols, this.spec, this.lastAt);
+    this.board = change.board;
+    this.seen.add(NovelGame.key(change.fresh));
+    this.question = change;
+    this.lastAt = change.at;
     this.render();
     return before;
   }
 
   // 가림막이 다 걷힌 뒤 답을 받기 시작한다
   ask(before) {
-    const q = this.q;
-    U.say(this.msg, '새로 나타난 그림을 누르세요', 'act');
-    this.cells.forEach((c, i) => c.classList.toggle('clickable', this.board.some((x) => x.at === i)));
-    this.phase = 'input';
+    const question = this.question;
+    U.say(this.message, '새로 나타난 그림을 누르세요', 'act');
+    this.cells.forEach((cell, i) => cell.classList.toggle('clickable', this.board.some((x) => x.at === i)));
+    this.phase = Phase.INPUT;
     const ids = (b) => b.map((x) => [x.at, NOVEL_SHAPES[x.s].id, NOVEL_MARKS[x.m].id]);
-    this.h.question({
+    this.host.question({
       grid: [this.rows, this.cols], n: this.answered + 1,
       before: ids(before), after: ids(this.board),
-      fresh: [NOVEL_SHAPES[q.fresh.s].id, NOVEL_MARKS[q.fresh.m].id], at: q.at, mode: q.mode, similar: q.similar, moved: q.moved,
+      fresh: [NOVEL_SHAPES[question.fresh.s].id, NOVEL_MARKS[question.fresh.m].id], at: question.at, mode: question.mode, similar: question.similar, moved: question.moved,
     });
-    this.h.timer(this.board.length, () => this.pick(-1));
+    this.host.timer(this.board.length, () => this.pick(-1));
   }
 
   // i = 누른 칸. -1 이면 시간이 다 된 것. 빈 칸은 무시한다
   pick(i) {
-    if (this.phase !== 'input') return;
+    if (this.phase !== Phase.INPUT) return;
     const hit = this.board.find((x) => x.at === i);
     if (i >= 0 && !hit) return;
-    this.phase = 'wait';
-    this.h.stopTimer();
-    const ok = i === this.q.at;
-    this.h.answer({ cell: i >= 0 ? i : null, correct: ok, timedOut: i < 0 });
-    this.cells.forEach((c) => c.classList.remove('clickable'));
-    const answer = this.cells[this.q.at];
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
+    const ok = i === this.question.at;
+    this.host.answer({ cell: i >= 0 ? i : null, correct: ok, timedOut: i < 0 });
+    this.cells.forEach((cell) => cell.classList.remove('clickable'));
+    const answer = this.cells[this.question.at];
     if (ok) {
       answer.classList.add('right');
       answer.append(U.el('span', 'mark', '✓'));
       this.correct++;
-      U.say(this.msg, '정답!', 'good');
-      this.h.award((this.h.base * this.h.mult) / NovelGame.QUESTIONS, answer);
-      this.h.sfx('good');
+      U.say(this.message, '정답!', 'good');
+      this.host.award(pointsPer(this.host, NovelGame.QUESTIONS), answer);
+      this.host.sfx(Sfx.GOOD);
     } else {
       if (i >= 0) {
         this.cells[i].classList.add('wrong');
         this.cells[i].append(U.el('span', 'mark', '✕'));
       }
       answer.classList.add('reveal');
-      U.say(this.msg, i >= 0 ? '새 그림은 여기였어요' : '시간 초과 · 새 그림은 여기였어요', 'bad');
-      this.h.sfx('bad');
+      U.say(this.message, i >= 0 ? '새 그림은 여기였어요' : '시간 초과 · 새 그림은 여기였어요', 'bad');
+      this.host.sfx(Sfx.BAD);
     }
-    const d = this.progress.children[this.answered];
-    d.classList.remove('cur');
-    d.classList.add(ok ? 'right' : 'wrong');
+    Progress.mark(this.progress, this.answered, ok);
     this.answered++;
-    this.h.after(ok ? 800 : 1400, () => {
+    this.host.after(ok ? 800 : 1400, () => {
       if (this.answered >= NovelGame.QUESTIONS) return this.finish();
       // 표시를 지운 판을 잠깐 다시 보여 준 뒤 다음 문제로
       this.render();
@@ -250,19 +253,19 @@ export class NovelGame {
   }
 
   finish() {
-    this.phase = 'end';
-    this.ro.disconnect();
-    this.h.done(this.result());
+    this.phase = Phase.END;
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === NovelGame.QUESTIONS, correct: this.correct, total: NovelGame.QUESTIONS };
+    return resultOf(this.correct, NovelGame.QUESTIONS);
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    this.ro.disconnect();
-    return { cleared: false, correct: this.correct, total: this.answered };
+    this.resizeObserver.disconnect();
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 문제 만들기 ----
@@ -277,15 +280,15 @@ export class NovelGame {
     for (let tries = 0; ; tries++) {
       const next = board.map((x) => ({ ...x }));
       const taken = new Set(next.map((x) => x.at));
-      const empty = [...Array(cells).keys()].filter((c) => !taken.has(c));
+      const empty = [...Array(cells).keys()].filter((cell) => !taken.has(cell));
       const mode = !empty.length || Math.random() < replace ? 'replace' : 'add';
       const onBoard = new Set(next.map((x) => x.s));
 
       // 새 그림 후보
-      const fresh = (shapes) => shapes.flatMap((s) => [...Array(marks).keys()].map((m) => ({ s, m })))
+      const fresh = (shapes) => shapes.flatMap((shapeIx) => [...Array(marks).keys()].map((markIx) => ({ s: shapeIx, m: markIx })))
         .filter((x) => !seen.has(NovelGame.key(x)));
       const near = marks > 1 ? fresh([...onBoard]) : [];
-      const far = fresh(allShapes.filter((s) => !onBoard.has(s)));
+      const far = fresh(allShapes.filter((shapeIx) => !onBoard.has(shapeIx)));
       const like = near.length && (Math.random() < similar || !far.length);
       const pool = like ? near : far.length ? far : fresh(allShapes);
       const pic = pool[U.rand(pool.length)];
@@ -309,7 +312,7 @@ export class NovelGame {
       if (count) {
         const movers = U.shuffle([...next]).slice(0, count);
         const stay = new Set(next.filter((x) => !movers.includes(x)).map((x) => x.at));
-        const free = [...Array(cells).keys()].filter((c) => !stay.has(c));
+        const free = [...Array(cells).keys()].filter((cell) => !stay.has(cell));
         for (let k = 0; k < 50; k++) {
           const dest = U.shuffle([...free]).slice(0, movers.length);
           if (movers.every((x, j) => dest[j] !== x.at)) {

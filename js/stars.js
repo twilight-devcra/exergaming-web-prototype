@@ -19,7 +19,7 @@ export const Stars = {
     return acc == null ? 0 : Math.round(U.clamp(acc, 0, 1) * this.MAX * 2) / 2;
   },
 
-  // App.stats → 게임 정확도 0~1 (문제가 하나도 없으면 null)
+  // App.roundStats.games → 게임 정확도 0~1 (문제가 하나도 없으면 null)
   gameAcc(stats) {
     let c = 0, t = 0;
     for (const s of Object.values(stats || {})) {

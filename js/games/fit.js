@@ -20,10 +20,13 @@
 //   upright — 조각을 돌려 놓지 않는다 (쉬운 단계). 정답 조각이 빈자리와 같은 방향이라 머릿속으로 돌려 볼 필요가 없다.
 import { U } from '../config.js';
 import { Dg } from '../diagram.js';
+import { Sfx } from '../sfx.js';
+import { Tag } from './tags.js';
+import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
 
 export class FitGame {
   static id = 'fit';
-  static tags = ['shape']; // 꼬리표가 겹치는 게임끼리는 연달아 나오지 않는다 (main.js planPass)
+  static tags = [Tag.SHAPE];
   static title = '빈자리 채우기';
   static hint = '빈자리에 끼웠을 때 선이 모두 이어지는<br>조각을 아래에서 고르세요';
   static levels = [
@@ -49,172 +52,172 @@ export class FitGame {
 
   // 소개 그림: ① 선이 끊긴 빈자리에 ② 선이 모두 이어지는 조각을 끼운다
   static diagram() {
-    const p = [[0], [], [0], [], [], []];
-    const v = FitGame.BOARD_VIEW;
-    const vb = `${-v / 2} ${-v / 2} ${v} ${v}`;
+    const piece = [[0], [], [0], [], [], []];
+    const view = FitGame.BOARD_VIEW;
+    const vb = `${-view / 2} ${-view / 2} ${view} ${view}`;
     return [
-      { svg: Dg.svg(vb, `<g class="fit-board">${FitGame.drawBoard(p)}</g>`), caption: '선이 끊긴 빈자리에' },
-      { svg: Dg.svg(vb, `<g class="fit-board">${FitGame.drawBoard(p)}<g class="seat right">${FitGame.drawPiece(p)}</g></g>`), caption: '선이 이어지는 조각 고르기' },
+      { svg: Dg.svg(vb, `<g class="fit-board">${FitGame.drawBoard(piece)}</g>`), caption: '선이 끊긴 빈자리에' },
+      { svg: Dg.svg(vb, `<g class="fit-board">${FitGame.drawBoard(piece)}<g class="seat right">${FitGame.drawPiece(piece)}</g></g>`), caption: '선이 이어지는 조각 고르기' },
     ];
   }
 
+  /** @param {import('./host.js').GameHost} host */
+
   constructor(host) {
-    this.h = host;
+    this.host = host;
     this.spec = FitGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
-    this.phase = 'wait';
+    this.phase = Phase.WAIT;
   }
 
   start() {
-    const { stage, level } = this.h;
-    this.msg = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${FitGame.title} · Lv.${level}`, this.msg, FitGame.ROUNDS);
+    const { stage, level } = this.host;
+    this.message = U.el('div', 'stage-msg', '');
+    const { body, dots } = U.frame(stage, `${FitGame.title} · Lv.${level}`, this.message, FitGame.ROUNDS);
     this.body = body;
     this.progress = dots;
     this.wrap = U.el('div', 'fit-wrap');
     this.board = U.el('div', 'fit-board');
-    this.cands = U.el('div', 'fit-cands');
-    this.wrap.append(this.board, this.cands);
+    this.candidateRow = U.el('div', 'fit-cands');
+    this.wrap.append(this.board, this.candidateRow);
     body.append(this.wrap);
-    this.ro = new ResizeObserver(() => this.layout());
-    this.ro.observe(body);
+    this.resizeObserver = new ResizeObserver(() => this.layout());
+    this.resizeObserver.observe(body);
     this.next();
   }
 
   next() {
     const pieces = FitGame.makeRound(this.spec);
-    this.gap = pieces[0];
+    this.missingPiece = pieces[0];
     // 조각마다 놓인 방향을 따로 정한다. 정답은 빈자리와 같은 방향으로는 놓지 않는다 — 돌려 보지 않고도 맞힐 수 있다.
     // upright 단계는 거꾸로 일부러 모두 빈자리와 같은 방향으로 둔다.
-    this.shown = U.shuffle(pieces.map((p, i) => {
-      if (this.spec.upright) return { p, rot: 0, answer: i === 0 };
+    this.choices = U.shuffle(pieces.map((piece, i) => {
+      if (this.spec.upright) return { piece, rot: 0, answer: i === 0 };
       let rot = U.rand(6);
       if (i === 0) {
-        const turned = [1, 2, 3, 4, 5].filter((k) => FitGame.str(FitGame.turn(p, k)) !== FitGame.str(p));
+        const turned = [1, 2, 3, 4, 5].filter((k) => FitGame.str(FitGame.turn(piece, k)) !== FitGame.str(piece));
         if (turned.length) rot = turned[U.rand(turned.length)];
       }
-      return { p, rot, answer: i === 0 };
+      return { piece, rot, answer: i === 0 };
     }));
 
-    U.say(this.msg, '선이 모두 이어지는 조각을 고르세요', 'act');
-    [...this.progress.children].forEach((d, i) => d.classList.toggle('cur', i === this.round));
+    U.say(this.message, '선이 모두 이어지는 조각을 고르세요', 'act');
+    Progress.current(this.progress, this.round);
 
-    const v = FitGame.BOARD_VIEW;
+    const view = FitGame.BOARD_VIEW;
     this.board.innerHTML =
-      `<svg viewBox="${-v / 2} ${-v / 2} ${v} ${v}">${FitGame.drawBoard(this.gap)}</svg>`;
+      `<svg viewBox="${-view / 2} ${-view / 2} ${view} ${view}">${FitGame.drawBoard(this.missingPiece)}</svg>`;
     this.boardSvg = this.board.querySelector('svg');
 
     const pv = FitGame.PIECE_VIEW;
-    this.cands.innerHTML = '';
-    this.btns = this.shown.map((s, i) => {
-      const b = U.el('button', 'fit-cand',
-        `<svg viewBox="${-pv / 2} ${-pv / 2} ${pv} ${pv}">${FitGame.drawPiece(FitGame.turn(s.p, s.rot))}</svg>`);
-      b.addEventListener('pointerdown', () => this.pick(i, b));
-      this.cands.append(b);
-      return b;
+    this.candidateRow.innerHTML = '';
+    this.candidateButtons = this.choices.map((choice, i) => {
+      const button = U.el('button', 'fit-cand',
+        `<svg viewBox="${-pv / 2} ${-pv / 2} ${pv} ${pv}">${FitGame.drawPiece(FitGame.turn(choice.piece, choice.rot))}</svg>`);
+      button.addEventListener('pointerdown', () => this.pick(i, button));
+      this.candidateRow.append(button);
+      return button;
     });
 
     this.layout();
-    this.phase = 'input';
-    this.h.question({
-      gap: FitGame.str(this.gap),
-      shown: this.shown.map((s) => ({ piece: FitGame.str(s.p), rot: s.rot, answer: s.answer })),
+    this.phase = Phase.INPUT;
+    this.host.question({
+      gap: FitGame.str(this.missingPiece),
+      shown: this.choices.map((choice) => ({ piece: FitGame.str(choice.piece), rot: choice.rot, answer: choice.answer })),
     });
-    this.h.timer(this.spec.cands, () => this.pick(-1, null));
+    this.host.timer(this.spec.cands, () => this.pick(-1, null));
   }
 
   layout() {
-    const s = this.body;
+    const body = this.body;
     const n = this.spec.cands;
     const ratio = FitGame.PIECE_VIEW / FitGame.BOARD_VIEW;   // 버튼 크기 = 판 크기 * ratio
     // 판과 조각 사이 간격(css gap)을 뺀 높이에 판 + 조각 한 줄을 맞춘다
-    const avail = s.clientHeight - 88 - U.gapOf(this.wrap, 24);
-    const cand = U.clamp(Math.min(avail / (1 / ratio + 1.1), (s.clientWidth - 40) / n - 16), 52, 132);
+    const avail = body.clientHeight - 88 - U.gapOf(this.wrap, 24);
+    const cand = U.clamp(Math.min(avail / (1 / ratio + 1.1), (body.clientWidth - 40) / n - 16), 52, 132);
     this.wrap.style.setProperty('--psz', `${cand}px`);
     this.wrap.style.setProperty('--bsz', `${Math.round(cand / ratio)}px`);
   }
 
   // i = 고른 조각. -1 이면 시간이 다 된 것 (끼워 보지 않고 정답 조각만 표시한다)
   pick(i, btn) {
-    if (this.phase !== 'input') return;
-    this.phase = 'wait';
-    this.h.stopTimer();
-    const s = this.shown[i];
-    const ok = !!s && s.answer;
-    this.h.answer({ picked: s ? i : null, correct: ok, timedOut: !s });
+    if (this.phase !== Phase.INPUT) return;
+    this.phase = Phase.WAIT;
+    this.host.stopTimer();
+    const choice = this.choices[i];
+    const ok = !!choice && choice.answer;
+    this.host.answer({ picked: choice ? i : null, correct: ok, timedOut: !choice });
 
-    this.btns.forEach((b, j) => {
+    this.candidateButtons.forEach((b, j) => {
       b.disabled = true;
-      if (this.shown[j].answer) b.classList.add('right');
+      if (this.choices[j].answer) b.classList.add('right');
     });
     if (!ok && btn) btn.classList.add('wrong');
-    if (s) this.seat(s, ok);
-    this.score(ok, s ? '선이 이어지지 않아요' : '시간 초과');
+    if (choice) this.seat(choice, ok);
+    this.score(ok, choice ? '선이 이어지지 않아요' : '시간 초과');
   }
 
   // 고른 조각을 빈자리로 돌려 끼워 본다. 오답은 가장 많이 이어지는 방향으로 끼우고,
   // 그래도 어긋나는 변에 표시를 해서 왜 안 맞는지 보이게 한다.
-  seat(s, ok) {
-    const k = FitGame.bestTurn(s.p, this.gap);
-    const seated = FitGame.turn(s.p, k);
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('class', `seat ${ok ? 'right' : 'wrong'}`);
-    g.innerHTML = FitGame.drawPiece(seated);
-    g.style.transform = `rotate(${FitGame.shortest(s.rot - k) * 60}deg)`;
-    this.boardSvg.append(g);
+  seat(choice, ok) {
+    const k = FitGame.bestTurn(choice.piece, this.missingPiece);
+    const seated = FitGame.turn(choice.piece, k);
+    const seatGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    seatGroup.setAttribute('class', `seat ${ok ? 'right' : 'wrong'}`);
+    seatGroup.innerHTML = FitGame.drawPiece(seated);
+    seatGroup.style.transform = `rotate(${FitGame.shortest(choice.rot - k) * 60}deg)`;
+    this.boardSvg.append(seatGroup);
     if (!ok) {
-      const marks = FitGame.misses(seated, this.gap).map((m, e) => (m ? FitGame.miss(e) : '')).join('');
+      const marks = FitGame.misses(seated, this.missingPiece).map((missed, edge) => (missed ? FitGame.miss(edge) : '')).join('');
       this.boardSvg.insertAdjacentHTML('beforeend', `<g class="miss">${marks}</g>`);
     }
-    requestAnimationFrame(() => requestAnimationFrame(() => (g.style.transform = 'rotate(0deg)')));
+    requestAnimationFrame(() => requestAnimationFrame(() => (seatGroup.style.transform = 'rotate(0deg)')));
   }
 
   score(ok, failMsg) {
-    const d = this.progress.children[this.round];
-    d.classList.remove('cur');
-    d.classList.add(ok ? 'right' : 'wrong');
+    Progress.mark(this.progress, this.round, ok);
 
     if (ok) {
       this.correct++;
-      U.say(this.msg, '선이 모두 이어졌어요!', 'good');
-      this.h.award((this.h.base * this.h.mult) / FitGame.ROUNDS, this.board);
-      this.h.sfx('good');
+      U.say(this.message, '선이 모두 이어졌어요!', 'good');
+      this.host.award(pointsPer(this.host, FitGame.ROUNDS), this.board);
+      this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.msg, failMsg, 'bad');
-      this.h.sfx('bad');
+      U.say(this.message, failMsg, 'bad');
+      this.host.sfx(Sfx.BAD);
     }
-    this.h.after(ok ? 1300 : 2200, () => this.advance());
+    this.host.after(ok ? 1300 : 2200, () => this.advance());
   }
 
   advance() {
     this.round++;
     if (this.round < FitGame.ROUNDS) return this.next();
-    this.ro.disconnect();
-    this.h.done(this.result());
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
-    return { cleared: this.correct === FitGame.ROUNDS, correct: this.correct, total: FitGame.ROUNDS };
+    return resultOf(this.correct, FitGame.ROUNDS);
   }
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    this.ro.disconnect();
-    return { cleared: false, correct: this.correct, total: this.round };
+    this.resizeObserver.disconnect();
+    return abortedResult(this.correct, this.round);
   }
 
   // ---- 조각 다루기 ----
   // 조각은 변 여섯 개의 목록이고, 변마다 거기서 끝나는 선의 색을 작은 번호부터 담는다 (0~2개).
   // 변 0은 오른쪽 위이고 시계 방향으로 번호가 붙는다. 한 색은 서로 다른 두 변에 한 번씩 나타난다.
-  static str(p) {
-    return p.map((e) => e.join('')).join('/');
+  static str(piece) {
+    return piece.map((edge) => edge.join('')).join('/');
   }
 
   // 시계 방향으로 60° × times
-  static turn(p, times) {
+  static turn(piece, times) {
     const k = ((times % 6) + 6) % 6;
-    return p.map((_, e) => p[(e - k + 6) % 6]);
+    return piece.map((_, edge) => piece[(edge - k + 6) % 6]);
   }
 
   // -3 ~ 2 단위로 바꿔서 늘 짧은 쪽으로 돌아가게 한다
@@ -225,51 +228,51 @@ export class FitGame {
 
   // 돌리거나 뒤집어서 겹칠 수 있는 조각들에 같은 이름을 붙인다.
   // 뒤집은 것까지 한 묶음으로 보기 때문에 오답이 '정답을 뒤집은 것'이 되는 일은 없다.
-  static key(p) {
-    const flipped = p.map((_, e) => p[(6 - e) % 6]);
+  static key(piece) {
+    const flipped = piece.map((_, edge) => piece[(6 - edge) % 6]);
     let best = null;
-    for (const q of [p, flipped]) {
+    for (const variant of [piece, flipped]) {
       for (let k = 0; k < 6; k++) {
-        const s = FitGame.str(FitGame.turn(q, k));
-        if (best === null || s < best) best = s;
+        const name = FitGame.str(FitGame.turn(variant, k));
+        if (best === null || name < best) best = name;
       }
     }
     return best;
   }
 
-  static misses(p, gap) {
-    return p.map((e, i) => e.join('') !== gap[i].join(''));
+  static misses(piece, gap) {
+    return piece.map((edge, i) => edge.join('') !== gap[i].join(''));
   }
 
   // 조각을 빈자리에 끼울 때 어긋나는 변 수가 가장 적은 방향
-  static bestTurn(p, gap) {
+  static bestTurn(piece, gap) {
     let best = 0;
     let bestMiss = Infinity;
     for (let k = 0; k < 6; k++) {
-      const miss = FitGame.misses(FitGame.turn(p, k), gap).filter(Boolean).length;
+      const miss = FitGame.misses(FitGame.turn(piece, k), gap).filter(Boolean).length;
       if (miss < bestMiss) [best, bestMiss] = [k, miss];
     }
     return best;
   }
 
-  static dist(p, q) {
-    return FitGame.misses(FitGame.turn(q, FitGame.bestTurn(q, p)), p).filter(Boolean).length;
+  static dist(first, second) {
+    return FitGame.misses(FitGame.turn(second, FitGame.bestTurn(second, first)), first).filter(Boolean).length;
   }
 
   // 선 lines개로 만들 수 있는 모든 조각. 색마다 두 변을 고른다 (작은 색부터 넣으므로 변마다 정렬된 채로 쌓인다).
   static all(lines) {
     const out = [];
-    const fill = (p, c) => {
-      if (c === lines) return out.push(p.map((x) => x.slice()));
-      for (let a = 0; a < 6; a++) {
-        if (p[a].length >= 2) continue;
-        for (let b = a + 1; b < 6; b++) {
-          if (p[b].length >= 2) continue;
-          p[a].push(c);
-          p[b].push(c);
-          fill(p, c + 1);
-          p[a].pop();
-          p[b].pop();
+    const fill = (piece, color) => {
+      if (color === lines) return out.push(piece.map((x) => x.slice()));
+      for (let from = 0; from < 6; from++) {
+        if (piece[from].length >= 2) continue;
+        for (let to = from + 1; to < 6; to++) {
+          if (piece[to].length >= 2) continue;
+          piece[from].push(color);
+          piece[to].push(color);
+          fill(piece, color + 1);
+          piece[from].pop();
+          piece[to].pop();
         }
       }
     };
@@ -284,87 +287,87 @@ export class FitGame {
     const answer = all[U.rand(all.length)];
     const own = FitGame.key(answer);
     const classes = new Map();
-    for (const p of U.shuffle(all)) {
-      const k = FitGame.key(p);
-      if (k !== own && !classes.has(k)) classes.set(k, p);
+    for (const piece of U.shuffle(all)) {
+      const k = FitGame.key(piece);
+      if (k !== own && !classes.has(k)) classes.set(k, piece);
     }
-    let pool = [...classes.values()].map((p) => ({ p, d: FitGame.dist(answer, p) }));
+    let pool = [...classes.values()].map((piece) => ({ piece, misses: FitGame.dist(answer, piece) }));
     // 선 하나짜리는 끝 사이 간격(1·2·3칸)으로 세 가지뿐이라 고를 것이 없다
-    if (pick === 'near') pool.sort((a, b) => a.d - b.d);   // 섞어 둔 순서를 지키며 가까운 것부터
+    if (pick === 'near') pool.sort((a, b) => a.misses - b.misses);   // 섞어 둔 순서를 지키며 가까운 것부터
     if (pick === 'far') {
-      const far = pool.filter((x) => x.d >= 3);
+      const far = pool.filter((x) => x.misses >= 3);
       if (far.length >= cands - 1) pool = far;
     }
-    return [answer, ...pool.slice(0, cands - 1).map((x) => x.p)];
+    return [answer, ...pool.slice(0, cands - 1).map((x) => x.piece)];
   }
 
   // ---- 그리기 ----
-  // 꼭짓점이 위로 가는 육각형. 변 e의 바깥쪽 방향은 -60° + 60°·e (화면 좌표, 시계 방향)
-  static normal(e) {
-    const a = ((-60 + 60 * e) * Math.PI) / 180;
-    return [Math.cos(a), Math.sin(a)];
+  // 꼭짓점이 위로 가는 육각형. 변 edge 의 바깥쪽 방향은 -60° + 60°·edge (화면 좌표, 시계 방향)
+  static normal(edge) {
+    const angle = ((-60 + 60 * edge) * Math.PI) / 180;
+    return [Math.cos(angle), Math.sin(angle)];
   }
 
   // 한 변에 선 끝이 둘이면 어느 쪽에 둘지 정한다. 선이 가장 덜 엇갈리는 배치를 고르는데,
   // 기준 방향으로 돌려 놓고 고른 뒤 되돌리기 때문에 조각을 돌려 놓아도 대개 같은 그림이 나온다.
   // (반 바퀴 돌려도 같은 조각 — 예: 마주 보는 두 변을 잇는 나란한 두 선 — 은 두 선의 좌우만 바뀔 수 있다.)
   // 빈자리와 끼워진 조각은 같은 방향의 같은 조각이라 언제나 똑같이 그려지고, 끝이 정확히 이어진다.
-  static arrange(p) {
+  static arrange(piece) {
     let k0 = 0;
     for (let k = 1; k < 6; k++) {
-      if (FitGame.str(FitGame.turn(p, k)) < FitGame.str(FitGame.turn(p, k0))) k0 = k;
+      if (FitGame.str(FitGame.turn(piece, k)) < FitGame.str(FitGame.turn(piece, k0))) k0 = k;
     }
-    const q = FitGame.turn(p, k0);
-    const shared = [0, 1, 2, 3, 4, 5].filter((e) => q[e].length === 2);
-    let best = q;
+    const base = FitGame.turn(piece, k0);
+    const shared = [0, 1, 2, 3, 4, 5].filter((edge) => base[edge].length === 2);
+    let best = base;
     let bestX = Infinity;
     for (let mask = 0; mask < 1 << shared.length; mask++) {
-      const o = q.map((x) => x.slice());
-      shared.forEach((e, i) => { if (mask & (1 << i)) o[e].reverse(); });
-      const x = FitGame.crossings(o);
-      if (x < bestX) [best, bestX] = [o, x];
+      const layout = base.map((x) => x.slice());
+      shared.forEach((edge, i) => { if (mask & (1 << i)) layout[edge].reverse(); });
+      const x = FitGame.crossings(layout);
+      if (x < bestX) [best, bestX] = [layout, x];
     }
     return FitGame.turn(best, -k0);
   }
 
   // 둘레를 시계 방향으로 돌며 선 끝에 번호를 매기면, 두 선은 끝이 서로 엇갈려 놓일 때만 만난다
-  static crossings(o) {
+  static crossings(layout) {
     const ends = {};
-    o.forEach((cs, e) => cs.forEach((c, j) => (ends[c] ||= []).push(e * 3 + (cs.length < 2 ? 1 : j * 2))));
+    layout.forEach((cs, edge) => cs.forEach((color, j) => (ends[color] ||= []).push(edge * 3 + (cs.length < 2 ? 1 : j * 2))));
     const chords = Object.values(ends);
     let n = 0;
     for (let i = 0; i < chords.length; i++) {
       for (let j = i + 1; j < chords.length; j++) {
-        const [a, b] = chords[i];
-        const inside = chords[j].filter((v) => v > a && v < b).length;
+        const [start, end] = chords[i];
+        const inside = chords[j].filter((point) => point > start && point < end).length;
         if (inside === 1) n++;
       }
     }
     return n;
   }
 
-  // 변 e에서 j번째 선 끝의 자리와 바깥쪽 방향. 끝이 하나면 한가운데, 둘이면 시계 방향 순서로 나란히 놓는다.
-  // p는 arrange를 거친 배치다.
-  static port(p, e, j) {
+  // 변 edge 에서 j번째 선 끝의 자리와 바깥쪽 방향. 끝이 하나면 한가운데, 둘이면 시계 방향 순서로 나란히 놓는다.
+  // layout 은 arrange 를 거친 배치다.
+  static port(layout, edge, j) {
     const ap = (FitGame.R * Math.sqrt(3)) / 2;
-    const [nx, ny] = FitGame.normal(e);
-    const off = p[e].length < 2 ? 0 : (j === 0 ? -1 : 1) * FitGame.GAP;
+    const [nx, ny] = FitGame.normal(edge);
+    const off = layout[edge].length < 2 ? 0 : (j === 0 ? -1 : 1) * FitGame.GAP;
     return { x: nx * ap - ny * off, y: ny * ap + nx * off, nx, ny };
   }
 
   static hex(cx, cy, cls) {
     const pts = [];
-    for (let v = 0; v < 6; v++) {
-      const a = ((-90 + 60 * v) * Math.PI) / 180;
-      pts.push(`${(cx + FitGame.R * Math.cos(a)).toFixed(2)},${(cy + FitGame.R * Math.sin(a)).toFixed(2)}`);
+    for (let corner = 0; corner < 6; corner++) {
+      const angle = ((-90 + 60 * corner) * Math.PI) / 180;
+      pts.push(`${(cx + FitGame.R * Math.cos(angle)).toFixed(2)},${(cy + FitGame.R * Math.sin(angle)).toFixed(2)}`);
     }
     return `<polygon class="${cls}" points="${pts.join(' ')}"/>`;
   }
 
   // 선은 테두리를 한 번 더 그려서 서로 겹쳐 지나갈 때도 어느 선이 어디로 가는지 보이게 한다
-  static stroke(d, color) {
-    return `<path class="halo" d="${d}" stroke-width="${FitGame.LINE + 4}"/>` +
-      `<path d="${d}" stroke="${color}" stroke-width="${FitGame.LINE}"/>`;
+  static stroke(pathData, color) {
+    return `<path class="halo" d="${pathData}" stroke-width="${FitGame.LINE + 4}"/>` +
+      `<path d="${pathData}" stroke="${color}" stroke-width="${FitGame.LINE}"/>`;
   }
 
   // 변에서 곧게 INSET 만큼 들어가 꺾은 뒤, 다른 변 앞에서 다시 꺾어 곧게 나간다. 같은 변에서 시작하는 두 선은 처음에 나란히 간다.
@@ -372,16 +375,16 @@ export class FitGame {
   // 갈고리(이웃) · 넓은 V(한 칸 건너) · 일자(마주 봄)로 한눈에 갈린다.
   static INSET = FitGame.R * 0.38;
   static drawPiece(pattern) {
-    const p = FitGame.arrange(pattern);
+    const layout = FitGame.arrange(pattern);
     const k = FitGame.INSET;
-    const f = (n) => n.toFixed(2);
+    const fixed = (n) => n.toFixed(2);
     let lines = '';
-    for (let c = 0; c < FitGame.COLORS.length; c++) {
-      const [a, b] = [0, 1, 2, 3, 4, 5].flatMap((e) => p[e].includes(c) ? [FitGame.port(p, e, p[e].indexOf(c))] : []);
-      if (!b) continue;
-      const d = `M${f(a.x)},${f(a.y)} L${f(a.x - a.nx * k)},${f(a.y - a.ny * k)} ` +
-        `L${f(b.x - b.nx * k)},${f(b.y - b.ny * k)} L${f(b.x)},${f(b.y)}`;
-      lines += FitGame.stroke(d, FitGame.COLORS[c]);
+    for (let color = 0; color < FitGame.COLORS.length; color++) {
+      const [start, end] = [0, 1, 2, 3, 4, 5].flatMap((edge) => layout[edge].includes(color) ? [FitGame.port(layout, edge, layout[edge].indexOf(color))] : []);
+      if (!end) continue;
+      const pathData = `M${fixed(start.x)},${fixed(start.y)} L${fixed(start.x - start.nx * k)},${fixed(start.y - start.ny * k)} ` +
+        `L${fixed(end.x - end.nx * k)},${fixed(end.y - end.ny * k)} L${fixed(end.x)},${fixed(end.y)}`;
+      lines += FitGame.stroke(pathData, FitGame.COLORS[color]);
     }
     return `${FitGame.hex(0, 0, 'tile piece')}<g class="lines">${lines}</g>`;
   }
@@ -392,22 +395,22 @@ export class FitGame {
     const ap = (FitGame.R * Math.sqrt(3)) / 2;
     let tiles = '';
     let stubs = '';
-    for (let e = 0; e < 6; e++) {
-      const [nx, ny] = FitGame.normal(e);
+    for (let edge = 0; edge < 6; edge++) {
+      const [nx, ny] = FitGame.normal(edge);
       tiles += FitGame.hex(nx * ap * 2, ny * ap * 2, 'tile');
-      gap[e].forEach((c, j) => {
-        const { x, y } = FitGame.port(gap, e, j);
-        const d = `M${x.toFixed(2)},${y.toFixed(2)} L${(x + nx * 110).toFixed(2)},${(y + ny * 110).toFixed(2)}`;
-        stubs += FitGame.stroke(d, FitGame.COLORS[c]);
+      gap[edge].forEach((color, j) => {
+        const { x, y } = FitGame.port(gap, edge, j);
+        const pathData = `M${x.toFixed(2)},${y.toFixed(2)} L${(x + nx * 110).toFixed(2)},${(y + ny * 110).toFixed(2)}`;
+        stubs += FitGame.stroke(pathData, FitGame.COLORS[color]);
       });
     }
     return `${tiles}${FitGame.hex(0, 0, 'gap')}<g class="lines">${stubs}</g>`;
   }
 
   // 오답을 끼웠을 때 어긋난 변에 찍는 표시. 선 끝이 둘이어도 함께 감싸도록 넉넉하게 그린다.
-  static miss(e) {
+  static miss(edge) {
     const ap = (FitGame.R * Math.sqrt(3)) / 2;
-    const [nx, ny] = FitGame.normal(e);
+    const [nx, ny] = FitGame.normal(edge);
     return `<circle cx="${(nx * ap).toFixed(2)}" cy="${(ny * ap).toFixed(2)}" r="13"/>`;
   }
 }

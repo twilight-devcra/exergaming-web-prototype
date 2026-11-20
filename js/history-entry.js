@@ -1,4 +1,4 @@
-// 회원 기록 항목 하나의 모양 (docs/SERVER.md '회원 기록'). 서버(api/server.js, require)와 태블릿(app/members.js, import)이 이 파일 하나를 함께 쓴다.
+// 회원 기록 항목 하나의 모양 (docs/SERVER.md '회원 기록'). 서버(api/server.js, require)와 태블릿(app/member-records.js, import)이 이 파일 하나를 함께 쓴다.
 //
 // 왜 형을 정해 두나: 회원 기록은 누구나 올릴 수 있는 세션(업로드 키는 공개)에서 뽑아 다른 태블릿 화면에 그린다.
 // 숫자 칸에 글이 들어오면 화면에 HTML 로 박힐 수 있으므로(XSS), 서버는 저장할 때, 태블릿은 받을 때 cleanEntry 로 형을 맞춘다.

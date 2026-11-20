@@ -510,6 +510,9 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 .dg-line { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.45; }
 .dg-chain { stroke: var(--line); stroke-width: 8; }
 .dg-rail { stroke: var(--ink-soft); stroke-width: 4; stroke-linecap: round; }
+.dg-pipe-edge, .dg-pipe { fill: none; stroke-linejoin: round; }
+.dg-pipe-edge { stroke: var(--ink); stroke-width: 11; }
+.dg-pipe { stroke: color-mix(in srgb, var(--ink-soft) 45%, var(--panel)); stroke-width: 8; }
 .dg-hole { fill: var(--ink); stroke-width: 6; }
 .dg-end { fill: var(--line); }
 .dg-trace { fill: none; stroke: var(--good); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
@@ -1499,42 +1502,43 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .cv-lid svg { display: block; width: 64%; height: 64%; margin: 18%; fill: rgba(255, 255, 255, 0.92); }
 .cv-tok.open .cv-lid { transform: rotateX(118deg); }
 
-/* 사다리 타기 */
-.lad-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; width: 100%; min-height: 0; }
-.lad-board { flex: 1; width: 100%; min-height: 0; }
-.lad-svg { display: block; width: 100%; height: 100%; }
-.lad-rail, .lad-rung { stroke: var(--ink-soft); stroke-linecap: round; }
-.lad-rail { stroke-width: 6; }
-.lad-rung { stroke-width: 5; }
+/* 배관 타기 (js/games/pipe.js) */
+.pipe-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; width: 100%; min-height: 0; }
+.pipe-board { flex: 1; width: 100%; min-height: 0; }
+.pipe-svg { display: block; width: 100%; height: 100%; }
+/* 관 (배관 미로처럼): 어두운 테두리(pipe-gap)를 먼저 깔고 그 위에 회색 관 몸통을 그린다. 나중 관이 앞 관의 테두리를 덮어
+   엇갈리는 곳에서 어느 관이 위로 지나가는지 보인다. 굵기는 칸 크기를 따라 js 가 정한다 (LadderGame.PIPE · EDGE) */
+.pipe-line, .pipe-gap { fill: none; stroke-linecap: butt; stroke-linejoin: round; }
+.pipe-line { stroke: color-mix(in srgb, var(--ink-soft) 45%, var(--panel)); }
+.pipe-gap { stroke: var(--ink); }
 /* 출발점: 조각 뒤의 동그란 받침. 누르는 곳은 그보다 넓은 투명 사각형 */
-.lad-start { cursor: pointer; }
-.lad-start rect { fill: transparent; }
-.lad-halo { fill: var(--panel); stroke: var(--line); stroke-width: 3; transition: fill 0.12s; }
+.pipe-start { cursor: pointer; }
+.pipe-start rect { fill: transparent; }
+.pipe-halo { fill: var(--panel); stroke: var(--line); stroke-width: 3; transition: fill 0.12s; }
 @media (hover: hover) {
-  .lad-start:not(.done):hover .lad-halo { fill: var(--accent-soft); }
+  .pipe-start:not(.done):hover .pipe-halo { fill: var(--accent-soft); }
 }
-.lad-start.done { cursor: default; }
+.pipe-start.done { cursor: default; }
 /* 조각: 아래쪽 어두운 테두리로 도드라져 보이게 */
-.lad-peg-pos { pointer-events: none; }
-.lad-peg { stroke: rgba(0, 0, 0, 0.28); stroke-width: 3; stroke-linejoin: round; }
-.lad-peg, .lad-floor { transform-box: fill-box; transform-origin: center; }
-.lad-peg.seated { animation: lad-seat 0.35s ease-out forwards; }
-@keyframes lad-seat { 50% { scale: 0.72; } 100% { scale: 0.84; } }
-.lad-peg.bump { animation: lad-bump 0.4s ease-out; }
-@keyframes lad-bump { 30% { translate: 0 -14px; } 60% { translate: 0 0; } 80% { translate: 0 -5px; } }
+.pipe-peg-pos { pointer-events: none; }
+.pipe-peg { stroke: rgba(0, 0, 0, 0.28); stroke-width: 3; stroke-linejoin: round; }
+.pipe-peg, .pipe-floor { transform-box: fill-box; transform-origin: center; }
+.pipe-peg.seated { animation: pipe-seat 0.35s ease-out forwards; }
+@keyframes pipe-seat { 50% { scale: 0.72; } 100% { scale: 0.84; } }
+.pipe-peg.bump { animation: pipe-bump 0.4s ease-out; }
+@keyframes pipe-bump { 30% { translate: 0 -14px; } 60% { translate: 0 0; } 80% { translate: 0 -5px; } }
 /* 구멍: 어두운 속 + 그 모양의 색 테두리 (stroke 는 js 에서) */
-.lad-hole { fill: color-mix(in srgb, var(--bg) 30%, #000); stroke-width: 4.5; stroke-linejoin: round; }
-.lad-end { fill: var(--line); }
-.lad-floor.fit { animation: lad-hit 0.35s ease-out; }
-.lad-hole.fit { stroke: var(--good); }
-.lad-hole.miss { stroke: var(--bad); }
-.lad-end.miss { fill: var(--bad); }
-@keyframes lad-hit { 50% { scale: 1.25; } }
+.pipe-hole { fill: color-mix(in srgb, var(--bg) 30%, #000); stroke-width: 4.5; stroke-linejoin: round; }
+.pipe-end { fill: var(--line); }
+.pipe-floor.fit { animation: pipe-hit 0.35s ease-out; }
+.pipe-hole.fit { stroke: var(--good); }
+.pipe-hole.miss { stroke: var(--bad); }
+.pipe-end.miss { fill: var(--bad); }
+@keyframes pipe-hit { 50% { scale: 1.25; } }
 /* 고른 길: 강조색으로 위에서부터 그려 내려가고, 다 내려오면 초록·빨강으로 바뀐다 (polyline 의 pathLength = 1) */
-.lad-trace {
+.pipe-trace {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 12;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 1;
@@ -1542,9 +1546,9 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   opacity: 0.85;
   transition: stroke-dashoffset 0.8s linear, stroke 0.15s;
 }
-.lad-trace.go { stroke-dashoffset: 0; }
-.lad-trace.right { stroke: var(--good); }
-.lad-trace.wrong { stroke: var(--bad); }
+.pipe-trace.go { stroke-dashoffset: 0; }
+.pipe-trace.right { stroke: var(--good); }
+.pipe-trace.wrong { stroke: var(--bad); }
 
 /* ---------- 측정 화면 ---------- */
 #calib {

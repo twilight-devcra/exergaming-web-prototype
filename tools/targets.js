@@ -104,7 +104,7 @@ const GAME_TARGETS = {
   fit: ['rotation', 'construct'],
   seek: ['selective', 'speed'],
   cover: ['stm', 'wm', 'calc'],
-  ladder: ['tracking', 'speed'],
+  pipe: ['tracking', 'speed'],
   novel: ['stm'],
   track: ['tracking', '~divided'],
   follow: ['comprehension', 'wm', '~inhibition', '~reasoning', '~sequence'],

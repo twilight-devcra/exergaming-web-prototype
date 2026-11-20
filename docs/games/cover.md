@@ -1,4 +1,4 @@
-[← 목차·공통 규칙](README.md) · [← 숨은 순서 찾기](seek.md) · [사다리 타기 →](ladder.md)
+[← 목차·공통 규칙](README.md) · [← 숨은 순서 찾기](seek.md) · [배관 타기 →](pipe.md)
 
 # 가린 숫자 더하기 (`cover`)
 

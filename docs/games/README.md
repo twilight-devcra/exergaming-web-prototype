@@ -24,7 +24,7 @@
 5. [빈자리 채우기](fit.md) — `fit`
 6. [숨은 순서 찾기](seek.md) — `seek`
 7. [가린 숫자 더하기](cover.md) — `cover`
-8. [사다리 타기](ladder.md) — `ladder`
+8. [배관 타기](pipe.md) — `pipe`
 9. [없던 그림 찾기](novel.md) — `novel`
 10. [공 따라가기](track.md) — `track`
 11. [지시 따르기](follow.md) — `follow`

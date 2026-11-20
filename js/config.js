@@ -60,7 +60,7 @@ export const DEFAULT_CONFIG = {
   introMs: { first: 4500, again: 2200 }, // 게임 소개(설명 그림) 시간: 라운드에서 처음 나올 때 / 다시 나올 때. 누르면 바로 넘어간다
   // 문제 하나의 제한 시간(초) = base + per × 일의 양. 입력을 받기 시작한 때부터 잰다.
   // 쉬운 단계(Lv1·Lv2)는 여기에 EASY_TIME 을 곱한다. 아래 범위는 Lv3~8 의 값이다.
-  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · ladder: 구멍에 닿는 길들이 지나는 가로줄 수의 합 · novel: 판의 그림 수 · track: 고를 공 수 · follow: 지시의 양 (버튼 하나 1 · 스위치·차례 누를 수 · 바로 옆 2 · 램프 조건 3 · 이어진 지시 단계 수 + 1) · pair: 양말 수 · box: 세어 둬야 할 과일 종류 수 (상자가 둘이면 +1) · compare: 왼쪽 그림의 선 수 · coin: 동전 수 (값을 더하는 Lv4~ 는 동전 수 × 1.3 + 종류 수) · recall: 눌러야 할 칸 수 · chain: 조각 수 · blank: 낱말 수
+  // 일의 양 — path: 눌러야 할 칸 수 · arith: 빈칸 수 · symbol: 1 · count: 켜진 칸 수 · fit: 보기 조각 수 · seek: 판의 칸 수 · cover: 식에 들어간 덮인 숫자 수 · pipe: 구멍에 닿는 관들의 길이 (판 단위 100 마다 1) · novel: 판의 그림 수 · track: 고를 공 수 · follow: 지시의 양 (버튼 하나 1 · 스위치·차례 누를 수 · 바로 옆 2 · 램프 조건 3 · 이어진 지시 단계 수 + 1) · pair: 양말 수 · box: 세어 둬야 할 과일 종류 수 (상자가 둘이면 +1) · compare: 왼쪽 그림의 선 수 · coin: 동전 수 (값을 더하는 Lv4~ 는 동전 수 × 1.3 + 종류 수) · recall: 눌러야 할 칸 수 · chain: 조각 수 · blank: 낱말 수
   questionTime: {
     path: { base: 3, per: 1.2 },     // 5칸 9초 ~ 14칸 20초
     symbol: { base: 6, per: 0 },     // 6초
@@ -69,7 +69,7 @@ export const DEFAULT_CONFIG = {
     fit: { base: 5, per: 1.5 },      // 조각 3개 10초 ~ 6개 14초
     seek: { base: 6, per: 0.25 },    // 19칸 11초 ~ 61칸 21초
     cover: { base: 5, per: 2.5 },    // 덮인 숫자 하나 7.5초 · 둘 10초
-    ladder: { base: 4, per: 0.7 },   // Lv3 약 6초 ~ Lv8 (구멍 4개) 약 20초
+    pipe: { base: 5, per: 0.6 },     // 선 길이 100 마다 0.6초. Lv1 약 15초 (쉬운 단계 배율) ~ Lv8 (구멍 4개) 약 35초
     novel: { base: 5, per: 0.5 },    // 그림 3개 6.5초 ~ 9개 9.5초
     track: { base: 4, per: 1.5 },    // 공이 멈춘 뒤부터: 1개 5.5초 ~ 4개 10초
     follow: { base: 4, per: 1.5 },
@@ -250,6 +250,8 @@ export const Config = {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) { }
     this.migrateLevel(saved);
+    // 2026-11-20: '사다리 타기'(ladder)가 '배관 타기'(pipe)로 바뀌었다. 켜 둔 게임 목록에 ladder 가 있으면 pipe 를 켠다
+    if (Array.isArray(saved.games)) saved.games = [...new Set(saved.games.map((id) => (id === 'ladder' ? 'pipe' : id)))];
     // 제한 시간 표는 화면에서 바꾸지 않으므로 늘 코드의 값을 쓴다 (예전에 저장된 표가 고친 값을 덮지 않게)
     return Object.assign({}, DEFAULT_CONFIG, saved, { questionTime: DEFAULT_CONFIG.questionTime, levelScheme: LEVEL_SCHEME });
   },

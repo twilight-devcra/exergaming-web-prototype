@@ -161,7 +161,7 @@
   // 서버가 /admin/api/options 로 모든 게임 이름을 주면 덮어쓴다
   const TITLES = {
     path: '길 따라 그리기', symbol: '심볼 위치 외우기', arith: '사칙연산 역산', count: '우세한 색 찾기', fit: '빈자리 채우기',
-    seek: '숨은 순서 찾기', cover: '가린 숫자 더하기', ladder: '사다리 타기', novel: '새로 나타난 그림', track: '공 따라가기',
+    seek: '숨은 순서 찾기', cover: '가린 숫자 더하기', ladder: '사다리 타기', pipe: '배관 타기', novel: '새로 나타난 그림', track: '공 따라가기',
     follow: '지시 따르기', pair: '짝 없는 양말', box: '상자 속 과일', compare: '두 그림 비교하기', coin: '동전 세기',
     recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기',
   };
@@ -329,10 +329,45 @@
       return svg(side * 2 + gap, h, b, '두 그림과 보기');
     },
 
+    // 배관 타기: 사다리 타기와 판 모양(위 조각 · 아래 구멍)이 같아 같은 그림을 쓴다
+    pipe(q, inputs, ans) {
+      return DRAW.ladder(q, inputs, ans);
+    },
+
     ladder(q, inputs, ans) {
       const d = q.data, L = d.lanes, X = 70, H = 230, top = 42, pad = 30;
       const lx = (i) => pad + i * X, ly = (v) => top + v * H;
       let b = '';
+      // 위의 조각과 아래 구멍을 얹어 마무리한다 (두 판 공통)
+      const finish = (body, label) => {
+        d.pegs.forEach((s, i) => {
+          const picked = ans && ans.picked === i;
+          body += `<g class="${picked ? (ans.correct ? 'f-good' : 'f-bad') : 'b-ink2'}">${(SHAPES[s] || SHAPES.circle)(lx(i), top - 22, 11)}</g>`;
+        });
+        d.holes.forEach((s, i) => {
+          if (!s) return;
+          body += `<g fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="3 2">${(SHAPES[s] || SHAPES.circle)(lx(i), top + H + 22, 11)}</g>`;
+        });
+        return svg(pad * 2 + (L - 1) * X, top + H + 44, body, label);
+      };
+      // 배관 타기 (pipe, 2026-11-20 부터)는 관마다 그린 점(lines)을, 예전 사다리 타기 (ladder)는 가로줄(rungs)을 남긴다
+      if (d.lines) {
+        // 선마다 그린 점 [x, y, x, y, ...] (게임 판 좌표, 화면에 그린 관의 가운데 줄)
+        // 판 좌표 → 이 그림 좌표: 출발점들의 x 를 lx(0) ~ lx(L - 1) 에, 선의 위 끝 ~ 아래 끝을 top ~ top + H 에 맞춘다
+        const startX = d.lines.map((l) => l[0]);
+        const [bx0, bx1] = [Math.min(...startX), Math.max(...startX)];
+        const by0 = d.lines[0][1], by1 = d.lines[0][d.lines[0].length - 1];
+        const fx = (x) => lx(0) + ((x - bx0) / (bx1 - bx0)) * (lx(L - 1) - lx(0));
+        const fy = (y) => top + ((y - by0) / (by1 - by0)) * H;
+        const pts = (line) => line.reduce((out, v, i) => (i % 2 ? out : [...out, `${fx(v).toFixed(1)},${fy(line[i + 1]).toFixed(1)}`]), []).join(' ');
+        for (const line of d.lines) b += `<polyline points="${pts(line)}" fill="none" class="s-axis" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+        const traceOf = (start) => `${lx(start)},${top - 10} ${pts(d.lines[start])}`;
+        if (ans) {
+          if (ans.picked !== d.answer) b += `<polyline points="${traceOf(d.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
+          if (ans.picked != null) b += `<polyline points="${traceOf(ans.picked)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+        }
+        return finish(b, '배관');
+      }
       for (let i = 0; i < L; i++) b += `<line x1="${lx(i)}" y1="${top}" x2="${lx(i)}" y2="${top + H}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
       for (const [i, yl, yr] of d.rungs) b += `<line x1="${lx(i)}" y1="${ly(yl)}" x2="${lx(i + 1)}" y2="${ly(yr)}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
       const trace = (start) => {
@@ -354,15 +389,7 @@
         if (ans.picked !== d.answer) b += `<polyline points="${trace(d.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
         if (ans.picked != null) b += `<polyline points="${trace(ans.picked)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
       }
-      d.pegs.forEach((s, i) => {
-        const picked = ans && ans.picked === i;
-        b += `<g class="${picked ? (ans.correct ? 'f-good' : 'f-bad') : 'b-ink2'}">${(SHAPES[s] || SHAPES.circle)(lx(i), top - 22, 11)}</g>`;
-      });
-      d.holes.forEach((s, i) => {
-        if (!s) return;
-        b += `<g fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="3 2">${(SHAPES[s] || SHAPES.circle)(lx(i), top + H + 22, 11)}</g>`;
-      });
-      return svg(pad * 2 + (L - 1) * X, top + H + 44, b, '사다리');
+      return finish(b, '사다리');
     },
 
     seek(q, inputs, ans) {

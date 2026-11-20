@@ -1,4 +1,4 @@
-[← 목차·공통 규칙](README.md) · [← 사다리 타기](ladder.md) · [공 따라가기 →](track.md)
+[← 목차·공통 규칙](README.md) · [← 배관 타기](pipe.md) · [공 따라가기 →](track.md)
 
 # 없던 그림 찾기 (`novel`)
 

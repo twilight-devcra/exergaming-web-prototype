@@ -24,7 +24,7 @@ export const ABILITY_WEIGHTS = {
   fit: { spatial: 0.6, logic: 0.4 },
   seek: { spatial: 0.3, attention: 0.4, speed: 0.3 },
   cover: { memory: 0.6, attention: 0.1, logic: 0.3 },
-  ladder: { spatial: 0.3, attention: 0.5, speed: 0.2 },
+  pipe: { spatial: 0.3, attention: 0.5, speed: 0.2 },
   novel: { memory: 0.6, attention: 0.4 },
   track: { attention: 0.6, spatial: 0.3, speed: 0.1 },
   follow: { attention: 0.5, logic: 0.3, memory: 0.2 },
@@ -44,7 +44,7 @@ export const ABILITY_WEIGHTS = {
 export const ABILITY_PACE = {
   count: { fast: 3, slow: 13 },
   seek: { fast: 4, slow: 17 },
-  ladder: { fast: 3.5, slow: 13.5 },
+  pipe: { fast: 3.5, slow: 13.5 },
   pair: { fast: 3, slow: 11 },
   compare: { fast: 3, slow: 9 },
 };

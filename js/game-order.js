@@ -2,7 +2,7 @@
 import { U } from './config.js';
 
 // 라운드 첫 게임은 설명 없이도 바로 알아듣는 것 중에서 고른다 (켜 둔 게 없으면 아무거나)
-export const OPENING_GAMES = ['count', 'ladder'];
+export const OPENING_GAMES = ['count', 'pipe'];
 
 // 한 바퀴 = 켜 둔 게임(types)을 한 번씩. 바퀴마다 순서를 섞되, 바로 앞 게임과 같거나 비슷한(tags 가 겹치는) 게임이
 // 이어지지 않게 한다 (바퀴가 바뀌는 자리 포함 — prev = 지난 바퀴의 마지막 게임). 그런 순서가 없으면 같은 게임만 피한다.

@@ -6,7 +6,7 @@ import { CountGame } from './count.js';
 import { FitGame } from './fit.js';
 import { SeekGame } from './seek.js';
 import { CoverGame } from './cover.js';
-import { LadderGame } from './ladder.js';
+import { PipeGame } from './pipe.js';
 import { NovelGame } from './novel.js';
 import { TrackGame } from './track.js';
 import { FollowGame } from './follow.js';
@@ -18,4 +18,4 @@ import { RecallGame } from './recall.js';
 import { ChainGame } from './chain.js';
 import { BlankGame } from './blank.js';
 
-export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, LadderGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame, RecallGame, ChainGame, BlankGame];
+export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, PipeGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame, RecallGame, ChainGame, BlankGame];

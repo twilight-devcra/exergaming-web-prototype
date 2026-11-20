@@ -79,8 +79,10 @@ export class RecallGame {
       ? "'별 둘'처럼 속으로 말하며 외운 뒤<br>물어본 것을 나온 차례대로 누르세요"
       : '하나씩 나오는 그림을 외운 뒤<br>나온 차례대로 누르세요';
   }
+  // 2026-11-20: 단계를 하나씩 뒤로 미뤘다 (예전 Lv7 → Lv8). 맨 앞에 더 쉬운 Lv1 을 넣고, 예전 Lv8 (7장 · 1.6초)은 뺐다
   static levels = [
-    // 쉬운 단계: 모양이나 개수 하나만 바뀐다
+    // 쉬운 단계: 모양이나 개수 하나만 바뀐다. Lv1 은 모양이 두 가지뿐이고 오래 보여 준다
+    { n: 2, p: 1, vals: 2, show: 2200 },
     { n: 2, p: 1, vals: 3, show: 1800 },
     { n: 3, p: 1, vals: 3, show: 1800 },
     // 모양과 개수가 함께 바뀐다: 어느 것을 물을지 모른다
@@ -90,7 +92,6 @@ export class RecallGame {
     // 모양 다섯 가지 · 짧게 보여 준다
     { n: 5, p: 2, vals: 5, show: 1700 },
     { n: 6, p: 2, vals: 5, show: 1700 },
-    { n: 7, p: 2, vals: 5, show: 1600 },
   ];
   static maxLevel = RecallGame.levels.length;
   static GAP_MS = 400;    // 그림과 그림 사이에 빈 카드를 보여 주는 시간

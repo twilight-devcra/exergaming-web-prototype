@@ -610,7 +610,8 @@ body[data-theme="scenic"] {
   #cog .stage-meta { position: static; justify-content: center; }
   #cog .stage-head { gap: 4px; }
   .stage-title { font-size: 15px; }
-  #shift-msg { top: 76px; width: calc(100% - 32px); padding: 16px 16px 18px; white-space: normal; border-radius: 20px; }
+  /* 연속 정답 배지(점수 칩 바로 아래) 밑에서 시작해 겹치지 않게 */
+  #shift-msg { top: 120px; width: calc(100% - 32px); padding: 16px 16px 18px; white-space: normal; border-radius: 20px; }
 
   /* ----- 대기 화면: 그림 위, 소개 아래. 세 단계는 세로 목록 ----- */
   /* 위아래로 넘치면 위에서부터 스크롤되도록 column 으로 놓고 그림을 앞으로 (column-reverse 는 위로 넘쳐 스크롤할 수 없다).

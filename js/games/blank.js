@@ -104,7 +104,22 @@ export class BlankGame {
     this.optionRow = U.el('div', 'ar-cands bl-opts');
     this.wrap.append(this.board, this.optionRow);
     body.append(this.wrap);
+    this.body = body;
+    this.resizeObserver = new ResizeObserver(() => this.fit());
+    this.resizeObserver.observe(body);
     this.host.after(200, () => this.ask());
+  }
+
+  // 글자 칸 크기(--ch)는 CSS 가 화면 높이로 정한다. 그래도 판과 보기가 게임 영역보다 크면(휴대폰에서 4낱말이 한 줄에 하나씩 쌓일 때)
+  // 들어갈 때까지 줄인다. 줄면 낱말이 한 줄에 둘씩 들어가 금방 맞는다
+  fit() {
+    this.board.style.removeProperty('--ch');
+    const room = this.body.clientHeight - 8;
+    const first = this.board.querySelector('.bl-ch');
+    if (!room || !first) return;
+    for (let ch = first.offsetWidth - 2; this.wrap.offsetHeight > room && ch >= 30; ch -= 2) {
+      this.board.style.setProperty('--ch', `${ch}px`);
+    }
   }
 
   ask() {
@@ -137,6 +152,7 @@ export class BlankGame {
       this.optionRow.append(button);
       return button;
     });
+    this.fit();
     this.host.sfx(Sfx.BLINK);
     this.phase = Phase.INPUT;
     this.host.question({ words, at, ans, opts: options });
@@ -181,7 +197,10 @@ export class BlankGame {
     }
     this.round++;
     const wait = ok ? 900 : 2000;
-    if (this.round >= BlankGame.ROUNDS) return this.host.after(wait, () => this.host.done(this.result()));
+    if (this.round >= BlankGame.ROUNDS) return this.host.after(wait, () => {
+      this.resizeObserver.disconnect();
+      this.host.done(this.result());
+    });
     this.host.after(wait, () => this.ask());
   }
 
@@ -191,6 +210,7 @@ export class BlankGame {
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
+    this.resizeObserver.disconnect();
     return abortedResult(this.correct, this.round);
   }
 }

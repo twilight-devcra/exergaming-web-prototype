@@ -40,6 +40,11 @@ export class Band {
     this.onLandmark = null; // (lm) 지난 기념물을 지나는 순간
     this.planting = null;   // 라운드 끝에 세우는 기념물 { score, t, label, seed, kind, size }
     this.endShift = 0;      // 나무를 심을 때 자전거가 앞으로 비켜 가는 정도 0~1
+    // 풍경 라이딩: 캔버스 위에 덮이는 화면 요소 (캔버스 좌표, measureUi). 휴대폰처럼 좁으면 그림이 그 밑으로 들어가기 쉽다
+    this.hudRects = [];     // 위쪽 칩(남은 시간·거리·점수)
+    this.endRect = null;    // 오른쪽 아래 '그만하기' 단추
+    this.dodge = null;      // 트랙이 '그만하기' 단추를 비켜 왼쪽으로 옮겨 간 정도 0~1 (dodgeTo 로 미끄러진다)
+    this.dodgeTo = 0;
     // 두뇌 게임만 하는 판 (페달 없이, main.js 가 넣는다): 띠는 자리를 지키며 점수만큼 흘러가지만, 허용 구역·RPM 말풍선이 없고
     // 공·자전거 대신 두뇌 배지가 가운데에서 달린다
     this.brainOnly = false;
@@ -90,6 +95,41 @@ export class Band {
     this.canvas.width = Math.round(r.width * dpr);
     this.canvas.height = Math.round(r.height * dpr);
     this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.dpr = dpr;
+    this.measureUi(r);
+  }
+
+  // 캔버스 위에 덮이는 화면 요소들을 캔버스 좌표로 잰다 (풍경 라이딩만 쓴다). 캔버스 크기가 바뀔 때마다 다시 잰다.
+  //   hudRects — 위쪽 칩들. 점수 알림·'여기에 맞춰 달려요'·건물 이름표를 그 밑으로 숨기지 않는다 (휴대폰에서는 칩이 가로를 다 차지한다)
+  //   endRect — '그만하기' 단추. 자전거가 그 밑으로 들어가지 않게 트랙을 비킨다. 단추가 숨어 있으면(라운드 밖) 비킬 것이 없다
+  measureUi(c) {
+    if (!c.width) return;
+    const local = (el) => {
+      const b = el.getBoundingClientRect();
+      return b.width && b.height ? { left: b.left - c.left, right: b.right - c.left, top: b.top - c.top, bottom: b.bottom - c.top } : null;
+    };
+    this.hudRects = [...document.querySelectorAll('#band-ui .hud')].map(local).filter(Boolean);
+    const end = this.canvas.parentElement.querySelector('.end-btn');
+    this.endRect = end && !end.hidden ? local(end) : null;
+  }
+
+  // 지금 그리는 좌표계(g 의 변환)에서 사각형 (x0, y0) ~ (x1, y1) 이 HUD 칩 밑으로 얼마나 들어가는가 (px, 겹치지 않으면 0)
+  hudDepth(x0, y0, x1, y1) {
+    if (!this.hudRects.length) return 0;
+    const m = this.g.getTransform();
+    const d = this.dpr;
+    const xs = [], ys = [];
+    for (const [x, y] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) {
+      xs.push((m.a * x + m.c * y + m.e) / d);
+      ys.push((m.b * x + m.d * y + m.f) / d);
+    }
+    const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
+    let depth = 0;
+    for (const h of this.hudRects) {
+      if (right <= h.left || left >= h.right || bottom <= h.top || top >= h.bottom) continue;
+      depth = Math.max(depth, h.bottom - top);
+    }
+    return depth;
   }
 
   setSlope(dir) {
@@ -116,6 +156,7 @@ export class Band {
     this.rings = [];
     this.planting = null;
     this.endShift = 0;
+    this.dodge = null;
     this.landmarks.forEach((lm) => (lm.pop = 0));
   }
 
@@ -196,6 +237,7 @@ export class Band {
     this.rings.forEach((r) => (r.t += dt));
     this.rings = this.rings.filter((r) => r.t < Band.RING_SEC);
     this.pop = Math.max(0, this.pop - dt / 0.4);
+    if (this.dodge != null) this.dodge = U.lerp(this.dodge, this.dodgeTo, 1 - Math.exp(-dt / 0.25));
     this.time += dt;
   }
 
@@ -436,14 +478,26 @@ export class Band {
   }
 
   // 점수 피드백 — baseY 에서 튀어 올랐다가 사라진다
-  drawFloaters(trackHalf, baseY, r, glow = () => {}) {
+  // beside = { left, right, y, maxX }: 풍경 라이딩의 말풍선 양 끝과 가운데 높이. 그 위로 올라갈 자리가 위쪽 칩에 막히면(휴대폰)
+  // 말풍선 옆에 띄운다 (오른쪽, 넘치면 왼쪽)
+  drawFloaters(trackHalf, baseY, r, glow = () => {}, beside = null) {
     const { g, pal } = this;
     g.textAlign = 'center';
     g.textBaseline = 'bottom';
+    const fontPx = Math.round(r * 0.95);
+    const rise = 26;
+    const cramped = beside && this.hudDepth(-fontPx, baseY - rise - fontPx * 1.3, fontPx, baseY) > 0;
     for (const f of this.floaters) {
-      const fx = f.x * trackHalf;
+      let fx = f.x * trackHalf;
       // 처음에 튕겨 오르고 끝에서 느려지게. 일정한 속도로 올라가면 흘러가는 느낌이 난다.
-      const fy = baseY - (1 - Math.pow(1 - f.t, 3)) * 26;
+      const ease = 1 - Math.pow(1 - f.t, 3);
+      let fy = baseY - ease * rise;
+      if (cramped) {
+        g.font = `800 ${fontPx}px ${pal.font}`;
+        const w = g.measureText(f.text).width * 1.3;
+        fx = beside.right + 10 + w / 2 + w / 2 <= beside.maxX ? beside.right + 10 + w / 2 : beside.left - 10 - w / 2;
+        fy = beside.y + fontPx * 0.5 - ease * 8;
+      }
       g.globalAlpha = f.t < 0.1 ? f.t / 0.1 : f.t < 0.5 ? 1 : 1 - (f.t - 0.5) / 0.5;
       g.fillStyle = pal[f.color] || f.color; // 'good' | 'warn' | 'bad' 또는 색 값
       glow(g.fillStyle);
@@ -572,9 +626,21 @@ export class Band {
       g.globalAlpha = 1;
     }
 
-    const cx = W / 2;
+    let cx = W / 2;
     const ext = W;
-    const trackHalf = Math.max(120, W / 2 - 230);
+    let trackHalf = Math.max(120, W / 2 - 230);
+    // 좁은 화면(휴대폰)에서는 트랙 끝이 오른쪽 아래 '그만하기' 단추 밑으로 들어간다. 자전거가 단추 높이에 있으면
+    // 트랙을 단추 왼쪽 자리에 맞게 줄이고 옮긴다 (카드가 커져 길이 단추보다 위로 가거나 단추가 숨으면 제자리로 미끄러져 돌아온다)
+    const end = this.endRect;
+    const reach = r + 6;
+    const bikeY = gy - roadH * 0.12;
+    this.dodgeTo = end && !this.brainOnly && bikeY + reach > end.top && bikeY - reach < end.bottom && cx + trackHalf + reach > end.left ? 1 : 0;
+    if (this.dodge == null) this.dodge = this.dodgeTo;
+    if (end && this.dodge > 0.001) {
+      const half = Math.min(trackHalf, Math.max(60, (end.left - 2 * reach) / 2));
+      trackHalf = U.lerp(trackHalf, half, this.dodge);
+      cx = U.lerp(cx, Math.min(cx, reach + half), this.dodge);
+    }
     const zoneHalf = trackHalf * (tolerance / maxDeviation);
     g.save();
     g.translate(cx, gy);
@@ -666,7 +732,7 @@ export class Band {
     const gapX = fs * 0.55;
     const ph = Math.round(fs * 1.9);
     const pw = padX * 2 + w1 + gapX + w2;
-    const px = U.clamp(bx, -W / 2 + pw / 2 + 12, W / 2 - pw / 2 - 12);
+    const px = U.clamp(bx, -cx + pw / 2 + 12, W - cx - pw / 2 - 12);
     const pyTop = by - r - fs * 0.6 - ph; // 배지가 커져도 말풍선은 제자리
     g.globalAlpha = 1 - this.endShift;
     g.fillStyle = pal.ink;
@@ -697,7 +763,9 @@ export class Band {
       g.font = `700 ${fs}px ${pal.fontText}`;
       const lw = g.measureText(text).width + fs * 1.4;
       const lh2 = Math.round(fs * 1.7);
-      const ly = pyTop - lh2 - 8;
+      // 위쪽 칩 밑으로 들어가면 그만큼 내린다 (휴대폰: 칩과 말풍선 사이가 좁다)
+      let ly = pyTop - lh2 - 8;
+      ly += this.hudDepth(-lw / 2, ly, lw / 2, ly + lh2) + (this.hudDepth(-lw / 2, ly, lw / 2, ly + lh2) ? 2 : 0);
       g.globalAlpha = la;
       g.fillStyle = pal.panel;
       g.beginPath();
@@ -709,7 +777,7 @@ export class Band {
       g.globalAlpha = 1;
     }
 
-    this.drawFloaters(trackHalf, pyTop - 4, r);
+    this.drawFloaters(trackHalf, pyTop - 4, r, undefined, { left: px - pw / 2, right: px + pw / 2, y: pyTop + ph / 2, maxX: W - cx - 8 });
     g.restore();
   }
 
@@ -942,7 +1010,9 @@ export class Band {
       g.save();
       g.translate(x, baseY);
       g.rotate(this.theta);
-      g.globalAlpha = U.clamp(k / 0.3, 0, 1);
+      // 카드가 다시 줄어 이름표가 위쪽 칩 밑으로 들어가면 흐려 지운다 (휴대폰: 칩이 가로를 다 차지한다)
+      const hidden = U.clamp(this.hudDepth(-tw / 2, ty, tw / 2, ty + th) / 16, 0, 1);
+      g.globalAlpha = U.clamp(k / 0.3, 0, 1) * (1 - hidden);
       g.translate(0, ty + th / 2);
       g.scale(1 + 0.15 * pop, 1 + 0.15 * pop);
       g.fillStyle = done ? pal.ink : 'rgba(29, 43, 36, 0.78)';

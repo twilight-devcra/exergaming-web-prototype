@@ -1,120 +1,92 @@
-// 인지 능력 점수 (세션 로그·참가 기록용. 결과 화면에는 2026-11-18 부터 그리지 않고 별점(js/stars.js)을 보여 준다)
-// 게임 하나가 축 하나가 아니라, 게임마다 여러 능력 축에 가중치를 나눠 준다 (docs/DEMO_BRIEF.md).
-// 축마다 둘 이상의 게임이 들어가므로 짧은 라운드에서 어떤 게임을 못 해도 모든 축이 채워진다.
-// 과학적으로 정확할 필요는 없다. 아래 표의 숫자는 플레이해 보며 감으로 다듬는다.
-// 능력마다 만점 기준이 없으므로 '어느 난이도까지 해냈나' 를 별 1~5개(반 개 단위)로 보여 준다.
-// 별 수 ≈ 해낸 레벨이라 짧은 라운드에서는 2~3개가 보통이고, 더 올라갈 자리가 남는다.
-import { BASE_LEVEL, U } from './config.js';
+// 결과 화면의 두뇌 그래프: 인지 영역마다의 정답률 + 답하는 속도 + 운동을 방사형 그래프로 그린다 (js/radar.js).
+// 2026-11-18 까지는 영역마다 '어느 난이도까지 해냈나'를 별로 그렸는데, 짧은 라운드에서는 처음 하는 사람의 그래프가
+// 작게 나와 힘이 빠졌다. 그래서 별(js/stars.js)은 정답률로 바꾸고 그래프를 뺐다가, 2026-11-20 정답률로 다시 그린다.
+// adaptive 난이도가 정답률을 55~80% 근처에 머물게 하므로 처음 하는 사람도 그래프가 꽤 찬다.
+//
+// 게임 하나가 영역 하나가 아니라, 게임마다 쓰는 영역을 적는다 (DOMAIN_GAMES). 영역마다 둘 이상의 게임이 들어가
+// 짧은 라운드에서도 대개 모든 영역이 채워진다. 과학적으로 정확할 필요는 없다 — 분류는 기획 표를 따른다 (2026-11-20).
+// 세션 로그·참가 기록·운영 메뉴의 CSV 에도 이 값(축마다 0~1)을 남긴다 (summary.domains, 축 id 가 열 이름).
 import { GAME_TYPES } from './games/index.js';
 
-export const ABILITIES = [
-  { id: 'memory', name: '기억력', praise: '본 것을 오래 또렷하게 기억해요' },
-  { id: 'spatial', name: '공간지각', praise: '모양과 위치를 한눈에 파악해요' },
+// 인지 영역. 그래프에서 위부터 시계 방향으로 이 순서다
+export const DOMAINS = [
+  { id: 'memory', name: '기억력', praise: '본 것을 또렷하게 기억해요' },
+  { id: 'spatial', name: '시공간', praise: '모양과 위치를 한눈에 파악해요' },
+  { id: 'calc', name: '계산', praise: '숫자를 정확하게 다뤄요' },
+  { id: 'executive', name: '전두엽', praise: '앞을 내다보고 차근차근 계획해요' },
   { id: 'attention', name: '주의집중', praise: '헷갈리는 것 속에서도 집중을 잃지 않아요' },
-  { id: 'logic', name: '논리·수리', praise: '숫자와 규칙을 차근차근 풀어내요' },
-  { id: 'speed', name: '처리속도', praise: '보고 판단하는 속도가 빨라요' },
+  { id: 'language', name: '언어', praise: '말과 글을 잘 알아들어요' },
 ];
 
-// 아래 두 표는 미니게임 설명서(tools/manual.js)도 읽는다
-export const ABILITY_WEIGHTS = {
-  path: { memory: 0.5, spatial: 0.4, attention: 0.1 },
-  symbol: { memory: 0.6, spatial: 0.3, attention: 0.1 },
-  arith: { memory: 0.2, attention: 0.1, logic: 0.7 },
-  count: { attention: 0.5, speed: 0.5 },
-  fit: { spatial: 0.6, logic: 0.4 },
-  seek: { spatial: 0.3, attention: 0.4, speed: 0.3 },
-  cover: { memory: 0.6, attention: 0.1, logic: 0.3 },
-  pipe: { spatial: 0.3, attention: 0.5, speed: 0.2 },
-  novel: { memory: 0.6, attention: 0.4 },
-  track: { attention: 0.6, spatial: 0.3, speed: 0.1 },
-  follow: { attention: 0.5, logic: 0.3, memory: 0.2 },
-  pair: { attention: 0.5, spatial: 0.2, speed: 0.3 },
-  box: { memory: 0.5, attention: 0.3, logic: 0.2 },
-  compare: { attention: 0.7, speed: 0.3 },
-  coin: { spatial: 0.4, logic: 0.4, attention: 0.2 },
-  recall: { memory: 0.7, attention: 0.3 },
-  chain: { logic: 0.5, spatial: 0.3, attention: 0.2 },
-  blank: { memory: 0.5, logic: 0.3, attention: 0.2 }, // 언어 축이 없어 낱말 인출(의미 기억)을 기억력에, 모든 낱말에 맞춰 보는 것을 논리에 둔다
-};
+// 영역 뒤에 붙는 두 축: 답하는 속도 (문제마다 제한 시간 가운데 남긴 몫) · 운동 (목표 속도를 지킨 비율)
+export const EXTRA_AXES = [
+  { id: 'speed', name: '답하는 속도', praise: '보고 판단하는 속도가 빨라요' },
+  { id: 'exercise', name: '운동', praise: '목표 속도를 꾸준히 지켰어요' },
+];
 
-// 처리속도 축에 들어가는 게임은 문제당 생각한 시간도 본다 (초). 입력이 열린 뒤 답할 때까지이고 정답 피드백·연출 시간은 빠진다
-// (App.roundStats.games[id].think, 시간 초과한 문제는 쓴 시간 그대로 넣는다). fast 이하면 그대로, slow 이상이면 그 게임의 처리속도 몫을 PACE_MIN 배로 깎는다.
-// 예전(피드백 포함 게임 시간) 기준에서 문제당 피드백 시간(1~1.5초)을 뺀 값이다. 플레이해 보며 다듬는다.
-// think 가 없는 예전 기록은 게임 시간(stats.ms, 피드백 포함)으로 재고 PACE_FEEDBACK 초를 빼서 같은 기준에 맞춘다
-export const ABILITY_PACE = {
-  count: { fast: 3, slow: 13 },
-  seek: { fast: 4, slow: 17 },
-  pipe: { fast: 3.5, slow: 13.5 },
-  pair: { fast: 3, slow: 11 },
-  compare: { fast: 3, slow: 9 },
+export const AXES = [...DOMAINS, ...EXTRA_AXES];
+
+// 게임마다 쓰는 영역: 1 = 주 영역, 0.5 = 부분 (기획 표에서 괄호로 적은 것). 미니게임 설명서(tools/manual.js)도 읽는다
+export const DOMAIN_GAMES = {
+  path: { spatial: 1, memory: 1 },          // 길 따라 그리기
+  symbol: { memory: 1 },                    // 심볼 위치 외우기
+  arith: { calc: 1 },                       // 사칙연산 역산
+  count: { spatial: 1, executive: 0.5 },    // 우세한 색 찾기
+  fit: { executive: 1, spatial: 1 },        // 빈자리 채우기
+  seek: { spatial: 1 },                     // 숨은 순서 찾기
+  cover: { calc: 1, memory: 1 },            // 가린 숫자 더하기
+  pipe: { spatial: 1, executive: 1 },       // 배관 타기
+  novel: { memory: 1 },                     // 없던 그림 찾기
+  track: { attention: 1 },                  // 공 따라가기
+  follow: { language: 1, attention: 1 },    // 지시 따르기
+  pair: { attention: 1 },                   // 짝없는 것 찾기
+  box: { calc: 1, attention: 1, memory: 1 }, // 상자 속 과일 세기
+  compare: { spatial: 1 },                  // 두 그림 비교하기
+  coin: { calc: 1, attention: 0.5 },        // 동전 세기
+  recall: { memory: 1, attention: 1 },      // 차례대로 외우기
+  chain: { executive: 1, spatial: 1 },      // 조각 잇기
+  blank: { language: 1 },                   // 같은 글자 넣기
 };
-const PACE_FEEDBACK = 1.2;
 
 export const Abilities = {
-  MAX_STARS: 5,
-  MIN_STARS: 1,    // 데이터가 있으면 적어도 별 하나
-  STAR_BONUS: 0.5, // 별 = 해낸 레벨 + 이만큼
-  PACE_MIN: 0.6,
-
-  // 별은 원래의 단계 체계로 센다: 원래의 첫 단계 Lv3(BASE_LEVEL)이 1이고, 그 아래 쉬운 단계 Lv1·Lv2 는 1/3·2/3 이다.
-  // (쉬운 단계를 더하기 전과 같은 판이면 같은 별이 나온다)
-  effLevel(lv) {
-    return lv >= BASE_LEVEL ? lv - BASE_LEVEL + 1 : lv / BASE_LEVEL;
-  },
-
-  // 문제당 생각한 시간 (초). 시간 초과한 문제도 쓴 시간 그대로 넣는다. 데이터가 없으면 null
-  perQuestionSec(s) {
-    const k = s.think;
-    if (k && k.n + k.out > 0) return (k.ms + k.outMs) / 1000 / (k.n + k.out);
-    if (s.ms > 0 && s.total > 0) return Math.max(0, s.ms / 1000 / s.total - PACE_FEEDBACK);
-    return null;
-  },
-
-  // 판 하나에서 해낸 레벨 = (레벨 − 1) + 정확도 (레벨은 effLevel, 0 아래로는 내려가지 않는다): Lv5 를 다 맞히면 3, 절반이면 2.5, Lv3 을 다 틀리면 0.
-  // 축 하나 = 관련 게임 판들의 가중 평균. 가중치 = 게임 가중치(ABILITY_WEIGHTS) × 레벨 — 높은 레벨에서 해낸(또는 놓친) 판이
-  // 몸풀기 첫 단계보다 크게 친다. 라운드 앞쪽 게임은 늘 시작 단계라, 레벨로 가중하지 않으면 모두가 낮게 나온다.
-  // stats: App.roundStats.games ({ id: { runs: [[레벨, 맞힌 수, 문제 수]…], total, ms } })
-  // → [{ id, name, praise, stars(1~5, 0.5 단위), value(그래프용 0~100), raw(해낸 레벨, 데이터 없으면 null), hasData }]
-  compute(stats) {
-    const sum = {};
-    const wsum = {};
+  // stats = App.roundStats.games ({ id: { correct, total, think: { limitMs, spareMs } } }), exercise = 속도 유지율 0~1 (두뇌 게임만 한 판은 null)
+  // → AXES 순서로 [{ id, name, praise, acc (0~1, 데이터가 없으면 null), hasData }]
+  //   영역의 정답률 = 그 영역을 쓰는 게임들의 맞힌 수 / 낸 문제 수 (게임마다 영역 가중치를 곱해 더한다)
+  //   답하는 속도 = 모든 문제의 제한 시간 가운데 남긴 시간의 몫 (시간 초과는 0). 제한 시간 막대를 끈 판에도 잰다 (main.js startQTimer)
+  compute(stats, exercise = null) {
+    const correct = {};
+    const total = {};
+    let limitMs = 0;
+    let spareMs = 0;
     for (const T of GAME_TYPES) {
       const s = stats[T.id];
-      const w = ABILITY_WEIGHTS[T.id];
-      if (!s || !w || !s.runs) continue;
-      // 처리속도 몫은 그 게임의 문제당 평균 시간으로 깎는다
-      const pace = ABILITY_PACE[T.id];
-      let paceK = 1;
-      const per = pace ? this.perQuestionSec(s) : null;
-      if (per != null) {
-        const f = U.clamp((pace.slow - per) / (pace.slow - pace.fast), 0, 1);
-        paceK = this.PACE_MIN + (1 - this.PACE_MIN) * f;
+      if (!s || !(s.total > 0)) continue;
+      for (const [domain, w] of Object.entries(DOMAIN_GAMES[T.id] || {})) {
+        correct[domain] = (correct[domain] || 0) + w * s.correct;
+        total[domain] = (total[domain] || 0) + w * s.total;
       }
-      for (const [level, correct, total] of s.runs) {
-        if (total <= 0) continue;
-        const lv = this.effLevel(level);
-        const d = Math.max(0, lv - 1 + correct / total);
-        for (const [axis, k] of Object.entries(w)) {
-          sum[axis] = (sum[axis] || 0) + k * lv * (axis === 'speed' ? d * paceK : d);
-          wsum[axis] = (wsum[axis] || 0) + k * lv;
-        }
+      if (s.think && s.think.limitMs > 0) {
+        limitMs += s.think.limitMs;
+        spareMs += s.think.spareMs;
       }
     }
-    return ABILITIES.map((a) => {
-      const has = wsum[a.id] > 0;
-      const raw = has ? sum[a.id] / wsum[a.id] : null;
-      const stars = has ? U.clamp(Math.round((raw + this.STAR_BONUS) * 2) / 2, this.MIN_STARS, this.MAX_STARS) : 0;
-      // 데이터가 없는 축은 별 하나 자리에 흐리게 그린다
-      const value = ((has ? stars : this.MIN_STARS) / this.MAX_STARS) * 100;
-      return { ...a, stars, value, raw: has ? Math.round(raw * 100) / 100 : null, hasData: has };
-    });
+    const acc = {
+      ...Object.fromEntries(DOMAINS.map((d) => [d.id, total[d.id] > 0 ? correct[d.id] / total[d.id] : null])),
+      speed: limitMs > 0 ? spareMs / limitMs : null,
+      exercise: exercise == null ? null : Math.min(1, Math.max(0, exercise)),
+    };
+    return AXES.map((axis) => ({ ...axis, acc: acc[axis.id], hasData: acc[axis.id] != null }));
   },
 
-  // 데이터가 있는 축 중 별이 가장 많은 것 (같으면 해낸 레벨이 높은 것)
+  // 칭찬할 축: 데이터가 있는 인지 영역·답하는 속도 가운데 정답률이 가장 높은 것 (운동은 별점 칸에서 따로 보여 준다)
   best(list) {
-    const has = list.filter((a) => a.hasData);
+    const has = list.filter((axis) => axis.hasData && axis.id !== 'exercise');
     if (!has.length) return null;
-    return has.reduce((b, a) => (a.stars > b.stars || (a.stars === b.stars && a.raw > b.raw) ? a : b));
+    return has.reduce((best, axis) => (axis.acc > best.acc ? axis : best));
+  },
+
+  // 기록용: { 축 id: 0~1 (소수 둘째 자리) 또는 null }
+  record(list) {
+    return Object.fromEntries(list.map((axis) => [axis.id, axis.hasData ? Math.round(axis.acc * 100) / 100 : null]));
   },
 };
-

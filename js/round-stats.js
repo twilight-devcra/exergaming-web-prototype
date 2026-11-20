@@ -7,7 +7,7 @@ export class RoundStats {
     // ms = 게임을 푸는 데 쓴 시간 (피드백 포함), think = 문제별 생각한 시간 (think()). runs · think 는 능력 점수에 쓴다
     this.games = Object.fromEntries(gameTypes.map((T) => [T.id, {
       plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0,
-      think: { n: 0, ms: 0, first: 0, out: 0, outMs: 0 },
+      think: { n: 0, ms: 0, first: 0, out: 0, outMs: 0, limitMs: 0, spareMs: 0 },
     }]));
     this.streak = 0;     // 지금 이어지는 연속 정답
     this.bestStreak = 0;
@@ -44,9 +44,14 @@ export class RoundStats {
   // 문제 하나의 생각한 시간 (게임 시계 ms, 입력이 열린 뒤부터. js/session-log.js 의 answer).
   // 제때 답한 문제: n 개, ms = 답이 정해질 때까지의 합, first = 처음 입력할 때까지의 합.
   // 시간 초과: out 개, outMs = 그 문제들에 쓴 시간 합. 입력이 열리기 전에 누른 답(지시 따르기의 램프 전에 누름)은 시간이 없어 세지 않는다
-  think(gameId, ms, first, timedOut) {
+  // limit = 그 문제의 제한 시간 (ms, 모르면 null): limitMs = 제한 시간 합, spareMs = 남긴 시간 합 (시간 초과는 0) — 답하는 속도 (js/abilities.js)
+  think(gameId, ms, first, timedOut, limit = null) {
     if (ms == null) return;
     const think = this.games[gameId].think;
+    if (limit > 0) {
+      think.limitMs += limit;
+      think.spareMs += timedOut ? 0 : Math.max(0, limit - ms);
+    }
     if (timedOut) {
       think.out++;
       think.outMs += ms;

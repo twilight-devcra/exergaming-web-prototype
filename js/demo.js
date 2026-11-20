@@ -11,6 +11,7 @@ import { SessionStore } from './session-log.js';
 import { SessionUpload } from './session-upload.js';
 import { RoundStats } from './round-stats.js';
 import { RoundReport } from './round-report.js';
+import { Abilities } from './abilities.js';
 import { AttractVisual } from '../app/attract-visual.js';
 import { CalibVisual } from '../app/calib-visual.js';
 import { MemberUI } from '../app/members.js';
@@ -264,7 +265,10 @@ export const Demo = {
       cog += points;
       const level = R(BASE_LEVEL, BASE_LEVEL + 3);
       const runs = level > BASE_LEVEL ? [[level - 1, Math.ceil(correct / 2), Math.ceil(total / 2)], [level, Math.floor(correct / 2), Math.floor(total / 2)]] : [[level, correct, total]];
-      a.roundStats.games[T.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * R(4000, 12000) };
+      // 답하는 속도: 문제마다 제한 시간의 30~70% 를 남긴 것처럼
+      const limitMs = total * R(8000, 14000);
+      const think = { n: total, ms: 0, first: 0, out: 0, outMs: 0, limitMs, spareMs: Math.round(limitMs * R(30, 70) / 100) };
+      a.roundStats.games[T.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * R(4000, 12000), think };
     }
     a.exScore = Math.round(exMax * R(55, 95) / 100);
     a.cogScore = cog;
@@ -434,8 +438,8 @@ export const Demo = {
     if (a.log) {
       a.log.meta.station = this.station;
       a.log.meta.participant = this.label(no);
-      a.log.meta.summary.abilities = Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.stars : null]));
-      a.log.meta.summary.abilitiesRaw = Object.fromEntries(abil.map((x) => [x.id, x.raw]));
+      // 두뇌 그래프의 축마다 0~1 (인지 영역 정답률 · 답하는 속도 · 운동, js/abilities.js). 2026-11-20 전 로그는 abilities(별)·abilitiesRaw 였다
+      a.log.meta.summary.domains = Abilities.record(abil);
       // 결과 화면의 별점 (js/stars.js): 운동 정확도(속도 유지율, 두뇌 게임만이면 null)·게임 정확도와 권한 다음 난이도
       a.log.meta.summary.accuracy = {
         exercise: a.brainOnly ? null : keep / 100,
@@ -450,7 +454,7 @@ export const Demo = {
       station: this.station, no, at: new Date().toISOString(),
       score: a.score, ex: a.exScore, cog: a.cogScore, track: a.brainOnly ? 'brain' : 'dual',
       kcal: Math.round(kcal * 10) / 10, distM: Math.round(m.distM), revs: Math.round(m.revs), cfg: Config.demoCode(cfg),
-      abilities: Object.fromEntries(abil.map((x) => [x.id, x.hasData ? x.stars : null])),
+      domains: Abilities.record(abil),
     });
     this.save('log', log.slice(-this.LOG_MAX));
     a.show('demo-result');

@@ -1,6 +1,7 @@
 // 세션 성과·운동량 카드 (#tpl-report). 테스트 결과 화면(js/test-results.js)과 스테이션 결과 화면(js/demo.js)이 함께 쓴다.
 import { $, U } from './config.js';
 import { Abilities } from './abilities.js';
+import { Radar } from './radar.js';
 import { Stars } from './stars.js';
 import { Exercise } from './exercise.js';
 
@@ -10,18 +11,22 @@ export const RoundReport = {
     return $('#tpl-report').content.cloneNode(true);
   },
 
-  // root 안의 카드를 이번 라운드로 채운다. 능력 점수(abil)는 화면에 그리지 않지만 세션 로그·참가 기록에 남긴다 (js/abilities.js)
-  // 반환: { abil(능력 점수), keep(속도 유지율 %), kcal, gameAcc(게임 정확도 0~1 또는 null), rec(권하는 다음 난이도, js/stars.js) }
+  // root 안의 카드를 이번 라운드로 채운다. 두뇌 그래프(영역별 정답률 · 답하는 속도 · 운동, js/abilities.js)도 그린다
+  // 반환: { abil(두뇌 그래프의 축들), keep(속도 유지율 %), kcal, gameAcc(게임 정확도 0~1 또는 null), rec(권하는 다음 난이도, js/stars.js) }
   fill(app, root) {
     const { cfg, meter } = app;
     const field = (cls) => root.querySelector(`.rp-${cls}`);
     const games = app.roundStats.games;
-    const abil = Abilities.compute(games);
     const exMax = Math.floor(cfg.durationSec / cfg.tickSec) * cfg.tickMaxPoints;
     const keep = U.clamp(Math.round((app.exScore / exMax) * 100), 0, 100);
+    const abil = Abilities.compute(games, app.brainOnly ? null : keep / 100);
+    Radar.render(field('radar'), abil);
+    // 가장 잘한 영역을 칭찬한다 (데이터가 없으면 비운다)
+    const best = Abilities.best(abil);
+    field('best').innerHTML = best ? `오늘 가장 돋보인 능력 <b>${best.name}</b><small>${best.praise}</small>` : '';
     const kcal = meter.kcal;
     const gameAcc = Stars.gameAcc(games);
-    const rec = fillStars(app, root, keep, gameAcc);
+    const rec = fillRecommendation(app, root, gameAcc);
     const dist = Exercise.fmtDist(meter.distM);
     field('dist').textContent = dist.value;
     field('dist-unit').textContent = dist.unit;
@@ -36,18 +41,9 @@ export const RoundReport = {
   },
 };
 
-// 세션 성과 카드: 운동(속도 유지율 %) · 인지(게임 정답률) 별을 나란히, 그리고 게임 정답률이 높으면 다음 난이도 권하기
+// 세션 성과 카드의 다음 난이도 상자: 게임 정답률이 높으면 올리기, 낮으면 내리기, 그 사이면 이대로 (js/stars.js)
 // 운영 버전은 고른 세션 난이도(SESSION_DIFFICULTIES)로, 테스트 화면은 라운드 난이도 프리셋(ROUND_PRESETS)으로 다음 단계를 찾는다
-function fillStars(app, root, keep, gameAcc) {
-  const row = (cls, acc) => {
-    const el = root.querySelector(`.rp-${cls}`);
-    el.classList.toggle('nodata', acc == null);
-    el.querySelector('.st-pct').textContent = acc == null ? '–' : `${Math.round(acc * 100)}%`;
-    el.querySelector('.st-stars').innerHTML = Stars.svg(Stars.of(acc));
-  };
-  row('st-ex', app.brainOnly ? null : keep / 100); // 두뇌 게임만 한 판은 '–' 와 흐린 별
-  row('st-game', gameAcc);
-
+function fillRecommendation(app, root, gameAcc) {
   // 세션 설정 화면에서 고른 세션 (운영 버전만 고른다)
   const session = app.log && app.log.meta.session;
   // 세션 난이도를 고르지 않은 판(시연 프로토타입)은 목록이 없으니 오르내리지 않고 이대로 계속하기만 권한다

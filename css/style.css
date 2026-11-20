@@ -1588,7 +1588,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   padding: clamp(14px, 3vh, 28px) clamp(16px, 3vw, 40px);
 }
 #result .dr-title { margin: 0; }
-#result .dr-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.95fr) minmax(0, 0.85fr); }
+#result .dr-grid { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.75fr) minmax(0, 0.9fr) minmax(0, 0.8fr); }
 #result :is(.rs-split dd, .dr-facts dd) { white-space: nowrap; }
 #result .dr-total { font-size: clamp(48px, 10vh, 96px); }
 .rs-score { gap: clamp(8px, 1.4vh, 12px); }
@@ -1783,10 +1783,6 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 .station-tag .st-name { font-weight: 700; }
 .station-tag .pedal-status { max-width: 40vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ---------- 세션 성과 별 (결과 화면, js/stars.js) ---------- */
-.st-svg { display: block; width: 100%; max-width: 240px; height: auto; }
-.st-svg .st-off { fill: var(--line); }
-.st-svg .st-on { fill: var(--warn); }
 
 /* ---------- 스테이션 결과 ---------- */
 #demo-result {
@@ -1837,15 +1833,8 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 }
 .dr-break { font-size: clamp(14px, 2.3vh, 18px); color: var(--ink-soft); font-weight: 600; }
 .dr-note { margin-top: clamp(8px, 2vh, 20px); font-size: clamp(13px, 2vh, 16px); line-height: 1.5; color: var(--ink-soft); }
-.dr-stars { gap: clamp(10px, 2.4vh, 22px); }
-/* 운동 · 인지 두 칸을 한 줄에 나란히 */
-.st-rows { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(14px, 2.4vw, 28px); margin: auto 0; }
-/* 칸 하나 = 이름 / 퍼센트 / 별 (가운데 맞춤). 좁은 카드에서도 이름이 줄바꿈되지 않게 세로로 쌓는다 */
-.st-row { display: flex; flex-direction: column; align-items: center; gap: clamp(6px, 1.2vh, 10px); min-width: 0; text-align: center; }
-.st-head { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: clamp(17px, 2.8vh, 24px); font-weight: 800; white-space: nowrap; }
-.st-pct { font-size: clamp(30px, 5.6vh, 52px); line-height: 1.05; color: var(--accent); font-variant-numeric: tabular-nums; }
-.st-row.nodata .st-pct { color: var(--ink-soft); }
-.st-row.nodata .st-svg { opacity: 0.5; }
+/* 이번 세션 성과: 두뇌 그래프 (js/radar.js) · 칭찬 한 줄 · 다음 난이도 상자 (js/stars.js) */
+.dr-session { gap: clamp(8px, 1.6vh, 16px); }
 /* 늘 보인다. 올리기는 노랑, 이대로는 파랑, 쉬어 가기는 초록 바탕 */
 .st-rec {
   padding: clamp(10px, 1.8vh, 16px) clamp(12px, 2vh, 18px);
@@ -1857,6 +1846,25 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 .st-rec.keep { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
 .st-rec.down { background: color-mix(in srgb, var(--good) 16%, var(--panel)); }
 #demo-result .st-rec { animation: recin 0.6s 0.7s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+/* 두뇌 그래프 (js/radar.js): 다음 난이도 상자 위에서 남는 높이를 모두 채운다 */
+.dr-brain { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dr-brain .radar { flex: 1; min-height: 0; width: 100%; }
+.radar .rd-grid { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.radar .rd-grid.outer { fill: color-mix(in srgb, var(--accent) 4%, var(--panel)); }
+.radar .rd-axis { stroke: var(--line); stroke-width: 1.5; }
+.radar .rd-shape { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent); stroke-width: 4; stroke-linejoin: round; }
+.radar .rd-dot { fill: var(--accent); stroke: var(--panel); stroke-width: 3; }
+.radar .rd-label { font-size: 25px; font-weight: 700; fill: var(--ink); }
+.radar .rd-value { font-size: 26px; font-weight: 800; fill: var(--accent); font-variant-numeric: tabular-nums; }
+.radar .nodata { fill: var(--ink-soft); }
+#demo-result .radar .rd-shape { animation: radarin 0.9s 0.3s cubic-bezier(0.2, 1.2, 0.4, 1) both; transform-origin: 270px 194px; }
+/* 그래프가 크게 들어가도록 이번 세션 성과 카드를 넓게 */
+#demo-result .dr-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.7fr) minmax(0, 0.9fr); }
+@keyframes radarin { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+.dr-best { margin: 0; text-align: center; font-size: clamp(14px, 2.2vh, 18px); line-height: 1.4; color: var(--ink-soft); font-weight: 600; word-break: keep-all; }
+.dr-best b { color: var(--accent); margin-left: 4px; }
+.dr-best small { display: block; font-size: 0.92em; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { #demo-result .radar .rd-shape { animation: none; } }
 @keyframes recin { from { transform: scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
 .dr-ex { gap: clamp(6px, 1.4vh, 12px); }
 .dr-stat { display: flex; align-items: baseline; gap: 8px; margin-top: clamp(4px, 1.5vh, 16px); }
@@ -1913,6 +1921,7 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 @media (max-width: 860px), (max-aspect-ratio: 1/1) {
   #demo-result { overflow-y: auto; }
   .dr-grid { grid-template-columns: 1fr; flex: none; }
+  .dr-brain .radar { height: min(78vw, 360px); flex: none; }
   #attract { flex-direction: column-reverse; }
   .att-visual { width: min(70vw, 40vh); }
 }
@@ -2057,6 +2066,7 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
   /* 결과: 카드를 한 줄에 하나씩 쌓는다 */
   #result, #demo-result { overflow-y: auto; }
   #result .dr-grid, #demo-result .dr-grid { grid-template-columns: minmax(0, 1fr); flex: none; }
+  .dr-brain .radar { height: min(78vw, 360px); flex: none; }
   .rs-rank .board-list, .rs-games { overflow: visible; }
   .result-actions { flex-wrap: wrap; width: 100%; }
   .result-actions .btn { flex: 1; padding: 12px 14px; font-size: 16px; white-space: nowrap; }

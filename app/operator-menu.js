@@ -2,7 +2,7 @@
 // 메뉴 안의 라운드 설정(DEMO_SETTINGS), 자동 업로드 설정, 기록 보기·내려받기도 여기 있다.
 // 스테이션 흐름(js/demo.js 의 Demo)은 isOpen·pinOpen 으로 메뉴가 열려 있는지 보고 게임을 멈춘다.
 import { PRESET_KEYS, ROUND_PRESETS, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, U } from '../js/config.js';
-import { ABILITIES } from '../js/abilities.js';
+import { AXES } from '../js/abilities.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
 
@@ -248,9 +248,10 @@ export const OperatorMenu = {
 
   downloadCsv() {
     const log = this.demo.load('log', []);
-    // track: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). 이 열을 더하기 전 기록은 dual
-    const head = ['station', 'no', 'time', 'settings', 'track', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...ABILITIES.map((x) => x.id)];
-    const rows = log.map((r) => [r.station, r.no, r.at, r.cfg ?? '', r.track || 'dual', r.score, r.ex, r.cog, r.kcal, r.distM ?? '', r.revs, ...ABILITIES.map((x) => r.abilities?.[x.id] ?? '')]);
+    // track: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). 이 열을 더하기 전 기록은 dual.
+    // 끝의 열은 두뇌 그래프의 축 (0~1, js/abilities.js AXES). 2026-11-20 전 기록은 축이 달라(별점) 비어 있다
+    const head = ['station', 'no', 'time', 'settings', 'track', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...AXES.map((x) => x.id)];
+    const rows = log.map((r) => [r.station, r.no, r.at, r.cfg ?? '', r.track || 'dual', r.score, r.ex, r.cog, r.kcal, r.distM ?? '', r.revs, ...AXES.map((x) => r.domains?.[x.id] ?? '')]);
     const csv = '﻿' + [head, ...rows].map((row) => row.join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));

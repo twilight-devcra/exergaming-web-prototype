@@ -7,7 +7,7 @@
 //   - 레벨 메모      — levels 배열 안의 주석 줄 (바로 다음 레벨에 붙인다)
 //   - 고정값         — 'static 대문자_이름 = 값; // 설명' 줄
 //   - 제한 시간      — js/config.js 의 questionTime 과 그 위 '일의 양' 주석
-//   - 능력 그래프    — js/abilities.js 의 ABILITY_WEIGHTS · ABILITY_PACE
+//   - 두뇌 그래프    — js/abilities.js 의 DOMAIN_GAMES (게임마다 쓰는 인지 영역)
 //   - 노리는 능력    — tools/targets.js (이것으로 점검표 TARGETS.md 도 만든다: 아직 노리지 않은 능력 찾기)
 // 그래서 설명서를 고치려면 게임 파일의 주석이나 값을 고친 뒤 이 스크립트를 다시 돌린다.
 const fs = require('fs');
@@ -141,10 +141,11 @@ function fmt(key, v) {
 (async () => {
   const { GAME_TYPES } = await load('js/games/index.js');
   const { DEFAULT_CONFIG, EASY_TIME, BASE_LEVEL, Config } = await load('js/config.js');
-  const { ABILITIES, ABILITY_WEIGHTS, ABILITY_PACE, Abilities } = await load('js/abilities.js');
+  // 결과 화면 두뇌 그래프의 영역 (tools/targets.js 의 DOMAINS 와는 다른 목록)
+  const { DOMAINS: GRAPH_DOMAINS, DOMAIN_GAMES } = await load('js/abilities.js');
   const configSrc = read('js/config.js');
   const loadText = loads(configSrc);
-  const abilityName = Object.fromEntries(ABILITIES.map((a) => [a.id, a.name]));
+  const domainName = Object.fromEntries(GRAPH_DOMAINS.map((d) => [d.id, d.name]));
   const LV = GAME_TYPES[0].levels.length;
 
   // ---- 노리는 능력 (tools/targets.js) ----
@@ -185,7 +186,7 @@ function fmt(key, v) {
   const mults = Array.from({ length: LV }, (_, i) => `Lv${i + 1} ×${Config.levelMult(DEFAULT_CONFIG, i + 1).toFixed(2)}`);
   md.push(`- **점수 배율** (기본 설정): ${mults.join(' · ')}`);
   md.push(`- **난이도 자동 조절** (기본 \`adaptive\`): 모든 게임이 하나의 난이도 값을 공유합니다. 정답이면 +${DEFAULT_CONFIG.diffUp}, 오답·시간 초과면 −${DEFAULT_CONFIG.diffDown}이고, 다음 게임의 레벨은 이 값의 정수 부분입니다. 활성화된 게임이 ${DEFAULT_CONFIG.diffGamesRef}종보다 많으면 두 증감 폭에 (${DEFAULT_CONFIG.diffGamesRef} / 게임 수)를 곱합니다. 운영 버전에서는 세션 길이와 난이도 설정에 따라 이 값을 따로 정합니다 (\`Config.session\`).`);
-  md.push(`- **능력 그래프**: 각 게임의 결과를 능력 축(${ABILITIES.map((a) => a.name).join(' · ')})에 가중치를 나눠 반영합니다. 처리속도 가중치가 있는 게임 중 일부는 문제당 소요 시간에 따라 그 가중치를 줄입니다 (느리면 최대 ×${Abilities.PACE_MIN}).`);
+  md.push(`- **두뇌 그래프** (결과 화면): 인지 영역(${GRAPH_DOMAINS.map((d) => d.name).join(' · ')})마다 그 영역을 쓰는 게임들의 정답률을 보여 줍니다. 게임마다 주 영역은 1, 부분 영역은 0.5 의 비중으로 셉니다. 영역 축 뒤에 답하는 속도(문제마다 제한 시간 가운데 남긴 몫)와 운동(목표 속도를 지킨 비율) 축이 붙습니다.`);
   md.push(`- ${LEGEND}`);
   md.push('');
 
@@ -214,8 +215,7 @@ function fmt(key, v) {
     const consts = constants(src).filter((c) => !['ROUNDS', 'QUESTIONS'].includes(c.name));
     const questions = T.ROUNDS ?? T.QUESTIONS ?? 1;
     const qt = DEFAULT_CONFIG.questionTime[T.id];
-    const w = ABILITY_WEIGHTS[T.id] || {};
-    const pace = ABILITY_PACE[T.id];
+    const domains = DOMAIN_GAMES[T.id] || {};
 
     const prev = GAME_TYPES[gi - 1];
     const next = GAME_TYPES[gi + 1];
@@ -231,9 +231,8 @@ function fmt(key, v) {
     md.push(`- 문제 수: 게임당 ${questions}개`);
     if (T.tags) md.push(`- 태그: ${T.tags.join(', ')} (태그가 겹치는 게임은 연달아 나오지 않음)`);
     if (qt) md.push(`- 제한 시간: ${qt.base}초 + ${qt.per}초 × N${loadText[T.id] ? `, N = ${loadText[T.id]}` : ''}`);
-    md.push(`- 능력 그래프 가중치: ${Object.entries(w).map(([k, v]) => `${abilityName[k]} ${v}`).join(' · ') || '없음'}` +
-      (pace ? ` (처리속도: 문제당 생각한 시간이 ${pace.fast}초 이하면 그대로, ${pace.slow}초 이상이면 ×${Abilities.PACE_MIN})` : ''));
-    md.push(`- 인지 영역: ${targetText(gameTargets[T.id]) || '*지정하지 않음 — tools/targets.js*'} ([점검표](TARGETS.md))`);
+    md.push(`- 두뇌 그래프 영역: ${Object.entries(domains).map(([k, v]) => `${domainName[k]}${v < 1 ? ' (부분)' : ''}`).join(' · ') || '없음'}`);
+    md.push(`- 세부 인지 영역: ${targetText(gameTargets[T.id]) || '*지정하지 않음 — tools/targets.js*'} ([점검표](TARGETS.md))`);
     md.push('');
 
     // 손잡이 설명: 레벨에 실제로 쓰인 것 + 설명만 있는 것. 쓰인 순서는 설명 순서를 따르고, 설명이 없는 것은 뒤에

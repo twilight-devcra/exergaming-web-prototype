@@ -310,17 +310,12 @@
 
   <!-- 세션 성과·운동량 카드: 시연 결과와 테스트 결과 화면이 함께 쓴다 (App.fillReport 가 채운다) -->
   <template id="tpl-report">
-    <div class="dr-card dr-stars">
+    <div class="dr-card dr-session">
       <h3>이번 세션 성과</h3>
-      <div class="st-rows">
-        <div class="st-row rp-st-ex">
-          <div class="st-head"><span>운동</span><b class="st-pct"></b></div>
-          <div class="st-stars"></div>
-        </div>
-        <div class="st-row rp-st-game">
-          <div class="st-head"><span>인지</span><b class="st-pct"></b></div>
-          <div class="st-stars"></div>
-        </div>
+      <!-- 두뇌 그래프: 인지 영역마다의 정답률 · 답하는 속도 · 운동 (js/abilities.js, js/radar.js) -->
+      <div class="dr-brain">
+        <svg class="radar rp-radar" role="img" aria-label="영역별 정답률"></svg>
+        <p class="dr-best rp-best"></p>
       </div>
       <!-- 게임 정확도가 높으면 다음 난이도를 권한다 (js/stars.js) -->
       <div class="st-rec rp-rec"></div>

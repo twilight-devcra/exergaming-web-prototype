@@ -5,12 +5,12 @@
 export const DEV_BUILD = /\/dev\//.test(location.pathname);
 
 if (DEV_BUILD) {
-  const P = 'dev:';
-  const wrap = (proto, names) => {
-    for (const m of names) {
-      const orig = proto[m];
-      proto[m] = function (name, ...rest) {
-        return orig.call(this, P + name, ...rest);
+  const PREFIX = 'dev:';
+  const wrap = (prototype, methodNames) => {
+    for (const methodName of methodNames) {
+      const original = prototype[methodName];
+      prototype[methodName] = function (name, ...rest) {
+        return original.call(this, PREFIX + name, ...rest);
       };
     }
   };

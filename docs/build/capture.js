@@ -8,41 +8,41 @@ const { launch, sleep } = require('./cdp');
 const ROOT = path.resolve(__dirname, '../..');
 const OUT = path.resolve(__dirname, '../shots');
 const PORT = 5199;
-const W = 1600;
-const H = 1000;
-const BAND = { x: 0, y: 0, width: W, height: H * 0.25 };
+const WIDTH = 1600;
+const HEIGHT = 1000;
+const BAND = { x: 0, y: 0, width: WIDTH, height: HEIGHT * 0.25 };
 
 function serve() {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
-  return http.createServer((req, res) => {
-    const url = decodeURIComponent(req.url.split('?')[0]);
+  return http.createServer((request, response) => {
+    const url = decodeURIComponent(request.url.split('?')[0]);
     const file = path.join(ROOT, url === '/' ? 'index.html' : url);
-    fs.readFile(file, (err, data) => {
-      if (err) return res.writeHead(404).end();
-      res.writeHead(200, { 'Content-Type': (types[path.extname(file)] || 'application/octet-stream') + '; charset=utf-8' });
-      res.end(data);
+    fs.readFile(file, (error, data) => {
+      if (error) return response.writeHead(404).end();
+      response.writeHead(200, { 'Content-Type': (types[path.extname(file)] || 'application/octet-stream') + '; charset=utf-8' });
+      response.end(data);
     });
   }).listen(PORT);
 }
 
 // 페이지 안에서 쓰는 헬퍼
 const HELPERS = `
-  window.__pedalAt = (ms) => {
-    clearInterval(window.__pi);
-    let k = 0;
-    window.__pi = setInterval(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: k++ % 2 ? 'KeyD' : 'KeyA' })), ms);
+  window.__pedalAt = (interval) => {
+    clearInterval(window.__pedalTimer);
+    let stroke = 0;
+    window.__pedalTimer = setInterval(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: stroke++ % 2 ? 'KeyD' : 'KeyA' })), interval);
   };
-  window.__tap = (el) => el.dispatchEvent(new PointerEvent('pointerdown'));
+  window.__tap = (element) => element.dispatchEvent(new PointerEvent('pointerdown'));
   true;
 `;
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const server = serve();
-  const page = await launch({ width: W, height: H });
+  const page = await launch({ width: WIDTH, height: HEIGHT });
   const shot = (name, clip) => page.shot(path.join(OUT, `${name}.png`), clip);
   try {
-    await page.viewport(W, H, 1.5);
+    await page.viewport(WIDTH, HEIGHT, 1.5);
     await page.goto(`http://localhost:${PORT}/`);
     // 메뉴 화면 순위 예시 데이터 (예시용 이름)
     await page.eval(`localStorage.clear();
@@ -70,26 +70,26 @@ const HELPERS = `
     await shot('03-countdown');
 
     // 길 따라 그리기
-    await page.waitFor(`App.current && App.current.T.id === 'path'`);
+    await page.waitFor(`App.current && App.current.type.id === 'path'`);
     await page.waitFor(`document.querySelectorAll('.pcell.on').length >= 5`);
     await shot('04-path-show');
     await page.waitFor(`App.current.game.phase === 'input'`);
     await page.eval(`(async () => {
-      const g = App.current.game;
-      for (let i = 1; i <= 4; i++) { const [r, c] = g.path[i]; __tap(g.cells[r][c]); await new Promise(r => setTimeout(r, 120)); }
+      const game = App.current.game;
+      for (let i = 1; i <= 4; i++) { const [row, column] = game.path[i]; __tap(game.cells[row][column]); await new Promise((resolve) => setTimeout(resolve, 120)); }
       return true; })()`);
     await sleep(250);
     await shot('05-path-input');
     await shot('band-ok', BAND);
     await page.eval(`(async () => {
-      const g = App.current.game;
-      for (let i = g.nextStep; i < g.path.length; i++) { const [r, c] = g.path[i]; __tap(g.cells[r][c]); await new Promise(r => setTimeout(r, 120)); }
+      const game = App.current.game;
+      for (let i = game.nextStep; i < game.path.length; i++) { const [row, column] = game.path[i]; __tap(game.cells[row][column]); await new Promise((resolve) => setTimeout(resolve, 120)); }
       return true; })()`);
     await sleep(300);
     await shot('06-path-clear');
 
     // 심볼 위치 외우기
-    await page.waitFor(`App.current && App.current.T.id === 'symbol'`);
+    await page.waitFor(`App.current && App.current.type.id === 'symbol'`);
     await page.waitFor(`document.querySelector('.memorize-banner')`);
     await sleep(300);
     await shot('07-symbol-banner');
@@ -101,23 +101,23 @@ const HELPERS = `
     await page.waitFor(`App.current.game.phase === 'input' && App.current.game.answered === 1`);
     await sleep(200);
     await shot('09-symbol-ask');
-    await page.eval(`(() => { const g = App.current.game;
-      const i = [...Array(8).keys()].find(i => i !== g.current.slot && !g.cells[i].classList.contains('closed'));
-      __tap(g.cells[i]); return true; })()`);
+    await page.eval(`(() => { const game = App.current.game;
+      const wrongSlot = [...Array(8).keys()].find((slot) => slot !== game.current.slot && !game.cells[slot].classList.contains('closed'));
+      __tap(game.cells[wrongSlot]); return true; })()`);
     await sleep(250);
     await shot('10-symbol-wrong');
     await page.waitFor(`App.current.game.phase === 'input' && App.current.game.answered === 2`);
     await page.eval(`__tap(App.current.game.cells[App.current.game.current.slot]); true`);
 
     // 사칙연산 역산 (페달을 느리게 밟아 구역 이탈도 함께 보여준다)
-    await page.waitFor(`App.current && App.current.T.id === 'arith' && App.current.game.phase === 'input'`, 15000);
-    await page.eval(`__pedalAt(640); (() => { const g = App.current.game;
-      __tap(g.candidateButtons.find(b => Number(b.textContent) === g.puzzle.sol[0])); return true; })()`);
+    await page.waitFor(`App.current && App.current.type.id === 'arith' && App.current.game.phase === 'input'`, 15000);
+    await page.eval(`__pedalAt(640); (() => { const game = App.current.game;
+      __tap(game.candidateButtons.find((button) => Number(button.textContent) === game.puzzle.solution[0])); return true; })()`);
     await sleep(3200);
     await shot('11-arith-slow');
     await shot('band-slow', BAND);
-    await page.eval(`(() => { const g = App.current.game;
-      g.puzzle.sol.slice(1).forEach(v => __tap(g.candidateButtons.find(b => Number(b.textContent) === v))); return true; })()`);
+    await page.eval(`(() => { const game = App.current.game;
+      game.puzzle.solution.slice(1).forEach((value) => __tap(game.candidateButtons.find((button) => Number(button.textContent) === value))); return true; })()`);
     await sleep(250);
     await page.eval(`__pedalAt(400); true`);
     await shot('12-arith-right');
@@ -130,14 +130,14 @@ const HELPERS = `
 
     // 결과 화면
     await page.waitFor(`App.state === 'result'`, 40000);
-    await page.eval(`clearInterval(window.__pi); document.activeElement.blur(); true`);
+    await page.eval(`clearInterval(window.__pedalTimer); document.activeElement.blur(); true`);
     await sleep(500);
     await shot('14-result');
   } finally {
     await page.close();
     server.close();
   }
-})().catch((e) => {
-  console.error(e);
+})().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

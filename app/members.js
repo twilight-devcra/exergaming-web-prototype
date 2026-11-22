@@ -29,7 +29,7 @@ export const MemberUI = {
     if (!document.getElementById('login')) return null;
     this.demo = demo;
     this.app = app;
-    const $ = (s) => document.querySelector(s);
+    const $ = (selector) => document.querySelector(selector);
     for (const id of ['#login', '#history']) {
       $(id).addEventListener('pointerdown', () => {
         demo.activeAt = app.clock;
@@ -42,20 +42,20 @@ export const MemberUI = {
     $('#lg-code').onclick = () => this.showPad(true);
     $('#lg-pad-cancel').onclick = () => this.showPad(false);
     $('#lg-photo').onclick = () => {
-      const f = $('#lg-photo-file');
-      f.value = ''; // 같은 사진을 다시 골라도 change 가 오게
-      f.click();
+      const fileInput = $('#lg-photo-file');
+      fileInput.value = ''; // 같은 사진을 다시 골라도 change 가 오게
+      fileInput.click();
     };
-    $('#lg-photo-file').addEventListener('change', (e) => {
+    $('#lg-photo-file').addEventListener('change', (event) => {
       demo.activeAt = app.clock; // 사진을 고르는 동안 자리 비움으로 넘어가지 않게
-      if (e.target.files[0]) this.fromPhoto(e.target.files[0]);
+      if (event.target.files[0]) this.fromPhoto(event.target.files[0]);
     });
-    $('#lg-keys').addEventListener('click', (e) => {
-      const b = e.target.closest('button');
-      if (!b) return;
-      if (b.dataset.k === 'del') this.code = this.code.slice(0, -1);
-      else if (b.dataset.k === 'ok') return this.submitCode();
-      else if (this.code.length < 8) this.code += b.textContent;
+    $('#lg-keys').addEventListener('click', (event) => {
+      const key = event.target.closest('button');
+      if (!key) return;
+      if (key.dataset.k === 'del') this.code = this.code.slice(0, -1);
+      else if (key.dataset.k === 'ok') return this.submitCode();
+      else if (this.code.length < 8) this.code += key.textContent;
       this.renderPad();
     });
     $('#hs-prev').onclick = () => this.moveMonth(-1);
@@ -71,55 +71,55 @@ export const MemberUI = {
 
   // ---------------- 로그인 ----------------
   openLogin(via) {
-    const a = this.app;
+    const app = this.app;
     this.via = via;
     this.user = null;
     this.guest = false;
     this.showPad(false);
     document.getElementById('lg-photo').hidden = !onPhone();
     document.getElementById('lg-photo-msg').textContent = '';
-    a.show('login');
-    a.state = 'login';
-    this.demo.activeAt = a.clock;
-    if (a.cfg.sound) a.audio.ambient(true);
+    app.show('login');
+    app.state = 'login';
+    this.demo.activeAt = app.clock;
+    if (app.config.sound) app.audio.ambient(true);
     this.startCamera();
   },
 
   startCamera() {
-    const msg = document.getElementById('lg-cam-msg');
+    const message = document.getElementById('lg-cam-msg');
     const box = document.querySelector('.lg-cam');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       box.classList.add('off');
-      msg.textContent = onPhone() ? '이 기기에서는 카메라를 쓸 수 없어요. 사진이나 번호로 들어가 주세요' : '이 기기에서는 카메라를 쓸 수 없어요. 번호로 들어가 주세요';
+      message.textContent = onPhone() ? '이 기기에서는 카메라를 쓸 수 없어요. 사진이나 번호로 들어가 주세요' : '이 기기에서는 카메라를 쓸 수 없어요. 번호로 들어가 주세요';
       return;
     }
     QrScanner.start(document.getElementById('lg-video'), (text) => {
       const id = Members.parse(text);
       if (id && this.app.state === 'login') this.login(id);
-    }, (st) => {
-      box.classList.toggle('off', st === 'denied');
-      msg.textContent = st === 'denied'
+    }, (state) => {
+      box.classList.toggle('off', state === 'denied');
+      message.textContent = state === 'denied'
         ? (onPhone() ? '카메라를 켜지 못했어요. 사진이나 번호로 들어가 주세요' : '카메라를 켜지 못했어요. 번호로 들어가 주세요')
-        : st === 'starting' ? '카메라를 켜는 중…' : '휴대폰에 찍어 둔 QR 코드를 화면 위쪽 카메라에 비춰 주세요';
+        : state === 'starting' ? '카메라를 켜는 중…' : '휴대폰에 찍어 둔 QR 코드를 화면 위쪽 카메라에 비춰 주세요';
     });
   },
 
   // 사진으로 들어가기: 고른 사진에서 회원 번호를 읽는다
   async fromPhoto(file) {
-    const msg = document.getElementById('lg-photo-msg');
-    msg.className = 'lg-photo-msg';
-    msg.textContent = '사진을 읽는 중…';
+    const message = document.getElementById('lg-photo-msg');
+    message.className = 'lg-photo-msg';
+    message.textContent = '사진을 읽는 중…';
     let id = null;
     try {
       id = Members.parse((await QrScanner.readImage(file)) || '');
-    } catch (e) { }
+    } catch { }
     if (this.app.state !== 'login') return;
     if (id) {
-      msg.textContent = '';
+      message.textContent = '';
       this.login(id);
     } else {
-      msg.className = 'lg-photo-msg bad';
-      msg.textContent = '이 사진에서 회원 카드를 찾지 못했어요. 저장해 둔 회원 카드 사진을 골라 주세요';
+      message.className = 'lg-photo-msg bad';
+      message.textContent = '이 사진에서 회원 카드를 찾지 못했어요. 저장해 둔 회원 카드 사진을 골라 주세요';
     }
   },
 
@@ -143,47 +143,47 @@ export const MemberUI = {
 
   // 서버에서 이 회원의 다른 태블릿 기록까지 받아 와 달력을 다시 그린다. 그동안은 이 태블릿 기록만 보인다
   async loadRemote(id) {
-    const src = document.getElementById('hs-src');
+    const sourceNote = document.getElementById('hs-src');
     delete Members.remote[id];
-    if (!Members.hasRemote()) { src.textContent = ''; return; }
+    if (!Members.hasRemote()) { sourceNote.textContent = ''; return; }
     const local = SessionUpload.settings().localHistory;
-    src.textContent = '다른 태블릿의 기록도 불러오는 중…';
+    sourceNote.textContent = '다른 태블릿의 기록도 불러오는 중…';
     try {
       const list = await Members.fetchRemote(id);
       if (this.user !== id) return;
       // 시험용 로컬 서버는 언제나 알린다. 실제 서버로 착각하지 않게
-      src.textContent = local ? `시험용: 이 태블릿의 세션 로그를 서버 대신 썼어요 (${list.length}건)`
+      sourceNote.textContent = local ? `시험용: 이 태블릿의 세션 로그를 서버 대신 썼어요 (${list.length}건)`
         : list && list.length ? '다른 태블릿의 기록까지 모두 보여 드려요' : '';
-    } catch (e) {
+    } catch {
       if (this.user !== id) return;
-      src.textContent = '지금은 서버에 연결하지 못해 이 태블릿의 기록만 보여 드려요';
+      sourceNote.textContent = '지금은 서버에 연결하지 못해 이 태블릿의 기록만 보여 드려요';
     }
     if (this.app.state === 'history') this.renderHistory();
   },
 
-  showPad(on) {
+  showPad(visible) {
     this.code = '';
-    document.getElementById('lg-pad').hidden = !on;
-    document.getElementById('lg-choices').hidden = on;
+    document.getElementById('lg-pad').hidden = !visible;
+    document.getElementById('lg-choices').hidden = visible;
     document.getElementById('lg-pad-msg').textContent = 'QR 코드 아래에 적힌 8자리 번호';
     this.renderPad();
   },
 
   renderPad() {
-    const d = (this.code + '________').slice(0, 8);
-    document.getElementById('lg-digits').innerHTML = [...d].map((c, i) => `${i === 4 ? '<em></em>' : ''}<i class="${c === '_' ? '' : 'on'}">${c === '_' ? '' : c}</i>`).join('');
+    const slots = (this.code + '________').slice(0, 8);
+    document.getElementById('lg-digits').innerHTML = [...slots].map((digit, i) => `${i === 4 ? '<em></em>' : ''}<i class="${digit === '_' ? '' : 'on'}">${digit === '_' ? '' : digit}</i>`).join('');
   },
 
   submitCode() {
     const id = this.code;
-    const msg = document.getElementById('lg-pad-msg');
-    if (id.length < 8) { msg.textContent = '8자리를 모두 눌러 주세요'; return; }
+    const message = document.getElementById('lg-pad-msg');
+    if (id.length < 8) { message.textContent = '8자리를 모두 눌러 주세요'; return; }
     if (!Members.valid(id)) {
-      msg.textContent = '번호가 맞지 않아요. 다시 확인해 주세요';
-      const el = document.getElementById('lg-digits');
-      el.classList.remove('shake');
-      void el.offsetWidth;
-      el.classList.add('shake');
+      message.textContent = '번호가 맞지 않아요. 다시 확인해 주세요';
+      const digits = document.getElementById('lg-digits');
+      digits.classList.remove('shake');
+      void digits.offsetWidth;
+      digits.classList.add('shake');
       this.code = '';
       this.renderPad();
       return;
@@ -193,100 +193,101 @@ export const MemberUI = {
 
   // ---------------- 기록 (달력) ----------------
   openHistory() {
-    const a = this.app;
+    const app = this.app;
     const now = new Date();
     this.month = new Date(now.getFullYear(), now.getMonth(), 1);
     this.renderHistory();
-    a.show('history');
-    a.state = 'history';
-    this.demo.activeAt = a.clock;
+    app.show('history');
+    app.state = 'history';
+    this.demo.activeAt = app.clock;
   },
 
   moveMonth(step) {
-    const m = new Date(this.month.getFullYear(), this.month.getMonth() + step, 1);
+    const month = new Date(this.month.getFullYear(), this.month.getMonth() + step, 1);
     const now = new Date();
-    if (m > new Date(now.getFullYear(), now.getMonth(), 1)) return;
-    if (m < new Date(now.getFullYear() - 2, now.getMonth(), 1)) return;
-    this.month = m;
+    if (month > new Date(now.getFullYear(), now.getMonth(), 1)) return;
+    if (month < new Date(now.getFullYear() - 2, now.getMonth(), 1)) return;
+    this.month = month;
     this.renderHistory();
   },
 
   renderHistory() {
     const id = this.user;
-    const hist = Members.merged(id);
-    const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const sessions = Members.merged(id);
+    const dayKey = (date) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     const byDay = {};
-    for (const h of hist) {
-      const k = dayKey(new Date(h.at));
-      byDay[k] = (byDay[k] || 0) + 1;
+    for (const session of sessions) {
+      const key = dayKey(new Date(session.at));
+      byDay[key] = (byDay[key] || 0) + 1;
     }
     const now = new Date();
-    const m = this.month;
-    document.getElementById('hs-title').textContent = hist.length ? '다시 오셨네요, 반가워요!' : '첫 트레이닝을 시작해 볼까요?';
+    const month = this.month;
+    document.getElementById('hs-title').textContent = sessions.length ? '다시 오셨네요, 반가워요!' : '첫 트레이닝을 시작해 볼까요?';
     document.getElementById('hs-id').textContent = `회원 번호 ${Members.format(id)}`;
-    document.getElementById('hs-month').textContent = `${m.getFullYear()}년 ${m.getMonth() + 1}월`;
-    const isThisMonth = m.getFullYear() === now.getFullYear() && m.getMonth() === now.getMonth();
+    document.getElementById('hs-month').textContent = `${month.getFullYear()}년 ${month.getMonth() + 1}월`;
+    const isThisMonth = month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth();
     document.getElementById('hs-next').disabled = isThisMonth;
     // 달력: 일요일부터
-    const first = new Date(m.getFullYear(), m.getMonth(), 1).getDay();
-    const days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-    let h = ['일', '월', '화', '수', '목', '금', '토'].map((w, i) => `<b class="${i === 0 ? 'sun' : ''}">${w}</b>`).join('');
-    for (let i = 0; i < first; i++) h += '<span></span>';
+    const firstWeekday = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+    const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    let calendarHtml = ['일', '월', '화', '수', '목', '금', '토'].map((weekday, i) => `<b class="${i === 0 ? 'sun' : ''}">${weekday}</b>`).join('');
+    for (let i = 0; i < firstWeekday; i++) calendarHtml += '<span></span>';
     let monthCount = 0;
-    for (let d = 1; d <= days; d++) {
-      const date = new Date(m.getFullYear(), m.getMonth(), d);
-      const n = byDay[dayKey(date)] || 0;
-      monthCount += n;
-      const cls = [n ? 'done' : '', isThisMonth && d === now.getDate() ? 'today' : '', date > now ? 'future' : ''].filter(Boolean).join(' ');
-      h += `<span class="${cls}">${d}${n > 1 ? `<small>${n}</small>` : ''}</span>`;
+    for (let day = 1; day <= days; day++) {
+      const date = new Date(month.getFullYear(), month.getMonth(), day);
+      const dayCount = byDay[dayKey(date)] || 0;
+      monthCount += dayCount;
+      const classes = [dayCount ? 'done' : '', isThisMonth && day === now.getDate() ? 'today' : '', date > now ? 'future' : ''].filter(Boolean).join(' ');
+      calendarHtml += `<span class="${classes}">${day}${dayCount > 1 ? `<small>${dayCount}</small>` : ''}</span>`;
     }
-    document.getElementById('hs-cal').innerHTML = h;
+    document.getElementById('hs-cal').innerHTML = calendarHtml;
     // 숫자 요약과 최근 기록
-    const thisMonth = hist.filter((x) => { const d = new Date(x.at); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).length;
-    const last = hist[hist.length - 1];
+    const thisMonth = sessions.filter((session) => { const date = new Date(session.at); return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth(); }).length;
+    const last = sessions[sessions.length - 1];
     const ago = last ? Math.round((new Date(now.toDateString()) - new Date(new Date(last.at).toDateString())) / 86400000) : null;
     document.getElementById('hs-stats').innerHTML = [
       ['이번 달', `${thisMonth}<small>번</small>`],
-      ['모두', `${hist.length}<small>번</small>`],
+      ['모두', `${sessions.length}<small>번</small>`],
       ['지난번', last ? (ago === 0 ? '오늘' : ago === 1 ? '어제' : `${ago}<small>일 전</small>`) : '–'],
-    ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
-    const diffLabel = (id) => (SESSION_DIFFICULTIES.find((d) => d.id === id) || {}).label || '';
-    const wd = ['일', '월', '화', '수', '목', '금', '토'];
-    document.getElementById('hs-recent').innerHTML = hist.length
-      ? hist.slice(-4).reverse().map((x) => {
-        const d = new Date(x.at);
-        return `<li><span>${d.getMonth() + 1}월 ${d.getDate()}일 (${wd[d.getDay()]})</span><span>${x.min ?? '–'}분 ·${diffLabel(x.difficulty)}${x.track === 'brain' ? ' · 두뇌만' : ''}</span><b>${(x.score || 0).toLocaleString('ko-KR')}점</b></li>`;
+    ].map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('');
+    const difficultyLabel = (difficultyId) => (SESSION_DIFFICULTIES.find((difficulty) => difficulty.id === difficultyId) || {}).label || '';
+    const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    document.getElementById('hs-recent').innerHTML = sessions.length
+      ? sessions.slice(-4).reverse().map((session) => {
+        const date = new Date(session.at);
+        return `<li><span>${date.getMonth() + 1}월 ${date.getDate()}일 (${weekdayNames[date.getDay()]})</span><span>${session.min ?? '–'}분 ·${difficultyLabel(session.difficulty)}${session.track === 'brain' ? ' · 두뇌만' : ''}</span><b>${(session.score || 0).toLocaleString('ko-KR')}점</b></li>`;
       }).join('')
       : `<li class="empty">${Members.hasRemote() ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
     // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'
-    const ro = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c >= 0 && c < 11172 && c % 28 && c % 28 !== 8 ? '으로' : '로'; };
+    const roParticle = (word) => { const syllable = word.charCodeAt(word.length - 1) - 0xac00; return syllable >= 0 && syllable < 11172 && syllable % 28 && syllable % 28 !== 8 ? '으로' : '로'; };
     const next = Members.nextSetup(last);
-    const dl = next ? diffLabel(next.difficulty) : '';
-    const tail = `${next && next.track === 'brain' ? ' · 두뇌 게임만' : ''}${next ? ro(next.track === 'brain' ? '만' : dl) : ''} 골라 둘게요`;
-    const sum = !next ? '다음 화면에서 시간과 난이도를 골라요'
-      : next.shift === 'up' ? `지난번에 아주 잘하셔서 난이도를 올려 ${next.min}분 · ${dl}${tail}`
-      : next.shift === 'down' ? `이번엔 조금 편하게 ${next.min}분 · ${dl}${tail}`
-      : `지난번처럼 ${next.min}분 · ${dl}${tail}`;
-    document.getElementById('hs-sum').textContent = sum;
+    const nextDifficulty = next ? difficultyLabel(next.difficulty) : '';
+    const tail = `${next && next.track === 'brain' ? ' · 두뇌 게임만' : ''}${next ? roParticle(next.track === 'brain' ? '만' : nextDifficulty) : ''} 골라 둘게요`;
+    const summary = !next ? '다음 화면에서 시간과 난이도를 골라요'
+      : next.shift === 'up' ? `지난번에 아주 잘하셔서 난이도를 올려 ${next.min}분 · ${nextDifficulty}${tail}`
+      : next.shift === 'down' ? `이번엔 조금 편하게 ${next.min}분 · ${nextDifficulty}${tail}`
+      : `지난번처럼 ${next.min}분 · ${nextDifficulty}${tail}`;
+    document.getElementById('hs-sum').textContent = summary;
     void monthCount;
   },
 
   // ---------------- 매 프레임 ----------------
-  tick(a, entered) {
-    if (a.state !== 'login') QrScanner.stop();
-    if (a.state === 'attract' && entered) {
+  tick(app, entered) {
+    if (app.state !== 'login') QrScanner.stop();
+    if (app.state === 'attract' && entered) {
       this.user = null;
       this.guest = false;
     }
-    if ((a.state === 'login' || a.state === 'history') && (a.clock - this.demo.activeAt) / 1000 > this.IDLE_SEC) a.show('attract');
+    if ((app.state === 'login' || app.state === 'history') && (app.clock - this.demo.activeAt) / 1000 > this.IDLE_SEC) app.show('attract');
   },
 
   // 풍경에 세울 지난 세션들 (js/band.js setLandmarks). 기념물 종류는 난이도, 크기는 시간으로 정한다. 손님은 없다
   landmarks() {
     if (!this.user) return [];
-    return Members.merged(this.user).map((x) => ({
-      score: x.score || 0, at: x.at, difficulty: x.difficulty, min: x.min, look: x.look || null,
-      key: x.sid ? `${x.device || ''}:${x.sid}` : x.at,
+    return Members.merged(this.user).map((session) => ({
+      // eslint-disable-next-line id-length -- 기록 항목 형식 (js/band.js 가 읽는다)
+      score: session.score || 0, at: session.at, difficulty: session.difficulty, min: session.min, look: session.look || null,
+      key: session.sid ? `${session.device || ''}:${session.sid}` : session.at,
     }));
   },
 
@@ -303,36 +304,37 @@ export const MemberUI = {
 
   // ---------------- 결과 화면 ----------------
   // 손님이면 새 번호를 만들어 오늘 기록을 그 번호로 저장하고 QR 카드를 보여 준다. 회원이면 기록에 더한다
-  onResult(a, sim) {
+  onResult(app, simulated) {
     const box = document.getElementById('dr-member');
     if (!box) return;
     // 새 회원 카드를 보여 줄 때만 결과 화면의 첫 칸을 넓힌다 (app/app.css .with-card)
     const screen = document.getElementById('demo-result');
     screen.classList.remove('with-card');
-    if (sim) {
+    if (simulated) {
       box.innerHTML = '<p class="dm-note">가상 결과라 기록하지 않아요</p>';
       return;
     }
     const fresh = !this.user;
     if (fresh) this.user = Members.newId();
     const id = this.user;
-    if (a.log) {
-      a.log.meta.user = id;
-      a.log.meta.userNew = fresh;
+    if (app.log) {
+      app.log.meta.user = id;
+      app.log.meta.userNew = fresh;
     }
-    const games = (a.roundStats && a.roundStats.games) || {}; // 게임별 성적 (js/round-stats.js)
-    const lv = Math.max(0, ...Object.values(games).map((s) => s.level || 0));
-    const s = a.log && a.log.meta.session;
+    const games = (app.roundStats && app.roundStats.games) || {}; // 게임별 성적 (js/round-stats.js)
+    const topLevel = Math.max(0, ...Object.values(games).map((game) => game.level || 0));
+    const session = app.log && app.log.meta.session;
     Members.record(id, {
-      at: new Date().toISOString(), min: s ? s.min : Math.round(a.cfg.durationSec / 60), difficulty: s ? s.difficulty : 'normal',
-      track: a.brainOnly ? 'brain' : 'dual', // 두뇌 게임만 한 판인가 (페달 + 두뇌 게임이면 dual)
-      score: a.score, distM: Math.round(a.meter.distM), kcal: Math.round(a.meter.kcal * 10) / 10, level: lv,
-      gameAcc: (() => { const acc = Stars.gameAcc(games); return acc == null ? null : Math.round(acc * 100) / 100; })(),
-      ended: a.log ? a.log.meta.ended : null,
+      // eslint-disable-next-line id-length -- localStorage 에 저장하는 기록 항목 형식
+      at: new Date().toISOString(), min: session ? session.min : Math.round(app.config.durationSec / 60), difficulty: session ? session.difficulty : 'normal',
+      track: app.brainOnly ? 'brain' : 'dual', // 두뇌 게임만 한 판인가 (페달 + 두뇌 게임이면 dual)
+      score: app.score, distM: Math.round(app.meter.distM), kcal: Math.round(app.meter.kcal * 10) / 10, level: topLevel,
+      gameAcc: (() => { const accuracy = Stars.gameAccuracy(games); return accuracy == null ? null : Math.round(accuracy * 100) / 100; })(),
+      ended: app.log ? app.log.meta.ended : null,
       // 서버 기록과 겹치는지 가리는 열쇠 (세션 로그의 meta.device + meta.id)
-      device: a.log ? a.log.meta.device : null, sid: a.log ? a.log.meta.id : null,
+      device: app.log ? app.log.meta.device : null, sid: app.log ? app.log.meta.id : null,
       // 풍경에 세운 기념물의 생김새 (js/landmarks.js Landmarks.look). 다음 라운드부터 이대로 그린다
-      look: (a.log && a.log.meta.landmark) || null,
+      look: (app.log && app.log.meta.landmark) || null,
     });
     document.getElementById('dr-id').textContent = `회원 ${Members.format(id)}`;
     if (fresh && onPhone()) {
@@ -349,17 +351,17 @@ export const MemberUI = {
           <p class="dm-save-msg" aria-live="polite"></p>
           <p class="dm-id">다음에는 '회원 카드가 있으신가요?' 화면에서 <strong>사진으로 들어가기</strong>를 누르고 저장한 카드를 고르세요. 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
         </div>`;
-      const btn = box.querySelector('.dm-save');
-      const msg = box.querySelector('.dm-save-msg');
-      let blob = null;
-      drawCard(id).then((b) => {
-        blob = b;
-        btn.disabled = false;
+      const saveButton = box.querySelector('.dm-save');
+      const saveMessage = box.querySelector('.dm-save-msg');
+      let cardBlob = null;
+      drawCard(id).then((blob) => {
+        cardBlob = blob;
+        saveButton.disabled = false;
       });
-      btn.onclick = async () => {
-        if (!blob) return;
-        const m = await saveCard(blob, id);
-        if (m) msg.textContent = m;
+      saveButton.onclick = async () => {
+        if (!cardBlob) return;
+        const notice = await saveCard(cardBlob, id);
+        if (notice) saveMessage.textContent = notice;
       };
     } else if (fresh) {
       screen.classList.add('with-card');
@@ -379,8 +381,8 @@ export const MemberUI = {
           <p class="dm-id">다음에 오시면 저장한 사진을 태블릿 카메라에 보여 주세요. 안 되면 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
         </div>`;
     } else {
-      const n = Members.merged(id).length;
-      box.innerHTML = `<p class="dm-saved"><b>${n}번째 트레이닝</b>을 기록했어요<br><span>회원 ${Members.format(id)}</span></p>`;
+      const recordCount = Members.merged(id).length;
+      box.innerHTML = `<p class="dm-saved"><b>${recordCount}번째 트레이닝</b>을 기록했어요<br><span>회원 ${Members.format(id)}</span></p>`;
     }
   },
 };

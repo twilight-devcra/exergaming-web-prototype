@@ -4,7 +4,7 @@
 //  - 센서 파형(lz): 페달 원시 파형에서 직접 구한 케이던스 (js/cadence-est.js). 켜져 있고 파형이 들어오는 동안은
 //    avg_rpm 보다 우선한다. 페달 검출기는 느리게 밟으면 회전을 놓치는데(DIR_FLIP), 파형은 그 구간에도 맞는 값을 낸다.
 //    파형이 LZ_STALE_MS 넘게 끊기면 avg_rpm 으로 돌아간다 (구 펌웨어, 유실 등).
-import { U } from './config.js';
+import { Util } from './config.js';
 
 export class Pedal {
   constructor() {
@@ -42,9 +42,9 @@ export class Pedal {
     if (this.onStroke) this.onStroke(key);
   }
 
-  setSensor(on) {
-    if (on === this.sensorOn) return;
-    this.sensorOn = on;
+  setSensor(connected) {
+    if (connected === this.sensorOn) return;
+    this.sensorOn = connected;
     this.sensorSeen = false;
     this.sensorRpm = 0;
     this.sensorAt = performance.now();
@@ -83,29 +83,29 @@ export class Pedal {
       // (재)연결 직후 첫 프레임이 오기 전까지는 직전 값을 유지해서 공이 튀지 않게 한다
       return this.sensorSeen ? this.sensorRpm : this.smoothed;
     }
-    const ts = this.times;
-    if (ts.length < 2) return 0;
-    const since = now - ts[ts.length - 1];
+    const strokeTimes = this.times;
+    if (strokeTimes.length < 2) return 0;
+    const since = now - strokeTimes[strokeTimes.length - 1];
     if (since > 2500) return 0;
     const intervals = [];
-    for (let i = ts.length - 1; i > 0 && intervals.length < 4; i--) {
-      if (now - ts[i - 1] > 3000) break;
-      intervals.push(ts[i] - ts[i - 1]);
+    for (let i = strokeTimes.length - 1; i > 0 && intervals.length < 4; i--) {
+      if (now - strokeTimes[i - 1] > 3000) break;
+      intervals.push(strokeTimes[i] - strokeTimes[i - 1]);
     }
     if (!intervals.length) return 0;
-    const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const averageMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     // 입력이 끊기면 마지막 간격보다 길어진 만큼 서서히 느려진다
-    const halfRevMs = Math.max(avg, since);
+    const halfRevMs = Math.max(averageMs, since);
     return 60000 / (halfRevMs * 2);
   }
 
-  update(dt) {
+  update(deltaSeconds) {
     const raw = this.rawRpm();
     // avg_rpm 은 1초에 한 번 계단처럼 바뀌므로 조금 더 길게 이어 붙인다.
     // 파형 추정은 이미 한 바퀴 평균이라 짧게만 다듬는다 (반 바퀴마다 바뀌는 계단만 부드럽게)
     const tau = this.lzLive ? 0.25 : this.sensorOn ? 0.5 : 0.25;
-    const k = 1 - Math.exp(-dt / tau);
-    this.smoothed = U.lerp(this.smoothed, raw, k);
+    const blend = 1 - Math.exp(-deltaSeconds / tau);
+    this.smoothed = Util.lerp(this.smoothed, raw, blend);
     return this.smoothed;
   }
 }

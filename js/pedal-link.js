@@ -3,8 +3,8 @@
 // 인자가 없는 명령도 `,0:`은 있어야 한다 (`VER,0:;`). 펌웨어 파서가 ','와 ':'를 모두 요구한다.
 export const NUS = {
   SERVICE: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-  RX: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // 웹 → 페달 (write)
-  TX: '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // 페달 → 웹 (notify)
+  RX_CHARACTERISTIC: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // 웹 → 페달 (write)
+  TX_CHARACTERISTIC: '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // 페달 → 웹 (notify)
   NAME_PREFIX: 'Cardio-P',                    // 광고 이름은 "Cardio-P 3A7F" 형태
   command: (name, values = []) => `${name},${values.length}:${values.join(',')};`,
 };
@@ -18,15 +18,15 @@ export const FrameCodec = {
     const data = text.slice(colon + 1).trim().replace(/;+$/, '');
     return {
       name: text.slice(0, comma).trim(),
-      values: data.split(',').map((v) => v.trim()).filter((v) => v !== ''),
+      values: data.split(',').map((value) => value.trim()).filter((value) => value !== ''),
     };
   },
 
   // `WORKOUT,3:avg_rpm,watt,rev_count;` — 연결되어 있는 동안 페달이 약 1초마다 보낸다
-  workout(f) {
-    if (f.name !== 'WORKOUT' || f.values.length !== 3) return null;
-    if (!f.values.every((v) => /^-?\d+$/.test(v))) return null;
-    const [rpm, watt, revCount] = f.values.map(Number);
+  workout(frame) {
+    if (frame.name !== 'WORKOUT' || frame.values.length !== 3) return null;
+    if (!frame.values.every((value) => /^-?\d+$/.test(value))) return null;
+    const [rpm, watt, revCount] = frame.values.map(Number);
     return { rpm, watt, revCount };
   },
 };
@@ -35,25 +35,25 @@ export const FrameCodec = {
 class FrameSplitter {
   constructor(maxBuffer = 2048) {
     this.maxBuffer = maxBuffer;
-    this.buf = '';
+    this.buffer = '';
   }
 
   feed(chunk) {
-    this.buf += chunk;
+    this.buffer += chunk;
     const out = [];
     let end;
-    while ((end = this.buf.indexOf(';')) >= 0) {
-      const frame = this.buf.slice(0, end).trim();
-      this.buf = this.buf.slice(end + 1);
+    while ((end = this.buffer.indexOf(';')) >= 0) {
+      const frame = this.buffer.slice(0, end).trim();
+      this.buffer = this.buffer.slice(end + 1);
       if (frame) out.push(frame);
     }
     // ';'가 유실되어도 버퍼가 끝없이 커지지 않게 한다
-    if (this.buf.length > this.maxBuffer) this.buf = '';
+    if (this.buffer.length > this.maxBuffer) this.buffer = '';
     return out;
   }
 
   reset() {
-    this.buf = '';
+    this.buffer = '';
   }
 }
 
@@ -70,16 +70,16 @@ export class PedalLink {
     this.onWorkout = null; // ({ rpm, watt, revCount })
     this.onRaw = null;     // (text) 알림 하나를 디코딩한 그대로. 디버그 페이지용
     this.onFrame = null;   // (raw, frame|null) ';'로 자른 프레임 하나와 파싱 결과. 디버그 페이지용
-    this.rx = null;
+    this.rxCharacteristic = null;
     this.splitter = new FrameSplitter();
     this.decoder = new TextDecoder();
     this.epoch = 0;        // 바뀌면 진행 중이던 이전 연결 시도의 결과는 무시된다
     this.retries = 0;
     this.retryTimer = null;
     this.connectedAt = 0;
-    this.txChain = Promise.resolve();
+    this.writeChain = Promise.resolve();
     this.handleGone = () => this.lost('페달과의 연결이 끊어졌습니다');
-    this.handleNotify = (e) => this.notify(e.target.value);
+    this.handleNotify = (event) => this.notify(event.target.value);
   }
 
   get supported() {
@@ -98,9 +98,9 @@ export class PedalLink {
         filters: [{ namePrefix: NUS.NAME_PREFIX }],
         optionalServices: [NUS.SERVICE],
       });
-    } catch (e) {
+    } catch (error) {
       // 선택 창을 그냥 닫은 경우(NotFoundError)는 오류가 아니다
-      if (e.name !== 'NotFoundError') this.setState(this.state, `페달을 찾지 못했습니다: ${e.message}`);
+      if (error.name !== 'NotFoundError') this.setState(this.state, `페달을 찾지 못했습니다: ${error.message}`);
       return;
     }
     this.release();
@@ -118,27 +118,27 @@ export class PedalLink {
     try {
       const server = await device.gatt.connect();
       this.connectedAt = performance.now();
-      const svc = await server.getPrimaryService(NUS.SERVICE);
-      const tx = await svc.getCharacteristic(NUS.TX);
-      const rx = await svc.getCharacteristic(NUS.RX);
-      tx.addEventListener('characteristicvaluechanged', this.handleNotify);
-      await tx.startNotifications();
+      const service = await server.getPrimaryService(NUS.SERVICE);
+      const txCharacteristic = await service.getCharacteristic(NUS.TX_CHARACTERISTIC);
+      const rxCharacteristic = await service.getCharacteristic(NUS.RX_CHARACTERISTIC);
+      txCharacteristic.addEventListener('characteristicvaluechanged', this.handleNotify);
+      await txCharacteristic.startNotifications();
       if (epoch !== this.epoch) return;
-      this.rx = rx;
+      this.rxCharacteristic = rxCharacteristic;
       this.splitter.reset();
       this.setState('ready', `${device.name || '페달'} 연결됨`);
       this.send(NUS.command('VER')).catch(() => {});
-    } catch (e) {
+    } catch (error) {
       if (epoch !== this.epoch) return;
       if (device.gatt.connected) device.gatt.disconnect();
-      this.lost(`연결 실패: ${e.message}`);
+      this.lost(`연결 실패: ${error.message}`);
     }
   }
 
   // 연결이 끊겼거나 연결 시도가 실패했을 때. 사용자가 끊은 게 아니면 몇 번 다시 시도한다.
-  lost(msg) {
+  lost(message) {
     if (this.retryTimer) return;
-    this.rx = null;
+    this.rxCharacteristic = null;
     const lived = this.connectedAt ? performance.now() - this.connectedAt : -1;
     this.connectedAt = 0;
     if (!this.wantLink) {
@@ -152,11 +152,11 @@ export class PedalLink {
       // 페달은 연결 직후 보안(페어링)을 요청하고, 실패하면 몇 초 안에 연결을 끊는다.
       // 한쪽에만 페어링 키가 남아 있을 때 이렇게 반복된다.
       const hint = lived >= 0 ? ' 연결 직후 계속 끊긴다면 OS 블루투스 설정에서 페달을 제거한 뒤 다시 연결해 보세요.' : '';
-      this.setState('disconnected', msg + hint);
+      this.setState('disconnected', message + hint);
       return;
     }
     this.retries++;
-    this.setState('reconnecting', `${msg} · 다시 연결 중… (${this.retries}/${PedalLink.MAX_RETRIES})`);
+    this.setState('reconnecting', `${message} · 다시 연결 중… (${this.retries}/${PedalLink.MAX_RETRIES})`);
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       this.open();
@@ -174,22 +174,22 @@ export class PedalLink {
     this.epoch++;
     clearTimeout(this.retryTimer);
     this.retryTimer = null;
-    this.rx = null;
+    this.rxCharacteristic = null;
     this.connectedAt = 0;
-    const d = this.device;
-    if (!d) return;
-    d.removeEventListener('gattserverdisconnected', this.handleGone);
-    if (d.gatt.connected) d.gatt.disconnect();
+    const device = this.device;
+    if (!device) return;
+    device.removeEventListener('gattserverdisconnected', this.handleGone);
+    if (device.gatt.connected) device.gatt.disconnect();
   }
 
   // 쓰기는 하나씩 차례로 보낸다. Web Bluetooth 는 GATT 쓰기가 겹치면 예외를 던진다.
   send(text) {
-    const rx = this.rx;
-    if (!rx) return Promise.reject(new Error('not connected'));
-    const run = () => rx.writeValueWithResponse(new TextEncoder().encode(text));
-    const p = this.txChain.then(run, run);
-    this.txChain = p.catch(() => {});
-    return p;
+    const rxCharacteristic = this.rxCharacteristic;
+    if (!rxCharacteristic) return Promise.reject(new Error('not connected'));
+    const run = () => rxCharacteristic.writeValueWithResponse(new TextEncoder().encode(text));
+    const sent = this.writeChain.then(run, run);
+    this.writeChain = sent.catch(() => {});
+    return sent;
   }
 
   notify(value) {
@@ -197,14 +197,14 @@ export class PedalLink {
     const text = this.decoder.decode(value);
     if (this.onRaw) this.onRaw(text);
     for (const raw of this.splitter.feed(text)) {
-      const f = FrameCodec.parse(raw);
-      if (this.onFrame) this.onFrame(raw, f);
-      if (!f) continue;
-      if (f.name === 'VER') {
-        this.firmware = f.values.join(' ');
-      } else if (f.name === 'WORKOUT') {
-        const w = FrameCodec.workout(f);
-        if (w && this.onWorkout) this.onWorkout(w);
+      const frame = FrameCodec.parse(raw);
+      if (this.onFrame) this.onFrame(raw, frame);
+      if (!frame) continue;
+      if (frame.name === 'VER') {
+        this.firmware = frame.values.join(' ');
+      } else if (frame.name === 'WORKOUT') {
+        const workout = FrameCodec.workout(frame);
+        if (workout && this.onWorkout) this.onWorkout(workout);
       }
     }
   }

@@ -18,7 +18,7 @@
 
 | 변수 | 설명 |
 |---|---|
-| `n` | 점 n×n |
+| `grid` | 점 grid×grid |
 | `lines` | 선 수 |
 | `changes` | 고를 수 있는 다름. 속 빈 선과 style 은 Lv5 부터 |
 | `hollow` | 선 하나가 속 빈 선일 확률 (0 이면 모두 꽉 찬 선) |
@@ -27,7 +27,7 @@
 
 ## 레벨별 값
 
-| Lv | `n` | `lines` | `changes` | `hollow` | `crowd` | `edge` | 메모 |
+| Lv | `grid` | `lines` | `changes` | `hollow` | `crowd` | `edge` | 메모 |
 |---|---|---|---|---|---|---|---|
 | 1 (쉬움) | 3 | 4 | add, remove | 0 | 0 | 0 | 쉬운 단계: 선이 적고, 선이 생기거나 없어지기만 한다 |
 | 2 (쉬움) | 3 | 5 | add, remove | 0 | 0 | 0 |  |

@@ -7,14 +7,14 @@
 //   - 쉬운 단계(slanted)의 첫 문제는 일부러 비스듬한 줄에 숨긴다.
 // 난이도:
 //   radius  — 판 반지름. 칸 수는 1 → 7칸, 2 → 19칸, 3 → 37칸, 4 → 61칸
-//   len     — 찾을 그림 순서의 길이
-//   symbols — 판에 쓰는 그림 가짓수. 칸마다 이 가운데서 무작위로 고른다
+//   sequenceLength — 찾을 그림 순서의 길이
+//   symbolCount — 판에 쓰는 그림 가짓수. 칸마다 이 가운데서 무작위로 고른다
 //   decoys  — 한 칸만 다른 가짜 줄의 수
 //   slanted — 첫 문제를 비스듬한 줄에 숨긴다 (쉬운 단계)
-// 육각 칸은 축 좌표 (q, r) 로 적는다 — 육각 격자에서 널리 쓰는 이름이라 그대로 둔다
-/* eslint id-length: ["warn", { "min": 2, "exceptionPatterns": ["^[ijkxyntab_qr]$", "^[WHSR]$"], "properties": "never" }] */
-import { U } from '../config.js';
-import { Dg } from '../diagram.js';
+// 육각 칸은 축 좌표 (column, row) 로 적는다. 흔히 (q, r) 라 쓰는 것으로, row 는 가로줄 번호이고
+// column 은 줄마다 반 칸씩 비껴 가는 세로 방향 번호다 (center 참고)
+import { Util } from '../config.js';
+import { Diagram } from '../diagram.js';
 import { Sfx } from '../sfx.js';
 import { Tag } from './tags.js';
 import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
@@ -38,45 +38,45 @@ export class SeekGame {
   // slanted — 첫 문제를 비스듬한 줄에 숨긴다. 처음 하는 사람이 나올 법한 단계(Lv1~3)에 둔다
   static levels = [
     // 쉬운 단계: 판이 작고(Lv1 은 7칸에 두 개짜리 순서), 그림 종류가 많아 찾는 순서가 눈에 잘 띈다
-    { radius: 1, len: 2, symbols: 4, decoys: 0, slanted: true },
-    { radius: 2, len: 3, symbols: 5, decoys: 0, slanted: true },
-    { radius: 2, len: 3, symbols: 4, decoys: 0, slanted: true },
-    { radius: 2, len: 3, symbols: 4, decoys: 1 },
-    { radius: 3, len: 3, symbols: 5, decoys: 2 },
-    { radius: 3, len: 4, symbols: 5, decoys: 2 },
-    { radius: 4, len: 4, symbols: 5, decoys: 3 },
-    { radius: 4, len: 5, symbols: 6, decoys: 4 },
+    { radius: 1, sequenceLength: 2, symbolCount: 4, decoys: 0, slanted: true },
+    { radius: 2, sequenceLength: 3, symbolCount: 5, decoys: 0, slanted: true },
+    { radius: 2, sequenceLength: 3, symbolCount: 4, decoys: 0, slanted: true },
+    { radius: 2, sequenceLength: 3, symbolCount: 4, decoys: 1 },
+    { radius: 3, sequenceLength: 3, symbolCount: 5, decoys: 2 },
+    { radius: 3, sequenceLength: 4, symbolCount: 5, decoys: 2 },
+    { radius: 4, sequenceLength: 4, symbolCount: 5, decoys: 3 },
+    { radius: 4, sequenceLength: 5, symbolCount: 6, decoys: 4 },
   ];
   static maxLevel = SeekGame.levels.length;
   static ROUNDS = 3;
-  static DIRS = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]]; // 축 좌표 (q, r)의 여섯 방향
+  static DIRECTIONS = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]]; // 축 좌표 (column, row)의 여섯 방향
   static UNIT = 50; // SVG 안에서 육각형 한 칸의 반지름
 
   // 소개 그림: ① 이 순서를 ② 판에서 한 줄로 찾아 누른다 (어느 방향이든 된다 — 일부러 비스듬한 줄로 보여 준다)
   static diagram() {
-    const vb = '-130 -125 260 250';
+    const viewBox = '-130 -125 260 250';
     // 찾을 순서는 판에서처럼 비스듬히 늘어놓는다 (가로로만 찾는 게 아니라는 것도 함께 보인다)
     const bead = (x, y, symbol) => `<polygon class="dg-cell" points="${SeekGame.hexPoints(x, y, 54)}"/>` +
       `<g transform="translate(${x - 34} ${y - 34}) scale(0.68)">${SEEK_SYMBOLS[symbol]}</g>`;
     const chain = '<line class="dg-chain" x1="-72" y1="-66" x2="72" y2="66"/>' +
       [[-72, -66, 0], [0, 0, 1], [72, 66, 2]].map(([x, y, symbol]) => bead(x, y, symbol)).join('');
-    // [q, r, 그림]. q = 0 인 세 칸이 정답 줄이다
+    // [column, row, 그림]. column = 0 인 세 칸이 정답 줄이다
     const cells = [[-1, 0, 4], [-1, 1, 0], [0, -1, 0], [0, 0, 1], [0, 1, 2], [1, -1, 3], [1, 0, 5]];
     const unit = SeekGame.UNIT;
-    let board = cells.map(([q, r]) => {
-      const [x, y] = SeekGame.center(q, r);
-      return `<polygon class="${q === 0 ? 'dg-soft' : 'dg-cell'}" points="${SeekGame.hexPoints(x, y, unit * 0.93)}"/>`;
+    let board = cells.map(([column, row]) => {
+      const [x, y] = SeekGame.center(column, row);
+      return `<polygon class="${column === 0 ? 'dg-soft' : 'dg-cell'}" points="${SeekGame.hexPoints(x, y, unit * 0.93)}"/>`;
     }).join('');
-    const [x1, y1] = SeekGame.center(0, -1);
-    const [x2, y2] = SeekGame.center(0, 1);
-    board += `<line class="dg-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
-    board += cells.map(([q, r, symbol]) => {
-      const [x, y] = SeekGame.center(q, r);
+    const [startX, startY] = SeekGame.center(0, -1);
+    const [endX, endY] = SeekGame.center(0, 1);
+    board += `<line class="dg-line" x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}"/>`;
+    board += cells.map(([column, row, symbol]) => {
+      const [x, y] = SeekGame.center(column, row);
       return `<g transform="translate(${x - 31} ${y - 31}) scale(0.62)">${SEEK_SYMBOLS[symbol]}</g>`;
     }).join('');
     return [
-      { svg: Dg.svg(vb, chain), caption: '이 순서가' },
-      { svg: Dg.svg(vb, board + Dg.tap(0, 0, 36)), caption: '한 줄로 놓인 곳 누르기' },
+      { svg: Diagram.svg(viewBox, chain), caption: '이 순서가' },
+      { svg: Diagram.svg(viewBox, board + Diagram.tap(0, 0, 36)), caption: '한 줄로 놓인 곳 누르기' },
     ];
   }
 
@@ -92,13 +92,13 @@ export class SeekGame {
 
   start() {
     const { stage, level } = this.host;
-    this.message = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${SeekGame.title} · Lv.${level}`, this.message, SeekGame.ROUNDS);
+    this.message = Util.element('div', 'stage-msg', '');
+    const { body, dots } = Util.frame(stage, `${SeekGame.title} · Lv.${level}`, this.message, SeekGame.ROUNDS);
     this.body = body;
     this.progress = dots;
-    this.wrap = U.el('div', 'seek-wrap');
-    const side = U.el('div', 'seek-side');
-    this.target = U.el('div', 'seek-target');
+    this.wrap = Util.element('div', 'seek-wrap');
+    const side = Util.element('div', 'seek-side');
+    this.target = Util.element('div', 'seek-target');
     side.append(this.target);
     this.board = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.board.setAttribute('class', 'seek-board');
@@ -114,23 +114,23 @@ export class SeekGame {
   }
 
   next() {
-    const { radius, len } = this.spec;
+    const { radius, sequenceLength } = this.spec;
     // 설명을 대신하는 첫 문제: 가로줄이 아닌 곳에 숨겨 '가로만 보면 안 된다'를 바로 겪게 한다
     const slanted = !!this.spec.slanted && this.round === 0;
     this.puzzle = SeekGame.make(this.spec, slanted);
-    const { cells, syms, seq } = this.puzzle;
-    const glyphs = U.shuffle([...SEEK_SYMBOLS]);
+    const { cells, cellSymbols, sequence } = this.puzzle;
+    const glyphs = Util.shuffle([...SEEK_SYMBOLS]);
 
-    U.say(this.message, `${this.isStacked() ? '위' : '왼쪽'} 순서가 놓인 줄을 누르세요`, 'act');
+    Util.say(this.message, `${this.isStacked() ? '위' : '왼쪽'} 순서가 놓인 줄을 누르세요`, 'act');
     Progress.current(this.progress, this.round);
 
     // 찾을 순서: 천천히 도는 사슬. 그림은 판에서와 같은 방향으로 서 있도록 반대로 돌린다.
     const turn = `${-Math.random() * 30}s`; // 문제마다 다른 각도에서 시작
     this.target.innerHTML = '';
-    const chain = U.el('div', 'seek-chain');
+    const chain = Util.element('div', 'seek-chain');
     chain.style.animationDelay = turn;
-    seq.forEach((symbol) => {
-      const bead = U.el('div', 'seek-bead',
+    sequence.forEach((symbol) => {
+      const bead = Util.element('div', 'seek-bead',
         `<svg viewBox="0 0 100 100"><polygon class="hexbg" points="${SeekGame.hexPoints(50, 50, 48)}"/>` +
         `<g transform="translate(19 19) scale(0.62)">${glyphs[symbol]}</g></svg>`);
       bead.style.animationDelay = turn;
@@ -141,20 +141,20 @@ export class SeekGame {
     // 판
     const unit = SeekGame.UNIT;
     const width = Math.sqrt(3) * unit * (2 * radius + 1);
-    const hgt = unit * (3 * radius + 2);
-    this.board.setAttribute('viewBox', `${-width / 2} ${-hgt / 2} ${width} ${hgt}`);
-    this.aspect = width / hgt;
-    this.board.innerHTML = cells.map(([q, r], i) => {
-      const [x, y] = SeekGame.center(q, r);
+    const height = unit * (3 * radius + 2);
+    this.board.setAttribute('viewBox', `${-width / 2} ${-height / 2} ${width} ${height}`);
+    this.aspect = width / height;
+    this.board.innerHTML = cells.map(([column, row], i) => {
+      const [x, y] = SeekGame.center(column, row);
       return `<g class="hcell clickable" data-i="${i}"><polygon points="${SeekGame.hexPoints(x, y, unit * 0.93)}"/>` +
-        `<g transform="translate(${x - 31} ${y - 31}) scale(0.62)">${glyphs[syms[i]]}</g></g>`;
+        `<g transform="translate(${x - 31} ${y - 31}) scale(0.62)">${glyphs[cellSymbols[i]]}</g></g>`;
     }).join('');
-    this.cellEls = [...this.board.querySelectorAll('.hcell')];
+    this.cellGroups = [...this.board.querySelectorAll('.hcell')];
 
-    this.wrap.style.setProperty('--len', len);
+    this.wrap.style.setProperty('--len', sequenceLength);
     this.layout();
     this.phase = Phase.INPUT;
-    this.host.question({ radius, len, cells, syms, seq, answer: this.puzzle.answer });
+    this.host.question({ radius, len: sequenceLength, cells, syms: cellSymbols, seq: sequence, answer: this.puzzle.answer });
     this.host.timer(cells.length, () => this.pick(-1));
   }
 
@@ -165,17 +165,17 @@ export class SeekGame {
 
   layout() {
     const body = this.body;
-    const { len } = this.spec;
+    const { sequenceLength } = this.spec;
     // 머리 아래 남은 자리에 판을 맞춘다. 사슬 옆(좁으면 위)에는 사슬이 한 바퀴 돌 자리가 필요하다.
     const stack = this.isStacked();
     this.wrap.classList.toggle('stack', stack);
-    const bead = U.clamp(body.clientWidth / 24, stack ? 22 : 30, 50);
-    const side = len * bead + (len - 1) * 6 + 28;
-    const availH = body.clientHeight - 30 - (stack ? side + 16 : 0);
-    const availW = body.clientWidth - (stack ? 24 : side + 48);
-    const hgt = U.clamp(Math.min(availH, availW / this.aspect), 140, 620);
-    this.board.style.height = `${hgt}px`;
-    this.board.style.width = `${hgt * this.aspect}px`;
+    const bead = Util.clamp(body.clientWidth / 24, stack ? 22 : 30, 50);
+    const side = sequenceLength * bead + (sequenceLength - 1) * 6 + 28;
+    const availableHeight = body.clientHeight - 30 - (stack ? side + 16 : 0);
+    const availableWidth = body.clientWidth - (stack ? 24 : side + 48);
+    const boardHeight = Util.clamp(Math.min(availableHeight, availableWidth / this.aspect), 140, 620);
+    this.board.style.height = `${boardHeight}px`;
+    this.board.style.width = `${boardHeight * this.aspect}px`;
     this.wrap.style.setProperty('--bead', `${bead}px`);
     this.wrap.style.setProperty('--side', `${side}px`);
   }
@@ -189,35 +189,35 @@ export class SeekGame {
     const ok = answer.includes(i);
     this.host.answer({ cell: i >= 0 ? i : null, correct: ok, timedOut: i < 0 });
 
-    this.cellEls.forEach((cell, j) => {
+    this.cellGroups.forEach((cell, j) => {
       cell.classList.remove('clickable');
       if (answer.includes(j)) cell.classList.add(ok ? 'right' : 'reveal');
       else cell.classList.add('dim');
     });
     if (!ok && i >= 0) {
-      this.cellEls[i].classList.remove('dim');
-      this.cellEls[i].classList.add('wrong');
+      this.cellGroups[i].classList.remove('dim');
+      this.cellGroups[i].classList.add('wrong');
     }
     // 정답 줄을 한 획으로 그어 '일직선'이라는 규칙을 매번 다시 보여준다
-    const [x1, y1] = SeekGame.center(...this.puzzle.cells[answer[0]]);
-    const [x2, y2] = SeekGame.center(...this.puzzle.cells[answer[answer.length - 1]]);
+    const [startX, startY] = SeekGame.center(...this.puzzle.cells[answer[0]]);
+    const [endX, endY] = SeekGame.center(...this.puzzle.cells[answer[answer.length - 1]]);
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('class', `seek-stroke ${ok ? 'right' : 'reveal'}`);
-    line.setAttribute('x1', x1);
-    line.setAttribute('y1', y1);
-    line.setAttribute('x2', x2);
-    line.setAttribute('y2', y2);
+    line.setAttribute('x1', startX);
+    line.setAttribute('y1', startY);
+    line.setAttribute('x2', endX);
+    line.setAttribute('y2', endY);
     this.board.append(line);
 
     Progress.mark(this.progress, this.round, ok);
 
     if (ok) {
       this.correct++;
-      U.say(this.message, '정답!', 'good');
-      this.host.award(pointsPer(this.host, SeekGame.ROUNDS), this.cellEls[i]);
+      Util.say(this.message, '정답!', 'good');
+      this.host.award(pointsPer(this.host, SeekGame.ROUNDS), this.cellGroups[i]);
       this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.message, i >= 0 ? '여기에 있었어요' : '시간 초과 · 여기에 있었어요', 'bad');
+      Util.say(this.message, i >= 0 ? '여기에 있었어요' : '시간 초과 · 여기에 있었어요', 'bad');
       this.host.sfx(Sfx.BAD);
     }
     this.host.after(ok ? 1000 : 1700, () => this.advance());
@@ -241,78 +241,78 @@ export class SeekGame {
   }
 
   // ---- 좌표 ----
-  // 뾰족한 쪽이 위로 가는 육각형 칸. 축 좌표 (q, r) → 칸 중심
-  static center(q, r) {
+  // 뾰족한 쪽이 위로 가는 육각형 칸. 축 좌표 (column, row) → 칸 중심
+  static center(column, row) {
     const unit = SeekGame.UNIT;
-    return [Math.sqrt(3) * unit * (q + r / 2), 1.5 * unit * r];
+    return [Math.sqrt(3) * unit * (column + row / 2), 1.5 * unit * row];
   }
 
-  static hexPoints(x, y, rad) {
-    return Array.from({ length: 6 }, (_, k) => {
-      const angle = ((60 * k - 90) * Math.PI) / 180;
-      return `${(x + Math.cos(angle) * rad).toFixed(1)},${(y + Math.sin(angle) * rad).toFixed(1)}`;
+  static hexPoints(x, y, radius) {
+    return Array.from({ length: 6 }, (_, corner) => {
+      const angle = ((60 * corner - 90) * Math.PI) / 180;
+      return `${(x + Math.cos(angle) * radius).toFixed(1)},${(y + Math.sin(angle) * radius).toFixed(1)}`;
     }).join(' ');
   }
 
   // ---- 문제 생성 ----
-  // 반환: cells = [[q, r], ...], syms = 칸마다의 그림 번호, seq = 찾을 순서, answer = 정답 줄의 칸 번호들.
+  // 반환: cells = [[column, row], ...], cellSymbols = 칸마다의 그림 번호, sequence = 찾을 순서, answer = 정답 줄의 칸 번호들.
   // 순서는 여섯 방향 중 어느 쪽으로 읽어도 판 전체에서 정확히 한 줄에만 나온다.
-  static make({ radius, len, symbols, decoys }, slanted) {
+  static make({ radius, sequenceLength, symbolCount, decoys }, slanted) {
     const cells = [];
-    for (let q = -radius; q <= radius; q++) {
-      for (let r = -radius; r <= radius; r++) {
-        if (Math.abs(q + r) <= radius) cells.push([q, r]);
+    for (let column = -radius; column <= radius; column++) {
+      for (let row = -radius; row <= radius; row++) {
+        if (Math.abs(column + row) <= radius) cells.push([column, row]);
       }
     }
-    const index = new Map(cells.map(([q, r], i) => [`${q},${r}`, i]));
-    // 판 안에 온전히 들어가는 길이 len의 모든 줄 (방향 포함)
+    const index = new Map(cells.map(([column, row], i) => [`${column},${row}`, i]));
+    // 판 안에 온전히 들어가는 길이 sequenceLength 의 모든 줄 (방향 포함)
     const lines = [];
-    cells.forEach(([q, r]) => {
-      SeekGame.DIRS.forEach(([dq, dr]) => {
+    cells.forEach(([column, row]) => {
+      SeekGame.DIRECTIONS.forEach(([stepColumn, stepRow]) => {
         const line = [];
-        for (let k = 0; k < len; k++) {
-          const i = index.get(`${q + dq * k},${r + dr * k}`);
+        for (let position = 0; position < sequenceLength; position++) {
+          const i = index.get(`${column + stepColumn * position},${row + stepRow * position}`);
           if (i === undefined) return;
           line.push(i);
         }
-        lines.push({ line, flat: dr === 0 });
+        lines.push({ line, flat: stepRow === 0 });
       });
     });
-    const other = (symbol) => (symbol + 1 + U.rand(symbols - 1)) % symbols;
+    const other = (symbol) => (symbol + 1 + Util.randomBelow(symbolCount - 1)) % symbolCount;
 
     for (;;) {
       // 뒤집어도 같은 순서는 한 줄이 양쪽 방향으로 두 번 맞아 버리므로 쓰지 않는다
-      let seq;
+      let sequence;
       do {
-        seq = Array.from({ length: len }, () => U.rand(symbols));
-      } while (seq.every((symbol, k) => symbol === seq[len - 1 - k]));
+        sequence = Array.from({ length: sequenceLength }, () => Util.randomBelow(symbolCount));
+      } while (sequence.every((symbol, position) => symbol === sequence[sequenceLength - 1 - position]));
 
-      const syms = cells.map(() => U.rand(symbols));
+      const cellSymbols = cells.map(() => Util.randomBelow(symbolCount));
       const pool = slanted ? lines.filter((candidate) => !candidate.flat) : lines;
-      const answer = pool[U.rand(pool.length)].line;
-      answer.forEach((i, k) => (syms[i] = seq[k]));
+      const answer = pool[Util.randomBelow(pool.length)].line;
+      answer.forEach((i, position) => (cellSymbols[i] = sequence[position]));
       const locked = new Set(answer);
 
       // 가짜 줄: 정답과 겹치지 않는 곳에, 처음이나 끝 한 칸만 다르게 놓는다
       for (let decoy = 0; decoy < decoys; decoy++) {
         const free = lines.filter((candidate) => candidate.line.every((i) => !locked.has(i)));
         if (!free.length) break;
-        const { line } = free[U.rand(free.length)];
-        const off = U.rand(2) ? 0 : len - 1;
-        line.forEach((i, k) => {
-          syms[i] = k === off ? other(seq[k]) : seq[k];
+        const { line } = free[Util.randomBelow(free.length)];
+        const wrongAt = Util.randomBelow(2) ? 0 : sequenceLength - 1;
+        line.forEach((i, position) => {
+          cellSymbols[i] = position === wrongAt ? other(sequence[position]) : sequence[position];
           locked.add(i);
         });
       }
 
       // 우연히 생긴 또 다른 정답 줄을 없앤다: 그 줄에서 정답에 속하지 않는 칸 하나를 다른 그림으로 바꾼다
       for (let pass = 0; pass < 200; pass++) {
-        const extra = lines.find(({ line }) => line !== answer && line.every((i, k) => syms[i] === seq[k]));
-        if (!extra) return { cells, syms, seq, answer };
+        const extra = lines.find(({ line }) => line !== answer && line.every((i, position) => cellSymbols[i] === sequence[position]));
+        if (!extra) return { cells, cellSymbols, sequence, answer };
         const outside = extra.line.filter((i) => !answer.includes(i));
         const loose = outside.filter((i) => !locked.has(i));
-        const i = (loose.length ? loose : outside)[U.rand((loose.length ? loose : outside).length)];
-        syms[i] = other(syms[i]);
+        const i = (loose.length ? loose : outside)[Util.randomBelow((loose.length ? loose : outside).length)];
+        cellSymbols[i] = other(cellSymbols[i]);
       }
     }
   }

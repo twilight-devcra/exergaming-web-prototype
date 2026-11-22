@@ -3,10 +3,10 @@
 
 // text 를 담은 QR 코드 svg
 export function qrSvg(text) {
-  const qr = qrcode(0, 'M');
-  qr.addData(text);
-  qr.make();
-  return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  const qrCode = qrcode(0, 'M');
+  qrCode.addData(text);
+  qrCode.make();
+  return qrCode.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
 }
 
 // ---------------- 카메라로 QR 읽기 ----------------
@@ -14,53 +14,53 @@ export function qrSvg(text) {
 export const QrScanner = {
   stream: null,
   timer: null,
-  on: false,
+  running: false,
 
   async start(video, onText, onState) {
     this.stop();
-    this.on = true;
+    this.running = true;
     onState('starting');
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-    } catch (e) {
-      this.on = false;
-      onState('denied', e);
+    } catch (error) {
+      this.running = false;
+      onState('denied', error);
       return;
     }
-    if (!this.on) return this.stop(); // 그 사이 화면을 떠났다
+    if (!this.running) return this.stop(); // 그 사이 화면을 떠났다
     video.srcObject = this.stream;
-    try { await video.play(); } catch (e) { }
+    try { await video.play(); } catch { }
     let detect = null;
     if ('BarcodeDetector' in window) {
       try {
         const formats = await BarcodeDetector.getSupportedFormats();
         if (formats.includes('qr_code')) {
-          const d = new BarcodeDetector({ formats: ['qr_code'] });
-          detect = async () => (await d.detect(video)).map((c) => c.rawValue);
+          const detector = new BarcodeDetector({ formats: ['qr_code'] });
+          detect = async () => (await detector.detect(video)).map((code) => code.rawValue);
         }
-      } catch (e) { }
+      } catch { }
     }
     if (!detect) {
       await this.loadJsQR();
-      const cv = document.createElement('canvas');
-      const g = cv.getContext('2d', { willReadFrequently: true });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
       detect = async () => {
-        const w = 640;
-        const h = Math.round((video.videoHeight / (video.videoWidth || 1)) * w) || 360;
-        cv.width = w;
-        cv.height = h;
-        g.drawImage(video, 0, 0, w, h);
-        const r = jsQR(g.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'attemptBoth' });
-        return r ? [r.data] : [];
+        const frameWidth = 640;
+        const frameHeight = Math.round((video.videoHeight / (video.videoWidth || 1)) * frameWidth) || 360;
+        canvas.width = frameWidth;
+        canvas.height = frameHeight;
+        context.drawImage(video, 0, 0, frameWidth, frameHeight);
+        const found = jsQR(context.getImageData(0, 0, frameWidth, frameHeight).data, frameWidth, frameHeight, { inversionAttempts: 'attemptBoth' });
+        return found ? [found.data] : [];
       };
     }
     onState('ready');
     const loop = async () => {
-      if (!this.on) return;
+      if (!this.running) return;
       try {
-        if (video.readyState >= 2) for (const t of await detect()) onText(t);
-      } catch (e) { }
-      if (this.on) this.timer = setTimeout(loop, 200);
+        if (video.readyState >= 2) for (const text of await detect()) onText(text);
+      } catch { }
+      if (this.running) this.timer = setTimeout(loop, 200);
     };
     loop();
   },
@@ -68,42 +68,42 @@ export const QrScanner = {
   // 사진 파일 하나에서 QR 내용을 읽는다 (없으면 null). 회원 카드 그림은 QR 이 크지만, 결과 화면을 캡처한 사진처럼 작은 QR 도
   // 읽히도록 jsQR 은 두 크기로 해 본다 (너무 큰 사진은 jsQR 이 느리고, 너무 줄이면 작은 QR 이 뭉개진다)
   async readImage(file) {
-    const bmp = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(file);
     try {
       if ('BarcodeDetector' in window && (await BarcodeDetector.getSupportedFormats()).includes('qr_code')) {
-        const found = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bmp);
+        const found = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bitmap);
         if (found.length) return found[0].rawValue;
       }
-    } catch (e) { }
+    } catch { }
     await this.loadJsQR();
-    const cv = document.createElement('canvas');
-    const g = cv.getContext('2d', { willReadFrequently: true });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
     for (const side of [1600, 800]) {
-      const k = Math.min(1, side / Math.max(bmp.width, bmp.height));
-      cv.width = Math.round(bmp.width * k);
-      cv.height = Math.round(bmp.height * k);
-      g.drawImage(bmp, 0, 0, cv.width, cv.height);
-      const r = jsQR(g.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: 'attemptBoth' });
-      if (r) return r.data;
+      const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const found = jsQR(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' });
+      if (found) return found.data;
     }
     return null;
   },
 
   loadJsQR() {
     if (window.jsQR) return Promise.resolve();
-    return new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'vendor/jsQR.js';
-      s.onload = res;
-      s.onerror = rej;
-      document.head.append(s);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'vendor/jsQR.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.append(script);
     });
   },
 
   stop() {
-    this.on = false;
+    this.running = false;
     clearTimeout(this.timer);
-    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    if (this.stream) this.stream.getTracks().forEach((track) => track.stop());
     this.stream = null;
   },
 };

@@ -17,31 +17,31 @@ globalThis.location = { pathname: '/', search: '', hash: '', hostname: 'localhos
 (async () => {
   const { BLANK_BANK } = await import(pathToFileURL(path.join(ROOT, 'js/games/blank-bank.js')));
   const { BlankGame } = await import(pathToFileURL(path.join(ROOT, 'js/games/blank.js')));
-  const rows = fs.readFileSync(path.join(__dirname, 'data/nikl-vocab.tsv'), 'utf8').split(/\r?\n/).slice(1).map((l) => l.split('\t'));
-  const nouns = new Set(rows.filter((r) => r[2] === '명').map((r) => (r[1] || '').replace(/\d+$/, '')));
-  const lex = new Set(fs.readFileSync(path.join(__dirname, '.cache/lexicon.txt'), 'utf8').split('\n').filter(Boolean));
-  for (const r of rows) if (r[1]) lex.add(r[1].replace(/\d+$/, ''));
+  const rows = fs.readFileSync(path.join(__dirname, 'data/nikl-vocab.tsv'), 'utf8').split(/\r?\n/).slice(1).map((line) => line.split('\t'));
+  const nouns = new Set(rows.filter((row) => row[2] === '명').map((row) => (row[1] || '').replace(/\d+$/, '')));
+  const lexicon = new Set(fs.readFileSync(path.join(__dirname, '.cache/lexicon.txt'), 'utf8').split('\n').filter(Boolean));
+  for (const row of rows) if (row[1]) lexicon.add(row[1].replace(/\d+$/, ''));
 
-  const fill = (w, at, s) => w.slice(0, at) + s + w.slice(at + 1);
-  const errs = [];
-  BLANK_BANK.forEach((lv, li) => {
-    const L = BlankGame.levels[li];
-    if (new Set(lv.map((q) => q[2])).size < BlankGame.ROUNDS) errs.push(`Lv${li + 1}: 답 글자가 ${BlankGame.ROUNDS}종보다 적다`);
-    for (const [words, at, a, wrong] of lv) {
-      const tag = `Lv${li + 1} ${words.join('·')}`;
-      if (words.length !== L.words) errs.push(`${tag}: 낱말 수 ${words.length} ≠ ${L.words}`);
-      if (wrong.length + 1 !== L.opts) errs.push(`${tag}: 보기 수 ${wrong.length + 1} ≠ ${L.opts}`);
-      if (new Set([a, ...wrong]).size !== wrong.length + 1) errs.push(`${tag}: 보기에 같은 글자`);
-      words.forEach((w, i) => {
-        if (w[at[i]] !== a) errs.push(`${tag}: ${w} 의 ${at[i]}번 글자가 ${a} 가 아니다`);
-        if (!nouns.has(w)) errs.push(`${tag}: ${w} 는 문제 낱말 목록에 없다`);
+  const fill = (word, position, letter) => word.slice(0, position) + letter + word.slice(position + 1);
+  const errors = [];
+  BLANK_BANK.forEach((levelQuestions, levelIndex) => {
+    const level = BlankGame.levels[levelIndex];
+    if (new Set(levelQuestions.map((question) => question[2])).size < BlankGame.ROUNDS) errors.push(`Lv${levelIndex + 1}: 답 글자가 ${BlankGame.ROUNDS}종보다 적다`);
+    for (const [words, positions, answer, wrong] of levelQuestions) {
+      const tag = `Lv${levelIndex + 1} ${words.join('·')}`;
+      if (words.length !== level.words) errors.push(`${tag}: 낱말 수 ${words.length} ≠ ${level.words}`);
+      if (wrong.length + 1 !== level.optionCount) errors.push(`${tag}: 보기 수 ${wrong.length + 1} ≠ ${level.optionCount}`);
+      if (new Set([answer, ...wrong]).size !== wrong.length + 1) errors.push(`${tag}: 보기에 같은 글자`);
+      words.forEach((word, i) => {
+        if (word[positions[i]] !== answer) errors.push(`${tag}: ${word} 의 ${positions[i]}번 글자가 ${answer} 가 아니다`);
+        if (!nouns.has(word)) errors.push(`${tag}: ${word} 는 문제 낱말 목록에 없다`);
       });
-      for (const d of wrong) {
-        if (words.every((w, i) => lex.has(fill(w, at[i], d)))) errs.push(`${tag}: 오답 ${d} 도 모든 빈칸에 맞는다 (${words.map((w, i) => fill(w, at[i], d)).join(' ')})`);
+      for (const wrongLetter of wrong) {
+        if (words.every((word, i) => lexicon.has(fill(word, positions[i], wrongLetter)))) errors.push(`${tag}: 오답 ${wrongLetter} 도 모든 빈칸에 맞는다 (${words.map((word, i) => fill(word, positions[i], wrongLetter)).join(' ')})`);
       }
     }
   });
-  const n = BLANK_BANK.reduce((s, lv) => s + lv.length, 0);
-  if (errs.length) { console.log(`문제 ${n}개 중 오류 ${errs.length}개`); errs.slice(0, 40).forEach((e) => console.log('  ' + e)); process.exitCode = 1; }
-  else console.log(`문제 ${n}개 모두 통과 (레벨별 ${BLANK_BANK.map((lv) => lv.length).join(' · ')})`);
+  const total = BLANK_BANK.reduce((sum, levelQuestions) => sum + levelQuestions.length, 0);
+  if (errors.length) { console.log(`문제 ${total}개 중 오류 ${errors.length}개`); errors.slice(0, 40).forEach((error) => console.log('  ' + error)); process.exitCode = 1; }
+  else console.log(`문제 ${total}개 모두 통과 (레벨별 ${BLANK_BANK.map((levelQuestions) => levelQuestions.length).join(' · ')})`);
 })();

@@ -3,7 +3,7 @@
 import { DEV_BUILD } from './dev-storage.js';
 
 // 난이도 단계. Lv1·Lv2 는 50~60대에게 원래의 첫 단계도 버겁다는 의견을 받고 그 아래에 더한 쉬운 단계다 (2026-10-21).
-// 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이다. 점수 배율은 Lv1 부터 오른다 (levelMult).
+// 원래의 첫 단계는 Lv3(BASE_LEVEL)이 되었다 — 기본 시작 난이도가 3이다. 점수 배율은 Lv1 부터 오른다 (levelMultiplier).
 // 쉬운 단계는 문제를 줄이는 것과 함께 제한 시간도 EASY_TIME 배로 늘린다 (Lv1, Lv2 순).
 // 2026-11-05: 1.5 · 1.25 → 2 · 1.6 (어르신이 처음 몇 판을 서두르지 않고 풀 수 있게)
 const EASY_LEVELS = 2;
@@ -51,7 +51,7 @@ export const DEFAULT_CONFIG = {
   // 게임 하나가 문제를 3개씩 내므로, 줄이지 않으면 8종을 켰을 때 잘하는 사람은 몇 종을 보기도 전에 최고 난이도에 닿는다.
   // 2 이면 8종을 한 바퀴 다 맞혀도 약 2.4단계 오른다 — 5분 라운드(2~3바퀴) 끝 무렵에야 최고 난이도에 닿는다.
   diffGamesRef: 2,
-  // 인지 게임 점수 배율: Lv1 x1.0 에서 Lv8 x(이 값)까지 레벨마다 같은 비율로 곱해 오른다 (levelMult).
+  // 인지 게임 점수 배율: Lv1 x1.0 에서 Lv8 x(이 값)까지 레벨마다 같은 비율로 곱해 오른다 (levelMultiplier).
   // 5 면 한 단계에 약 x1.26: Lv1 1.0 · Lv2 1.26 · Lv3 1.58 · Lv4 2.0 · Lv5 2.5 · Lv6 3.2 · Lv7 4.0 · Lv8 5.0
   // (2026-11-05 전: Lv3 까지 x1.0, 그 위로 +0.2 씩 · Lv8 x2.0 = multiplierStep)
   multiplierTop: 5,
@@ -108,7 +108,7 @@ export const ROUND_PRESETS = [
   {
     id: 'normal', label: '보통',
     desc: 'Lv3부터 Lv8까지. 정답률 60% 근처에 머물고, 페달 허용 구역 ±12%.',
-    values: Object.fromEntries(PRESET_KEYS.map((k) => [k, DEFAULT_CONFIG[k]])),
+    values: Object.fromEntries(PRESET_KEYS.map((key) => [key, DEFAULT_CONFIG[key]])),
   },
   {
     id: 'challenge', label: '도전',
@@ -215,97 +215,97 @@ export const Config = {
     return Object.assign({}, DEFAULT_CONFIG, DEMO_CONFIG, this.demoSaved());
   },
   demoDefaults() {
-    const c = Object.assign({}, DEFAULT_CONFIG, DEMO_CONFIG);
-    return Object.fromEntries(DEMO_SETTINGS.map((s) => [s.key, c[s.key]]));
+    const defaults = Object.assign({}, DEFAULT_CONFIG, DEMO_CONFIG);
+    return Object.fromEntries(DEMO_SETTINGS.map((setting) => [setting.key, defaults[setting.key]]));
   },
   demoSaved() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(DEMO_SETTINGS_KEY) || '{}'); } catch (e) { }
+    try { saved = JSON.parse(localStorage.getItem(DEMO_SETTINGS_KEY) || '{}'); } catch { /* 저장된 값이 없으면 기본값 */ }
     this.migrateLevel(saved);
-    return Object.fromEntries(DEMO_SETTINGS.filter((s) => s.key in saved).map((s) => [s.key, saved[s.key]]));
+    return Object.fromEntries(DEMO_SETTINGS.filter((setting) => setting.key in saved).map((setting) => [setting.key, saved[setting.key]]));
   },
   // 기본값과 같은 항목은 저장하지 않는다 (DEMO_CONFIG 를 고쳐 배포하면 바꾸지 않은 항목은 새 값을 따른다)
   demoSave(values) {
-    const def = this.demoDefaults();
-    const diff = Object.fromEntries(Object.entries(values).filter(([k, v]) => v !== def[k]));
+    const defaults = this.demoDefaults();
+    const changed = Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== defaults[key]));
     try {
-      if (Object.keys(diff).length) localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify({ ...diff, levelScheme: LEVEL_SCHEME }));
+      if (Object.keys(changed).length) localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify({ ...changed, levelScheme: LEVEL_SCHEME }));
       else localStorage.removeItem(DEMO_SETTINGS_KEY);
-    } catch (e) { }
+    } catch { /* 저장 못 해도 이번 실행에는 쓴다 */ }
   },
   // 인지 게임 점수 배율. Lv1 x1 → TOP_LEVEL x multiplierTop, 레벨마다 같은 비율로 곱한다 (높은 단계일수록 한 단계에 더 많이 오른다)
-  levelMult(cfg, level) {
-    const top = cfg.multiplierTop > 0 ? cfg.multiplierTop : 1;
-    const k = Math.min(Math.max(level, 1), TOP_LEVEL) - 1;
-    return top ** (k / (TOP_LEVEL - 1));
+  levelMultiplier(config, level) {
+    const top = config.multiplierTop > 0 ? config.multiplierTop : 1;
+    const step = Math.min(Math.max(level, 1), TOP_LEVEL) - 1;
+    return top ** (step / (TOP_LEVEL - 1));
   },
   // 스테이션끼리 설정이 같은지 맞춰 보는 4자리 코드 (DEMO_SETTINGS 값으로 만든 해시)
-  demoCode(cfg) {
-    const str = JSON.stringify(DEMO_SETTINGS.map((s) => cfg[s.key]));
-    let h = 0x811c9dc5;
-    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
-    return ((h >>> 0) % 0x10000).toString(16).toUpperCase().padStart(4, '0');
+  demoCode(config) {
+    const text = JSON.stringify(DEMO_SETTINGS.map((setting) => config[setting.key]));
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+    return ((hash >>> 0) % 0x10000).toString(16).toUpperCase().padStart(4, '0');
   },
   load() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch (e) { }
+    try { saved = JSON.parse(localStorage.getItem('exergame.config') || '{}'); } catch { /* 저장된 값이 없으면 기본값 */ }
     this.migrateLevel(saved);
     // 2026-11-20: '사다리 타기'(ladder)가 '배관 타기'(pipe)로 바뀌었다. 켜 둔 게임 목록에 ladder 가 있으면 pipe 를 켠다
     if (Array.isArray(saved.games)) saved.games = [...new Set(saved.games.map((id) => (id === 'ladder' ? 'pipe' : id)))];
     // 제한 시간 표는 화면에서 바꾸지 않으므로 늘 코드의 값을 쓴다 (예전에 저장된 표가 고친 값을 덮지 않게)
     return Object.assign({}, DEFAULT_CONFIG, saved, { questionTime: DEFAULT_CONFIG.questionTime, levelScheme: LEVEL_SCHEME });
   },
-  // cfg 의 값이 어느 라운드 난이도 프리셋과 꼭 맞는가. 하나라도 다르면 'custom'
-  presetOf(cfg) {
-    const p = ROUND_PRESETS.find((x) => PRESET_KEYS.every((k) => cfg[k] === x.values[k]));
-    return p ? p.id : 'custom';
+  // config 의 값이 어느 라운드 난이도 프리셋과 꼭 맞는가. 하나라도 다르면 'custom'
+  presetOf(config) {
+    const matched = ROUND_PRESETS.find((candidate) => PRESET_KEYS.every((key) => config[key] === candidate.values[key]));
+    return matched ? matched.id : 'custom';
   },
   preset(id) {
-    return ROUND_PRESETS.find((x) => x.id === id) || null;
+    return ROUND_PRESETS.find((candidate) => candidate.id === id) || null;
   },
   // 프리셋 고르기 아래의 설명 문구 (id 가 'custom' 이면 직접 바꾼 상태라는 안내)
   presetNote(id) {
-    const p = this.preset(id);
-    return p ? `${p.desc} ${PRESET_NOTE}` : PRESET_CUSTOM_NOTE;
+    const roundPreset = this.preset(id);
+    return roundPreset ? `${roundPreset.desc} ${PRESET_NOTE}` : PRESET_CUSTOM_NOTE;
   },
   presetNotes() {
-    return [...ROUND_PRESETS.map((p) => this.presetNote(p.id)), PRESET_CUSTOM_NOTE];
+    return [...ROUND_PRESETS.map((roundPreset) => this.presetNote(roundPreset.id)), PRESET_CUSTOM_NOTE];
   },
   // 게임 중 음악 스타일: 주소의 ?music= → 이 태블릿에서 고른 것 → 판(edition)별 기본값
   music() {
-    const ok = (id) => MUSIC_STYLES.some((m) => m.id === id);
-    const q = new URLSearchParams(location.search).get('music');
-    if (ok(q)) return q;
+    const isStyle = (id) => MUSIC_STYLES.some((style) => style.id === id);
+    const fromUrl = new URLSearchParams(location.search).get('music');
+    if (isStyle(fromUrl)) return fromUrl;
     let saved = null;
-    try { saved = localStorage.getItem(MUSIC_KEY); } catch (e) { }
-    if (ok(saved)) return saved;
+    try { saved = localStorage.getItem(MUSIC_KEY); } catch { /* 못 읽으면 기본값 */ }
+    if (isStyle(saved)) return saved;
     return MUSIC_DEFAULT[EDITION] || 'beat';
   },
   setMusic(id) {
-    try { localStorage.setItem(MUSIC_KEY, id); } catch (e) { }
+    try { localStorage.setItem(MUSIC_KEY, id); } catch { /* 저장 못 해도 넘어간다 */ }
   },
   // 운영 버전의 세션 설정(시간·난이도)으로 바뀌는 값. 운영 메뉴의 라운드 설정 위에 덮는다
   session(min, difficultyId) {
-    const d = SESSION_DIFFICULTIES.find((x) => x.id === difficultyId) || SESSION_DIFFICULTIES[1];
-    const r4 = (v) => Math.round(v * 10000) / 10000;
-    const diffUp = r4((d.maxLevel - 1) / (SESSION_ANSWERS_PER_MIN * min * d.climb));
+    const difficulty = SESSION_DIFFICULTIES.find((candidate) => candidate.id === difficultyId) || SESSION_DIFFICULTIES[1];
+    const round4 = (value) => Math.round(value * 10000) / 10000;
+    const diffUp = round4((difficulty.maxLevel - 1) / (SESSION_ANSWERS_PER_MIN * min * difficulty.climb));
     return {
       durationSec: min * 60,
       difficulty: 'adaptive',
       startLevel: 1,
-      maxLevel: d.maxLevel,
+      maxLevel: difficulty.maxLevel,
       diffUp,
-      diffDown: r4((diffUp * d.hold) / (1 - d.hold)),
+      diffDown: round4((diffUp * difficulty.hold) / (1 - difficulty.hold)),
       diffGamesRef: 0, // 켜 둔 게임 수로 폭을 줄이지 않는다 (오르는 빠르기를 위 식이 이미 정한다)
-      questionTimeScale: d.questionTimeScale,
+      questionTimeScale: difficulty.questionTimeScale,
     };
   },
   // 쉬운 단계를 더하기 전에 저장한 시작 난이도는 같은 문제가 나오도록 번호를 옮긴다
   migrateLevel(saved) {
     if (saved.startLevel != null && saved.levelScheme !== LEVEL_SCHEME) saved.startLevel += EASY_LEVELS;
   },
-  save(cfg) {
-    try { localStorage.setItem('exergame.config', JSON.stringify(cfg)); } catch (e) { }
+  save(config) {
+    try { localStorage.setItem('exergame.config', JSON.stringify(config)); } catch { /* 저장 못 해도 이번 실행에는 쓴다 */ }
   },
 };
 
@@ -318,70 +318,70 @@ export const PHONE_LANDSCAPE = '(orientation: landscape) and (max-height: 500px)
 export const DEMO = EDITION === 'app';
 
 // 공용 유틸
-export const $ = (s) => document.querySelector(s);
-export const U = {
-  rand: (n) => Math.floor(Math.random() * n),
-  randInt: (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1)),
-  clamp: (v, lo, hi) => Math.max(lo, Math.min(hi, v)),
-  lerp: (a, b, t) => a + (b - a) * t,
-  shuffle(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
+export const $ = (selector) => document.querySelector(selector);
+export const Util = {
+  randomBelow: (count) => Math.floor(Math.random() * count),
+  randomInt: (min, max) => min + Math.floor(Math.random() * (max - min + 1)),
+  clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+  lerp: (start, end, amount) => start + (end - start) * amount,
+  shuffle(items) {
+    for (let i = items.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
+      [items[i], items[j]] = [items[j], items[i]];
     }
-    return arr;
+    return items;
   },
-  el(tag, cls, html) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (html != null) e.innerHTML = html;
-    return e;
+  element(tag, className, html) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (html != null) node.innerHTML = html;
+    return node;
   },
   // 글이 바뀌어도 아래 칸들이 밀리지 않도록, 들어갈 수 있는 글 가운데 가장 긴 것의 높이를 미리 잡아 둔다.
   // 화면에 보이는 동안에만 잴 수 있다 (안 보이면 아무것도 하지 않는다)
-  reserveHeight(el, texts) {
-    if (!el.offsetParent) return;
-    const keep = el.textContent;
-    el.style.minHeight = '';
-    let h = 0;
-    for (const t of texts) {
-      el.textContent = t;
-      h = Math.max(h, el.offsetHeight);
+  reserveHeight(box, texts) {
+    if (!box.offsetParent) return;
+    const keep = box.textContent;
+    box.style.minHeight = '';
+    let tallest = 0;
+    for (const text of texts) {
+      box.textContent = text;
+      tallest = Math.max(tallest, box.offsetHeight);
     }
-    el.textContent = keep;
-    el.style.minHeight = `${h}px`;
+    box.textContent = keep;
+    box.style.minHeight = `${tallest}px`;
   },
   // 게임 안내 문구를 바꾼다. kind 에 따라 문구 앞 아이콘과 색이 정해진다 (css .stage-msg):
   //   look 보기 · act 누르기 · good 맞음 · bad 틀림 · '' 아이콘 없음
   // 문구 안에 붙은 제한 시간 막대(.qtimer)는 문구를 바꿔도 그대로 둔다
-  say(el, text, kind = '') {
-    const bar = el.querySelector('.qtimer');
-    el.textContent = text;
-    if (bar) el.append(bar);
-    el.className = `stage-msg${kind ? ` ${kind}` : ''}`;
+  say(messageBox, text, kind = '') {
+    const bar = messageBox.querySelector('.qtimer');
+    messageBox.textContent = text;
+    if (bar) messageBox.append(bar);
+    messageBox.className = `stage-msg${kind ? ` ${kind}` : ''}`;
   },
   // 게임 영역의 머리 (모든 게임 공용): 게임 이름·레벨과 진행 점, 그 아래 안내 문구. 게임이 바뀌어도 같은 자리에 두어
   // 속도 띠를 보다가 돌아온 눈이 늘 같은 곳에서 할 일을 찾게 한다. 판은 돌려준 body (머리 아래 남은 자리의 가운데)에 넣는다.
   // rounds = 진행 점 개수 (0 이면 점 없음)
-  frame(stage, title, msg, rounds = 0) {
-    const meta = U.el('div', 'stage-meta');
-    const dots = U.el('div', 'dots');
-    for (let i = 0; i < rounds; i++) dots.append(U.el('span'));
-    meta.append(U.el('span', 'stage-title', title), dots);
-    const head = U.el('div', 'stage-head');
-    head.append(meta, msg);
-    const body = U.el('div', 'stage-body');
+  frame(stage, title, message, rounds = 0) {
+    const meta = Util.element('div', 'stage-meta');
+    const dots = Util.element('div', 'dots');
+    for (let i = 0; i < rounds; i++) dots.append(Util.element('span'));
+    meta.append(Util.element('span', 'stage-title', title), dots);
+    const head = Util.element('div', 'stage-head');
+    head.append(meta, message);
+    const body = Util.element('div', 'stage-body');
     stage.append(head, body);
     return { body, dots };
   },
   // 문제와 보기 사이 간격 (css gap). 운영 버전은 문제와 보기를 따로 감싸느라 더 넓다 (app/app.css '문제와 보기를 나눈다').
   // 게임은 판 크기를 셈할 때 이 값을 쓴다. 못 읽으면 fallback
-  gapOf(el, fallback) {
-    const v = parseFloat(getComputedStyle(el).rowGap);
-    return Number.isFinite(v) ? v : fallback;
+  gapOf(container, fallback) {
+    const gap = parseFloat(getComputedStyle(container).rowGap);
+    return Number.isFinite(gap) ? gap : fallback;
   },
-  fmtTime(sec) {
-    sec = Math.max(0, Math.ceil(sec));
-    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  formatTime(seconds) {
+    seconds = Math.max(0, Math.ceil(seconds));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   },
 };

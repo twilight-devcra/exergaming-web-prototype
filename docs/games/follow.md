@@ -20,7 +20,7 @@
 |---|---|
 | `buttons` · `switches` · `lamps` | 조작판의 버튼·스위치·램프 수 (0 이면 그 줄이 없다) |
 | `kinds` | 이 단계에서 나올 수 있는 지시 종류 (같은 것을 두 번 적으면 더 자주 나온다) |
-| `sw` | sw 의 켤 스위치 수 |
+| `flips` | sw 의 켤 스위치 수 |
 | `steps` | seq·reverse 의 누를 버튼 수 |
 | `times` | twice 의 횟수 |
 | `chain` | chain 의 단계 수 |
@@ -32,7 +32,7 @@
 
 ## 레벨별 값
 
-| Lv | `buttons` | `switches` | `lamps` | `kinds` | `sw` | `steps` | `times` | `chain` | `mixed` | `distract` | `read` | `cover` | `time` | 메모 |
+| Lv | `buttons` | `switches` | `lamps` | `kinds` | `flips` | `steps` | `times` | `chain` | `mixed` | `distract` | `read` | `cover` | `time` | 메모 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 (쉬움) | 3 | 0 | 0 | one, edge, twice | – | – | 2 | – | – | – | – | – | – | 쉬운 단계: 버튼 하나를 그림이나 자리로 찾는다 |
 | 2 (쉬움) | 4 | 3 | 0 | one, edge, nth, twice, sw | 1 | – | 2 | – | – | – | – | – | – |  |

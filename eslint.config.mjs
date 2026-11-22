@@ -11,9 +11,11 @@ export default [
       sourceType: 'module',
     },
     rules: {
-      // 한두 글자 이름은 짧은 콜백·반복문에서만. 넓게 쓰이는 이름은 뜻을 담는다
-      // (x·y 좌표, i·j 반복 번호, t 시각, k 비율, b 상자/버튼, 정렬 비교의 a·b, 판 크기 상수 W·H·S·R 같은 관용 이름은 둔다)
-      'id-length': ['warn', { min: 2, exceptionPatterns: ['^[ijkxyntab_]$', '^[WHSR]$'], properties: 'never' }],
+      // 이름은 뜻을 담는다 (h 대신 boxHeight). 한두 글자 줄임말은 쓰지 않는다.
+      // 남겨 두는 것: i·j 반복 번호, x·y 좌표, 정렬 비교의 a·b, 낱말인 id·ok, node 의 fs, 선택 도우미 $.
+      // 저장된 데이터·서버 형식처럼 바꿀 수 없는 속성 이름은 그 줄에서만 끈다.
+      // 규칙이 못 잡는 세 글자 이상 줄임말(cnt, idx 같은)도 풀어 쓴다.
+      'id-length': ['warn', { min: 3, exceptionPatterns: ['^[ijxyab_$]$', '^(id|ok|fs)$'], properties: 'always' }],
       'no-shadow': 'warn',
       'prefer-const': 'warn',
       'no-unused-vars': ['warn', { args: 'none' }],

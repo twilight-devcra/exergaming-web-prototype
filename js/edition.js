@@ -49,7 +49,7 @@ export const TestEdition = {
   onRotate: () => false,
   logClosed() {},
   plantInfo: () => null,
-  roundPreset: (app) => Config.presetOf(app.cfg),
+  roundPreset: (app) => Config.presetOf(app.config),
   remembersSetup: () => false,
   showResult() {
     TestResults.show();

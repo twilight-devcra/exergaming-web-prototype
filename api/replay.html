@@ -156,8 +156,8 @@
 
 <script>
 (() => {
-  const $ = (s) => document.querySelector(s);
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const $ = (selector) => document.querySelector(selector);
+  const escapeHtml = (text) => String(text).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
   // 서버가 /admin/api/options 로 모든 게임 이름을 주면 덮어쓴다
   const TITLES = {
     path: '길 따라 그리기', symbol: '심볼 위치 외우기', arith: '사칙연산 역산', count: '우세한 색 찾기', fit: '빈자리 채우기',
@@ -165,499 +165,520 @@
     follow: '지시 따르기', pair: '짝 없는 양말', box: '상자 속 과일', compare: '두 그림 비교하기', coin: '동전 세기',
     recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기',
   };
-  const fmt = (ms, tenths = true) => {
-    if (ms == null || !isFinite(ms)) return '–';
-    const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60), r = s - m * 60;
-    return `${m}:${(tenths ? r.toFixed(1) : Math.floor(r).toString()).padStart(tenths ? 4 : 2, '0')}`;
+  const clockText = (milliseconds, tenths = true) => {
+    if (milliseconds == null || !isFinite(milliseconds)) return '–';
+    const totalSeconds = Math.max(0, milliseconds) / 1000, minutes = Math.floor(totalSeconds / 60), remainder = totalSeconds - minutes * 60;
+    return `${minutes}:${(tenths ? remainder.toFixed(1) : Math.floor(remainder).toString()).padStart(tenths ? 4 : 2, '0')}`;
   };
-  const sec = (ms) => (ms == null ? '–' : `${(ms / 1000).toFixed(1)}초`);
+  const seconds = (milliseconds) => (milliseconds == null ? '–' : `${(milliseconds / 1000).toFixed(1)}초`);
 
   // ---------- 세션 → 재생용 모델 ----------
-  function model(log) {
-    const ev = log.events || [];
-    const end = ev.length ? ev[ev.length - 1].clock : 0;
-    const games = [], qs = [], pauses = [];
-    let g = null, q = null, pauseAt = null;
-    for (const e of ev) {
-      if (e.type === 'game_start') { g = { game: e.game, level: e.level, start: e.clock, open: null, end: end, qs: [] }; games.push(g); }
-      else if (e.type === 'intro_end' && g) g.open = e.clock;
-      else if ((e.type === 'game_end' || e.type === 'game_abort') && g) { g.end = e.clock; g.aborted = e.type === 'game_abort'; g = null; }
+  function buildModel(log) {
+    const events = log.events || [];
+    const end = events.length ? events[events.length - 1].clock : 0;
+    const games = [], questions = [], pauses = [];
+    let round = null, question = null, pauseAt = null;
+    for (const event of events) {
+      if (event.type === 'game_start') { round = { game: event.game, level: event.level, start: event.clock, open: null, end: end, questions: [] }; games.push(round); }
+      else if (event.type === 'intro_end' && round) round.open = event.clock;
+      else if ((event.type === 'game_end' || event.type === 'game_abort') && round) { round.end = event.clock; round.aborted = event.type === 'game_abort'; round = null; }
       // 문제 번호는 1씩 늘어난다. 로그 버전 5 까지는 상자 속 과일의 문제 내용(q)이 번호를 덮어써서, 그때는 앞 번호 + 1 로 메운다
-      else if (e.type === 'question') { const n = Number.isInteger(e.q) ? e.q : (qs.length ? qs[qs.length - 1].n : 0) + 1; q = { n, game: e.game, level: e.level, at: e.clock, open: e.clock, data: e, inputs: [], answer: null, limit: null, g }; qs.push(q); if (g) g.qs.push(q); }
-      else if (e.type === 'input_open' && q && q.n === e.q) q.open = e.clock;
-      else if (e.type === 'timer_start' && q && !q.answer && q.limit == null) q.limit = e.limitMs;
-      else if (e.type === 'input' && q && q.n === e.q) q.inputs.push(e);
-      else if (e.type === 'answer' && q && q.n === e.q) {
-        q.answer = e;
-        if (!('first' in e)) e.first = q.inputs.length ? q.inputs[0].ms : e.timedOut ? null : e.ms;
+      else if (event.type === 'question') {
+        const number = Number.isInteger(event.q) ? event.q : (questions.length ? questions[questions.length - 1].number : 0) + 1;
+        question = { number, game: event.game, level: event.level, shownAt: event.clock, open: event.clock, data: event, inputs: [], answer: null, limit: null, round };
+        questions.push(question);
+        if (round) round.questions.push(question);
       }
-      else if (e.type === 'pause') pauseAt = e.clock;
-      else if (e.type === 'resume' && pauseAt != null) { pauses.push([pauseAt, e.clock]); pauseAt = null; }
+      else if (event.type === 'input_open' && question && question.number === event.q) question.open = event.clock;
+      else if (event.type === 'timer_start' && question && !question.answer && question.limit == null) question.limit = event.limitMs;
+      else if (event.type === 'input' && question && question.number === event.q) question.inputs.push(event);
+      else if (event.type === 'answer' && question && question.number === event.q) {
+        question.answer = event;
+        if (!('first' in event)) event.first = question.inputs.length ? question.inputs[0].ms : event.timedOut ? null : event.ms;
+      }
+      else if (event.type === 'pause') pauseAt = event.clock;
+      else if (event.type === 'resume' && pauseAt != null) { pauses.push([pauseAt, event.clock]); pauseAt = null; }
     }
     const order = [];
-    for (const x of games) if (!order.includes(x.game)) order.push(x.game);
-    const samples = (log.samples || []).map((s) => ({ c: s[1], rpm: s[2], target: s[3], inZone: s[5], score: s[6] }));
-    return { log, end, games, qs, order, samples, pauses, brain: !!(log.meta && log.meta.track === 'brain'), tol: (log.meta && log.meta.config && log.meta.config.tolerance) || 0.12,
-      playStart: (ev.find((e) => e.type === 'play_start') || {}).clock ?? 0 };
+    for (const played of games) if (!order.includes(played.game)) order.push(played.game);
+    const samples = (log.samples || []).map((sample) => ({ clock: sample[1], rpm: sample[2], target: sample[3], inZone: sample[5], score: sample[6] }));
+    return { log, end, games, questions, order, samples, pauses, brain: !!(log.meta && log.meta.track === 'brain'), tolerance: (log.meta && log.meta.config && log.meta.config.tolerance) || 0.12,
+      playStart: (events.find((event) => event.type === 'play_start') || {}).clock ?? 0 };
   }
-  const result = (q) => !q.answer ? 'wait' : q.answer.timedOut ? 'late' : q.answer.correct ? 'good' : 'bad';
+  const resultOf = (question) => !question.answer ? 'wait' : question.answer.timedOut ? 'late' : question.answer.correct ? 'good' : 'bad';
   const RESULT = { good: '정답', bad: '오답', late: '시간 초과', wait: '푸는 중' };
-  const gColor = (M, id) => `var(--g${(M.order.indexOf(id) % 6) + 1})`;
+  const gameColor = (id) => `var(--g${(model.order.indexOf(id) % 6) + 1})`;
 
   // ---------- 그림 도우미 ----------
   const SHAPES = {
-    circle: (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r * 0.85}"/>`,
-    square: (x, y, r) => `<rect x="${x - r * 0.78}" y="${y - r * 0.78}" width="${r * 1.56}" height="${r * 1.56}" rx="${r * 0.15}"/>`,
-    triangle: (x, y, r) => `<polygon points="${x},${y - r} ${x + r * 0.95},${y + r * 0.75} ${x - r * 0.95},${y + r * 0.75}"/>`,
-    diamond: (x, y, r) => `<polygon points="${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}"/>`,
-    plus: (x, y, r) => { const a = r * 0.32; return `<path d="M${x - a} ${y - r}h${2 * a}v${r - a}h${r - a}v${2 * a}h${-(r - a)}v${r - a}h${-2 * a}v${-(r - a)}h${-(r - a)}v${-2 * a}h${r - a}z"/>`; },
-    star: (x, y, r) => { let p = ''; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; p += `${(x + rr * Math.cos(a)).toFixed(1)},${(y + rr * Math.sin(a)).toFixed(1)} `; } return `<polygon points="${p}"/>`; },
-    moon: (x, y, r) => `<path d="M${x + r * 0.3} ${y - r} a${r} ${r} 0 1 0 0 ${2 * r} a${r * 0.75} ${r * 0.75} 0 1 1 0 ${-2 * r}z"/>`,
-    heart: (x, y, r) => `<path d="M${x} ${y + r * 0.85} C${x - r * 1.3} ${y - r * 0.1} ${x - r * 0.6} ${y - r * 1.1} ${x} ${y - r * 0.35} C${x + r * 0.6} ${y - r * 1.1} ${x + r * 1.3} ${y - r * 0.1} ${x} ${y + r * 0.85}z"/>`,
+    circle: (x, y, radius) => `<circle cx="${x}" cy="${y}" r="${radius * 0.85}"/>`,
+    square: (x, y, radius) => `<rect x="${x - radius * 0.78}" y="${y - radius * 0.78}" width="${radius * 1.56}" height="${radius * 1.56}" rx="${radius * 0.15}"/>`,
+    triangle: (x, y, radius) => `<polygon points="${x},${y - radius} ${x + radius * 0.95},${y + radius * 0.75} ${x - radius * 0.95},${y + radius * 0.75}"/>`,
+    diamond: (x, y, radius) => `<polygon points="${x},${y - radius} ${x + radius},${y} ${x},${y + radius} ${x - radius},${y}"/>`,
+    plus: (x, y, radius) => {
+      const arm = radius * 0.32;
+      return `<path d="M${x - arm} ${y - radius}h${2 * arm}v${radius - arm}h${radius - arm}v${2 * arm}h${-(radius - arm)}v${radius - arm}h${-2 * arm}v${-(radius - arm)}h${-(radius - arm)}v${-2 * arm}h${radius - arm}z"/>`;
+    },
+    star: (x, y, radius) => {
+      let points = '';
+      for (let i = 0; i < 10; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI / 5, pointRadius = i % 2 ? radius * 0.45 : radius;
+        points += `${(x + pointRadius * Math.cos(angle)).toFixed(1)},${(y + pointRadius * Math.sin(angle)).toFixed(1)} `;
+      }
+      return `<polygon points="${points}"/>`;
+    },
+    moon: (x, y, radius) => `<path d="M${x + radius * 0.3} ${y - radius} a${radius} ${radius} 0 1 0 0 ${2 * radius} a${radius * 0.75} ${radius * 0.75} 0 1 1 0 ${-2 * radius}z"/>`,
+    heart: (x, y, radius) => `<path d="M${x} ${y + radius * 0.85} C${x - radius * 1.3} ${y - radius * 0.1} ${x - radius * 0.6} ${y - radius * 1.1} ${x} ${y - radius * 0.35} C${x + radius * 0.6} ${y - radius * 1.1} ${x + radius * 1.3} ${y - radius * 0.1} ${x} ${y + radius * 0.85}z"/>`,
   };
   const SEEK_GLYPHS = ['circle', 'triangle', 'square', 'diamond', 'star', 'plus', 'heart', 'moon'];
-  const COUNT = { red: '#e5484d', blue: '#2f6fed', green: '#1f9d55', yellow: '#f5b301', purple: '#8e4ec6' };
+  const COUNT_COLORS = { red: '#e5484d', blue: '#2f6fed', green: '#1f9d55', yellow: '#f5b301', purple: '#8e4ec6' };
   const COUNT_GLYPH = { red: 'circle', blue: 'square', green: 'triangle', yellow: 'diamond', purple: 'plus' };
-  const svg = (w, h, body, label) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="${esc(label)}">${body}</svg>`;
-  const badge = (x, y, n, cls = 'f-series') => `<circle cx="${x}" cy="${y}" r="9" class="${cls}"/><text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="10" font-weight="700" class="f-on">${n}</text>`;
+  const svg = (width, height, body, label) => `<svg viewBox="0 0 ${width} ${height}" width="${width}" role="img" aria-label="${escapeHtml(label)}">${body}</svg>`;
+  const badge = (x, y, label, className = 'f-series') => `<circle cx="${x}" cy="${y}" r="9" class="${className}"/><text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="10" font-weight="700" class="f-on">${label}</text>`;
 
   // 각 그리기는 (문제, 지금까지의 입력, 보이는 답 또는 null) → SVG
   const DRAW = {
-    count(q, inputs, ans) {
-      const d = q.data, [rows, cols] = d.grid, S = 46, pad = 8;
-      let b = '';
-      d.cells.forEach((ci, k) => {
-        const x = pad + (k % cols) * S, y = pad + Math.floor(k / cols) * S;
-        if (ci < 0) { b += `<rect x="${x + 2}" y="${y + 2}" width="${S - 4}" height="${S - 4}" rx="6" class="b-grid"/>`; return; }
-        const id = d.colors[ci];
-        b += `<rect x="${x + 2}" y="${y + 2}" width="${S - 4}" height="${S - 4}" rx="6" fill="${COUNT[id]}"/>`;
-        b += `<g fill="#fff" opacity="0.9">${SHAPES[COUNT_GLYPH[id]](x + S / 2, y + S / 2, 10)}</g>`;
+    count(question, inputs, answer) {
+      const data = question.data, [rows, cols] = data.grid, cellSize = 46, pad = 8;
+      let body = '';
+      data.cells.forEach((colorIndex, cellIndex) => {
+        const x = pad + (cellIndex % cols) * cellSize, y = pad + Math.floor(cellIndex / cols) * cellSize;
+        if (colorIndex < 0) { body += `<rect x="${x + 2}" y="${y + 2}" width="${cellSize - 4}" height="${cellSize - 4}" rx="6" class="b-grid"/>`; return; }
+        const id = data.colors[colorIndex];
+        body += `<rect x="${x + 2}" y="${y + 2}" width="${cellSize - 4}" height="${cellSize - 4}" rx="6" fill="${COUNT_COLORS[id]}"/>`;
+        body += `<g fill="#fff" opacity="0.9">${SHAPES[COUNT_GLYPH[id]](x + cellSize / 2, y + cellSize / 2, 10)}</g>`;
       });
-      const gw = cols * S + pad * 2, oy = rows * S + pad * 2 + 10, ow = 64;
-      const ox = Math.max(pad, (gw - d.colors.length * ow) / 2);
-      d.colors.forEach((id, i) => {
-        const x = ox + i * ow, picked = ans && ans.picked === id, right = i === 0;
-        b += `<rect x="${x + 4}" y="${oy}" width="${ow - 8}" height="40" rx="8" fill="${COUNT[id]}" opacity="${ans ? (picked || right ? 1 : 0.35) : 0.85}"/>`;
-        b += `<g fill="#fff">${SHAPES[COUNT_GLYPH[id]](x + 20, oy + 20, 8)}</g>`;
-        b += `<text x="${x + ow - 16}" y="${oy + 25}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">${ans ? d.counts[i] : '?'}</text>`;
-        if (picked) b += `<rect x="${x + 1}" y="${oy - 3}" width="${ow - 2}" height="46" rx="10" fill="none" stroke-width="3" class="${right ? 's-good' : 's-bad'}"/>`;
+      const gridWidth = cols * cellSize + pad * 2, optionsTop = rows * cellSize + pad * 2 + 10, optionWidth = 64;
+      const optionsLeft = Math.max(pad, (gridWidth - data.colors.length * optionWidth) / 2);
+      data.colors.forEach((id, i) => {
+        const x = optionsLeft + i * optionWidth, picked = answer && answer.picked === id, right = i === 0;
+        body += `<rect x="${x + 4}" y="${optionsTop}" width="${optionWidth - 8}" height="40" rx="8" fill="${COUNT_COLORS[id]}" opacity="${answer ? (picked || right ? 1 : 0.35) : 0.85}"/>`;
+        body += `<g fill="#fff">${SHAPES[COUNT_GLYPH[id]](x + 20, optionsTop + 20, 8)}</g>`;
+        body += `<text x="${x + optionWidth - 16}" y="${optionsTop + 25}" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">${answer ? data.counts[i] : '?'}</text>`;
+        if (picked) body += `<rect x="${x + 1}" y="${optionsTop - 3}" width="${optionWidth - 2}" height="46" rx="10" fill="none" stroke-width="3" class="${right ? 's-good' : 's-bad'}"/>`;
       });
-      return svg(Math.max(gw, ox * 2 + d.colors.length * ow), oy + 48, b, '색 격자와 보기');
+      return svg(Math.max(gridWidth, optionsLeft * 2 + data.colors.length * optionWidth), optionsTop + 48, body, '색 격자와 보기');
     },
 
-    path(q, inputs, ans) {
-      const d = q.data, [rows, cols] = d.grid, S = 54, pad = 10;
-      const cx = (c) => pad + c * S + S / 2, cy = (r) => pad + r * S + S / 2;
-      let b = '';
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) b += `<rect x="${pad + c * S + 3}" y="${pad + r * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" class="b-surf s-axis" stroke-width="1"/>`;
+    path(question, inputs, answer) {
+      const data = question.data, [rows, cols] = data.grid, cellSize = 54, pad = 10;
+      const centerX = (column) => pad + column * cellSize + cellSize / 2, centerY = (row) => pad + row * cellSize + cellSize / 2;
+      let body = '';
+      for (let row = 0; row < rows; row++) for (let column = 0; column < cols; column++) body += `<rect x="${pad + column * cellSize + 3}" y="${pad + row * cellSize + 3}" width="${cellSize - 6}" height="${cellSize - 6}" rx="8" class="b-surf s-axis" stroke-width="1"/>`;
       // 보여 준 길 (점선)
-      b += `<polyline points="${d.path.map(([r, c]) => `${cx(c)},${cy(r)}`).join(' ')}" fill="none" class="s-axis" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>`;
-      const [sr, sc] = d.path[0];
-      b += `<rect x="${pad + sc * S + 3}" y="${pad + sr * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" class="b-ink2"/><text x="${cx(sc)}" y="${cy(sr) + 4}" text-anchor="middle" font-size="11" font-weight="700" class="b-surf">출발</text>`;
-      inputs.forEach((e, i) => {
-        const [r, c] = e.cell;
-        b += `<rect x="${pad + c * S + 3}" y="${pad + r * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" class="f-series" opacity="0.18"/>`;
-        b += badge(cx(c), cy(r), i + 1);
+      body += `<polyline points="${data.path.map(([row, column]) => `${centerX(column)},${centerY(row)}`).join(' ')}" fill="none" class="s-axis" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>`;
+      const [startRow, startColumn] = data.path[0];
+      body += `<rect x="${pad + startColumn * cellSize + 3}" y="${pad + startRow * cellSize + 3}" width="${cellSize - 6}" height="${cellSize - 6}" rx="8" class="b-ink2"/><text x="${centerX(startColumn)}" y="${centerY(startRow) + 4}" text-anchor="middle" font-size="11" font-weight="700" class="b-surf">출발</text>`;
+      inputs.forEach((input, i) => {
+        const [row, column] = input.cell;
+        body += `<rect x="${pad + column * cellSize + 3}" y="${pad + row * cellSize + 3}" width="${cellSize - 6}" height="${cellSize - 6}" rx="8" class="f-series" opacity="0.18"/>`;
+        body += badge(centerX(column), centerY(row), i + 1);
       });
-      if (ans && ans.wrongCell) {
-        const [r, c] = ans.wrongCell;
-        b += `<rect x="${pad + c * S + 3}" y="${pad + r * S + 3}" width="${S - 6}" height="${S - 6}" rx="8" fill="none" class="s-bad" stroke-width="3"/>`;
-        b += `<text x="${cx(c)}" y="${cy(r) + 6}" text-anchor="middle" font-size="18" font-weight="700" class="f-bad">✕</text>`;
+      if (answer && answer.wrongCell) {
+        const [row, column] = answer.wrongCell;
+        body += `<rect x="${pad + column * cellSize + 3}" y="${pad + row * cellSize + 3}" width="${cellSize - 6}" height="${cellSize - 6}" rx="8" fill="none" class="s-bad" stroke-width="3"/>`;
+        body += `<text x="${centerX(column)}" y="${centerY(row) + 6}" text-anchor="middle" font-size="18" font-weight="700" class="f-bad">✕</text>`;
       }
-      return svg(cols * S + pad * 2, rows * S + pad * 2, b, '길 격자와 누른 칸');
+      return svg(cols * cellSize + pad * 2, rows * cellSize + pad * 2, body, '길 격자와 누른 칸');
     },
 
-    arith(q, inputs, ans) {
-      const d = q.data, n = d.ops.length + 1, W = 52, gap = 30;
-      const fill = Array(n).fill(null);
-      (d.given || []).forEach((i) => (fill[i] = d.sol[i]));
-      for (const e of inputs) { if ('put' in e) fill[e.slot] = e.put; else if ('remove' in e) fill[e.slot] = null; }
-      if (ans && ans.fill) ans.fill.forEach((v, i) => (fill[i] = v));
-      let b = '', x = 10;
-      for (let i = 0; i < n; i++) {
-        const given = (d.given || []).includes(i);
-        b += `<rect x="${x}" y="10" width="${W}" height="${W}" rx="8" class="${given ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1.5"/>`;
-        if (fill[i] != null) b += `<text x="${x + W / 2}" y="${10 + W / 2 + 8}" text-anchor="middle" font-size="24" font-weight="700" class="b-ink">${fill[i]}</text>`;
-        x += W;
-        if (i < n - 1) { b += `<text x="${x + gap / 2}" y="${10 + W / 2 + 8}" text-anchor="middle" font-size="22" class="b-ink2">${d.ops[i] === '+' ? '+' : '−'}</text>`; x += gap; }
+    arith(question, inputs, answer) {
+      const data = question.data, slotCount = data.ops.length + 1, slotSize = 52, gap = 30;
+      const filled = Array(slotCount).fill(null);
+      (data.given || []).forEach((i) => (filled[i] = data.sol[i]));
+      for (const input of inputs) { if ('put' in input) filled[input.slot] = input.put; else if ('remove' in input) filled[input.slot] = null; }
+      if (answer && answer.fill) answer.fill.forEach((value, i) => (filled[i] = value));
+      let body = '', x = 10;
+      for (let i = 0; i < slotCount; i++) {
+        const given = (data.given || []).includes(i);
+        body += `<rect x="${x}" y="10" width="${slotSize}" height="${slotSize}" rx="8" class="${given ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1.5"/>`;
+        if (filled[i] != null) body += `<text x="${x + slotSize / 2}" y="${10 + slotSize / 2 + 8}" text-anchor="middle" font-size="24" font-weight="700" class="b-ink">${filled[i]}</text>`;
+        x += slotSize;
+        if (i < slotCount - 1) { body += `<text x="${x + gap / 2}" y="${10 + slotSize / 2 + 8}" text-anchor="middle" font-size="22" class="b-ink2">${data.ops[i] === '+' ? '+' : '−'}</text>`; x += gap; }
       }
-      b += `<text x="${x + gap / 2}" y="${10 + W / 2 + 8}" text-anchor="middle" font-size="22" class="b-ink2">=</text>`;
+      body += `<text x="${x + gap / 2}" y="${10 + slotSize / 2 + 8}" text-anchor="middle" font-size="22" class="b-ink2">=</text>`;
       x += gap;
-      b += `<text x="${x + 4}" y="${10 + W / 2 + 9}" font-size="26" font-weight="700" class="b-ink">${d.ans}</text>`;
-      const w = x + 60;
+      body += `<text x="${x + 4}" y="${10 + slotSize / 2 + 9}" font-size="26" font-weight="700" class="b-ink">${data.ans}</text>`;
+      const width = x + 60;
       // 보기
-      const cw = 44, cx0 = Math.max(10, (w - d.cands.length * (cw + 8)) / 2);
-      d.cands.forEach((v, i) => {
-        const used = fill.includes(v), xx = cx0 + i * (cw + 8);
-        b += `<rect x="${xx}" y="${W + 34}" width="${cw}" height="38" rx="8" class="${used ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1"/>`;
-        b += `<text x="${xx + cw / 2}" y="${W + 59}" text-anchor="middle" font-size="16" font-weight="600" class="${used ? 'b-mut' : 'b-ink'}">${v}</text>`;
+      const candidateWidth = 44, candidatesLeft = Math.max(10, (width - data.cands.length * (candidateWidth + 8)) / 2);
+      data.cands.forEach((value, i) => {
+        const used = filled.includes(value), candidateX = candidatesLeft + i * (candidateWidth + 8);
+        body += `<rect x="${candidateX}" y="${slotSize + 34}" width="${candidateWidth}" height="38" rx="8" class="${used ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1"/>`;
+        body += `<text x="${candidateX + candidateWidth / 2}" y="${slotSize + 59}" text-anchor="middle" font-size="16" font-weight="600" class="${used ? 'b-mut' : 'b-ink'}">${value}</text>`;
       });
-      if (ans && !ans.correct) b += `<text x="10" y="${W + 98}" font-size="12" class="b-ink2">풀이 예: ${d.sol.map((v, i) => (i ? ` ${d.ops[i - 1] === '+' ? '+' : '−'} ` : '') + v).join('')} = ${d.ans}</text>`;
-      return svg(w, W + (ans && !ans.correct ? 108 : 86), b, '식과 보기');
+      if (answer && !answer.correct) body += `<text x="10" y="${slotSize + 98}" font-size="12" class="b-ink2">풀이 예: ${data.sol.map((value, i) => (i ? ` ${data.ops[i - 1] === '+' ? '+' : '−'} ` : '') + value).join('')} = ${data.ans}</text>`;
+      return svg(width, slotSize + (answer && !answer.correct ? 108 : 86), body, '식과 보기');
     },
 
-    compare(q, inputs, ans) {
-      const d = q.data, n = d.grid, S = 36, pad = 16, side = (n - 1) * S + pad * 2, gap = 34;
-      const key = (l) => l.slice(0, 4).join(',');
-      const same4 = (a, b) => key(a) === key(b) || key(a) === [b[2], b[3], b[0], b[1]].join(',');
-      const c = d.change || {};
-      let right = d.left.filter((l) => !(c.removed && same4(l, c.removed))).map((l) => l.slice());
-      if (c.added) right.push(c.added.slice());
-      if (c.restyled) right = right.map((l) => (same4(l, c.restyled) ? c.restyled.slice() : l));
-      const isChanged = (l, onLeft) => ans && d.change && ((onLeft && c.removed && same4(l, c.removed)) || (!onLeft && ((c.added && same4(l, c.added)) || (c.restyled && same4(l, c.restyled)))) || (c.restyled && same4(l, c.restyled)));
-      const card = (ox, lines, onLeft) => {
-        let b = `<rect x="${ox}" y="0" width="${side}" height="${side}" rx="10" class="b-surf s-axis" stroke-width="1"/>`;
-        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) b += `<circle cx="${ox + pad + x * S}" cy="${pad + y * S}" r="2.2" class="b-mut"/>`;
-        for (const l of lines) {
-          const [x1, y1, x2, y2, st] = l, hl = isChanged(l, onLeft);
-          const p = `x1="${ox + pad + x1 * S}" y1="${pad + y1 * S}" x2="${ox + pad + x2 * S}" y2="${pad + y2 * S}" stroke-linecap="round"`;
-          const col = hl ? 'var(--late)' : 'var(--ink)';
-          b += `<line ${p} stroke="${col}" stroke-width="${st === 'h' ? 8 : 5}"/>`;
-          if (st === 'h') b += `<line ${p} stroke="var(--hollow-in)" stroke-width="3.5"/>`;
+    compare(question, inputs, answer) {
+      const data = question.data, gridSize = data.grid, spacing = 36, pad = 16, side = (gridSize - 1) * spacing + pad * 2, gap = 34;
+      const lineKey = (line) => line.slice(0, 4).join(',');
+      const sameLine = (a, b) => lineKey(a) === lineKey(b) || lineKey(a) === [b[2], b[3], b[0], b[1]].join(',');
+      const change = data.change || {};
+      let right = data.left.filter((line) => !(change.removed && sameLine(line, change.removed))).map((line) => line.slice());
+      if (change.added) right.push(change.added.slice());
+      if (change.restyled) right = right.map((line) => (sameLine(line, change.restyled) ? change.restyled.slice() : line));
+      const isChanged = (line, onLeft) => answer && data.change && ((onLeft && change.removed && sameLine(line, change.removed)) || (!onLeft && ((change.added && sameLine(line, change.added)) || (change.restyled && sameLine(line, change.restyled)))) || (change.restyled && sameLine(line, change.restyled)));
+      const card = (cardLeft, lines, onLeft) => {
+        let cardBody = `<rect x="${cardLeft}" y="0" width="${side}" height="${side}" rx="10" class="b-surf s-axis" stroke-width="1"/>`;
+        for (let y = 0; y < gridSize; y++) for (let x = 0; x < gridSize; x++) cardBody += `<circle cx="${cardLeft + pad + x * spacing}" cy="${pad + y * spacing}" r="2.2" class="b-mut"/>`;
+        for (const line of lines) {
+          const [fromX, fromY, toX, toY, lineStyle] = line, highlighted = isChanged(line, onLeft);
+          const ends = `x1="${cardLeft + pad + fromX * spacing}" y1="${pad + fromY * spacing}" x2="${cardLeft + pad + toX * spacing}" y2="${pad + toY * spacing}" stroke-linecap="round"`;
+          const stroke = highlighted ? 'var(--late)' : 'var(--ink)';
+          cardBody += `<line ${ends} stroke="${stroke}" stroke-width="${lineStyle === 'h' ? 8 : 5}"/>`;
+          if (lineStyle === 'h') cardBody += `<line ${ends} stroke="var(--hollow-in)" stroke-width="3.5"/>`;
         }
-        return b;
+        return cardBody;
       };
-      let b = card(0, d.left, true) + card(side + gap, right, false);
-      b += `<text x="${side + gap / 2}" y="${side / 2 + 6}" text-anchor="middle" font-size="16" class="b-mut">↔</text>`;
-      const h = side + 44, mid = side + gap / 2;
-      const opt = (x, label, v) => {
-        const picked = ans && ans.picked === v, rightAns = (v === 'same') === d.same;
-        const cls = picked ? (rightAns ? 's-good' : 's-bad') : 's-axis';
-        return `<rect x="${x}" y="${side + 12}" width="96" height="30" rx="15" class="b-surf ${cls}" stroke-width="${picked ? 3 : 1}"/><text x="${x + 48}" y="${side + 32}" text-anchor="middle" font-size="13" font-weight="600" class="${ans && rightAns ? 'b-ink' : 'b-ink2'}">${label}</text>`;
+      let body = card(0, data.left, true) + card(side + gap, right, false);
+      body += `<text x="${side + gap / 2}" y="${side / 2 + 6}" text-anchor="middle" font-size="16" class="b-mut">↔</text>`;
+      const height = side + 44, mid = side + gap / 2;
+      const option = (x, label, value) => {
+        const picked = answer && answer.picked === value, rightAnswer = (value === 'same') === data.same;
+        const strokeClass = picked ? (rightAnswer ? 's-good' : 's-bad') : 's-axis';
+        return `<rect x="${x}" y="${side + 12}" width="96" height="30" rx="15" class="b-surf ${strokeClass}" stroke-width="${picked ? 3 : 1}"/><text x="${x + 48}" y="${side + 32}" text-anchor="middle" font-size="13" font-weight="600" class="${answer && rightAnswer ? 'b-ink' : 'b-ink2'}">${label}</text>`;
       };
-      b += opt(mid - 104, '같아요', 'same') + opt(mid + 8, '달라요', 'diff');
-      return svg(side * 2 + gap, h, b, '두 그림과 보기');
+      body += option(mid - 104, '같아요', 'same') + option(mid + 8, '달라요', 'diff');
+      return svg(side * 2 + gap, height, body, '두 그림과 보기');
     },
 
     // 배관 타기: 사다리 타기와 판 모양(위 조각 · 아래 구멍)이 같아 같은 그림을 쓴다
-    pipe(q, inputs, ans) {
-      return DRAW.ladder(q, inputs, ans);
+    pipe(question, inputs, answer) {
+      return DRAW.ladder(question, inputs, answer);
     },
 
-    ladder(q, inputs, ans) {
-      const d = q.data, L = d.lanes, X = 70, H = 230, top = 42, pad = 30;
-      const lx = (i) => pad + i * X, ly = (v) => top + v * H;
-      let b = '';
+    ladder(question, inputs, answer) {
+      const data = question.data, lanes = data.lanes, laneGap = 70, boardHeight = 230, top = 42, pad = 30;
+      const laneX = (i) => pad + i * laneGap, heightY = (fraction) => top + fraction * boardHeight;
+      let body = '';
       // 위의 조각과 아래 구멍을 얹어 마무리한다 (두 판 공통)
-      const finish = (body, label) => {
-        d.pegs.forEach((s, i) => {
-          const picked = ans && ans.picked === i;
-          body += `<g class="${picked ? (ans.correct ? 'f-good' : 'f-bad') : 'b-ink2'}">${(SHAPES[s] || SHAPES.circle)(lx(i), top - 22, 11)}</g>`;
+      const finish = (finishedBody, label) => {
+        data.pegs.forEach((shape, i) => {
+          const picked = answer && answer.picked === i;
+          finishedBody += `<g class="${picked ? (answer.correct ? 'f-good' : 'f-bad') : 'b-ink2'}">${(SHAPES[shape] || SHAPES.circle)(laneX(i), top - 22, 11)}</g>`;
         });
-        d.holes.forEach((s, i) => {
-          if (!s) return;
-          body += `<g fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="3 2">${(SHAPES[s] || SHAPES.circle)(lx(i), top + H + 22, 11)}</g>`;
+        data.holes.forEach((shape, i) => {
+          if (!shape) return;
+          finishedBody += `<g fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="3 2">${(SHAPES[shape] || SHAPES.circle)(laneX(i), top + boardHeight + 22, 11)}</g>`;
         });
-        return svg(pad * 2 + (L - 1) * X, top + H + 44, body, label);
+        return svg(pad * 2 + (lanes - 1) * laneGap, top + boardHeight + 44, finishedBody, label);
       };
       // 배관 타기 (pipe, 2026-11-20 부터)는 관마다 그린 점(lines)을, 예전 사다리 타기 (ladder)는 가로줄(rungs)을 남긴다
-      if (d.lines) {
+      if (data.lines) {
         // 선마다 그린 점 [x, y, x, y, ...] (게임 판 좌표, 화면에 그린 관의 가운데 줄)
-        // 판 좌표 → 이 그림 좌표: 출발점들의 x 를 lx(0) ~ lx(L - 1) 에, 선의 위 끝 ~ 아래 끝을 top ~ top + H 에 맞춘다
-        const startX = d.lines.map((l) => l[0]);
-        const [bx0, bx1] = [Math.min(...startX), Math.max(...startX)];
-        const by0 = d.lines[0][1], by1 = d.lines[0][d.lines[0].length - 1];
-        const fx = (x) => lx(0) + ((x - bx0) / (bx1 - bx0)) * (lx(L - 1) - lx(0));
-        const fy = (y) => top + ((y - by0) / (by1 - by0)) * H;
-        const pts = (line) => line.reduce((out, v, i) => (i % 2 ? out : [...out, `${fx(v).toFixed(1)},${fy(line[i + 1]).toFixed(1)}`]), []).join(' ');
-        for (const line of d.lines) b += `<polyline points="${pts(line)}" fill="none" class="s-axis" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
-        const traceOf = (start) => `${lx(start)},${top - 10} ${pts(d.lines[start])}`;
-        if (ans) {
-          if (ans.picked !== d.answer) b += `<polyline points="${traceOf(d.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
-          if (ans.picked != null) b += `<polyline points="${traceOf(ans.picked)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+        // 판 좌표 → 이 그림 좌표: 출발점들의 x 를 laneX(0) ~ laneX(lanes - 1) 에, 선의 위 끝 ~ 아래 끝을 top ~ top + boardHeight 에 맞춘다
+        const startX = data.lines.map((line) => line[0]);
+        const [boardLeft, boardRight] = [Math.min(...startX), Math.max(...startX)];
+        const boardTop = data.lines[0][1], boardBottom = data.lines[0][data.lines[0].length - 1];
+        const toPictureX = (x) => laneX(0) + ((x - boardLeft) / (boardRight - boardLeft)) * (laneX(lanes - 1) - laneX(0));
+        const toPictureY = (y) => top + ((y - boardTop) / (boardBottom - boardTop)) * boardHeight;
+        const pointsOf = (line) => line.reduce((out, value, i) => (i % 2 ? out : [...out, `${toPictureX(value).toFixed(1)},${toPictureY(line[i + 1]).toFixed(1)}`]), []).join(' ');
+        for (const line of data.lines) body += `<polyline points="${pointsOf(line)}" fill="none" class="s-axis" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+        const traceOf = (start) => `${laneX(start)},${top - 10} ${pointsOf(data.lines[start])}`;
+        if (answer) {
+          if (answer.picked !== data.answer) body += `<polyline points="${traceOf(data.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
+          if (answer.picked != null) body += `<polyline points="${traceOf(answer.picked)}" fill="none" class="${answer.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
         }
-        return finish(b, '배관');
+        return finish(body, '배관');
       }
-      for (let i = 0; i < L; i++) b += `<line x1="${lx(i)}" y1="${top}" x2="${lx(i)}" y2="${top + H}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
-      for (const [i, yl, yr] of d.rungs) b += `<line x1="${lx(i)}" y1="${ly(yl)}" x2="${lx(i + 1)}" y2="${ly(yr)}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
+      for (let i = 0; i < lanes; i++) body += `<line x1="${laneX(i)}" y1="${top}" x2="${laneX(i)}" y2="${top + boardHeight}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
+      for (const [i, leftY, rightY] of data.rungs) body += `<line x1="${laneX(i)}" y1="${heightY(leftY)}" x2="${laneX(i + 1)}" y2="${heightY(rightY)}" class="s-axis" stroke-width="4" stroke-linecap="round"/>`;
       const trace = (start) => {
-        let lane = start, y = 0; const pts = [[lx(lane), ly(0)]];
+        let lane = start, y = 0; const points = [[laneX(lane), heightY(0)]];
         for (let guard = 0; guard < 99; guard++) {
           let best = null;
-          for (const [i, yl, yr] of d.rungs) {
-            if (i === lane && yl > y + 1e-9 && (!best || yl < best.y)) best = { y: yl, to: i + 1, ty: yr };
-            if (i + 1 === lane && yr > y + 1e-9 && (!best || yr < best.y)) best = { y: yr, to: i, ty: yl };
+          for (const [i, leftY, rightY] of data.rungs) {
+            if (i === lane && leftY > y + 1e-9 && (!best || leftY < best.y)) best = { y: leftY, toLane: i + 1, landingY: rightY };
+            if (i + 1 === lane && rightY > y + 1e-9 && (!best || rightY < best.y)) best = { y: rightY, toLane: i, landingY: leftY };
           }
           if (!best) break;
-          pts.push([lx(lane), ly(best.y)], [lx(best.to), ly(best.ty)]);
-          lane = best.to; y = best.ty;
+          points.push([laneX(lane), heightY(best.y)], [laneX(best.toLane), heightY(best.landingY)]);
+          lane = best.toLane; y = best.landingY;
         }
-        pts.push([lx(lane), ly(1)]);
-        return pts.map((p) => p.join(',')).join(' ');
+        points.push([laneX(lane), heightY(1)]);
+        return points.map((point) => point.join(',')).join(' ');
       };
-      if (ans) {
-        if (ans.picked !== d.answer) b += `<polyline points="${trace(d.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
-        if (ans.picked != null) b += `<polyline points="${trace(ans.picked)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      if (answer) {
+        if (answer.picked !== data.answer) body += `<polyline points="${trace(data.answer)}" fill="none" class="s-good" stroke-width="3" stroke-dasharray="6 5" stroke-linejoin="round"/>`;
+        if (answer.picked != null) body += `<polyline points="${trace(answer.picked)}" fill="none" class="${answer.correct ? 's-good' : 's-bad'}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
       }
-      return finish(b, '사다리');
+      return finish(body, '사다리');
     },
 
-    seek(q, inputs, ans) {
-      const d = q.data, S = 24, r3 = Math.sqrt(3);
-      const cs = d.cells.map(([qq, r]) => [r3 * (qq + r / 2) * S, 1.5 * r * S]);
-      const xs = cs.map((c) => c[0]), ys = cs.map((c) => c[1]);
-      const minX = Math.min(...xs) - S, minY = Math.min(...ys) - S, w = Math.max(...xs) - minX + S, top = 56;
-      const hex = (x, y, s) => Array.from({ length: 6 }, (_, k) => { const a = Math.PI / 180 * (60 * k - 30); return `${(x + s * Math.cos(a)).toFixed(1)},${(y + s * Math.sin(a)).toFixed(1)}`; }).join(' ');
-      let b = '';
+    seek(question, inputs, answer) {
+      const data = question.data, cellSize = 24, sqrt3 = Math.sqrt(3);
+      const centers = data.cells.map(([axialQ, axialR]) => [sqrt3 * (axialQ + axialR / 2) * cellSize, 1.5 * axialR * cellSize]);
+      const centerXs = centers.map((center) => center[0]), centerYs = centers.map((center) => center[1]);
+      const minX = Math.min(...centerXs) - cellSize, minY = Math.min(...centerYs) - cellSize, width = Math.max(...centerXs) - minX + cellSize, top = 56;
+      const hexPoints = (x, y, size) => Array.from({ length: 6 }, (_, corner) => { const angle = Math.PI / 180 * (60 * corner - 30); return `${(x + size * Math.cos(angle)).toFixed(1)},${(y + size * Math.sin(angle)).toFixed(1)}`; }).join(' ');
+      let body = '';
       // 찾을 순서
-      const sx = w / 2 - (d.seq.length * 34) / 2;
-      b += `<text x="${w / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">찾을 순서</text>`;
-      d.seq.forEach((s, i) => { b += `<rect x="${sx + i * 34 + 2}" y="18" width="30" height="30" rx="6" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${SHAPES[SEEK_GLYPHS[s % 8]](sx + i * 34 + 17, 33, 9)}</g>`; });
-      cs.forEach(([x, y], i) => {
-        const X = x - minX, Y = y - minY + top, onAns = ans && d.answer.includes(i), picked = ans && ans.cell === i;
-        b += `<polygon points="${hex(X, Y, S * 0.95)}" class="${onAns ? 'f-good' : 'b-surf'} s-axis" stroke-width="1" ${onAns ? 'fill-opacity="0.22"' : ''}/>`;
-        b += `<g class="b-ink">${SHAPES[SEEK_GLYPHS[d.syms[i] % 8]](X, Y, 8.5)}</g>`;
-        if (picked) b += `<polygon points="${hex(X, Y, S * 0.82)}" fill="none" class="${ans.correct ? 's-good' : 's-bad'}" stroke-width="3"/>`;
+      const sequenceLeft = width / 2 - (data.seq.length * 34) / 2;
+      body += `<text x="${width / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">찾을 순서</text>`;
+      data.seq.forEach((symbol, i) => { body += `<rect x="${sequenceLeft + i * 34 + 2}" y="18" width="30" height="30" rx="6" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${SHAPES[SEEK_GLYPHS[symbol % 8]](sequenceLeft + i * 34 + 17, 33, 9)}</g>`; });
+      centers.forEach(([x, y], i) => {
+        const cellX = x - minX, cellY = y - minY + top, inAnswer = answer && data.answer.includes(i), picked = answer && answer.cell === i;
+        body += `<polygon points="${hexPoints(cellX, cellY, cellSize * 0.95)}" class="${inAnswer ? 'f-good' : 'b-surf'} s-axis" stroke-width="1" ${inAnswer ? 'fill-opacity="0.22"' : ''}/>`;
+        body += `<g class="b-ink">${SHAPES[SEEK_GLYPHS[data.syms[i] % 8]](cellX, cellY, 8.5)}</g>`;
+        if (picked) body += `<polygon points="${hexPoints(cellX, cellY, cellSize * 0.82)}" fill="none" class="${answer.correct ? 's-good' : 's-bad'}" stroke-width="3"/>`;
       });
-      return svg(w, Math.max(...ys) - minY + S + top, b, '육각 판과 찾을 순서');
+      return svg(width, Math.max(...centerYs) - minY + cellSize + top, body, '육각 판과 찾을 순서');
     },
   };
 
   // ---------- 화면 ----------
-  let M = null, t = 0, playing = false, speed = 4, cur = null;
+  let model = null, playhead = 0, playing = false, speed = 4, currentQuestion = null;
 
   function load(log) {
-    M = model(log);
+    model = buildModel(log);
     $('#tl-sec').hidden = false;
     $('#stage').hidden = false;
-    const m = log.meta || {}, s = m.summary || {};
-    const when = m.startedAt ? new Date(m.startedAt).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '';
-    const ended = { complete: '끝까지 함', user: '그만하기', operator: '운영자가 끝냄', idle: '자리 비움', abandoned: '중단' }[m.ended] || m.ended || '';
-    $('#sess-meta').textContent = [when, m.station ? `스테이션 ${m.station}` : null, m.participant ? `참가 ${m.participant}` : null,
-      m.track === 'brain' ? '두뇌 게임만' : '페달 + 두뇌 게임', m.input === 'pedal' ? '페달' : '키보드', ended, `로그 v${m.version ?? '?'}`].filter(Boolean).join(' · ');
+    const meta = log.meta || {}, summary = meta.summary || {};
+    const when = meta.startedAt ? new Date(meta.startedAt).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    const ended = { complete: '끝까지 함', user: '그만하기', operator: '운영자가 끝냄', idle: '자리 비움', abandoned: '중단' }[meta.ended] || meta.ended || '';
+    $('#sess-meta').textContent = [when, meta.station ? `스테이션 ${meta.station}` : null, meta.participant ? `참가 ${meta.participant}` : null,
+      meta.track === 'brain' ? '두뇌 게임만' : '페달 + 두뇌 게임', meta.input === 'pedal' ? '페달' : '키보드', ended, `로그 v${meta.version ?? '?'}`].filter(Boolean).join(' · ');
 
-    const done = M.qs.filter((q) => q.answer);
-    const inTime = done.filter((q) => !q.answer.timedOut && q.answer.ms != null);
-    const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
-    const play = M.samples.filter((x) => x.c >= M.playStart && x.target != null);
-    const zone = play.length ? Math.round((100 * play.filter((x) => x.inZone).length) / play.length) : null;
-    const tile = (k, v, small = '', extra = '') => `<div class="tile"><div class="k">${k}</div><div class="v">${v}<small>${small}</small></div>${extra ? `<div class="x">${extra}</div>` : ''}</div>`;
+    const done = model.questions.filter((question) => question.answer);
+    const inTime = done.filter((question) => !question.answer.timedOut && question.answer.ms != null);
+    const average = (values) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null);
+    const playSamples = model.samples.filter((sample) => sample.clock >= model.playStart && sample.target != null);
+    const zone = playSamples.length ? Math.round((100 * playSamples.filter((sample) => sample.inZone).length) / playSamples.length) : null;
+    const tile = (label, value, small = '', extra = '') => `<div class="tile"><div class="k">${label}</div><div class="v">${value}<small>${small}</small></div>${extra ? `<div class="x">${extra}</div>` : ''}</div>`;
     $('#tiles').innerHTML = [
-      tile('총점', s.score ?? '–', '', s.exScore != null ? `운동 ${s.exScore} · 인지 ${s.cogScore}` : ''),
-      tile('정답', `${done.filter((q) => q.answer.correct).length}/${done.length}`, '', done.some((q) => q.answer.timedOut) ? `시간 초과 ${done.filter((q) => q.answer.timedOut).length}번` : ''),
-      tile('첫 입력까지 (평균)', inTime.length ? (avg(inTime.map((q) => q.answer.first ?? q.answer.ms)) / 1000).toFixed(1) : '–', '초'),
-      tile('답까지 (평균)', inTime.length ? (avg(inTime.map((q) => q.answer.ms)) / 1000).toFixed(1) : '–', '초'),
+      tile('총점', summary.score ?? '–', '', summary.exScore != null ? `운동 ${summary.exScore} · 인지 ${summary.cogScore}` : ''),
+      tile('정답', `${done.filter((question) => question.answer.correct).length}/${done.length}`, '', done.some((question) => question.answer.timedOut) ? `시간 초과 ${done.filter((question) => question.answer.timedOut).length}번` : ''),
+      tile('첫 입력까지 (평균)', inTime.length ? (average(inTime.map((question) => question.answer.first ?? question.answer.ms)) / 1000).toFixed(1) : '–', '초'),
+      tile('답까지 (평균)', inTime.length ? (average(inTime.map((question) => question.answer.ms)) / 1000).toFixed(1) : '–', '초'),
       tile('초록 구역 안', zone == null ? '–' : zone, zone == null ? '' : '%'),
-      tile('플레이 시간', s.elapsedSec != null ? fmt(s.elapsedSec * 1000, false) : fmt(M.end - M.playStart, false)),
+      tile('플레이 시간', summary.elapsedSec != null ? clockText(summary.elapsedSec * 1000, false) : clockText(model.end - model.playStart, false)),
     ].join('');
 
-    $('#legend').innerHTML = M.order.map((id) => `<span><i style="background:${gColor(M, id)}"></i>${esc(TITLES[id] || id)}</span>`).join('') +
-      (M.brain ? '' : `<span><i style="background:var(--zone);outline:1px solid var(--zone-edge)"></i>목표 구역</span><span><i style="background:var(--series);height:2px"></i>RPM</span>`);
+    $('#legend').innerHTML = model.order.map((id) => `<span><i style="background:${gameColor(id)}"></i>${escapeHtml(TITLES[id] || id)}</span>`).join('') +
+      (model.brain ? '' : `<span><i style="background:var(--zone);outline:1px solid var(--zone-edge)"></i>목표 구역</span><span><i style="background:var(--series);height:2px"></i>RPM</span>`);
 
-    $('#q-count').textContent = `${M.qs.length}개 · ${M.games.length}판`;
-    $('#q-body').innerHTML = M.qs.map((q, i) => {
-      const r = result(q), a = q.answer;
-      return `<tr class="q-row" tabindex="0" data-i="${i}"><td>${q.n}</td><td><span class="sw" style="background:${gColor(M, q.game)}"></span>${esc(TITLES[q.game] || q.game)}</td><td>${q.level}</td>
-        <td><span class="dot ${r}"></span> ${RESULT[r]}</td><td>${a ? sec(a.first) : '–'}</td><td>${a ? sec(a.ms) : '–'}</td></tr>`;
+    $('#q-count').textContent = `${model.questions.length}개 · ${model.games.length}판`;
+    $('#q-body').innerHTML = model.questions.map((question, i) => {
+      const result = resultOf(question), answer = question.answer;
+      return `<tr class="q-row" tabindex="0" data-i="${i}"><td>${question.number}</td><td><span class="sw" style="background:${gameColor(question.game)}"></span>${escapeHtml(TITLES[question.game] || question.game)}</td><td>${question.level}</td>
+        <td><span class="dot ${result}"></span> ${RESULT[result]}</td><td>${answer ? seconds(answer.first) : '–'}</td><td>${answer ? seconds(answer.ms) : '–'}</td></tr>`;
     }).join('');
-    const first = M.qs[0];
-    seek(first && first.answer ? first.answer.clock : M.end / 3);
+    const first = model.questions[0];
+    seek(first && first.answer ? first.answer.clock : model.end / 3);
     drawTimeline();
     render();
   }
 
   // 타임라인 좌표
-  const TL = { W: 1000, H: 196, l: 40, r: 12, band: [6, 26], chart: [40, 148], qrow: [160, 172], axis: 190 };
-  const tx = (c) => TL.l + (c / Math.max(1, M.end)) * (TL.W - TL.l - TL.r);
+  const TIMELINE = { width: 1000, height: 196, left: 40, right: 12, band: [6, 26], chart: [40, 148], questionRow: [160, 172], axis: 190 };
+  const timeX = (clock) => TIMELINE.left + (clock / Math.max(1, model.end)) * (TIMELINE.width - TIMELINE.left - TIMELINE.right);
   function drawTimeline() {
-    const el = $('#tl');
-    el.setAttribute('viewBox', `0 0 ${TL.W} ${TL.H}`);
+    const timeline = $('#tl');
+    timeline.setAttribute('viewBox', `0 0 ${TIMELINE.width} ${TIMELINE.height}`);
     // 두뇌 게임만 한 판은 페달 기록이 없어(rpm 0, 목표 없음) RPM 그래프 대신 한 줄 안내만 둔다
-    const brain = M.brain;
-    const sm = M.samples.filter((x) => x.rpm != null);
-    const hi = Math.max(10, ...sm.map((x) => x.rpm), ...sm.filter((x) => x.target != null).map((x) => x.target * (1 + M.tol))) * 1.08;
-    const ry = (v) => TL.chart[1] - (v / hi) * (TL.chart[1] - TL.chart[0]);
-    let b = '';
+    const brain = model.brain;
+    const rpmSamples = model.samples.filter((sample) => sample.rpm != null);
+    const rpmMax = Math.max(10, ...rpmSamples.map((sample) => sample.rpm), ...rpmSamples.filter((sample) => sample.target != null).map((sample) => sample.target * (1 + model.tolerance))) * 1.08;
+    const rpmY = (rpm) => TIMELINE.chart[1] - (rpm / rpmMax) * (TIMELINE.chart[1] - TIMELINE.chart[0]);
+    let body = '';
     // 눈금
-    const step = M.end > 240000 ? 60000 : 30000;
-    for (let c = 0; c <= M.end; c += step) b += `<line x1="${tx(c)}" y1="${TL.chart[0] - 4}" x2="${tx(c)}" y2="${TL.qrow[1]}" stroke="var(--grid)"/><text x="${tx(c)}" y="${TL.axis}" text-anchor="middle" class="lbl">${fmt(c, false)}</text>`;
-    if (brain) b += `<text x="${(TL.l + TL.W - TL.r) / 2}" y="${(TL.chart[0] + TL.chart[1]) / 2 + 4}" text-anchor="middle" class="lbl">두뇌 게임만 한 판 — 페달 기록 없음</text>`;
-    else for (const v of [0, Math.round(hi / 2 / 10) * 10]) b += `<text x="${TL.l - 6}" y="${ry(v) + 4}" text-anchor="end" class="lbl">${v}</text>`;
-    if (!brain) b += `<text x="${TL.l - 6}" y="${TL.chart[0] + 2}" text-anchor="end" class="lbl">RPM</text>`;
+    const step = model.end > 240000 ? 60000 : 30000;
+    for (let clock = 0; clock <= model.end; clock += step) body += `<line x1="${timeX(clock)}" y1="${TIMELINE.chart[0] - 4}" x2="${timeX(clock)}" y2="${TIMELINE.questionRow[1]}" stroke="var(--grid)"/><text x="${timeX(clock)}" y="${TIMELINE.axis}" text-anchor="middle" class="lbl">${clockText(clock, false)}</text>`;
+    if (brain) body += `<text x="${(TIMELINE.left + TIMELINE.width - TIMELINE.right) / 2}" y="${(TIMELINE.chart[0] + TIMELINE.chart[1]) / 2 + 4}" text-anchor="middle" class="lbl">두뇌 게임만 한 판 — 페달 기록 없음</text>`;
+    else for (const rpm of [0, Math.round(rpmMax / 2 / 10) * 10]) body += `<text x="${TIMELINE.left - 6}" y="${rpmY(rpm) + 4}" text-anchor="end" class="lbl">${rpm}</text>`;
+    if (!brain) body += `<text x="${TIMELINE.left - 6}" y="${TIMELINE.chart[0] + 2}" text-anchor="end" class="lbl">RPM</text>`;
     // 측정(두뇌 게임만이면 카운트다운) 구간. 이름은 들어갈 만큼 넓을 때만
-    if (M.playStart > 0) {
-      const w = tx(M.playStart) - tx(0);
-      b += `<rect x="${tx(0)}" y="${TL.band[0]}" width="${w}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="var(--grid)"/>`;
-      if (w > 36) b += `<text x="${tx(0) + w / 2}" y="${TL.band[0] + 14}" text-anchor="middle" class="lbl-ink">${brain ? '준비' : '측정'}</text>`;
+    if (model.playStart > 0) {
+      const width = timeX(model.playStart) - timeX(0);
+      body += `<rect x="${timeX(0)}" y="${TIMELINE.band[0]}" width="${width}" height="${TIMELINE.band[1] - TIMELINE.band[0]}" rx="3" fill="var(--grid)"/>`;
+      if (width > 36) body += `<text x="${timeX(0) + width / 2}" y="${TIMELINE.band[0] + 14}" text-anchor="middle" class="lbl-ink">${brain ? '준비' : '측정'}</text>`;
     }
     // 게임 띠 (소개 부분은 옅게)
-    for (const g of M.games) {
-      const x0 = tx(g.start), x1 = tx(g.end), xo = tx(g.open ?? g.start), col = gColor(M, g.game);
-      b += `<rect x="${x0}" y="${TL.band[0]}" width="${Math.max(1, x1 - x0 - 1)}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="${col}" opacity="0.35"/>`;
-      b += `<rect x="${xo}" y="${TL.band[0]}" width="${Math.max(1, x1 - xo - 1)}" height="${TL.band[1] - TL.band[0]}" rx="3" fill="${col}"/>`;
-      const name = TITLES[g.game] || g.game;
-      if (x1 - xo > name.length * 11 + 8) b += `<text x="${xo + 6}" y="${TL.band[0] + 14}" class="band-lbl">${esc(name)}</text>`;
+    for (const round of model.games) {
+      const startX = timeX(round.start), endX = timeX(round.end), openX = timeX(round.open ?? round.start), color = gameColor(round.game);
+      body += `<rect x="${startX}" y="${TIMELINE.band[0]}" width="${Math.max(1, endX - startX - 1)}" height="${TIMELINE.band[1] - TIMELINE.band[0]}" rx="3" fill="${color}" opacity="0.35"/>`;
+      body += `<rect x="${openX}" y="${TIMELINE.band[0]}" width="${Math.max(1, endX - openX - 1)}" height="${TIMELINE.band[1] - TIMELINE.band[0]}" rx="3" fill="${color}"/>`;
+      const name = TITLES[round.game] || round.game;
+      if (endX - openX > name.length * 11 + 8) body += `<text x="${openX + 6}" y="${TIMELINE.band[0] + 14}" class="band-lbl">${escapeHtml(name)}</text>`;
     }
     // 목표 구역 + RPM
-    const zs = brain ? [] : sm.filter((x) => x.target != null);
-    if (zs.length) {
-      const up = zs.map((x) => `${tx(x.c).toFixed(1)},${ry(x.target * (1 + M.tol)).toFixed(1)}`), dn = zs.slice().reverse().map((x) => `${tx(x.c).toFixed(1)},${ry(x.target * (1 - M.tol)).toFixed(1)}`);
-      b += `<polygon points="${up.join(' ')} ${dn.join(' ')}" fill="var(--zone)" stroke="var(--zone-edge)" stroke-width="0.8"/>`;
-      b += `<polyline points="${zs.map((x) => `${tx(x.c).toFixed(1)},${ry(x.target).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--zone-edge)" stroke-dasharray="4 3"/>`;
+    const zoneSamples = brain ? [] : rpmSamples.filter((sample) => sample.target != null);
+    if (zoneSamples.length) {
+      const upperEdge = zoneSamples.map((sample) => `${timeX(sample.clock).toFixed(1)},${rpmY(sample.target * (1 + model.tolerance)).toFixed(1)}`);
+      const lowerEdge = zoneSamples.slice().reverse().map((sample) => `${timeX(sample.clock).toFixed(1)},${rpmY(sample.target * (1 - model.tolerance)).toFixed(1)}`);
+      body += `<polygon points="${upperEdge.join(' ')} ${lowerEdge.join(' ')}" fill="var(--zone)" stroke="var(--zone-edge)" stroke-width="0.8"/>`;
+      body += `<polyline points="${zoneSamples.map((sample) => `${timeX(sample.clock).toFixed(1)},${rpmY(sample.target).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--zone-edge)" stroke-dasharray="4 3"/>`;
     }
-    if (!brain) b += `<polyline points="${sm.map((x) => `${tx(x.c).toFixed(1)},${ry(x.rpm).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--series)" stroke-width="1.6" stroke-linejoin="round"/>`;
-    for (const [a, z] of M.pauses) b += `<rect x="${tx(a)}" y="${TL.chart[0]}" width="${Math.max(2, tx(z) - tx(a))}" height="${TL.chart[1] - TL.chart[0]}" fill="var(--axis)" opacity="0.5"/>`;
+    if (!brain) body += `<polyline points="${rpmSamples.map((sample) => `${timeX(sample.clock).toFixed(1)},${rpmY(sample.rpm).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--series)" stroke-width="1.6" stroke-linejoin="round"/>`;
+    for (const [pauseStart, pauseEnd] of model.pauses) body += `<rect x="${timeX(pauseStart)}" y="${TIMELINE.chart[0]}" width="${Math.max(2, timeX(pauseEnd) - timeX(pauseStart))}" height="${TIMELINE.chart[1] - TIMELINE.chart[0]}" fill="var(--axis)" opacity="0.5"/>`;
     // 문제: 입력이 열린 때 ~ 답, 점 색 = 결과
-    const qy = (TL.qrow[0] + TL.qrow[1]) / 2;
-    b += `<text x="${TL.l - 6}" y="${qy + 4}" text-anchor="end" class="lbl">문제</text>`;
-    for (const q of M.qs) {
-      const r = result(q), endC = q.answer ? q.answer.clock : q.g ? q.g.end : q.open;
-      b += `<line x1="${tx(q.open)}" y1="${qy}" x2="${tx(endC)}" y2="${qy}" stroke="var(--axis)" stroke-width="3" stroke-linecap="round"/>`;
-      if (q.answer) b += `<circle cx="${tx(endC)}" cy="${qy}" r="4.5" fill="var(--${r === 'wait' ? 'axis' : r})"/>`;
+    const rowY = (TIMELINE.questionRow[0] + TIMELINE.questionRow[1]) / 2;
+    body += `<text x="${TIMELINE.left - 6}" y="${rowY + 4}" text-anchor="end" class="lbl">문제</text>`;
+    for (const question of model.questions) {
+      const result = resultOf(question), endClock = question.answer ? question.answer.clock : question.round ? question.round.end : question.open;
+      body += `<line x1="${timeX(question.open)}" y1="${rowY}" x2="${timeX(endClock)}" y2="${rowY}" stroke="var(--axis)" stroke-width="3" stroke-linecap="round"/>`;
+      if (question.answer) body += `<circle cx="${timeX(endClock)}" cy="${rowY}" r="4.5" fill="var(--${result === 'wait' ? 'axis' : result})"/>`;
     }
-    b += `<g id="ph"><line id="ph-line" y1="2" y2="${TL.qrow[1] + 4}" stroke="var(--ink)" stroke-width="1.5"/><circle id="ph-dot" cy="2" r="4" fill="var(--ink)"/></g>`;
-    el.innerHTML = b;
+    body += `<g id="ph"><line id="ph-line" y1="2" y2="${TIMELINE.questionRow[1] + 4}" stroke="var(--ink)" stroke-width="1.5"/><circle id="ph-dot" cy="2" r="4" fill="var(--ink)"/></g>`;
+    timeline.innerHTML = body;
     placeHead();
   }
   function placeHead() {
-    const x = tx(t);
-    const l = $('#ph-line'), d = $('#ph-dot');
-    if (l) { l.setAttribute('x1', x); l.setAttribute('x2', x); d.setAttribute('cx', x); }
-    $('#clock').textContent = fmt(t);
+    const x = timeX(playhead);
+    const line = $('#ph-line'), dot = $('#ph-dot');
+    if (line) { line.setAttribute('x1', x); line.setAttribute('x2', x); dot.setAttribute('cx', x); }
+    $('#clock').textContent = clockText(playhead);
   }
 
   // 지금 시각의 문제: 지금 게임(소개가 끝난 뒤)의 마지막으로 열린 문제
   function current() {
-    const g = M.games.find((x) => t >= x.start && t < x.end) || (t >= M.end ? M.games[M.games.length - 1] : null);
-    if (!g) return { phase: t < M.playStart ? 'calib' : 'between' };
-    if (g.open == null || t < g.open) return { phase: 'intro', g };
-    const qs = g.qs.filter((q) => q.at <= t);
-    return qs.length ? { phase: 'q', g, q: qs[qs.length - 1] } : { phase: 'intro', g };
+    const round = model.games.find((candidate) => playhead >= candidate.start && playhead < candidate.end) || (playhead >= model.end ? model.games[model.games.length - 1] : null);
+    if (!round) return { phase: playhead < model.playStart ? 'calib' : 'between' };
+    if (round.open == null || playhead < round.open) return { phase: 'intro', round };
+    const opened = round.questions.filter((question) => question.shownAt <= playhead);
+    return opened.length ? { phase: 'question', round, question: opened[opened.length - 1] } : { phase: 'intro', round };
   }
 
   function render() {
     placeHead();
-    const c = current(), board = $('#board'), think = $('#think');
-    const q = c.q || null;
-    document.querySelectorAll('.q-row').forEach((r) => r.classList.toggle('cur', q && M.qs[r.dataset.i] === q));
-    if (q !== cur) {
-      cur = q;
-      const row = q && document.querySelector(`.q-row[data-i="${M.qs.indexOf(q)}"]`);
+    const moment = current(), board = $('#board'), think = $('#think');
+    const question = moment.question || null;
+    document.querySelectorAll('.q-row').forEach((rowElement) => rowElement.classList.toggle('cur', question && model.questions[rowElement.dataset.i] === question));
+    if (question !== currentQuestion) {
+      currentQuestion = question;
+      const row = question && document.querySelector(`.q-row[data-i="${model.questions.indexOf(question)}"]`);
       if (row && playing) row.scrollIntoView({ block: 'nearest' });
     }
-    if (!q) {
-      $('#b-title').textContent = c.phase === 'calib' ? '속도 측정' : c.g ? TITLES[c.g.game] || c.g.game : '–';
+    if (!question) {
+      $('#b-title').textContent = moment.phase === 'calib' ? '속도 측정' : moment.round ? TITLES[moment.round.game] || moment.round.game : '–';
       $('#b-chip').innerHTML = '';
-      $('#b-meta').textContent = c.g ? `Lv${c.g.level} · 게임 소개 화면` : c.phase === 'calib' ? '기준 RPM을 재는 중' : '';
-      board.innerHTML = `<div class="empty">${c.phase === 'calib' ? '페달 속도를 재고 있어요' : c.g ? '소개 화면 — 문제는 곧 나와요' : '게임 사이'}</div>`;
+      $('#b-meta').textContent = moment.round ? `Lv${moment.round.level} · 게임 소개 화면` : moment.phase === 'calib' ? '기준 RPM을 재는 중' : '';
+      board.innerHTML = `<div class="empty">${moment.phase === 'calib' ? '페달 속도를 재고 있어요' : moment.round ? '소개 화면 — 문제는 곧 나와요' : '게임 사이'}</div>`;
       think.innerHTML = '';
       return;
     }
-    const inputs = q.inputs.filter((e) => e.clock <= t);
-    const shown = q.answer && q.answer.clock <= t ? q.answer : null;
-    const r = shown ? result(q) : 'wait';
-    $('#b-title').textContent = `${TITLES[q.game] || q.game}`;
-    $('#b-chip').innerHTML = `<span class="chip ${r}">${RESULT[r]}</span>`;
-    const nth = q.g ? `${q.g.qs.indexOf(q) + 1}/${q.g.qs.length}번째 문제` : '';
-    $('#b-meta').textContent = [`Lv${q.level}`, nth, `세션 문제 #${q.n}`, q.open !== q.at ? '지시를 띄운 뒤 입력이 열림' : null].filter(Boolean).join(' · ');
-    const draw = DRAW[q.game];
+    const inputs = question.inputs.filter((input) => input.clock <= playhead);
+    const shown = question.answer && question.answer.clock <= playhead ? question.answer : null;
+    const result = shown ? resultOf(question) : 'wait';
+    $('#b-title').textContent = `${TITLES[question.game] || question.game}`;
+    $('#b-chip').innerHTML = `<span class="chip ${result}">${RESULT[result]}</span>`;
+    const nth = question.round ? `${question.round.questions.indexOf(question) + 1}/${question.round.questions.length}번째 문제` : '';
+    $('#b-meta').textContent = [`Lv${question.level}`, nth, `세션 문제 #${question.number}`, question.open !== question.shownAt ? '지시를 띄운 뒤 입력이 열림' : null].filter(Boolean).join(' · ');
+    const draw = DRAW[question.game];
     if (draw) {
-      try { board.innerHTML = draw(q, inputs, shown); }
-      catch (e) { board.innerHTML = `<div class="empty">그림을 그리지 못했어요 (${esc(e.message)})</div>`; }
+      try { board.innerHTML = draw(question, inputs, shown); }
+      catch (error) { board.innerHTML = `<div class="empty">그림을 그리지 못했어요 (${escapeHtml(error.message)})</div>`; }
     } else {
-      const { t: _t, clock, type, ...rest } = q.data;
-      board.innerHTML = `<div class="empty">이 게임은 아직 그림이 없어요. 기록된 문제 내용:<pre>${esc(JSON.stringify(rest, null, 1))}</pre></div>`;
+      const rest = { ...question.data }; // 시각·종류(t · clock · type)는 빼고 문제 내용만 보인다
+      for (const key of ['t', 'clock', 'type']) delete rest[key];
+      board.innerHTML = `<div class="empty">이 게임은 아직 그림이 없어요. 기록된 문제 내용:<pre>${escapeHtml(JSON.stringify(rest, null, 1))}</pre></div>`;
     }
     // 생각한 시간 막대: 입력이 열린 때 → 첫 입력 → 답, 제한 시간 표시
-    const now = Math.max(0, t - q.open), ms = shown ? shown.ms : null, first = shown ? shown.first : (q.inputs.find((e) => e.clock <= t) || {}).ms;
-    const full = Math.max(q.limit || 0, q.answer ? q.answer.ms || 0 : 0, now, 1000);
-    const W = 600, X = (v) => (Math.min(v, full) / full) * W;
-    const live = ms ?? now;
-    let b = `<rect x="0" y="6" width="${W}" height="12" rx="6" fill="var(--grid)"/>`;
-    if (first != null) b += `<rect x="0" y="6" width="${X(first)}" height="12" rx="6" fill="var(--series)"/>`;
-    b += `<rect x="${first != null ? X(first) : 0}" y="6" width="${Math.max(0, X(live) - (first != null ? X(first) : 0))}" height="12" rx="6" fill="var(--series)" opacity="0.4"/>`;
-    for (const e of inputs) b += `<line x1="${X(e.ms)}" y1="3" x2="${X(e.ms)}" y2="21" stroke="var(--ink)" stroke-width="1.5"/>`;
-    if (q.limit) b += `<line x1="${X(q.limit) - 1}" y1="0" x2="${X(q.limit) - 1}" y2="24" stroke="var(--bad)" stroke-width="2"/><text x="${X(q.limit) - 5}" y="32" text-anchor="end" class="lbl">제한 ${sec(q.limit)}</text>`;
-    think.innerHTML = `<div class="k"><span>생각한 시간 — 첫 입력까지 <b>${sec(first)}</b> · 답까지 <b>${shown ? sec(ms) : sec(now) + '…'}</b></span><span>${inputs.length ? `입력 ${inputs.length}번` : ''}</span></div>
-      <svg viewBox="0 0 ${W} 34" preserveAspectRatio="none" aria-hidden="true">${b}</svg>`;
+    const now = Math.max(0, playhead - question.open), answerMs = shown ? shown.ms : null, first = shown ? shown.first : (question.inputs.find((input) => input.clock <= playhead) || {}).ms;
+    const full = Math.max(question.limit || 0, question.answer ? question.answer.ms || 0 : 0, now, 1000);
+    const barWidth = 600, barX = (milliseconds) => (Math.min(milliseconds, full) / full) * barWidth;
+    const live = answerMs ?? now;
+    let body = `<rect x="0" y="6" width="${barWidth}" height="12" rx="6" fill="var(--grid)"/>`;
+    if (first != null) body += `<rect x="0" y="6" width="${barX(first)}" height="12" rx="6" fill="var(--series)"/>`;
+    body += `<rect x="${first != null ? barX(first) : 0}" y="6" width="${Math.max(0, barX(live) - (first != null ? barX(first) : 0))}" height="12" rx="6" fill="var(--series)" opacity="0.4"/>`;
+    for (const input of inputs) body += `<line x1="${barX(input.ms)}" y1="3" x2="${barX(input.ms)}" y2="21" stroke="var(--ink)" stroke-width="1.5"/>`;
+    if (question.limit) body += `<line x1="${barX(question.limit) - 1}" y1="0" x2="${barX(question.limit) - 1}" y2="24" stroke="var(--bad)" stroke-width="2"/><text x="${barX(question.limit) - 5}" y="32" text-anchor="end" class="lbl">제한 ${seconds(question.limit)}</text>`;
+    think.innerHTML = `<div class="k"><span>생각한 시간 — 첫 입력까지 <b>${seconds(first)}</b> · 답까지 <b>${shown ? seconds(answerMs) : seconds(now) + '…'}</b></span><span>${inputs.length ? `입력 ${inputs.length}번` : ''}</span></div>
+      <svg viewBox="0 0 ${barWidth} 34" preserveAspectRatio="none" aria-hidden="true">${body}</svg>`;
   }
 
-  function seek(c) { t = Math.max(0, Math.min(M.end, c)); }
+  function seek(clock) { playhead = Math.max(0, Math.min(model.end, clock)); }
 
   // 재생
-  let last = 0;
+  let lastFrame = 0;
   function tick(now) {
     if (!playing) return;
-    const dt = Math.min(100, now - last); last = now;
-    seek(t + dt * speed);
-    if (t >= M.end) setPlaying(false);
+    const elapsed = Math.min(100, now - lastFrame); lastFrame = now;
+    seek(playhead + elapsed * speed);
+    if (playhead >= model.end) setPlaying(false);
     render();
     requestAnimationFrame(tick);
   }
-  function setPlaying(on) {
-    playing = on;
-    $('#play').textContent = on ? '❚❚ 멈춤' : '▶ 재생';
-    if (on) { if (t >= M.end) seek(0); last = performance.now(); requestAnimationFrame(tick); }
+  function setPlaying(shouldPlay) {
+    playing = shouldPlay;
+    $('#play').textContent = shouldPlay ? '❚❚ 멈춤' : '▶ 재생';
+    if (shouldPlay) { if (playhead >= model.end) seek(0); lastFrame = performance.now(); requestAnimationFrame(tick); }
   }
   $('#play').addEventListener('click', () => setPlaying(!playing));
-  $('#speed').addEventListener('change', (e) => (speed = Number(e.target.value)));
+  $('#speed').addEventListener('change', (event) => (speed = Number(event.target.value)));
 
   // 타임라인 끌기
-  const tl = $('#tl');
-  const fromEvent = (e) => { const r = tl.getBoundingClientRect(); const x = ((e.clientX - r.left) / r.width) * TL.W; return ((x - TL.l) / (TL.W - TL.l - TL.r)) * M.end; };
-  let drag = false;
-  tl.addEventListener('pointerdown', (e) => { drag = true; tl.setPointerCapture(e.pointerId); seek(fromEvent(e)); render(); });
-  tl.addEventListener('pointermove', (e) => { if (drag) { seek(fromEvent(e)); render(); } });
-  tl.addEventListener('pointerup', () => (drag = false));
-  tl.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { seek(t + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10000 : 1000)); render(); e.preventDefault(); }
-    if (e.key === ' ') { setPlaying(!playing); e.preventDefault(); }
+  const timelineElement = $('#tl');
+  const fromEvent = (event) => {
+    const rect = timelineElement.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * TIMELINE.width;
+    return ((x - TIMELINE.left) / (TIMELINE.width - TIMELINE.left - TIMELINE.right)) * model.end;
+  };
+  let dragging = false;
+  timelineElement.addEventListener('pointerdown', (event) => { dragging = true; timelineElement.setPointerCapture(event.pointerId); seek(fromEvent(event)); render(); });
+  timelineElement.addEventListener('pointermove', (event) => { if (dragging) { seek(fromEvent(event)); render(); } });
+  timelineElement.addEventListener('pointerup', () => (dragging = false));
+  timelineElement.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { seek(playhead + (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 10000 : 1000)); render(); event.preventDefault(); }
+    if (event.key === ' ') { setPlaying(!playing); event.preventDefault(); }
   });
   // 목록에서 고르기: 그 문제의 답이 나온 순간으로 (답이 없으면 연 순간)
-  const pickRow = (row) => { const q = M.qs[row.dataset.i]; setPlaying(false); seek(q.answer ? q.answer.clock : q.open + 1); render(); };
-  $('#q-body').addEventListener('click', (e) => { const row = e.target.closest('.q-row'); if (row) pickRow(row); });
-  $('#q-body').addEventListener('keydown', (e) => { const row = e.target.closest('.q-row'); if (row && (e.key === 'Enter' || e.key === ' ')) { pickRow(row); e.preventDefault(); } });
+  const pickRow = (row) => { const question = model.questions[row.dataset.i]; setPlaying(false); seek(question.answer ? question.answer.clock : question.open + 1); render(); };
+  $('#q-body').addEventListener('click', (event) => { const row = event.target.closest('.q-row'); if (row) pickRow(row); });
+  $('#q-body').addEventListener('keydown', (event) => { const row = event.target.closest('.q-row'); if (row && (event.key === 'Enter' || event.key === ' ')) { pickRow(row); event.preventDefault(); } });
 
   // 파일 열기 (.json · .jsonl 첫 줄 · .json.gz)
-  $('#file').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    const msg = $('#open-msg');
+  $('#file').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const message = $('#open-msg');
     try {
       let text;
-      const head = new Uint8Array(await f.slice(0, 2).arrayBuffer());
-      if (head[0] === 0x1f && head[1] === 0x8b) text = await new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text();
-      else text = await f.text();
+      const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+      if (head[0] === 0x1f && head[1] === 0x8b) text = await new Response(file.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+      else text = await file.text();
       const line = text.trim().split('\n')[0];
-      const log = JSON.parse(text.trim().startsWith('{') && text.trim().split('\n').length > 1 && f.name.endsWith('.jsonl') ? line : text);
+      const log = JSON.parse(text.trim().startsWith('{') && text.trim().split('\n').length > 1 && file.name.endsWith('.jsonl') ? line : text);
       if (!log.events) throw new Error('events 가 없어요');
       setPlaying(false);
       load(log);
-      msg.textContent = `${f.name}${f.name.endsWith('.jsonl') ? ' (첫 세션)' : ''}`;
-      msg.className = '';
-    } catch (err) {
-      msg.textContent = `열지 못했어요: ${err.message}. 세션 로그(.json, .json.gz, .jsonl)인지 확인하세요.`;
-      msg.className = 'err';
+      message.textContent = `${file.name}${file.name.endsWith('.jsonl') ? ' (첫 세션)' : ''}`;
+      message.className = '';
+    } catch (error) {
+      message.textContent = `열지 못했어요: ${error.message}. 세션 로그(.json, .json.gz, .jsonl)인지 확인하세요.`;
+      message.className = 'err';
     }
   });
 
   // 관리 화면에서 열었으면 원본을 받아 온다 (같은 출처라 관리 화면 비밀번호가 그대로 쓰인다)
   const BASE = `${location.origin}/admin/`;
   $('#back').href = BASE;
-  async function gunzipJSON(res) {
-    const buf = new Uint8Array(await res.arrayBuffer());
-    const gz = buf[0] === 0x1f && buf[1] === 0x8b;
-    const text = gz ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(buf);
+  async function gunzipJSON(response) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const gzipped = bytes[0] === 0x1f && bytes[1] === 0x8b;
+    const text = gzipped ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(bytes);
     return JSON.parse(text);
   }
   (async () => {
     try {
-      const o = await (await fetch(BASE + 'api/options', { cache: 'no-store' })).json();
-      Object.assign(TITLES, o.titles || {});
-    } catch (e) { }
-    const p = new URLSearchParams(location.search);
-    const env = p.get('env'), device = p.get('device'), sid = p.get('sid');
+      const options = await (await fetch(BASE + 'api/options', { cache: 'no-store' })).json();
+      Object.assign(TITLES, options.titles || {});
+    } catch { }
+    const params = new URLSearchParams(location.search);
+    const env = params.get('env'), device = params.get('device'), sid = params.get('sid');
     if (!device || !sid) return;
     $('#sess-meta').textContent = '불러오는 중…';
     try {
-      const r = await fetch(`${BASE}raw/${encodeURIComponent(env || 'prod')}/${encodeURIComponent(device)}/${encodeURIComponent(sid)}`, { cache: 'no-store' });
-      if (!r.ok) throw new Error(r.status === 404 ? '원본이 없어요' : `서버 응답 ${r.status}`);
-      const log = await gunzipJSON(r);
+      const response = await fetch(`${BASE}raw/${encodeURIComponent(env || 'prod')}/${encodeURIComponent(device)}/${encodeURIComponent(sid)}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(response.status === 404 ? '원본이 없어요' : `서버 응답 ${response.status}`);
+      const log = await gunzipJSON(response);
       if (!log.events) throw new Error('세션 로그 형식이 아니에요');
       load(log);
       document.title = `세션 재생 · ${device.slice(0, 8)} ${(log.meta && log.meta.startedAt || '').slice(0, 10)}`;
-    } catch (err) {
-      $('#sess-meta').innerHTML = `<span class="err">세션을 열지 못했어요: ${esc(err.message)}</span>`;
+    } catch (error) {
+      $('#sess-meta').innerHTML = `<span class="err">세션을 열지 못했어요: ${escapeHtml(error.message)}</span>`;
     }
   })();
 })();

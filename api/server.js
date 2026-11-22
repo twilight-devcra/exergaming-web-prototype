@@ -15,22 +15,22 @@ const crypto = require('crypto');
 process.removeAllListeners('warning'); // node:sqlite 의 ExperimentalWarning 을 로그에 남기지 않는다
 const { DatabaseSync } = require('node:sqlite');
 
-const C = {
+const config = {
   port: Number(process.env.PORT || 8787),
   host: process.env.HOST || '127.0.0.1', // 앞에 Caddy 를 두므로 바깥에는 열지 않는다
   dataDir: path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data')),
   uploadKey: process.env.UPLOAD_KEY || '', // 비어 있으면 업로드·회원 기록에 키를 묻지 않는다
   adminPassword: process.env.ADMIN_PASSWORD || '', // 비어 있으면 /admin 을 닫는다
-  origins: (process.env.ALLOW_ORIGINS || 'https://twilight-devcra.github.io,http://localhost:5173').split(',').map((s) => s.trim()).filter(Boolean),
+  origins: (process.env.ALLOW_ORIGINS || 'https://twilight-devcra.github.io,http://localhost:5173').split(',').map((origin) => origin.trim()).filter(Boolean),
   maxBody: 10 * 1024 * 1024, // 가장 긴 15분 판이 약 2 MB. 413 은 그 태블릿의 업로드를 멈추게 하므로 넉넉히
   historyPerMin: 30, // IP 하나가 1분에 회원 기록을 물을 수 있는 횟수 (번호를 차례로 넣어 보는 것 막기)
 };
 
 // ---------------- 저장소 ----------------
 
-fs.mkdirSync(path.join(C.dataDir, 'raw'), { recursive: true });
-const db = new DatabaseSync(path.join(C.dataDir, 'exergame.db'));
-db.exec(`
+fs.mkdirSync(path.join(config.dataDir, 'raw'), { recursive: true });
+const database = new DatabaseSync(path.join(config.dataDir, 'exergame.db'));
+database.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA synchronous = NORMAL;
   CREATE TABLE IF NOT EXISTS sessions (
@@ -61,15 +61,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS questions_game ON questions (game, level);
 `);
 
-const safe = (s, fallback) => {
-  const t = String(s ?? '').trim();
-  if (/^[A-Za-z0-9_.-]{1,80}$/.test(t) && !/^\.+$/.test(t)) return t;
-  return t ? `h-${crypto.createHash('sha1').update(t).digest('hex').slice(0, 16)}` : fallback;
+const safe = (text, fallback) => {
+  const trimmed = String(text ?? '').trim();
+  if (/^[A-Za-z0-9_.-]{1,80}$/.test(trimmed) && !/^\.+$/.test(trimmed)) return trimmed;
+  return trimmed ? `h-${crypto.createHash('sha1').update(trimmed).digest('hex').slice(0, 16)}` : fallback;
 };
-const rawPath = (env, device, sid) => path.join(C.dataDir, 'raw', env, device || '_', `${sid}.json.gz`);
-const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+const rawPath = (env, device, sid) => path.join(config.dataDir, 'raw', env, device || '_', `${sid}.json.gz`);
+const numberOrNull = (value) => (typeof value === 'number' && isFinite(value) ? value : null);
 // 객체는 JSON 으로 (String() 은 {"toString": "x"} 같은 본문에서 던진다 → 500 이 되면 그 태블릿의 업로드가 멈춘다)
-const str = (v) => (v === undefined || v === null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v));
+const textOrNull = (value) => (value === undefined || value === null ? null : typeof value === 'object' ? JSON.stringify(value) : String(value));
 
 // 세션 로그 하나 → 회원 기록 항목 하나 (형을 지킨 것, 또는 null). 태블릿(app/member-records.js)과 같은 파일을 쓴다 (docs/SERVER.md '회원 기록')
 const { summarize, cleanEntry } = require('../js/history-entry.js');
@@ -77,83 +77,85 @@ const { summarize, cleanEntry } = require('../js/history-entry.js');
 // 이벤트에서 게임 한 판·문제 하나씩 뽑는다 (docs/SESSION_LOG.md 'events')
 function extract(log) {
   const games = [];
-  const qs = new Map();
-  let cur = null;
-  let lastQ = 0; // 문제 번호는 1씩 늘어난다. 로그 버전 5 까지는 상자 속 과일의 문제 내용(q)이 번호를 덮어써서, 그때는 앞 번호 + 1 로 메운다
-  for (const e of Array.isArray(log.events) ? log.events : []) {
-    if (!e || typeof e !== 'object') continue;
-    if (e.type === 'game_start') {
-      cur = { game: str(e.game), level: num(e.level), diff: num(e.diff), correct: null, total: null, cleared: null, aborted: 0, points: 0 };
-      games.push(cur);
-    } else if ((e.type === 'game_end' || e.type === 'game_abort') && cur) {
-      Object.assign(cur, { correct: num(e.correct), total: num(e.total), cleared: e.cleared ? 1 : 0, aborted: e.type === 'game_abort' ? 1 : 0 });
-      cur = null;
-    } else if (e.type === 'points' && games.length) {
-      games[games.length - 1].points += num(e.pts) || 0;
-    } else if (e.type === 'question') {
-      const n = Number.isInteger(e.q) ? e.q : lastQ + 1;
-      lastQ = n;
-      qs.set(n, { q: n, game: str(e.game), level: num(e.level), correct: null, timed_out: 0, answered: 0, ms: null, load: null, limit_ms: null });
-    } else if (e.type === 'timer_start') {
-      const q = [...qs.values()].pop();
-      if (q && q.answered === 0) Object.assign(q, { load: num(e.load), limit_ms: num(e.limitMs) });
-    } else if (e.type === 'answer' && qs.has(e.q)) {
-      Object.assign(qs.get(e.q), { correct: e.correct ? 1 : 0, timed_out: e.timedOut ? 1 : 0, answered: 1, ms: num(e.ms) });
+  const questionsByNumber = new Map();
+  let currentGame = null;
+  let lastNumber = 0; // 문제 번호는 1씩 늘어난다. 로그 버전 5 까지는 상자 속 과일의 문제 내용(q)이 번호를 덮어써서, 그때는 앞 번호 + 1 로 메운다
+  for (const event of Array.isArray(log.events) ? log.events : []) {
+    if (!event || typeof event !== 'object') continue;
+    if (event.type === 'game_start') {
+      currentGame = { game: textOrNull(event.game), level: numberOrNull(event.level), diff: numberOrNull(event.diff), correct: null, total: null, cleared: null, aborted: 0, points: 0 };
+      games.push(currentGame);
+    } else if ((event.type === 'game_end' || event.type === 'game_abort') && currentGame) {
+      Object.assign(currentGame, { correct: numberOrNull(event.correct), total: numberOrNull(event.total), cleared: event.cleared ? 1 : 0, aborted: event.type === 'game_abort' ? 1 : 0 });
+      currentGame = null;
+    } else if (event.type === 'points' && games.length) {
+      games[games.length - 1].points += numberOrNull(event.pts) || 0;
+    } else if (event.type === 'question') {
+      const number = Number.isInteger(event.q) ? event.q : lastNumber + 1;
+      lastNumber = number;
+      questionsByNumber.set(number, { number, game: textOrNull(event.game), level: numberOrNull(event.level), correct: null, timed_out: 0, answered: 0, answerMs: null, load: null, limit_ms: null });
+    } else if (event.type === 'timer_start') {
+      const question = [...questionsByNumber.values()].pop();
+      if (question && question.answered === 0) Object.assign(question, { load: numberOrNull(event.load), limit_ms: numberOrNull(event.limitMs) });
+    } else if (event.type === 'answer' && questionsByNumber.has(event.q)) {
+      Object.assign(questionsByNumber.get(event.q), { correct: event.correct ? 1 : 0, timed_out: event.timedOut ? 1 : 0, answered: 1, answerMs: numberOrNull(event.ms) });
     }
   }
-  return { games, questions: [...qs.values()].filter((q) => Number.isInteger(q.q)) };
+  return { games, questions: [...questionsByNumber.values()].filter((question) => Number.isInteger(question.number)) };
 }
 
 // 적응형 난이도가 머무는 정답률 = diffDown / (diffUp + diffDown) (js/config.js). 밸런스는 이것과 견준다
-function targetAcc(cfg) {
-  if (!cfg || (cfg.difficulty && cfg.difficulty !== 'adaptive')) return null;
-  const up = num(cfg.diffUp), down = num(cfg.diffDown);
-  return up > 0 && down > 0 ? down / (up + down) : null;
+function targetAccuracy(sessionConfig) {
+  if (!sessionConfig || (sessionConfig.difficulty && sessionConfig.difficulty !== 'adaptive')) return null;
+  const stepUp = numberOrNull(sessionConfig.diffUp), stepDown = numberOrNull(sessionConfig.diffDown);
+  return stepUp > 0 && stepDown > 0 ? stepDown / (stepUp + stepDown) : null;
 }
 
 // 목표 속도 유지 비율 (samples 의 inZone, 측정 중인 null 은 뺀다)
 function inZone(log) {
-  const S = Array.isArray(log.samples) ? log.samples : [];
-  let n = 0, k = 0;
-  for (const s of S) if (Array.isArray(s) && (s[5] === 0 || s[5] === 1)) { n++; k += s[5]; }
-  return n ? k / n : null;
+  const samples = Array.isArray(log.samples) ? log.samples : [];
+  let measured = 0, inZoneCount = 0;
+  for (const sample of samples) if (Array.isArray(sample) && (sample[5] === 0 || sample[5] === 1)) { measured++; inZoneCount += sample[5]; }
+  return measured ? inZoneCount / measured : null;
 }
 
-const upsert = db.prepare(`INSERT OR REPLACE INTO sessions VALUES (
+const upsertSession = database.prepare(`INSERT OR REPLACE INTO sessions VALUES (
   :env, :device, :sid, :received_at, :bytes, :version, :edition, :mode, :track, :user, :guest, :station, :participant,
   :started_at, :ended, :duration_ms, :elapsed_sec, :min, :difficulty, :input, :theme, :music,
   :score, :ex_score, :cog_score, :baseline, :best_streak, :kcal, :dist_m, :avg_rpm, :in_zone, :target_acc, :summary, :history)`);
-const delGames = db.prepare('DELETE FROM games WHERE env = ? AND device = ? AND sid = ?');
-const delQs = db.prepare('DELETE FROM questions WHERE env = ? AND device = ? AND sid = ?');
-const insGame = db.prepare('INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-const insQ = db.prepare('INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+const deleteGames = database.prepare('DELETE FROM games WHERE env = ? AND device = ? AND sid = ?');
+const deleteQuestions = database.prepare('DELETE FROM questions WHERE env = ? AND device = ? AND sid = ?');
+const insertGame = database.prepare('INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+const insertQuestion = database.prepare('INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
 function index(env, device, sid, log, bytes, receivedAt) {
-  const m = log.meta || {};
-  const sum = m.summary || {};
-  const ex = sum.exercise || {};
+  const meta = log.meta || {};
+  const summary = meta.summary || {};
+  const exercise = summary.exercise || {};
   const { games, questions } = extract(log);
-  db.exec('BEGIN');
+  database.exec('BEGIN');
   try {
-    upsert.run({
+    upsertSession.run({
       env, device, sid, received_at: receivedAt, bytes,
-      version: num(m.version), edition: str(m.edition), mode: str(m.mode), track: str(m.track || 'dual'),
-      user: str(m.user), guest: m.guest ? 1 : 0, station: str(m.station), participant: str(m.participant),
-      started_at: str(m.startedAt), ended: str(m.ended), duration_ms: num(m.durationMs), elapsed_sec: num(sum.elapsedSec),
-      min: m.session ? num(m.session.min) : null, difficulty: m.session ? str(m.session.difficulty) : null,
-      input: str(m.input), theme: str(m.theme), music: str(m.music),
-      score: num(sum.score), ex_score: num(sum.exScore), cog_score: num(sum.cogScore), baseline: num(sum.baseline), best_streak: num(sum.bestStreak),
-      kcal: num(ex.kcal), dist_m: num(ex.distM), avg_rpm: num(ex.avgRpm), in_zone: inZone(log), target_acc: targetAcc(m.config),
-      summary: JSON.stringify(sum), history: JSON.stringify(summarize(log)),
+      version: numberOrNull(meta.version), edition: textOrNull(meta.edition), mode: textOrNull(meta.mode), track: textOrNull(meta.track || 'dual'),
+      user: textOrNull(meta.user), guest: meta.guest ? 1 : 0, station: textOrNull(meta.station), participant: textOrNull(meta.participant),
+      started_at: textOrNull(meta.startedAt), ended: textOrNull(meta.ended), duration_ms: numberOrNull(meta.durationMs), elapsed_sec: numberOrNull(summary.elapsedSec),
+      min: meta.session ? numberOrNull(meta.session.min) : null, difficulty: meta.session ? textOrNull(meta.session.difficulty) : null,
+      input: textOrNull(meta.input), theme: textOrNull(meta.theme), music: textOrNull(meta.music),
+      score: numberOrNull(summary.score), ex_score: numberOrNull(summary.exScore), cog_score: numberOrNull(summary.cogScore), baseline: numberOrNull(summary.baseline), best_streak: numberOrNull(summary.bestStreak),
+      kcal: numberOrNull(exercise.kcal), dist_m: numberOrNull(exercise.distM), avg_rpm: numberOrNull(exercise.avgRpm), in_zone: inZone(log), target_acc: targetAccuracy(meta.config),
+      summary: JSON.stringify(summary), history: JSON.stringify(summarize(log)),
     });
-    delGames.run(env, device, sid);
-    delQs.run(env, device, sid);
-    games.forEach((g, i) => insGame.run(env, device, sid, i, g.game, g.level, g.diff, g.correct, g.total, g.cleared, g.aborted, g.points));
-    for (const q of questions) insQ.run(env, device, sid, q.q, q.game, q.level, q.correct, q.timed_out, q.answered, q.ms, q.load, q.limit_ms);
-    db.exec('COMMIT');
-  } catch (e) {
-    db.exec('ROLLBACK');
-    throw e;
+    deleteGames.run(env, device, sid);
+    deleteQuestions.run(env, device, sid);
+    games.forEach((game, i) => insertGame.run(env, device, sid, i, game.game, game.level, game.diff, game.correct, game.total, game.cleared, game.aborted, game.points));
+    for (const question of questions) {
+      insertQuestion.run(env, device, sid, question.number, question.game, question.level, question.correct, question.timed_out, question.answered, question.answerMs, question.load, question.limit_ms);
+    }
+    database.exec('COMMIT');
+  } catch (error) {
+    database.exec('ROLLBACK');
+    throw error;
   }
 }
 
@@ -163,19 +165,19 @@ function store(env, body) {
   let log;
   try {
     log = JSON.parse(body.toString('utf8'));
-  } catch (e) {
+  } catch {
     log = null;
   }
   if (!log || typeof log !== 'object' || Array.isArray(log)) {
-    const dir = path.join(C.dataDir, 'raw', '_invalid');
+    const dir = path.join(config.dataDir, 'raw', '_invalid');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, `${Date.now()}-${crypto.randomBytes(3).toString('hex')}.gz`), zlib.gzipSync(body));
     return { stored: 'invalid' };
   }
-  const m = log.meta || {};
+  const meta = log.meta || {};
   // device 가 없는 예전 세션은 '_' 로 묶는다. id 가 없으면 내용으로 정한다 (같은 본문이 다시 와도 한 건)
-  const device = safe(m.device, '_');
-  const sid = safe(m.id, `c-${crypto.createHash('sha1').update(body).digest('hex').slice(0, 16)}`);
+  const device = safe(meta.device, '_');
+  const sid = safe(meta.id, `c-${crypto.createHash('sha1').update(body).digest('hex').slice(0, 16)}`);
   const file = rawPath(env, device, sid);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file + '.tmp', zlib.gzipSync(body));
@@ -186,140 +188,141 @@ function store(env, body) {
 
 // 원본에서 색인을 다시 만든다 (색인 형식을 바꾼 뒤)
 function reindex() {
-  const root = path.join(C.dataDir, 'raw');
-  let n = 0;
+  const root = path.join(config.dataDir, 'raw');
+  let count = 0;
   for (const env of fs.readdirSync(root)) {
     if (env.startsWith('_')) continue;
     for (const device of fs.readdirSync(path.join(root, env))) {
-      for (const f of fs.readdirSync(path.join(root, env, device))) {
-        if (!f.endsWith('.json.gz')) continue;
-        const file = path.join(root, env, device, f);
+      for (const fileName of fs.readdirSync(path.join(root, env, device))) {
+        if (!fileName.endsWith('.json.gz')) continue;
+        const file = path.join(root, env, device, fileName);
         const body = zlib.gunzipSync(fs.readFileSync(file));
-        index(env, device, f.slice(0, -'.json.gz'.length), JSON.parse(body.toString('utf8')), body.length, fs.statSync(file).mtime.toISOString());
-        n++;
+        index(env, device, fileName.slice(0, -'.json.gz'.length), JSON.parse(body.toString('utf8')), body.length, fs.statSync(file).mtime.toISOString());
+        count++;
       }
     }
   }
-  return n;
+  return count;
 }
 
 // ---------------- HTTP ----------------
 
-const send = (res, status, body, headers = {}) => {
-  const isBuf = Buffer.isBuffer(body);
-  const data = body === undefined ? '' : isBuf || typeof body === 'string' ? body : JSON.stringify(body);
-  res.writeHead(status, {
-    ...(body !== undefined && !isBuf && typeof body !== 'string' ? { 'Content-Type': 'application/json; charset=utf-8' } : {}),
+const send = (response, status, body, headers = {}) => {
+  const isBuffer = Buffer.isBuffer(body);
+  const data = body === undefined ? '' : isBuffer || typeof body === 'string' ? body : JSON.stringify(body);
+  response.writeHead(status, {
+    ...(body !== undefined && !isBuffer && typeof body !== 'string' ? { 'Content-Type': 'application/json; charset=utf-8' } : {}),
     ...headers,
   });
-  res.end(data);
+  response.end(data);
 };
 
-function cors(req, res) {
-  const o = req.headers.origin;
-  if (o && C.origins.includes(o)) {
-    res.setHeader('Access-Control-Allow-Origin', o);
-    res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Max-Age', '86400');
+function cors(request, response) {
+  const origin = request.headers.origin;
+  if (origin && config.origins.includes(origin)) {
+    response.setHeader('Access-Control-Allow-Origin', origin);
+    response.setHeader('Vary', 'Origin');
+    response.setHeader('Access-Control-Allow-Methods', 'POST, GET');
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.setHeader('Access-Control-Max-Age', '86400');
   }
 }
 
-const eq = (a, b) => {
-  const x = Buffer.from(String(a));
-  const y = Buffer.from(String(b));
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
+// 길이가 같으면 걸리는 시간이 내용과 상관없는 비교 (비밀번호·키를 한 글자씩 맞혀 보지 못하게)
+const sameSecret = (given, expected) => {
+  const givenBytes = Buffer.from(String(given));
+  const expectedBytes = Buffer.from(String(expected));
+  return givenBytes.length === expectedBytes.length && crypto.timingSafeEqual(givenBytes, expectedBytes);
 };
-const keyOk = (req) => !C.uploadKey || eq(req.headers.authorization || '', `Bearer ${C.uploadKey}`);
+const keyOk = (request) => !config.uploadKey || sameSecret(request.headers.authorization || '', `Bearer ${config.uploadKey}`);
 
 // 관리 화면: HTTP Basic (사용자 이름은 아무거나, 비밀번호 = ADMIN_PASSWORD)
-function adminOk(req) {
-  if (!C.adminPassword) return false;
-  const m = /^Basic (.+)$/.exec(req.headers.authorization || '');
-  if (!m) return false;
-  const pass = Buffer.from(m[1], 'base64').toString('utf8').split(':').slice(1).join(':');
-  return eq(pass, C.adminPassword);
+function adminOk(request) {
+  if (!config.adminPassword) return false;
+  const match = /^Basic (.+)$/.exec(request.headers.authorization || '');
+  if (!match) return false;
+  const password = Buffer.from(match[1], 'base64').toString('utf8').split(':').slice(1).join(':');
+  return sameSecret(password, config.adminPassword);
 }
 
 // IP 마다 1분 창의 요청 수
 const hits = new Map();
-function limited(ip, bucket, perMin) {
-  const k = `${bucket}:${ip}`;
+function limited(address, bucket, perMin) {
+  const key = `${bucket}:${address}`;
   const now = Date.now();
-  const h = hits.get(k);
-  if (!h || now - h.at > 60000) {
-    hits.set(k, { at: now, n: 1 });
+  const minuteHits = hits.get(key);
+  if (!minuteHits || now - minuteHits.startedAt > 60000) {
+    hits.set(key, { startedAt: now, count: 1 });
     return false;
   }
-  return ++h.n > perMin;
+  return ++minuteHits.count > perMin;
 }
 setInterval(() => {
   const now = Date.now();
-  for (const [k, h] of hits) if (now - h.at > 60000) hits.delete(k);
+  for (const [key, minuteHits] of hits) if (now - minuteHits.startedAt > 60000) hits.delete(key);
 }, 60000).unref();
 
-const clientIp = (req) => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
-const envOf = (u) => safe(u.searchParams.get('env') || 'prod', 'prod');
+const clientAddress = (request) => String(request.headers['x-forwarded-for'] || request.socket.remoteAddress || '').split(',')[0].trim();
+const envOf = (url) => safe(url.searchParams.get('env') || 'prod', 'prod');
 
-function readBody(req, limit) {
+function readBody(request, limit) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    let n = 0;
-    req.on('data', (c) => {
-      n += c.length;
-      if (n > limit) {
+    let received = 0;
+    request.on('data', (chunk) => {
+      received += chunk.length;
+      if (received > limit) {
         reject(Object.assign(new Error('too large'), { status: 413 }));
-        req.destroy();
-      } else chunks.push(c);
+        request.destroy();
+      } else chunks.push(chunk);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    request.on('end', () => resolve(Buffer.concat(chunks)));
+    request.on('error', reject);
   });
 }
 
-const history = db.prepare(`SELECT history FROM sessions
+const selectHistory = database.prepare(`SELECT history FROM sessions
   WHERE env = ? AND user = ? AND ended IS NOT NULL AND ended NOT IN ('abandoned', 'user') AND started_at >= ?`);
 
-const admin = require('./admin.js')(db, { rawPath, safe });
+const handleAdmin = require('./admin.js')(database, { rawPath, safe });
 
-async function handle(req, res) {
-  const u = new URL(req.url, 'http://x');
-  cors(req, res);
-  if (req.method === 'OPTIONS') return send(res, 204);
+async function handle(request, response) {
+  const url = new URL(request.url, 'http://x');
+  cors(request, response);
+  if (request.method === 'OPTIONS') return send(response, 204);
 
-  if (u.pathname === '/health') return send(res, 200, { ok: true });
+  if (url.pathname === '/health') return send(response, 200, { ok: true });
 
-  if (u.pathname === '/sessions' && req.method === 'POST') {
-    if (!keyOk(req)) return send(res, 401, { error: 'key' });
-    const body = await readBody(req, C.maxBody);
-    const r = store(envOf(u), body);
-    return send(res, 200, { ok: true, ...r });
+  if (url.pathname === '/sessions' && request.method === 'POST') {
+    if (!keyOk(request)) return send(response, 401, { error: 'key' });
+    const body = await readBody(request, config.maxBody);
+    const result = store(envOf(url), body);
+    return send(response, 200, { ok: true, ...result });
   }
 
-  if (u.pathname === '/history' && req.method === 'GET') {
-    if (!keyOk(req)) return send(res, 401, { error: 'key' });
-    if (limited(clientIp(req), 'history', C.historyPerMin)) return send(res, 429, { error: 'rate' });
-    const user = u.searchParams.get('user') || '';
-    if (!/^\d{8}$/.test(user)) return send(res, 200, { sessions: [] });
+  if (url.pathname === '/history' && request.method === 'GET') {
+    if (!keyOk(request)) return send(response, 401, { error: 'key' });
+    if (limited(clientAddress(request), 'history', config.historyPerMin)) return send(response, 429, { error: 'rate' });
+    const user = url.searchParams.get('user') || '';
+    if (!/^\d{8}$/.test(user)) return send(response, 200, { sessions: [] });
     const since = new Date(Date.now() - 2 * 366 * 864e5).toISOString(); // 달력은 최근 2년까지만 넘겨 본다
     // 저장할 때 이미 형을 맞췄지만, 고치기 전에 저장된 줄(--reindex 전)도 있을 수 있으므로 내보낼 때 한 번 더 맞춘다
-    const sessions = history.all(envOf(u), user, since).map((r) => cleanEntry(JSON.parse(r.history))).filter(Boolean);
-    return send(res, 200, { sessions });
+    const sessions = selectHistory.all(envOf(url), user, since).map((row) => cleanEntry(JSON.parse(row.history))).filter(Boolean);
+    return send(response, 200, { sessions });
   }
 
-  if (u.pathname === '/admin' || u.pathname.startsWith('/admin/')) {
-    if (limited(clientIp(req), 'admin', 600)) return send(res, 429, 'too many requests');
-    if (!adminOk(req)) {
-      return send(res, 401, C.adminPassword ? 'login required' : 'admin disabled (set ADMIN_PASSWORD)', {
-        ...(C.adminPassword ? { 'WWW-Authenticate': 'Basic realm="exergame admin", charset="UTF-8"' } : {}),
+  if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+    if (limited(clientAddress(request), 'admin', 600)) return send(response, 429, 'too many requests');
+    if (!adminOk(request)) {
+      return send(response, 401, config.adminPassword ? 'login required' : 'admin disabled (set ADMIN_PASSWORD)', {
+        ...(config.adminPassword ? { 'WWW-Authenticate': 'Basic realm="exergame admin", charset="UTF-8"' } : {}),
         'Content-Type': 'text/plain; charset=utf-8',
       });
     }
-    return admin(req, res, u, send);
+    return handleAdmin(request, response, url, send);
   }
 
-  return send(res, 404, { error: 'not found' });
+  return send(response, 404, { error: 'not found' });
 }
 
 if (process.argv.includes('--reindex')) {
@@ -327,11 +330,11 @@ if (process.argv.includes('--reindex')) {
   process.exit(0);
 }
 
-http.createServer((req, res) => {
-  handle(req, res).catch((e) => {
-    if (e.status !== 413) console.error(new Date().toISOString(), req.method, req.url, e);
-    if (!res.headersSent) send(res, e.status || 500, { error: e.status === 413 ? 'too large' : 'server error' });
+http.createServer((request, response) => {
+  handle(request, response).catch((error) => {
+    if (error.status !== 413) console.error(new Date().toISOString(), request.method, request.url, error);
+    if (!response.headersSent) send(response, error.status || 500, { error: error.status === 413 ? 'too large' : 'server error' });
   });
-}).listen(C.port, C.host, () => {
-  console.log(`exergame api on http://${C.host}:${C.port} · data ${C.dataDir} · upload key ${C.uploadKey ? 'on' : 'off'} · admin ${C.adminPassword ? 'on' : 'off'}`);
+}).listen(config.port, config.host, () => {
+  console.log(`exergame api on http://${config.host}:${config.port} · data ${config.dataDir} · upload key ${config.uploadKey ? 'on' : 'off'} · admin ${config.adminPassword ? 'on' : 'off'}`);
 });

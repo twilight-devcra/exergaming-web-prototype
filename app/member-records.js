@@ -15,19 +15,19 @@ export const Members = {
   luhn(body) {
     let sum = 0;
     for (let i = 0; i < body.length; i++) {
-      let d = +body[body.length - 1 - i];
-      if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; }
-      sum += d;
+      let digit = +body[body.length - 1 - i];
+      if (i % 2 === 0) { digit *= 2; if (digit > 9) digit -= 9; }
+      sum += digit;
     }
     return String((10 - (sum % 10)) % 10);
   },
 
   newId() {
-    const r = new Uint32Array(1);
+    const random = new Uint32Array(1);
     let id;
     do {
-      crypto.getRandomValues(r);
-      const body = String(1000000 + (r[0] % 9000000)); // 7자리, 0 으로 시작하지 않게
+      crypto.getRandomValues(random);
+      const body = String(1000000 + (random[0] % 9000000)); // 7자리, 0 으로 시작하지 않게
       id = body + this.luhn(body);
     } while (this.all()[id]);
     return id;
@@ -43,8 +43,8 @@ export const Members = {
 
   // QR 내용이나 입력에서 회원 번호를 찾는다 (카드 주소 #번호, 띄어 쓴 번호 모두)
   parse(text) {
-    for (const m of String(text).matchAll(/(\d{4})[\s-]?(\d{4})/g)) {
-      const id = m[1] + m[2];
+    for (const match of String(text).matchAll(/(\d{4})[\s-]?(\d{4})/g)) {
+      const id = match[1] + match[2];
       if (this.valid(id)) return id;
     }
     return null;
@@ -56,11 +56,11 @@ export const Members = {
 
   // ---------------- 기록 (이 태블릿) ----------------
   all() {
-    try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { return {}; }
+    try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch { return {}; }
   },
 
   save(all) {
-    try { localStorage.setItem(this.KEY, JSON.stringify(all)); } catch (e) { }
+    try { localStorage.setItem(this.KEY, JSON.stringify(all)); } catch { }
   },
 
   ensure(id) {
@@ -74,9 +74,9 @@ export const Members = {
 
   record(id, entry) {
     const all = this.all();
-    const m = all[id] || (all[id] = { created: new Date().toISOString(), history: [] });
-    m.history.push(entry);
-    m.history = m.history.slice(-500);
+    const member = all[id] || (all[id] = { created: new Date().toISOString(), history: [] });
+    member.history.push(entry);
+    member.history = member.history.slice(-500);
     this.save(all);
   },
 
@@ -100,20 +100,20 @@ export const Members = {
     const { historyUrl, key, localHistory } = SessionUpload.settings();
     if (localHistory) return (this.remote[id] = await this.localServer(id));
     if (!historyUrl) return null;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), this.TIMEOUT_MS);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
     try {
-      const u = new URL(historyUrl, location.href);
-      u.searchParams.set('user', id);
-      const res = await fetch(u, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: ctrl.signal });
-      if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
-      const body = await res.json();
+      const url = new URL(historyUrl, location.href);
+      url.searchParams.set('user', id);
+      const response = await fetch(url, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: controller.signal });
+      if (!response.ok) throw new Error(`서버 응답 ${response.status}`);
+      const body = await response.json();
       const raw = Array.isArray(body) ? body : (body && body.sessions) || [];
       const list = (Array.isArray(raw) ? raw : []).map(cleanEntry).filter(Boolean);
       this.remote[id] = list;
       return list;
     } finally {
-      clearTimeout(t);
+      clearTimeout(timeout);
     }
   },
 
@@ -121,27 +121,27 @@ export const Members = {
   // 게임 정확도가 높았으면 한 단계 위, 낮았으면 한 단계 아래). shift = 'up' · 'down' · 'keep'
   nextSetup(last) {
     if (!last) return null;
-    const rec = Stars.nextSession(last.difficulty, last.gameAcc);
-    return { min: last.min, difficulty: rec.to ? rec.to.id : last.difficulty, track: last.track || 'dual', shift: rec.kind };
+    const recommendation = Stars.nextSession(last.difficulty, last.gameAcc);
+    return { min: last.min, difficulty: recommendation.target ? recommendation.target.id : last.difficulty, track: last.track || 'dual', shift: recommendation.kind };
   },
 
   // 시험용 회원 기록 서버 (SESSION_UPLOAD.localHistory): 바깥 서버 대신 이 태블릿의 세션 로그(IndexedDB)에서
   // 서버와 같은 규칙으로 고른다. 그 회원 번호이고 결과 화면까지 간 세션 (중단 abandoned·그만하기 user 는 뺀다). 세션 로그를 모두 읽으므로 시험용으로만 쓴다
   async localServer(id) {
-    const out = [];
+    const summaries = [];
     await SessionStore.scan((log) => {
-      const m = log.meta || {};
-      if (m.user === id && m.ended && m.ended !== 'abandoned' && m.ended !== 'user') out.push(summarize(log));
+      const meta = log.meta || {};
+      if (meta.user === id && meta.ended && meta.ended !== 'abandoned' && meta.ended !== 'user') summaries.push(summarize(log));
     });
-    return out.filter(Boolean);
+    return summaries.filter(Boolean);
   },
 
   // 이 태블릿 기록 + 서버 기록. 같은 세션(태블릿 번호 + 세션 번호)은 한 번만, 시간순.
   // 화면은 모두 이 목록으로 그리므로 여기서 한 번 더 형을 맞춘다 (예전 태블릿 기록 · 시험용 로컬 서버도)
   merged(id) {
-    const out = new Map();
-    const keyOf = (x) => (x.sid ? `${x.device || ''}:${x.sid}` : `at:${x.at}`);
-    for (const x of [...(this.remote[id] || []), ...this.history(id)].map(cleanEntry)) if (x) out.set(keyOf(x), x);
-    return [...out.values()].sort((a, b) => new Date(a.at) - new Date(b.at));
+    const bySession = new Map();
+    const keyOf = (entry) => (entry.sid ? `${entry.device || ''}:${entry.sid}` : `at:${entry.at}`);
+    for (const entry of [...(this.remote[id] || []), ...this.history(id)].map(cleanEntry)) if (entry) bySession.set(keyOf(entry), entry);
+    return [...bySession.values()].sort((a, b) => new Date(a.at) - new Date(b.at));
   },
 };

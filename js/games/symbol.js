@@ -2,10 +2,10 @@
 // 2x4 판의 몇 칸에 서로 다른 심볼을 잠깐 보여준 뒤, 위쪽 칸에 뜬 심볼이 어디 있었는지 3번 맞힌다
 // (심볼이 둘뿐인 가장 쉬운 단계는 2번).
 // 난이도:
-//   n    — 보여 주는 심볼 수 (판 8칸 가운데 몇 칸에 놓나)
+//   symbolCount — 보여 주는 심볼 수 (판 8칸 가운데 몇 칸에 놓나)
 //   show — 심볼을 보여 주는 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 SHOW_MS 로 고정이다
-import { U } from '../config.js';
-import { Dg } from '../diagram.js';
+import { Util } from '../config.js';
+import { Diagram } from '../diagram.js';
 import { Sfx } from '../sfx.js';
 import { Tag } from './tags.js';
 import { Phase, pointsPer, resultOf, abortedResult } from './kit.js';
@@ -13,8 +13,8 @@ import { Phase, pointsPer, resultOf, abortedResult } from './kit.js';
 export const SYMBOLS = (() => {
   const star = Array.from({ length: 10 }, (_, i) => {
     const angle = ((-90 + i * 36) * Math.PI) / 180;
-    const rad = i % 2 ? 20 : 47;
-    return `${(50 + Math.cos(angle) * rad).toFixed(1)},${(54 + Math.sin(angle) * rad).toFixed(1)}`;
+    const radius = i % 2 ? 20 : 47;
+    return `${(50 + Math.cos(angle) * radius).toFixed(1)},${(54 + Math.sin(angle) * radius).toFixed(1)}`;
   }).join(' ');
   // 모양과 색이 모두 확실히 구분되도록 구성
   return [
@@ -30,8 +30,8 @@ export const SYMBOLS = (() => {
   ];
 })();
 
-function symbolEl(sym) {
-  return U.el('div', 'sym', `<svg viewBox="0 0 100 100">${sym.svg}</svg>`);
+function symbolElement(symbol) {
+  return Util.element('div', 'sym', `<svg viewBox="0 0 100 100">${symbol.svg}</svg>`);
 }
 
 export class SymbolGame {
@@ -39,11 +39,11 @@ export class SymbolGame {
   static tags = [Tag.MEMORY];
   static title = '심볼 위치 외우기';
   static hint = '잠깐 보이는 그림들의 위치를 외운 뒤<br>위에 나온 그림이 어디 있었는지 고르세요';
-  // n = 심볼 수, show = 심볼 노출 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 SHOW_MS 로 고정이다.
+  // symbolCount = 심볼 수, show = 심볼 노출 시간(ms). 쉬운 단계(Lv1·Lv2)만 따로 정하고, 나머지는 SHOW_MS 로 고정이다.
   static levels = [
-    { n: 2, show: 4500 },
-    { n: 3, show: 4500 },
-    { n: 3 }, { n: 4 }, { n: 5 }, { n: 6 }, { n: 7 }, { n: 8 },
+    { symbolCount: 2, show: 4500 },
+    { symbolCount: 3, show: 4500 },
+    { symbolCount: 3 }, { symbolCount: 4 }, { symbolCount: 5 }, { symbolCount: 6 }, { symbolCount: 7 }, { symbolCount: 8 },
   ];
   static maxLevel = SymbolGame.levels.length;
   static SHOW_MS = 3200;
@@ -52,15 +52,15 @@ export class SymbolGame {
   // 소개 그림: ① 그림 자리를 외우고 ② 위에 나온 그림이 있던 칸을 누른다
   static diagram() {
     const CELL = 34, GAP = 8;
-    const at = (slot, y0) => [8 + (slot % 4) * (CELL + GAP), y0 + Math.floor(slot / 4) * (CELL + GAP)];
-    const sym = (id) => SYMBOLS.find((symbol) => symbol.id === id).svg;
+    const cellCorner = (slot, gridTop) => [8 + (slot % 4) * (CELL + GAP), gridTop + Math.floor(slot / 4) * (CELL + GAP)];
+    const symbolSvg = (id) => SYMBOLS.find((symbol) => symbol.id === id).svg;
     const placed = [[1, 'star'], [4, 'circle'], [6, 'triangle']];
-    const grid = (y0) => [...Array(8).keys()].map((i) => Dg.rect(...at(i, y0), CELL, CELL)).join('');
-    const center = (slot, y0) => at(slot, y0).map((coord) => coord + CELL / 2);
+    const grid = (gridTop) => [...Array(8).keys()].map((i) => Diagram.rect(...cellCorner(i, gridTop), CELL, CELL)).join('');
+    const center = (slot, gridTop) => cellCorner(slot, gridTop).map((coord) => coord + CELL / 2);
     return [
-      { svg: Dg.svg('0 0 176 140', grid(32) + placed.map(([slot, id]) => Dg.glyph(sym(id), ...center(slot, 32), 26)).join('')), caption: '그림 자리를 외우고' },
+      { svg: Diagram.svg('0 0 176 140', grid(32) + placed.map(([slot, id]) => Diagram.glyph(symbolSvg(id), ...center(slot, 32), 26)).join('')), caption: '그림 자리를 외우고' },
       {
-        svg: Dg.svg('0 0 176 140', Dg.rect(66, 2, 44, 44, 'dg-slot active', 9) + Dg.glyph(sym('star'), 88, 24, 30) + grid(58) + Dg.tap(...center(1, 58))),
+        svg: Diagram.svg('0 0 176 140', Diagram.rect(66, 2, 44, 44, 'dg-slot active', 9) + Diagram.glyph(symbolSvg('star'), 88, 24, 30) + grid(58) + Diagram.tap(...center(1, 58))),
         caption: '위 그림이 있던 칸 누르기',
       },
     ];
@@ -71,7 +71,7 @@ export class SymbolGame {
   constructor(host) {
     this.host = host;
     this.spec = SymbolGame.levels[host.level - 1];
-    this.symbolCount = this.spec.n;
+    this.symbolCount = this.spec.symbolCount;
     this.questions = Math.min(SymbolGame.QUESTIONS, this.symbolCount);
     this.phase = Phase.SHOW;
     this.correct = 0;
@@ -80,17 +80,17 @@ export class SymbolGame {
 
   start() {
     const { stage, level } = this.host;
-    this.message = U.el('div', 'stage-msg', '');
-    this.body = U.frame(stage, `${SymbolGame.title} · Lv.${level}`, this.message).body;
-    this.wrap = U.el('div', 'sym-wrap');
-    this.target = U.el('div', 'sym-target');
-    this.grid = U.el('div', 'sym-grid');
+    this.message = Util.element('div', 'stage-msg', '');
+    this.body = Util.frame(stage, `${SymbolGame.title} · Lv.${level}`, this.message).body;
+    this.wrap = Util.element('div', 'sym-wrap');
+    this.target = Util.element('div', 'sym-target');
+    this.grid = Util.element('div', 'sym-grid');
     this.wrap.append(this.target, this.grid);
     this.body.append(this.wrap);
 
     this.cells = [];
     for (let i = 0; i < 8; i++) {
-      const cell = U.el('div', 'scell');
+      const cell = Util.element('div', 'scell');
       cell.addEventListener('pointerdown', () => this.pick(i));
       this.grid.append(cell);
       this.cells.push(cell);
@@ -99,22 +99,22 @@ export class SymbolGame {
     this.resizeObserver.observe(this.body);
     this.layout();
 
-    const slots = U.shuffle([...Array(8).keys()]).slice(0, this.symbolCount);
-    const syms = U.shuffle([...SYMBOLS]).slice(0, this.symbolCount);
-    this.placed = slots.map((slot, i) => ({ slot, sym: syms[i] }));
-    this.asks = U.shuffle([...this.placed]).slice(0, this.questions);
+    const slots = Util.shuffle([...Array(8).keys()]).slice(0, this.symbolCount);
+    const symbols = Util.shuffle([...SYMBOLS]).slice(0, this.symbolCount);
+    this.placed = slots.map((slot, i) => ({ slot, symbol: symbols[i] }));
+    this.asks = Util.shuffle([...this.placed]).slice(0, this.questions);
 
-    const banner = U.el('div', 'memorize-banner', '외우세요!');
+    const banner = Util.element('div', 'memorize-banner', '외우세요!');
     this.grid.append(banner);
     this.host.after(1100, () => {
       banner.remove();
-      U.say(this.message, '그림 자리를 외우세요', 'look');
-      this.placed.forEach(({ slot, sym }) => this.cells[slot].append(symbolEl(sym)));
+      Util.say(this.message, '그림 자리를 외우세요', 'look');
+      this.placed.forEach(({ slot, symbol }) => this.cells[slot].append(symbolElement(symbol)));
       this.host.sfx(Sfx.BLINK);
     });
     this.host.after(1100 + (this.spec.show || SymbolGame.SHOW_MS), () => {
       this.cells.forEach((cell) => (cell.innerHTML = ''));
-      U.say(this.message, '');
+      Util.say(this.message, '');
       this.host.after(350, () => this.ask());
     });
   }
@@ -122,18 +122,18 @@ export class SymbolGame {
   layout() {
     const body = this.body;
     // 물어보는 칸 + 격자 두 줄 = 세 칸 높이. 빼는 것: 물어보는 칸과 격자 사이 간격(css gap) + 격자 줄 사이 14px
-    const avail = body.clientHeight - U.gapOf(this.wrap, 14) - 14;
-    const sz = Math.max(48, Math.min(avail / 3, body.clientWidth / 4.5, 140));
-    this.wrap.style.setProperty('--sz', `${sz}px`);
+    const availableHeight = body.clientHeight - Util.gapOf(this.wrap, 14) - 14;
+    const cellSize = Math.max(48, Math.min(availableHeight / 3, body.clientWidth / 4.5, 140));
+    this.wrap.style.setProperty('--sz', `${cellSize}px`);
   }
 
   ask() {
     const ask = this.asks[this.answered];
     this.current = ask;
     this.target.innerHTML = '';
-    this.target.append(symbolEl(ask.sym));
+    this.target.append(symbolElement(ask.symbol));
     this.target.classList.add('active');
-    U.say(this.message, '이 그림은 어디 있었나요?', 'act');
+    Util.say(this.message, '이 그림은 어디 있었나요?', 'act');
     // 앞 질문의 ✓/✕ 표시를 지운다. 고른 칸을 막아 두면 한 번 틀린 칸이 다음 질문의 정답일 때 고를 수 없었다
     this.cells.forEach((cell) => {
       cell.classList.remove('closed', 'right', 'wrong');
@@ -142,8 +142,9 @@ export class SymbolGame {
     });
     this.phase = Phase.INPUT;
     this.host.question({
-      target: ask.sym.id, slot: ask.slot, n: this.answered + 1,
-      board: this.placed.map((entry) => [entry.slot, entry.sym.id]), // 외울 때 보여 준 [칸, 심볼]
+      // eslint-disable-next-line id-length -- 세션 기록의 키 (바꾸면 기록 형식이 바뀐다)
+      target: ask.symbol.id, slot: ask.slot, n: this.answered + 1,
+      board: this.placed.map((entry) => [entry.slot, entry.symbol.id]), // 외울 때 보여 준 [칸, 심볼]
     });
     this.host.timer(1, () => this.pick(-1));
   }
@@ -159,9 +160,9 @@ export class SymbolGame {
     this.host.answer({ picked: cell ? i : null, correct: ok, timedOut: !cell });
     if (cell) {
       cell.classList.add('closed', ok ? 'right' : 'wrong');
-      cell.append(U.el('span', 'mark', ok ? '✓' : '✕'));
+      cell.append(Util.element('span', 'mark', ok ? '✓' : '✕'));
     } else {
-      U.say(this.message, '시간 초과', 'bad');
+      Util.say(this.message, '시간 초과', 'bad');
     }
     if (ok) {
       this.correct++;
@@ -172,7 +173,7 @@ export class SymbolGame {
       this.host.sfx(Sfx.BAD);
       const answer = this.cells[this.current.slot];
       answer.classList.add('reveal');
-      const ghost = symbolEl(this.current.sym);
+      const ghost = symbolElement(this.current.symbol);
       ghost.style.opacity = '0.45';
       answer.append(ghost);
       this.host.after(800, () => {
@@ -191,7 +192,7 @@ export class SymbolGame {
     this.phase = Phase.END;
     this.target.classList.remove('active');
     this.target.innerHTML = '';
-    U.say(this.message, `${this.questions}개 중 ${this.correct}개 정답`, this.correct === this.questions ? 'good' : '');
+    Util.say(this.message, `${this.questions}개 중 ${this.correct}개 정답`, this.correct === this.questions ? 'good' : '');
     // 문제마다 이미 정답/오답 소리를 들려줬다. 다 맞혔을 때의 축하음은 host가 울린다.
     this.host.after(1200, () => {
       this.resizeObserver.disconnect();

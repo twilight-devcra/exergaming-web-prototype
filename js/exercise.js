@@ -12,16 +12,16 @@ export const Exercise = {
   MET_POINTS: [[0, 1.3], [60, 3.5], [90, 4.8]],
 
   met(rpm) {
-    const p = this.MET_POINTS;
-    if (rpm <= p[0][0]) return p[0][1];
-    for (let i = 1; i < p.length; i++) {
-      const [r1, m1] = p[i];
-      if (rpm <= r1) {
-        const [r0, m0] = p[i - 1];
-        return m0 + ((m1 - m0) * (rpm - r0)) / (r1 - r0);
+    const points = this.MET_POINTS;
+    if (rpm <= points[0][0]) return points[0][1];
+    for (let i = 1; i < points.length; i++) {
+      const [upperRpm, upperMet] = points[i];
+      if (rpm <= upperRpm) {
+        const [lowerRpm, lowerMet] = points[i - 1];
+        return lowerMet + ((upperMet - lowerMet) * (rpm - lowerRpm)) / (upperRpm - lowerRpm);
       }
     }
-    return p[p.length - 1][1];
+    return points[points.length - 1][1];
   },
 
   kcalPerSec(rpm) {
@@ -29,9 +29,9 @@ export const Exercise = {
   },
 
   // 결과 화면용 거리: 1 km 아래는 10 m 단위, 위는 0.1 km 단위
-  fmtDist(m) {
-    const r = Math.round(m / 10) * 10;
-    return r < 1000 ? { value: String(r), unit: 'm' } : { value: (m / 1000).toFixed(1), unit: 'km' };
+  formatDistance(meters) {
+    const rounded = Math.round(meters / 10) * 10;
+    return rounded < 1000 ? { value: String(rounded), unit: 'm' } : { value: (meters / 1000).toFixed(1), unit: 'km' };
   },
 };
 
@@ -47,11 +47,11 @@ export class ExerciseMeter {
     this.activeSec = 0;  // 실제로 밟은 시간
   }
 
-  add(dt, rpm) {
+  add(deltaSeconds, rpm) {
     if (rpm <= 0) return;
-    this.kcal += Exercise.kcalPerSec(rpm) * dt;
-    this.revs += (rpm / 60) * dt;
-    this.activeSec += dt;
+    this.kcal += Exercise.kcalPerSec(rpm) * deltaSeconds;
+    this.revs += (rpm / 60) * deltaSeconds;
+    this.activeSec += deltaSeconds;
   }
 
   get distM() {

@@ -4,73 +4,77 @@
 // 태블릿은 번호만 있으면 되고(app/member-records.js Members.parse), 내용이 짧으면 QR 칸이 21 × 21 로 굵어져 멀리서·작게 보여도 잘 읽힌다.
 // 둘레 여백은 표준대로 4칸 (사진 속 어두운 배경과 붙지 않게)
 export async function drawCard(id) {
-  const W = 1080, H = 1440;
-  const cv = document.createElement('canvas');
-  cv.width = W;
-  cv.height = H;
-  const g = cv.getContext('2d');
-  const text = '"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  const num = 'Nunito, ' + text;
+  const cardWidth = 1080, cardHeight = 1440;
+  const canvas = document.createElement('canvas');
+  canvas.width = cardWidth;
+  canvas.height = cardHeight;
+  const context = canvas.getContext('2d');
+  const textFont = '"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  const numberFont = 'Nunito, ' + textFont;
   try {
-    await Promise.all([document.fonts.load(`700 60px ${text}`), document.fonts.load(`900 120px ${num}`)]);
-  } catch (e) { }
-  const logo = await new Promise((res) => {
-    const im = new Image();
-    im.onload = () => res(im);
-    im.onerror = () => res(null);
-    im.src = 'logo.svg';
+    await Promise.all([document.fonts.load(`700 60px ${textFont}`), document.fonts.load(`900 120px ${numberFont}`)]);
+  } catch { }
+  const logo = await new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = 'logo.svg';
   });
-  g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, W, H);
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, cardWidth, cardHeight);
   // 머리: 로고와 이름
-  g.textBaseline = 'middle';
-  g.textAlign = 'left';
-  g.font = `700 64px ${text}`;
+  context.textBaseline = 'middle';
+  context.textAlign = 'left';
+  context.font = `700 64px ${textFont}`;
   const name = '두뇌 ';
-  const nw = g.measureText(name).width;
-  g.font = `900 64px ${num}`;
-  const pw = g.measureText('PT').width;
-  const lw = logo ? 92 : 0;
-  let x = (W - (lw + (logo ? 22 : 0) + nw + pw)) / 2;
-  if (logo) g.drawImage(logo, x, 70, lw, lw);
-  x += lw + (logo ? 22 : 0);
-  g.fillStyle = '#1d2b24';
-  g.font = `700 64px ${text}`;
-  g.fillText(name, x, 118);
-  g.fillStyle = '#15803d';
-  g.font = `900 64px ${num}`;
-  g.fillText('PT', x + nw, 118);
-  g.textAlign = 'center';
-  g.fillStyle = '#4a5a52';
-  g.font = `500 40px ${text}`;
-  g.fillText('나의 회원 카드', W / 2, 220);
+  const nameWidth = context.measureText(name).width;
+  context.font = `900 64px ${numberFont}`;
+  const ptWidth = context.measureText('PT').width;
+  const logoSize = logo ? 92 : 0;
+  let x = (cardWidth - (logoSize + (logo ? 22 : 0) + nameWidth + ptWidth)) / 2;
+  if (logo) context.drawImage(logo, x, 70, logoSize, logoSize);
+  x += logoSize + (logo ? 22 : 0);
+  context.fillStyle = '#1d2b24';
+  context.font = `700 64px ${textFont}`;
+  context.fillText(name, x, 118);
+  context.fillStyle = '#15803d';
+  context.font = `900 64px ${numberFont}`;
+  context.fillText('PT', x + nameWidth, 118);
+  context.textAlign = 'center';
+  context.fillStyle = '#4a5a52';
+  context.font = `500 40px ${textFont}`;
+  context.fillText('나의 회원 카드', cardWidth / 2, 220);
   // QR (회원 번호만)
-  const qr = qrcode(0, 'M');
-  qr.addData(id);
-  qr.make();
-  const n = qr.getModuleCount();
+  const qrCode = qrcode(0, 'M');
+  qrCode.addData(id);
+  qrCode.make();
+  const moduleCount = qrCode.getModuleCount();
   const quiet = 4;
   const size = 780;
-  const cell = Math.floor(size / (n + quiet * 2));
-  const qs = cell * (n + quiet * 2);
-  const qx = (W - qs) / 2, qy = 290;
-  g.fillStyle = '#ffffff';
-  g.fillRect(qx, qy, qs, qs);
-  g.fillStyle = '#111111';
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect(qx + (c + quiet) * cell, qy + (r + quiet) * cell, cell, cell);
+  const cell = Math.floor(size / (moduleCount + quiet * 2));
+  const qrSize = cell * (moduleCount + quiet * 2);
+  const qrX = (cardWidth - qrSize) / 2, qrY = 290;
+  context.fillStyle = '#ffffff';
+  context.fillRect(qrX, qrY, qrSize, qrSize);
+  context.fillStyle = '#111111';
+  for (let row = 0; row < moduleCount; row++) {
+    for (let column = 0; column < moduleCount; column++) {
+      if (qrCode.isDark(row, column)) context.fillRect(qrX + (column + quiet) * cell, qrY + (row + quiet) * cell, cell, cell);
+    }
+  }
   // 회원 번호
-  g.fillStyle = '#1d2b24';
-  g.font = `900 120px ${num}`;
-  g.fillText(`${id.slice(0, 4)} ${id.slice(4)}`, W / 2, qy + qs + 90);
-  g.fillStyle = '#4a5a52';
-  g.font = `500 36px ${text}`;
-  g.fillText('회원 번호', W / 2, qy + qs + 175);
+  context.fillStyle = '#1d2b24';
+  context.font = `900 120px ${numberFont}`;
+  context.fillText(`${id.slice(0, 4)} ${id.slice(4)}`, cardWidth / 2, qrY + qrSize + 90);
+  context.fillStyle = '#4a5a52';
+  context.font = `500 36px ${textFont}`;
+  context.fillText('회원 번호', cardWidth / 2, qrY + qrSize + 175);
   // 쓰는 법
-  g.fillStyle = '#2563eb';
-  g.font = `700 40px ${text}`;
-  g.fillText('운동하러 오시면 이 사진을', W / 2, H - 150);
-  g.fillText('태블릿 카메라에 보여 주세요', W / 2, H - 92);
-  return new Promise((res) => cv.toBlob(res, 'image/png'));
+  context.fillStyle = '#2563eb';
+  context.font = `700 40px ${textFont}`;
+  context.fillText('운동하러 오시면 이 사진을', cardWidth / 2, cardHeight - 150);
+  context.fillText('태블릿 카메라에 보여 주세요', cardWidth / 2, cardHeight - 92);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
 // 갤러리에 저장: iPhone 은 공유 창의 '이미지 저장'으로 사진 앱에, 그 밖(안드로이드 등)은 내려받기로 (갤러리의 '다운로드' 앨범에 보인다).
@@ -84,17 +88,17 @@ export async function saveCard(blob, id) {
       try {
         await navigator.share({ files: [file], title: '두뇌 PT 회원 카드' });
         return '공유 창에서 \'이미지 저장\'을 고르면 사진 앱에 저장돼요';
-      } catch (e) {
-        if (e.name === 'AbortError') return '';
+      } catch (error) {
+        if (error.name === 'AbortError') return '';
       }
     }
   }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 4000);
   return '저장했어요! 갤러리(사진)의 \'다운로드\'에서 찾을 수 있어요';
 }

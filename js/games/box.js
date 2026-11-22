@@ -23,10 +23,10 @@
 //   boxes — 상자 수. 둘이면 위아래 두 줄에 하나씩 두고 (줄마다 상자 하나일 때와 똑같이 왼쪽에서 들어가 오른쪽으로 나온다)
 //           한쪽 상자에 대해 묻는다. 처음에는 한 줄에 상자 둘을 두고 왼쪽 상자 → 오른쪽 상자로 옮기게 했더니,
 //           나오자마자 다른 상자로 들어가는 과일을 따라가기 벅찼다 (2026-11-02)
-//   q     — 질문 종류: total 모두 몇 개 · kind (그림) 몇 개 · most 가장 많은 과일 · diff (그림)가 (그림)보다 몇 개 더
-//   opts  — 숫자 보기 수 (기본 4)
-import { U } from '../config.js';
-import { Dg } from '../diagram.js';
+//   questionTypes — 질문 종류: total 모두 몇 개 · kind (그림) 몇 개 · most 가장 많은 과일 · diff (그림)가 (그림)보다 몇 개 더
+//   optionCount — 숫자 보기 수 (기본 4)
+import { Util } from '../config.js';
+import { Diagram } from '../diagram.js';
 import { Sfx } from '../sfx.js';
 import { Tag } from './tags.js';
 
@@ -95,48 +95,48 @@ export class BoxGame {
   static hint = '상자에 들어가고 나오는 과일을 잘 보고<br>상자 안에 남은 과일을 맞혀 보세요';
   static levels = [
     // 쉬운 단계: 한 가지 과일이 빈 상자에 들어가기만 한다 (Lv2 부터 가끔 나온다)
-    { steps: 2, per: [1, 2], kinds: 1, start: 0, out: 0, q: [QuestionType.TOTAL], opts: 3 },
-    { steps: 3, per: [1, 2], kinds: 1, start: 0, out: 0.35, q: [QuestionType.TOTAL], opts: 3 },
+    { steps: 2, per: [1, 2], kinds: 1, start: 0, out: 0, questionTypes: [QuestionType.TOTAL], optionCount: 3 },
+    { steps: 3, per: [1, 2], kinds: 1, start: 0, out: 0.35, questionTypes: [QuestionType.TOTAL], optionCount: 3 },
     // 두 가지 과일 가운데 하나를 묻는다
-    { steps: 3, per: [1, 2], kinds: 2, start: 0, q: [QuestionType.KIND] },
-    { steps: 3, per: [1, 3], kinds: 2, start: [2, 3], mixed: 0.3, q: [QuestionType.KIND, QuestionType.TOTAL] },
+    { steps: 3, per: [1, 2], kinds: 2, start: 0, questionTypes: [QuestionType.KIND] },
+    { steps: 3, per: [1, 3], kinds: 2, start: [2, 3], mixed: 0.3, questionTypes: [QuestionType.KIND, QuestionType.TOTAL] },
     // 비교하는 질문
-    { steps: 3, per: [1, 3], kinds: 2, start: [2, 4], mixed: 0.4, q: [QuestionType.MOST, QuestionType.DIFF, QuestionType.KIND] },
+    { steps: 3, per: [1, 3], kinds: 2, start: [2, 4], mixed: 0.4, questionTypes: [QuestionType.MOST, QuestionType.DIFF, QuestionType.KIND] },
     // 세 가지 과일 · 지나가기만 하는 과일
-    { steps: 3, per: [2, 3], kinds: 3, start: [3, 4], mixed: 0.5, decoy: 1, q: [QuestionType.KIND, QuestionType.MOST] },
-    { steps: 4, per: [1, 3], kinds: 3, start: [3, 5], mixed: 0.6, decoy: 2, q: [QuestionType.DIFF, QuestionType.KIND], opts: 5 },
+    { steps: 3, per: [2, 3], kinds: 3, start: [3, 4], mixed: 0.5, decoy: 1, questionTypes: [QuestionType.KIND, QuestionType.MOST] },
+    { steps: 4, per: [1, 3], kinds: 3, start: [3, 5], mixed: 0.6, decoy: 2, questionTypes: [QuestionType.DIFF, QuestionType.KIND], optionCount: 5 },
     // 상자 둘 (위아래 두 줄)
-    { steps: 4, per: [1, 3], kinds: 2, start: [4, 5], mixed: 0.4, boxes: 2, q: [QuestionType.KIND, QuestionType.TOTAL], opts: 5 },
+    { steps: 4, per: [1, 3], kinds: 2, start: [4, 5], mixed: 0.4, boxes: 2, questionTypes: [QuestionType.KIND, QuestionType.TOTAL], optionCount: 5 },
   ];
   static maxLevel = BoxGame.levels.length;
-  static SPEED = 0.1;     // 판 단위/ms. 과일 하나가 칸 끝에서 상자 뒤까지(GAP + FS) 약 1.2초
+  static SPEED = 0.1;     // 판 단위/ms. 과일 하나가 칸 끝에서 상자 뒤까지(GAP + FRUIT_SIZE) 약 1.2초
   static PAUSE_MS = 300;  // 한 줄이 다 숨은 뒤 다음 차례까지
   static CAP = 9;         // 상자 하나에 들 수 있는 과일 수 (답이 한 자리 수가 되게)
   static OUT = 0.45;      // 단계 표에 out 이 없을 때 한 차례가 빼기일 확률
   static ZERO = 0.12;     // 답이 0 인 문제를 이 정도만 남긴다 (자주 나오면 '0' 을 찍는 것이 수가 된다)
   static START_MIN = 2;   // 상자가 둘일 때 상자마다 처음 드는 최소 과일 수
   // 판 (판 단위). 한 번에 하나씩 숨으므로 상자는 과일 하나만 가리면 되지만, 열었을 때 9개가 3열로 들어가게 둔다
-  static FS = 46;         // 움직이는 과일 크기 (열린 상자 속은 IN_FS)
-  static IN_FS = 24;
-  static SP = 54;         // 한 줄에서 과일 사이 거리 (가운데끼리)
+  static FRUIT_SIZE = 46;     // 움직이는 과일 크기 (열린 상자 속은 OPEN_FRUIT_SIZE)
+  static OPEN_FRUIT_SIZE = 24;
+  static FRUIT_SPACING = 54;  // 한 줄에서 과일 사이 거리 (가운데끼리)
   static GAP = 76;        // 칸 끝과 상자 사이
-  static BOX = { w: 84, h: 84, y: 64 };
-  static H = 160;         // 판 높이. 너비는 상자 수에 따라
+  static BOX = { width: 84, height: 84, top: 64 };
+  static BOARD_HEIGHT = 160; // 판 높이. 너비는 상자 수에 따라
   static LANE = 32;       // 지나가기만 하는 과일이 다니는 높이 (상자 위)
-  static ROWS = { y: [12, 116], h: 212 }; // 상자가 둘일 때: 줄마다 상자 위쪽 끝, 판 높이 (지나가는 과일 없이)
+  static ROWS = { tops: [12, 116], boardHeight: 212 }; // 상자가 둘일 때: 줄마다 상자 위쪽 끝, 판 높이 (지나가는 과일 없이)
 
   // 소개 그림: ① 들어가고 나오는 과일을 보고 ② 남은 과일 수를 고른다
   static diagram() {
     const [apple, melon] = FRUITS;
-    const box = '<rect class="dg-bx" x="62" y="22" width="56" height="50" rx="6"/>' + Dg.text(90, 48, '?', 22, 'dg-bx-q');
-    const step1 = Dg.glyph(apple.svg, 20, 47, 26) + diagramArrow(36, 56, 47) + box + diagramArrow(124, 144, 47) +
-      Dg.glyph(melon.svg, 160, 47, 26);
-    const choices = [1, 2, 3].map((value, i) => Dg.rect(44 + i * 34, 62, 28, 28) + Dg.text(58 + i * 34, 76, value, 16)).join('');
-    const step2 = Dg.text(66, 30, '상자 안', 14, 'dg-txt') + Dg.glyph(apple.svg, 106, 30, 24) + Dg.text(132, 30, '?', 16, 'dg-txt') +
-      choices + Dg.tap(92, 76, 18);
+    const box = '<rect class="dg-bx" x="62" y="22" width="56" height="50" rx="6"/>' + Diagram.text(90, 48, '?', 22, 'dg-bx-q');
+    const step1 = Diagram.glyph(apple.svg, 20, 47, 26) + diagramArrow(36, 56, 47) + box + diagramArrow(124, 144, 47) +
+      Diagram.glyph(melon.svg, 160, 47, 26);
+    const choices = [1, 2, 3].map((value, i) => Diagram.rect(44 + i * 34, 62, 28, 28) + Diagram.text(58 + i * 34, 76, value, 16)).join('');
+    const step2 = Diagram.text(66, 30, '상자 안', 14, 'dg-txt') + Diagram.glyph(apple.svg, 106, 30, 24) + Diagram.text(132, 30, '?', 16, 'dg-txt') +
+      choices + Diagram.tap(92, 76, 18);
     return [
-      { svg: Dg.svg('0 0 180 96', step1), caption: '들어가고 나오는 과일을 보고' },
-      { svg: Dg.svg('0 0 180 96', step2), caption: '상자 안에 남은 수 고르기' },
+      { svg: Diagram.svg('0 0 180 96', step1), caption: '들어가고 나오는 과일을 보고' },
+      { svg: Diagram.svg('0 0 180 96', step2), caption: '상자 안에 남은 수 고르기' },
     ];
   }
 
@@ -153,17 +153,17 @@ export class BoxGame {
     const { stage, level } = this.host;
     const { puzzle } = this;
     const hasStartFruits = puzzle.boxes.some((box) => BoxGame.sum(puzzle.start[box]) > 0);
-    this.msg = U.el('div', 'stage-msg look', hasStartFruits ? '상자 안의 과일을 잘 보세요' : '들어가고 나오는 과일을 잘 보세요');
-    this.body = U.frame(stage, `${BoxGame.title} · Lv.${level}`, this.msg).body;
-    this.wrap = U.el('div', 'bx-wrap');
+    this.message = Util.element('div', 'stage-msg look', hasStartFruits ? '상자 안의 과일을 잘 보세요' : '들어가고 나오는 과일을 잘 보세요');
+    this.body = Util.frame(stage, `${BoxGame.title} · Lv.${level}`, this.message).body;
+    this.wrap = Util.element('div', 'bx-wrap');
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.setAttribute('class', 'bx-arena');
     this.svg.setAttribute('viewBox', `0 0 ${puzzle.width} ${puzzle.height}`);
     this.svg.innerHTML = renderArena(puzzle);
     this.backLayer = this.svg.querySelector('.bx-back');
     this.frontLayer = this.svg.querySelector('.bx-front');
-    this.boxEls = perBox(puzzle.boxes, (box) => this.svg.querySelector(`[data-box="${box}"]`));
-    this.optionBar = U.el('div', 'ar-cands bx-opts');
+    this.boxGroups = perBox(puzzle.boxes, (box) => this.svg.querySelector(`[data-box="${box}"]`));
+    this.optionBar = Util.element('div', 'ar-cands bx-opts');
     this.wrap.append(this.svg, this.optionBar);
     this.body.append(this.wrap);
     this.resizeObserver = new ResizeObserver(() => this.layout());
@@ -192,7 +192,7 @@ export class BoxGame {
     const aspect = this.puzzle.width / this.puzzle.height;
     const optionsHeight = this.optionBar.offsetHeight || 104;
     // 최소 200px: 화면이 낮아도 상자와 보기가 판 자리를 넘치지 않게
-    const fitHeight = body.clientHeight - optionsHeight - U.gapOf(this.wrap, 22) - 18;
+    const fitHeight = body.clientHeight - optionsHeight - Util.gapOf(this.wrap, 22) - 18;
     const width = Math.max(200, Math.min(body.clientWidth - 40, fitHeight * aspect, 960));
     this.svg.style.width = `${width}px`;
     this.svg.style.height = `${width / aspect}px`;
@@ -200,70 +200,70 @@ export class BoxGame {
 
   // 상자를 열어 속(counts = { 과일 id: 수 })을 보여 준다. 과일 종류끼리 모아 3열로 늘어놓는다
   openBox(box, counts) {
-    const el = this.boxEls[box];
-    const size = BoxGame.IN_FS;
+    const boxGroup = this.boxGroups[box];
+    const size = BoxGame.OPEN_FRUIT_SIZE;
     const fruits = this.puzzle.kinds.flatMap((kind) => Array(counts[kind] || 0).fill(kind));
-    const cols = Math.min(3, Math.max(1, fruits.length));
+    const columns = Math.min(3, Math.max(1, fruits.length));
     const rows = Math.ceil(fruits.length / 3);
     const cell = size + 2;
-    const x0 = this.puzzle.centerX[box] - ((cols - 1) * cell) / 2;
-    const y0 = rowMidY(this.puzzle, box) - ((rows - 1) * cell) / 2;
-    el.querySelector('.bx-in').innerHTML = fruits.map((kind, i) =>
-      Dg.glyph(BoxGame.fruit(kind).svg, x0 + (i % 3) * cell, y0 + Math.floor(i / 3) * cell, size)).join('');
-    el.classList.add('open');
+    const firstX = this.puzzle.centerX[box] - ((columns - 1) * cell) / 2;
+    const firstY = rowMidY(this.puzzle, box) - ((rows - 1) * cell) / 2;
+    boxGroup.querySelector('.bx-in').innerHTML = fruits.map((kind, i) =>
+      Diagram.glyph(BoxGame.fruit(kind).svg, firstX + (i % 3) * cell, firstY + Math.floor(i / 3) * cell, size)).join('');
+    boxGroup.classList.add('open');
   }
 
   closeBox(box) {
-    const el = this.boxEls[box];
-    el.classList.remove('open');
-    el.querySelector('.bx-in').innerHTML = '';
+    const boxGroup = this.boxGroups[box];
+    boxGroup.classList.remove('open');
+    boxGroup.querySelector('.bx-in').innerHTML = '';
   }
 
   // 순서를 보여 준다. 과일마다 출발 시각·자리·도착 자리를 정해 두고(flight), 게임 시계(host.now)로 위치를 고른다 —
   // 일시정지·운영 메뉴 중에는 과일도 멈춘다. 출발·도착 자리는 칸 밖 또는 상자 뒤에 과일이 통째로 숨는 자리라서
-  // 움직이기 전·뒤에는 보이지 않는다. 한 줄의 과일은 같은 길을 SP 만큼씩 늦게 출발한다
+  // 움직이기 전·뒤에는 보이지 않는다. 한 줄의 과일은 같은 길을 FRUIT_SPACING 만큼씩 늦게 출발한다
   play() {
     const { puzzle } = this;
-    U.say(this.msg, '잘 보세요', 'look');
+    Util.say(this.message, '잘 보세요', 'look');
     this.phase = Phase.PLAY;
-    const { SP, SPEED, PAUSE_MS } = BoxGame;
+    const { FRUIT_SPACING, SPEED, PAUSE_MS } = BoxGame;
     this.flights = [];
     let stepStart = 0;
     puzzle.steps.forEach((moves) => {
-      const at = stepStart;
+      const stepAt = stepStart;
       let stepEnd = stepStart;
       moves.forEach((move) => {
         move.fruits.forEach((kind, i) => {
-          const flight = this.launch(move, kind, at + (i * SP) / SPEED);
+          const flight = this.launch(move, kind, stepAt + (i * FRUIT_SPACING) / SPEED);
           // 지나가기만 하는 과일은 다음 차례를 기다리게 하지 않는다
-          if (!move.decoy) stepEnd = Math.max(stepEnd, flight.t0 + flight.dur);
+          if (!move.decoy) stepEnd = Math.max(stepEnd, flight.departAt + flight.duration);
         });
       });
-      this.host.after(at, () => this.host.sfx(Sfx.BLINK));
+      this.host.after(stepAt, () => this.host.sfx(Sfx.BLINK));
       stepStart = stepEnd + PAUSE_MS;
     });
     const clockStart = this.host.now();
     const tick = () => {
       if (this.phase !== Phase.PLAY) return;
       const elapsed = this.host.now() - clockStart;
-      this.flights.forEach((flight) => this.placeFlight(flight, U.clamp((elapsed - flight.t0) / flight.dur, 0, 1)));
+      this.flights.forEach((flight) => this.placeFlight(flight, Util.clamp((elapsed - flight.departAt) / flight.duration, 0, 1)));
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-    const lastLanding = Math.max(...this.flights.map((flight) => flight.t0 + flight.dur));
+    const lastLanding = Math.max(...this.flights.map((flight) => flight.departAt + flight.duration));
     this.host.after(lastLanding + 350, () => this.ask());
   }
 
-  // 과일 하나를 판에 올리고 움직임(flight)을 정한다. t0 = 출발 시각 (순서 시작부터 ms)
-  launch(move, kind, t0) {
+  // 과일 하나를 판에 올리고 움직임(flight)을 정한다. departAt = 출발 시각 (순서 시작부터 ms)
+  launch(move, kind, departAt) {
     const { puzzle } = this;
-    const x1 = departX(puzzle, move.from);
-    const x2 = arriveX(puzzle, move.to);
-    const el = document.createElementNS(SVG_NS, 'g');
-    el.innerHTML = Dg.glyph(BoxGame.fruit(kind).svg, 0, 0, BoxGame.FS);
-    (move.decoy ? this.frontLayer : this.backLayer).append(el);
+    const fromX = departX(puzzle, move.from);
+    const toX = arriveX(puzzle, move.to);
+    const sprite = document.createElementNS(SVG_NS, 'g');
+    sprite.innerHTML = Diagram.glyph(BoxGame.fruit(kind).svg, 0, 0, BoxGame.FRUIT_SIZE);
+    (move.decoy ? this.frontLayer : this.backLayer).append(sprite);
     const rowBox = move.to === Spot.RIGHT ? move.from : move.to;
-    const flight = { el, t0, dur: Math.abs(x2 - x1) / BoxGame.SPEED, x1, x2, y: move.decoy ? BoxGame.LANE : rowMidY(puzzle, rowBox) };
+    const flight = { sprite, departAt, duration: Math.abs(toX - fromX) / BoxGame.SPEED, fromX, toX, y: move.decoy ? BoxGame.LANE : rowMidY(puzzle, rowBox) };
     // 상자 가장자리를 지나는 순간 (과일이 반쯤 가려질 때) 상자가 움찔하고 그 자리에 고리가 퍼진다
     if (!move.decoy) {
       if (move.to !== Spot.RIGHT) flight.enter = { box: move.to, x: puzzle.left[move.to] };
@@ -276,8 +276,8 @@ export class BoxGame {
 
   // progress = 0 (출발) … 1 (도착). 가속 없이 같은 빠르기로
   placeFlight(flight, progress) {
-    const x = U.lerp(flight.x1, flight.x2, progress);
-    flight.el.setAttribute('transform', `translate(${x.toFixed(2)} ${flight.y})`);
+    const x = Util.lerp(flight.fromX, flight.toX, progress);
+    flight.sprite.setAttribute('transform', `translate(${x.toFixed(2)} ${flight.y})`);
     if (this.phase !== Phase.PLAY) return;
     this.crossEdge(flight, flight.leave, 'out', x);
     this.crossEdge(flight, flight.enter, 'in', x);
@@ -292,15 +292,15 @@ export class BoxGame {
 
   // 들어갈 때(in)와 나올 때(out) 상자가 조금 다르게 움찔한다 (css .bx-box.fx-in / .fx-out). 고리는 가장자리에서 퍼진다
   pulseBox(box, x, y, direction) {
-    const el = this.boxEls[box];
-    el.classList.remove('fx-in', 'fx-out');
-    el.getBoundingClientRect(); // 연달아 지나가도 움찔하는 애니메이션을 처음부터 다시
-    el.classList.add(`fx-${direction}`);
+    const boxGroup = this.boxGroups[box];
+    boxGroup.classList.remove('fx-in', 'fx-out');
+    boxGroup.getBoundingClientRect(); // 연달아 지나가도 움찔하는 애니메이션을 처음부터 다시
+    boxGroup.classList.add(`fx-${direction}`);
     const ring = document.createElementNS(SVG_NS, 'circle');
     ring.setAttribute('class', 'bx-ring');
     ring.setAttribute('cx', String(x));
     ring.setAttribute('cy', String(y));
-    ring.setAttribute('r', String(BoxGame.FS / 2));
+    ring.setAttribute('r', String(BoxGame.FRUIT_SIZE / 2));
     ring.addEventListener('animationend', () => ring.remove());
     this.frontLayer.append(ring);
   }
@@ -312,13 +312,13 @@ export class BoxGame {
     this.phase = Phase.INPUT;
     this.backLayer.innerHTML = '';
     this.frontLayer.innerHTML = '';
-    if (twoBoxes) this.boxEls[question.box].classList.add('asked');
-    U.say(this.msg, '', 'act');
-    this.msg.insertBefore(U.el('span', 'bx-q-text', questionText(question, twoBoxes)), this.msg.firstChild);
+    if (twoBoxes) this.boxGroups[question.box].classList.add('asked');
+    Util.say(this.message, '', 'act');
+    this.message.insertBefore(Util.element('span', 'bx-q-text', questionText(question, twoBoxes)), this.message.firstChild);
 
     this.optionButtons = question.options.map((value) => {
       const label = question.type === QuestionType.MOST ? fruitIcon(value) : String(value);
-      const button = U.el('button', 'ar-cand bx-opt', label);
+      const button = Util.element('button', 'ar-cand bx-opt', label);
       button.addEventListener('pointerdown', () => this.pick(value, button));
       this.optionBar.append(button);
       return { value, button };
@@ -350,11 +350,11 @@ export class BoxGame {
     if (!correct && button) button.classList.add('wrong');
     puzzle.boxes.forEach((box) => this.openBox(box, puzzle.end[box]));
     if (correct) {
-      U.say(this.msg, '정답!', 'good');
-      this.host.award(this.host.base * this.host.mult, button);
+      Util.say(this.message, '정답!', 'good');
+      this.host.award(this.host.base * this.host.multiplier, button);
       this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.msg, button ? '상자 안을 보세요' : '시간 초과 · 상자 안을 보세요', 'bad');
+      Util.say(this.message, button ? '상자 안을 보세요' : '시간 초과 · 상자 안을 보세요', 'bad');
       this.host.sfx(Sfx.BAD);
     }
     this.host.after(correct ? 1100 : 2000, () => this.finish());
@@ -382,7 +382,7 @@ export class BoxGame {
 
   // counts = { 과일 id: 수 } 의 합
   static sum(counts) {
-    return Object.values(counts).reduce((sum, n) => sum + n, 0);
+    return Object.values(counts).reduce((sum, count) => sum + count, 0);
   }
 
   // ---- 문제 만들기 ----
@@ -396,7 +396,7 @@ export class BoxGame {
       if (puzzle) return puzzle;
     }
     // 조건을 못 맞추면 가장 단순한 판: 한 가지 과일을 넣기만 한다
-    const simplest = { ...spec, kinds: 1, start: 0, out: 0, mixed: 0, decoy: 0, boxes: 1, q: [QuestionType.TOTAL] };
+    const simplest = { ...spec, kinds: 1, start: 0, out: 0, mixed: 0, decoy: 0, boxes: 1, questionTypes: [QuestionType.TOTAL] };
     return BoxGame.tryMake(simplest, true);
   }
 
@@ -405,19 +405,19 @@ export class BoxGame {
     const boxCount = spec.boxes || 1;
     const boxes = boxCount === 2 ? [Spot.TOP, Spot.BOTTOM] : [Spot.TOP];
     const { GAP, BOX, ROWS } = BoxGame;
-    const width = 2 * GAP + BOX.w;
-    const height = boxCount === 2 ? ROWS.h : BoxGame.H;
+    const width = 2 * GAP + BOX.width;
+    const height = boxCount === 2 ? ROWS.boardHeight : BoxGame.BOARD_HEIGHT;
     const left = perBox(boxes, () => GAP);
-    const top = perBox(boxes, (box, i) => (boxCount === 2 ? ROWS.y[i] : BOX.y));
-    const right = perBox(boxes, (box) => left[box] + BOX.w);
-    const centerX = perBox(boxes, (box) => left[box] + BOX.w / 2);
+    const top = perBox(boxes, (box, i) => (boxCount === 2 ? ROWS.tops[i] : BOX.top));
+    const right = perBox(boxes, (box) => left[box] + BOX.width);
+    const centerX = perBox(boxes, (box) => left[box] + BOX.width / 2);
     const kinds = pickFruitKinds(spec.kinds);
     const counts = perBox(boxes, () => zeroCounts(kinds));
     // 처음 든 과일: 상자가 둘이면 위 상자에 더 많이 (같을 수도 있다), 상자마다 START_MIN 개 이상
     if (spec.start) {
-      const total = U.randInt(...spec.start);
+      const total = Util.randomInt(...spec.start);
       const min = BoxGame.START_MIN;
-      const bottomCount = boxCount === 2 ? U.randInt(min, Math.max(min, Math.floor(total / 2))) : 0;
+      const bottomCount = boxCount === 2 ? Util.randomInt(min, Math.max(min, Math.floor(total / 2))) : 0;
       addRandomFruits(counts[Spot.TOP], kinds, total - bottomCount);
       if (boxCount === 2) addRandomFruits(counts[Spot.BOTTOM], kinds, bottomCount);
     }
@@ -432,8 +432,9 @@ export class BoxGame {
     // 지나가기만 하는 과일: 상자 위로 다니므로 아무 차례에나 얹는다 (서로 다른 차례에).
     // 마지막 차례에는 얹지 않는다 — 칸 끝까지 가는 동안 질문이 늦어진다
     const decoyCount = boxCount === 1 ? spec.decoy || 0 : 0;
-    const carrierSteps = U.shuffle(steps.slice(0, -1));
+    const carrierSteps = Util.shuffle(steps.slice(0, -1));
     for (let i = 0; i < decoyCount && i < carrierSteps.length; i++) {
+      // eslint-disable-next-line id-length -- 움직임(from·to)은 세션 기록에 그대로 남는다 (api/replay.html 이 읽는다)
       carrierSteps[i].push({ from: Spot.LEFT, to: Spot.RIGHT, fruits: [randomKind(kinds)], decoy: true });
     }
     const end = counts;
@@ -448,30 +449,31 @@ export class BoxGame {
     // 빼기를 먼저 해 볼지 넣기를 먼저 해 볼지 정한다 (뺄 것이 없거나 상자가 차면 다른 쪽)
     const takeOut = Math.random() < (spec.out ?? BoxGame.OUT);
     const tryLater = ([from]) => ((from === Spot.LEFT) === takeOut ? 1 : 0);
-    const order = U.shuffle([...routes]).sort((a, b) => tryLater(a) - tryLater(b));
-    for (const [from, to] of order) {
-      const room = to === Spot.RIGHT ? Infinity : BoxGame.CAP - BoxGame.sum(counts[to]);
+    const order = Util.shuffle([...routes]).sort((a, b) => tryLater(a) - tryLater(b));
+    for (const [from, target] of order) {
+      const room = target === Spot.RIGHT ? Infinity : BoxGame.CAP - BoxGame.sum(counts[target]);
       // 첫 차례에 빼면 적어도 하나는 남긴다
       const available = from === Spot.LEFT ? Infinity : BoxGame.sum(counts[from]) - (firstStep ? 1 : 0);
-      const size = Math.min(U.randInt(...spec.per), room, available);
+      const size = Math.min(Util.randomInt(...spec.per), room, available);
       if (size < 1) continue;
       const fruits = lineUpFruits(spec, kinds, from === Spot.LEFT ? null : counts[from], size);
       fruits.forEach((kind) => {
         if (from !== Spot.LEFT) counts[from][kind]--;
-        if (to !== Spot.RIGHT) counts[to][kind]++;
+        if (target !== Spot.RIGHT) counts[target][kind]++;
       });
-      return { from, to, fruits };
+      // eslint-disable-next-line id-length -- 움직임(from·to)은 세션 기록에 그대로 남는다 (api/replay.html 이 읽는다)
+      return { from, to: target, fruits };
     }
     return null;
   }
 
   // 질문과 답·보기를 정한다. 못 정하면 null (판을 다시 만든다)
   static question(spec, kinds, boxes, steps, end, loose) {
-    const type = spec.q[U.rand(spec.q.length)];
+    const type = spec.questionTypes[Util.randomBelow(spec.questionTypes.length)];
     const moves = steps.flat().filter((move) => !move.decoy);
     // 상자가 둘이면 드나든 일이 있는 상자 가운데 하나를 묻는다
     const box = boxes.length > 1
-      ? U.shuffle([...boxes]).find((candidate) => moves.some((move) => move.to === candidate) && moves.some((move) => move.from === candidate))
+      ? Util.shuffle([...boxes]).find((candidate) => moves.some((move) => move.to === candidate) && moves.some((move) => move.from === candidate))
       : Spot.TOP;
     if (!box) return null;
     const timesMoved = (kind) => moves.filter((move) => move.fruits.includes(kind) && (move.from === box || move.to === box)).length;
@@ -481,7 +483,7 @@ export class BoxGame {
     const finalCounts = end[box];
     let askedKinds = [];
     if (type === QuestionType.KIND) {
-      const kind = U.shuffle([...kinds]).find((candidate) => timesMoved(candidate) >= 2);
+      const kind = Util.shuffle([...kinds]).find((candidate) => timesMoved(candidate) >= 2);
       if (!kind) return null;
       askedKinds = [kind];
     } else if (type === QuestionType.MOST) {
@@ -490,7 +492,7 @@ export class BoxGame {
       if (top < 1 || best.length !== 1) return null;
       return { type, box, kinds: [], answer: best[0], options: [...kinds] };
     } else if (type === QuestionType.DIFF) {
-      const pairs = U.shuffle(kinds.flatMap((more) => kinds
+      const pairs = Util.shuffle(kinds.flatMap((more) => kinds
         .filter((less) => finalCounts[more] > finalCounts[less] && timesMoved(more) && timesMoved(less))
         .map((less) => [more, less])));
       if (!pairs.length) return null;
@@ -504,10 +506,10 @@ export class BoxGame {
     const lastFruit = (move) => [{ move, kind: move.fruits[move.fruits.length - 1] }];
     const mistakes = [
       countSkipping(wholeLine(moves[moves.length - 1])),
-      countSkipping(wholeLine(moves[U.rand(moves.length)])),
-      countSkipping(lastFruit(moves[U.rand(moves.length)])),
+      countSkipping(wholeLine(moves[Util.randomBelow(moves.length)])),
+      countSkipping(lastFruit(moves[Util.randomBelow(moves.length)])),
     ];
-    return { type, box, kinds: askedKinds, answer, options: pickOptions(answer, mistakes, spec.opts || 4) };
+    return { type, box, kinds: askedKinds, answer, options: pickOptions(answer, mistakes, spec.optionCount || 4) };
   }
 }
 
@@ -527,17 +529,17 @@ function deepCopy(value) {
 }
 
 function randomKind(kinds) {
-  return kinds[U.rand(kinds.length)];
+  return kinds[Util.randomBelow(kinds.length)];
 }
 
-function addRandomFruits(counts, kinds, n) {
-  for (let i = 0; i < n; i++) counts[randomKind(kinds)]++;
+function addRandomFruits(counts, kinds, fruitCount) {
+  for (let i = 0; i < fruitCount; i++) counts[randomKind(kinds)]++;
 }
 
 // 과일 종류를 count 가지 고른다 (함께 내지 않는 짝은 피한다)
 function pickFruitKinds(count) {
   const kinds = [];
-  for (const fruit of U.shuffle([...FRUITS])) {
+  for (const fruit of Util.shuffle([...FRUITS])) {
     if (kinds.length >= count) break;
     const clashes = kinds.some((kind) => FRUIT_CLASH.some((pair) => pair.includes(kind) && pair.includes(fruit.id)));
     if (!clashes) kinds.push(fruit.id);
@@ -552,12 +554,12 @@ function lineUpFruits(spec, kinds, source, size) {
   const isAvailable = (kind) => !remaining || remaining[kind] > 0;
   const fruits = [];
   for (let i = 0; i < size; i++) {
-    const prev = fruits[i - 1];
-    const keep = prev && isAvailable(prev) && Math.random() >= (spec.mixed || 0);
-    const others = U.shuffle(kinds.filter((kind) => isAvailable(kind) && kind !== prev));
+    const previous = fruits[i - 1];
+    const keep = previous && isAvailable(previous) && Math.random() >= (spec.mixed || 0);
+    const others = Util.shuffle(kinds.filter((kind) => isAvailable(kind) && kind !== previous));
     let next = null;
-    if (keep) next = prev;
-    else if (!prev || spec.mixed) next = others[0] || (isAvailable(prev) ? prev : null);
+    if (keep) next = previous;
+    else if (!previous || spec.mixed) next = others[0] || (isAvailable(previous) ? previous : null);
     if (!next) break;
     fruits.push(next);
     if (remaining) remaining[next]--;
@@ -586,10 +588,10 @@ function undoMoves(end, skipped) {
 // 숫자 보기 count 개: 답, 하기 쉬운 실수 (하나는 자리를 남겨 둔다), 답 가까운 수, 모자라면 0 부터 채운다
 function pickOptions(answer, mistakes, count) {
   const options = new Set([answer]);
-  for (const guess of U.shuffle(mistakes)) {
+  for (const guess of Util.shuffle(mistakes)) {
     if (options.size < count - 1 && guess >= 0 && guess !== answer) options.add(guess);
   }
-  for (const offset of U.shuffle([-2, -1, 1, 2, 3])) {
+  for (const offset of Util.shuffle([-2, -1, 1, 2, 3])) {
     if (options.size >= count) break;
     if (answer + offset >= 0) options.add(answer + offset);
   }
@@ -613,33 +615,33 @@ function renderArena(puzzle) {
 
 // 상자가 놓인 바닥 줄
 function renderGround(puzzle, box) {
-  const groundY = puzzle.top[box] + BoxGame.BOX.h + 0.5;
+  const groundY = puzzle.top[box] + BoxGame.BOX.height + 0.5;
   return `<line class="bx-ground" x1="0" x2="${puzzle.width}" y1="${groundY}" y2="${groundY}"/>`;
 }
 
 // 상자 껍데기, 닫혔을 때의 '?', 열렸을 때 속을 그릴 자리(.bx-in)
 function renderBox(puzzle, box) {
-  const { w, h } = BoxGame.BOX;
+  const { width, height } = BoxGame.BOX;
   const top = puzzle.top[box];
   return `<g class="bx-box" data-box="${box}">` +
-    `<rect class="bx-shell" x="${puzzle.left[box]}" y="${top}" width="${w}" height="${h}" rx="8"/>` +
-    `<text class="bx-q" x="${puzzle.centerX[box]}" y="${top + h / 2 + 2}" text-anchor="middle" dominant-baseline="central">?</text>` +
+    `<rect class="bx-shell" x="${puzzle.left[box]}" y="${top}" width="${width}" height="${height}" rx="8"/>` +
+    `<text class="bx-q" x="${puzzle.centerX[box]}" y="${top + height / 2 + 2}" text-anchor="middle" dominant-baseline="central">?</text>` +
     '<g class="bx-in"></g></g>';
 }
 
 // 상자 줄의 가운데 높이
 function rowMidY(puzzle, box) {
-  return puzzle.top[box] + BoxGame.BOX.h / 2;
+  return puzzle.top[box] + BoxGame.BOX.height / 2;
 }
 
 // 출발 자리: 칸 왼쪽 밖, 또는 상자 뒤 (오른쪽 끝에 과일이 통째로 숨는 자리)
 function departX(puzzle, spot) {
-  return spot === Spot.LEFT ? -BoxGame.FS / 2 : puzzle.right[spot] - BoxGame.FS / 2;
+  return spot === Spot.LEFT ? -BoxGame.FRUIT_SIZE / 2 : puzzle.right[spot] - BoxGame.FRUIT_SIZE / 2;
 }
 
 // 도착 자리: 칸 오른쪽 밖, 또는 상자 뒤 (왼쪽 끝에 과일이 통째로 숨는 자리)
 function arriveX(puzzle, spot) {
-  return spot === Spot.RIGHT ? puzzle.width + BoxGame.FS / 2 : puzzle.left[spot] + BoxGame.FS / 2;
+  return spot === Spot.RIGHT ? puzzle.width + BoxGame.FRUIT_SIZE / 2 : puzzle.left[spot] + BoxGame.FRUIT_SIZE / 2;
 }
 
 function fruitIcon(id) {
@@ -668,6 +670,6 @@ function questionLoad({ question, kinds, boxes }) {
 }
 
 // 소개 그림의 오른쪽 화살표
-function diagramArrow(x1, x2, y) {
-  return `<path class="dg-bx-arrow" d="M${x1} ${y}H${x2}m-6 -5l6 5-6 5"/>`;
+function diagramArrow(fromX, toX, y) {
+  return `<path class="dg-bx-arrow" d="M${fromX} ${y}H${toX}m-6 -5l6 5-6 5"/>`;
 }

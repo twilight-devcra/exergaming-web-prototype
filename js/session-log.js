@@ -17,29 +17,29 @@ export class SessionLog {
 
   constructor(app) {
     this.app = app;
-    this.t0 = performance.now();
-    const d = new Date();
-    this.id = `${d.getTime()}`;
+    this.startedAtMs = performance.now();
+    const startedAt = new Date();
+    this.id = `${startedAt.getTime()}`;
     this.meta = {
       version: SessionLog.VERSION,
       id: this.id,
       mode: app.edition.mode,
       // 운동 방식: dual = 페달 + 두뇌 게임 · brain = 두뇌 게임만 (페달 없이, 속도 측정·운동 점수 없음)
-      track: app.cfg.brainOnly ? 'brain' : 'dual',
-      startedAt: d.toISOString(),
+      track: app.config.brainOnly ? 'brain' : 'dual',
+      startedAt: startedAt.toISOString(),
       theme: Theme.current.id,
       music: Config.music(), // 음악 스타일 (js/audio.js STYLES)
       input: app.pedal.sensorOn ? 'pedal' : 'keyboard',
       firmware: app.link.firmware || null,
-      rpmSource: app.cfg.rpmSource,
+      rpmSource: app.config.rpmSource,
       userAgent: navigator.userAgent,
       screen: [window.innerWidth, window.innerHeight],
       edition: EDITION, // prototype | app
       device: SessionLog.deviceId(), // 태블릿마다 하나. id 는 태블릿 안에서만 겹치지 않으므로 서버에서는 device + id 로 구분한다
-      config: JSON.parse(JSON.stringify(app.cfg)),
-      preset: Config.presetOf(app.cfg), // 라운드 난이도 프리셋 (값을 하나라도 고쳤으면 custom)
+      config: JSON.parse(JSON.stringify(app.config)),
+      preset: Config.presetOf(app.config), // 라운드 난이도 프리셋 (값을 하나라도 고쳤으면 custom)
       formats: {
-        t: 'ms since session start (wall clock)',
+        t: 'ms since session start (wall clock)', // eslint-disable-line id-length -- 세션 로그 형식
         clock: 'game clock ms (stops while paused)',
         keys: ['t', 'code'],
         capd: ['t', 'seq', '(lz, ly, gx, gz) x 5 samples at 100Hz; lz in 0.1 mg'],
@@ -52,8 +52,8 @@ export class SessionLog {
     this.capd = [];
     this.workout = [];
     this.samples = [];
-    this.q = null;          // 지금 답을 기다리는 문제
-    this.qn = 0;
+    this.pendingQuestion = null; // 지금 답을 기다리는 문제
+    this.questionCount = 0;
     this.sampleAcc = 0;
     this.done = false;
   }
@@ -68,17 +68,18 @@ export class SessionLog {
         localStorage.setItem(KEY, id);
       }
       return id;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
 
   now() {
-    return Math.round((performance.now() - this.t0) * 10) / 10;
+    return Math.round((performance.now() - this.startedAtMs) * 10) / 10;
   }
 
-  ev(type, data = {}) {
+  event(type, data = {}) {
     if (this.done) return;
+    // eslint-disable-next-line id-length -- 세션 로그 형식
     this.events.push({ t: this.now(), clock: Math.round(this.app.clock), type, ...data });
   }
 
@@ -86,42 +87,42 @@ export class SessionLog {
   // open: false 면 문제만 남기고, 입력이 실제로 열리는 순간 open() 을 부른다 (지시 따르기: 지시를 읽는 단계 · 램프 기다리기)
   question(game, level, data, open = true) {
     if (this.done) return;
-    this.q = { game, n: ++this.qn, clock: open ? this.app.clock : null, first: null };
+    this.pendingQuestion = { game, number: ++this.questionCount, clock: open ? this.app.clock : null, first: null };
     // 문제 번호(q)는 맨 뒤에 둬서 게임이 보낸 내용의 같은 이름 칸이 덮어쓰지 못하게 한다 (예전에 상자 속 과일의 q 가 덮어썼다)
-    this.ev('question', { game, level, ...data, q: this.q.n });
+    this.event('question', { game, level, ...data, q: this.pendingQuestion.number }); // eslint-disable-line id-length -- 세션 로그 형식
   }
 
   // question(..., false) 로 띄운 문제의 입력이 열린 순간
   open(game) {
-    const q = this.q;
-    if (!q || q.clock != null) return;
-    q.clock = this.app.clock;
-    this.ev('input_open', { game, q: q.n });
+    const question = this.pendingQuestion;
+    if (!question || question.clock != null) return;
+    question.clock = this.app.clock;
+    this.event('input_open', { game, q: question.number }); // eslint-disable-line id-length -- 세션 로그 형식
   }
 
   // 입력이 열린 뒤 지금까지 걸린 시간 (게임 시계 ms). 열리기 전이면 null
-  since(q) {
-    return q && q.clock != null ? Math.round(this.app.clock - q.clock) : null;
+  since(question) {
+    return question && question.clock != null ? Math.round(this.app.clock - question.clock) : null;
   }
 
   // 답이 끝까지 정해진 순간 (시간 초과 포함). ms = 입력이 열린 뒤 답이 정해질 때까지,
   // first = 입력이 열린 뒤 처음 입력할 때까지 (한 번 눌러 답하는 게임은 ms 와 같다. 아무것도 누르지 않고 시간이 다 되면 null)
-  // 반환: { ms, first } — App 이 게임별 생각한 시간(stats.think)에 더한다
+  // 반환: { thinkMs (= ms), first } — App 이 게임별 생각한 시간(stats.think)에 더한다
   answer(game, data) {
-    const q = this.q;
-    const ms = this.since(q);
-    const first = q && q.first != null ? q.first : data.timedOut ? null : ms;
-    this.ev('answer', { game, q: q ? q.n : null, ms, first, ...data });
-    this.q = null;
-    return { ms, first };
+    const question = this.pendingQuestion;
+    const ms = this.since(question); // eslint-disable-line id-length -- 세션 로그 형식 (answer 이벤트의 ms 칸)
+    const first = question && question.first != null ? question.first : data.timedOut ? null : ms;
+    this.event('answer', { game, q: question ? question.number : null, ms, first, ...data }); // eslint-disable-line id-length -- 세션 로그 형식
+    this.pendingQuestion = null;
+    return { thinkMs: ms, first };
   }
 
   // 답 도중의 입력 하나 (길 따라 그리기의 칸 하나, 사칙연산의 숫자 넣기/빼기)
   input(game, data) {
-    const q = this.q;
-    const ms = this.since(q);
-    if (q && q.first == null && ms != null) q.first = ms;
-    this.ev('input', { game, q: q ? q.n : null, ms, ...data });
+    const question = this.pendingQuestion;
+    const ms = this.since(question); // eslint-disable-line id-length -- 세션 로그 형식 (input 이벤트의 ms 칸)
+    if (question && question.first == null && ms != null) question.first = ms;
+    this.event('input', { game, q: question ? question.number : null, ms, ...data }); // eslint-disable-line id-length -- 세션 로그 형식
   }
 
   key(code) {
@@ -132,27 +133,27 @@ export class SessionLog {
     if (!this.done) this.capd.push([this.now(), ...values]);
   }
 
-  workoutFrame(w) {
-    if (!this.done) this.workout.push([this.now(), w.rpm, w.watt, w.revCount]);
+  workoutFrame(frame) {
+    if (!this.done) this.workout.push([this.now(), frame.rpm, frame.watt, frame.revCount]);
   }
 
-  sample(dt, rpm) {
+  sample(deltaSec, rpm) {
     if (this.done) return;
-    this.sampleAcc += dt;
+    this.sampleAcc += deltaSec;
     if (this.sampleAcc < SessionLog.SAMPLE_SEC) return;
     this.sampleAcc = 0;
-    const a = this.app;
-    const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
+    const app = this.app;
+    const round1 = (value) => (value == null ? null : Math.round(value * 10) / 10);
     // 목표·공 위치·점수는 카운트다운부터 의미가 있다 (측정 중에는 앞 판의 값이 남아 있다)
-    const live = a.state === 'countdown' || a.state === 'play';
-    this.samples.push([this.now(), Math.round(a.clock), r1(rpm), live ? r1(a.target) : null,
-      live ? Math.round(a.band.deviation * 1000) / 1000 : null, live ? (a.band.inZone ? 1 : 0) : null, live ? a.score : 0]);
+    const live = app.state === 'countdown' || app.state === 'play';
+    this.samples.push([this.now(), Math.round(app.clock), round1(rpm), live ? round1(app.target) : null,
+      live ? Math.round(app.band.deviation * 1000) / 1000 : null, live ? (app.band.inZone ? 1 : 0) : null, live ? app.score : 0]);
   }
 
   // ended: complete | operator | idle | abandoned
   finish(ended, summary = {}) {
     if (this.done) return;
-    this.ev('session_end', { ended });
+    this.event('session_end', { ended });
     this.done = true;
     this.meta.endedAt = new Date().toISOString();
     this.meta.ended = ended;
@@ -165,9 +166,9 @@ export class SessionLog {
   }
 
   fileName() {
-    const d = new Date(this.meta.startedAt);
-    const p = (n) => String(n).padStart(2, '0');
-    const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+    const startedAt = new Date(this.meta.startedAt);
+    const pad2 = (number) => String(number).padStart(2, '0');
+    const stamp = `${startedAt.getFullYear()}${pad2(startedAt.getMonth() + 1)}${pad2(startedAt.getDate())}-${pad2(startedAt.getHours())}${pad2(startedAt.getMinutes())}${pad2(startedAt.getSeconds())}`;
     const who = this.meta.participant ? `-${this.meta.participant}` : '';
     return `exergame-session${who}-${stamp}.json`;
   }
@@ -178,80 +179,80 @@ export class SessionLog {
 }
 
 function downloadBlob(name, parts, type) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(parts, { type }));
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob(parts, { type }));
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 2000);
 }
 
 // 운영 버전(스테이션 흐름): 끝난 세션을 태블릿에 쌓아 두고 운영 메뉴에서 한꺼번에 내보낸다
 export const SessionStore = {
-  db: null,
+  database: null,
 
   open() {
-    if (!this.db) {
-      this.db = new Promise((res, rej) => {
+    if (!this.database) {
+      this.database = new Promise((resolve, reject) => {
         // 2: 서버로 보낸 세션의 id 를 적어 두는 uploaded 를 더했다 (js/session-upload.js)
-        const r = indexedDB.open('exergame-sessions', 2);
-        r.onupgradeneeded = () => {
-          const db = r.result;
-          if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'meta.id' });
-          if (!db.objectStoreNames.contains('uploaded')) db.createObjectStore('uploaded', { keyPath: 'id' });
+        const request = indexedDB.open('exergame-sessions', 2);
+        request.onupgradeneeded = () => {
+          const database = request.result;
+          if (!database.objectStoreNames.contains('sessions')) database.createObjectStore('sessions', { keyPath: 'meta.id' });
+          if (!database.objectStoreNames.contains('uploaded')) database.createObjectStore('uploaded', { keyPath: 'id' });
         };
-        r.onsuccess = () => res(r.result);
-        r.onerror = () => rej(r.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
       });
       // 저장 공간이 모자랄 때 브라우저가 지우지 않도록 요청한다 (허락하지 않아도 저장은 된다)
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     }
-    return this.db;
+    return this.database;
   },
 
-  async run(mode, fn, store = 'sessions') {
-    const db = await this.open();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(store, mode);
-      const req = fn(tx.objectStore(store));
-      tx.oncomplete = () => res(req && req.result);
-      tx.onerror = () => rej(tx.error);
+  async run(mode, work, store = 'sessions') {
+    const database = await this.open();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(store, mode);
+      const request = work(transaction.objectStore(store));
+      transaction.oncomplete = () => resolve(request && request.result);
+      transaction.onerror = () => reject(transaction.error);
     });
   },
 
   put(log) {
-    return this.run('readwrite', (s) => s.put(JSON.parse(JSON.stringify(log))));
+    return this.run('readwrite', (objectStore) => objectStore.put(JSON.parse(JSON.stringify(log))));
   },
 
   count() {
-    return this.run('readonly', (s) => s.count());
+    return this.run('readonly', (objectStore) => objectStore.count());
   },
 
   get(id) {
-    return this.run('readonly', (s) => s.get(id));
+    return this.run('readonly', (objectStore) => objectStore.get(id));
   },
 
   keys() {
-    return this.run('readonly', (s) => s.getAllKeys());
+    return this.run('readonly', (objectStore) => objectStore.getAllKeys());
   },
 
   // 업로드 (js/session-upload.js): 서버가 받았다고 답한 세션
   uploadedKeys() {
-    return this.run('readonly', (s) => s.getAllKeys(), 'uploaded');
+    return this.run('readonly', (objectStore) => objectStore.getAllKeys(), 'uploaded');
   },
 
   markUploaded(id) {
-    return this.run('readwrite', (s) => s.put({ id, at: new Date().toISOString() }), 'uploaded');
+    return this.run('readwrite', (objectStore) => objectStore.put({ id, at: new Date().toISOString() }), 'uploaded'); // eslint-disable-line id-length -- 저장된 기록 형식
   },
 
-  // 세션을 하나씩 fn(log) 에 넘긴다 (시험용 회원 기록 서버, app/member-records.js)
-  scan(fn) {
-    return this.run('readonly', (s) => {
-      const req = s.openCursor();
-      req.onsuccess = () => {
-        const c = req.result;
-        if (!c) return;
-        fn(c.value);
-        c.continue();
+  // 세션을 하나씩 visit(log) 에 넘긴다 (시험용 회원 기록 서버, app/member-records.js)
+  scan(visit) {
+    return this.run('readonly', (objectStore) => {
+      const request = objectStore.openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        visit(cursor.value);
+        cursor.continue();
       };
       return null;
     });
@@ -260,13 +261,13 @@ export const SessionStore = {
   // 한 줄에 세션 하나 (JSON Lines). 큰 문자열 하나로 합치지 않고 조각째 Blob 으로 넘긴다
   async exportAll(name) {
     const parts = [];
-    await this.run('readonly', (s) => {
-      const req = s.openCursor();
-      req.onsuccess = () => {
-        const c = req.result;
-        if (!c) return;
-        parts.push(JSON.stringify(c.value), '\n');
-        c.continue();
+    await this.run('readonly', (objectStore) => {
+      const request = objectStore.openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        parts.push(JSON.stringify(cursor.value), '\n');
+        cursor.continue();
       };
       return null;
     });

@@ -9,7 +9,7 @@ export const Phase = Object.freeze({
   END: 'end',     // 끝났다
 });
 
-// U.frame 이 만든 진행 점 (문제마다 하나)
+// Util.frame 이 만든 진행 점 (문제마다 하나)
 export const Progress = {
   // 지금 푸는 문제의 점을 표시한다
   current(dots, index) {
@@ -29,7 +29,7 @@ export const Progress = {
  * @param {number} parts
  */
 export function pointsPer(host, parts) {
-  return (host.base * host.mult) / parts;
+  return (host.base * host.multiplier) / parts;
 }
 
 /**

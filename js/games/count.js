@@ -9,8 +9,8 @@
 //   cells  — 켜는 칸 수의 상한 (격자를 가득 채우지 않는다)
 // 격자는 Lv5 까지 작게 유지하고, 네 가지를 다 조인 Lv6~8 에서만 칸을 늘린다 (2026-10-23 시험: 높은 단계가 쉬웠다).
 // 1·2위 차이가 1칸인 채로 칸이 늘면 눈대중이 더는 안 통하고 끝까지 세어야 한다.
-import { U } from '../config.js';
-import { Dg } from '../diagram.js';
+import { Util } from '../config.js';
+import { Diagram } from '../diagram.js';
 import { Sfx } from '../sfx.js';
 import { Tag } from './tags.js';
 import { Phase, Progress, pointsPer, resultOf, abortedResult } from './kit.js';
@@ -48,15 +48,15 @@ export class CountGame {
   // 소개 그림: ① 가장 많은 색을 찾아 ② 아래 보기에서 고른다
   static diagram() {
     const [red, blue] = COUNT_COLORS;
-    const cell = (col, x, y, size) => (col
-      ? `<rect fill="${col.fill}" x="${x}" y="${y}" width="${size}" height="${size}" rx="7"/>` + Dg.glyph(col.glyph, x + size / 2, y + size / 2, size, 'fill="rgba(255,255,255,0.7)"')
-      : Dg.rect(x, y, size, size));
+    const cell = (color, x, y, size) => (color
+      ? `<rect fill="${color.fill}" x="${x}" y="${y}" width="${size}" height="${size}" rx="7"/>` + Diagram.glyph(color.glyph, x + size / 2, y + size / 2, size, 'fill="rgba(255,255,255,0.7)"')
+      : Diagram.rect(x, y, size, size));
     const layout = [[red, red, blue], [red, red, null], [red, blue, null]];
     let grid = '';
-    layout.forEach((row, rowIndex) => row.forEach((col, colIndex) => (grid += cell(col, 30 + colIndex * 40, 6 + rowIndex * 40, 36))));
+    layout.forEach((row, rowIndex) => row.forEach((color, columnIndex) => (grid += cell(color, 30 + columnIndex * 40, 6 + rowIndex * 40, 36))));
     return [
-      { svg: Dg.svg('0 0 180 130', grid), caption: '가장 많은 색을 찾아' },
-      { svg: Dg.svg('0 0 180 130', cell(blue, 36, 41, 48) + cell(red, 96, 41, 48) + Dg.tap(120, 65, 30)), caption: '아래 보기에서 고르기' },
+      { svg: Diagram.svg('0 0 180 130', grid), caption: '가장 많은 색을 찾아' },
+      { svg: Diagram.svg('0 0 180 130', cell(blue, 36, 41, 48) + cell(red, 96, 41, 48) + Diagram.tap(120, 65, 30)), caption: '아래 보기에서 고르기' },
     ];
   }
 
@@ -72,13 +72,13 @@ export class CountGame {
 
   start() {
     const { stage, level } = this.host;
-    this.message = U.el('div', 'stage-msg', '');
-    const { body, dots } = U.frame(stage, `${CountGame.title} · Lv.${level}`, this.message, CountGame.ROUNDS);
+    this.message = Util.element('div', 'stage-msg', '');
+    const { body, dots } = Util.frame(stage, `${CountGame.title} · Lv.${level}`, this.message, CountGame.ROUNDS);
     this.body = body;
     this.progress = dots;
-    this.wrap = U.el('div', 'cnt-wrap');
-    this.grid = U.el('div', 'cnt-grid');
-    this.optionRow = U.el('div', 'cnt-opts');
+    this.wrap = Util.element('div', 'cnt-wrap');
+    this.grid = Util.element('div', 'cnt-grid');
+    this.optionRow = Util.element('div', 'cnt-opts');
     this.wrap.append(this.grid, this.optionRow);
     body.append(this.wrap);
     this.resizeObserver = new ResizeObserver(() => this.layout());
@@ -89,70 +89,71 @@ export class CountGame {
   }
 
   next() {
-    const [rows, cols] = this.spec.grid;
+    const [rows, columns] = this.spec.grid;
     // counts와 palette는 모두 개수 내림차순 — 0번이 언제나 정답이다
     this.counts = CountGame.makeCounts(this.spec);
-    this.palette = U.shuffle([...COUNT_COLORS]).slice(0, this.spec.colors);
-    const owner = CountGame.place(this.counts, rows, cols, this.spec.clump);
+    this.palette = Util.shuffle([...COUNT_COLORS]).slice(0, this.spec.colors);
+    const owner = CountGame.place(this.counts, rows, columns, this.spec.clump);
 
-    U.say(this.message, '가장 많은 색을 고르세요', 'act');
+    Util.say(this.message, '가장 많은 색을 고르세요', 'act');
     Progress.current(this.progress, this.round);
 
     this.grid.innerHTML = '';
-    this.grid.style.setProperty('--cols', cols);
-    this.cells = owner.map((ci) => {
-      const cell = U.el('div', 'ccell');
-      if (ci >= 0) {
-        const col = this.palette[ci];
+    this.grid.style.setProperty('--cols', columns);
+    this.cells = owner.map((colorIndex) => {
+      const cell = Util.element('div', 'ccell');
+      if (colorIndex >= 0) {
+        const color = this.palette[colorIndex];
         cell.classList.add('lit');
-        cell.dataset.c = String(ci);
-        cell.style.background = col.fill;
-        cell.innerHTML = `<svg viewBox="0 0 100 100">${col.glyph}</svg>`;
+        // eslint-disable-next-line id-length -- DOM 의 data-c 속성 (색 번호)
+        cell.dataset.c = String(colorIndex);
+        cell.style.background = color.fill;
+        cell.innerHTML = `<svg viewBox="0 0 100 100">${color.glyph}</svg>`;
       }
       this.grid.append(cell);
       return cell;
     });
 
     this.optionRow.innerHTML = '';
-    this.optionButtons = U.shuffle(this.palette.map((col, i) => ({ col, i }))).map(({ col, i }) => {
-      const b = U.el('button', 'cnt-opt', `<svg viewBox="0 0 100 100">${col.glyph}</svg><span class="n"></span>`);
-      b.style.background = col.fill;
-      b.addEventListener('pointerdown', () => this.pick(i, b));
-      this.optionRow.append(b);
-      return { b, i };
+    this.optionButtons = Util.shuffle(this.palette.map((color, colorIndex) => ({ color, colorIndex }))).map(({ color, colorIndex }) => {
+      const button = Util.element('button', 'cnt-opt', `<svg viewBox="0 0 100 100">${color.glyph}</svg><span class="n"></span>`);
+      button.style.background = color.fill;
+      button.addEventListener('pointerdown', () => this.pick(colorIndex, button));
+      this.optionRow.append(button);
+      return { button, colorIndex };
     });
 
     this.layout();
     this.phase = Phase.INPUT;
-    this.host.question({ grid: [rows, cols], colors: this.palette.map((color) => color.id), counts: this.counts, cells: owner });
+    this.host.question({ grid: [rows, columns], colors: this.palette.map((color) => color.id), counts: this.counts, cells: owner });
     this.host.timer(this.counts.reduce((a, b) => a + b, 0), () => this.pick(-1, null));
   }
 
   layout() {
     const body = this.body;
-    const [rows, cols] = this.spec.grid;
+    const [rows, columns] = this.spec.grid;
     // 보기 버튼과 그 위 간격이 쓰는 높이를 뺀 나머지에 격자를 맞춘다 (보기가 아직 없으면 버튼 한 줄 + 아래 여백 114px 로 친다)
-    const avail = body.clientHeight - (this.optionRow.offsetHeight || 114) - U.gapOf(this.wrap, 26) - 10;
+    const availableHeight = body.clientHeight - (this.optionRow.offsetHeight || 114) - Util.gapOf(this.wrap, 26) - 10;
     const gap = 6;   // css .cnt-grid gap
-    const sz = U.clamp(Math.min((avail - (rows - 1) * gap) / rows, (body.clientWidth - 40 - (cols - 1) * gap) / cols), 22, 92);
-    this.wrap.style.setProperty('--csz', `${sz}px`);
+    const cellSize = Util.clamp(Math.min((availableHeight - (rows - 1) * gap) / rows, (body.clientWidth - 40 - (columns - 1) * gap) / columns), 22, 92);
+    this.wrap.style.setProperty('--csz', `${cellSize}px`);
   }
 
   // i = 고른 색 (0 이 정답). -1 이면 시간이 다 된 것
-  pick(i, btn) {
+  pick(i, button) {
     if (this.phase !== Phase.INPUT) return;
     this.phase = Phase.WAIT;
     this.host.stopTimer();
     const ok = i === 0;
-    this.host.answer({ picked: i >= 0 ? this.palette[i].id : null, count: i >= 0 ? this.counts[i] : null, correct: ok, timedOut: !btn });
+    this.host.answer({ picked: i >= 0 ? this.palette[i].id : null, count: i >= 0 ? this.counts[i] : null, correct: ok, timedOut: !button });
 
     // 보기마다 실제 개수를 적어 주고, 정답 색이 아닌 칸은 흐리게 해서 왜 그 색인지 보이게 한다
-    this.optionButtons.forEach(({ b, i: j }) => {
-      b.querySelector('.n').textContent = String(this.counts[j]);
-      if (j === 0) b.classList.add('right');
-      b.disabled = true;
+    this.optionButtons.forEach((option) => {
+      option.button.querySelector('.n').textContent = String(this.counts[option.colorIndex]);
+      if (option.colorIndex === 0) option.button.classList.add('right');
+      option.button.disabled = true;
     });
-    if (!ok && btn) btn.classList.add('wrong');
+    if (!ok && button) button.classList.add('wrong');
     this.cells.forEach((cell) => {
       if (cell.classList.contains('lit') && cell.dataset.c !== '0') cell.classList.add('dim');
     });
@@ -161,11 +162,11 @@ export class CountGame {
 
     if (ok) {
       this.correct++;
-      U.say(this.message, '정답!', 'good');
+      Util.say(this.message, '정답!', 'good');
       this.host.award(pointsPer(this.host, CountGame.ROUNDS), this.grid);
       this.host.sfx(Sfx.GOOD);
     } else {
-      U.say(this.message, `${btn ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`, 'bad');
+      Util.say(this.message, `${button ? '' : '시간 초과 · '}가장 많은 색은 ${this.counts[0]}칸`, 'bad');
       this.host.sfx(Sfx.BAD);
     }
     this.host.after(ok ? 1000 : 1600, () => this.advance());
@@ -196,52 +197,52 @@ export class CountGame {
   static makeCounts({ colors, cells, margin, spread }) {
     const floor = (second) => Math.max(1, second - spread);                       // 비우승 색이 내려갈 수 있는 하한
     const least = (second) => second + margin + second + (colors - 2) * floor(second);      // 그 2위 개수로 가능한 최소 총량
-    let hi = 1;
-    while (least(hi + 1) <= cells) hi++;
+    let maxSecond = 1;
+    while (least(maxSecond + 1) <= cells) maxSecond++;
 
     for (let tries = 0; tries < 200; tries++) {
-      const second = Math.max(1, hi - U.rand(2));
+      const second = Math.max(1, maxSecond - Util.randomBelow(2));
       const list = [second + margin, second];
-      while (list.length < colors) list.push(U.randInt(floor(second), second));
+      while (list.length < colors) list.push(Util.randomInt(floor(second), second));
       if (list.reduce((a, b) => a + b, 0) <= cells) return list;
     }
-    return [hi + margin, hi, ...Array(Math.max(0, colors - 2)).fill(floor(hi))];
+    return [maxSecond + margin, maxSecond, ...Array(Math.max(0, colors - 2)).fill(floor(maxSecond))];
   }
 
   // ---- 배치: clump 확률로 같은 색을 이웃 칸에 붙인다 ----
   // 2위 색을 먼저 놓아 격자 전체로 퍼지게 한다. 넓게 퍼진 색은 실제보다 많아 보여서 눈대중을 방해한다.
-  static place(counts, rows, cols, clump) {
-    const total = rows * cols;
+  static place(counts, rows, columns, clump) {
+    const total = rows * columns;
     const owner = new Array(total).fill(-1);
     const free = new Set(Array.from({ length: total }, (_, i) => i));
     const order = counts.map((_, i) => i);
     if (order.length >= 2) [order[0], order[1]] = [order[1], order[0]];
 
-    for (const ci of order) {
+    for (const colorIndex of order) {
       const mine = [];
-      for (let k = 0; k < counts[ci]; k++) {
+      for (let placedCount = 0; placedCount < counts[colorIndex]; placedCount++) {
         let pick = -1;
         if (mine.length && Math.random() < clump) {
-          const nbrs = [];
-          for (const idx of mine) {
-            const row = Math.floor(idx / cols);
-            const col = idx % cols;
-            for (const [nr, nc] of [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]]) {
-              if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-              const n = nr * cols + nc;
-              if (free.has(n)) nbrs.push(n);
+          const neighbors = [];
+          for (const cellIndex of mine) {
+            const row = Math.floor(cellIndex / columns);
+            const column = cellIndex % columns;
+            for (const [neighborRow, neighborColumn] of [[row - 1, column], [row + 1, column], [row, column - 1], [row, column + 1]]) {
+              if (neighborRow < 0 || neighborRow >= rows || neighborColumn < 0 || neighborColumn >= columns) continue;
+              const neighbor = neighborRow * columns + neighborColumn;
+              if (free.has(neighbor)) neighbors.push(neighbor);
             }
           }
-          if (nbrs.length) pick = nbrs[U.rand(nbrs.length)];
+          if (neighbors.length) pick = neighbors[Util.randomBelow(neighbors.length)];
         }
         if (pick < 0) {
-          const arr = [...free];
-          if (!arr.length) break;
-          pick = arr[U.rand(arr.length)];
+          const freeCells = [...free];
+          if (!freeCells.length) break;
+          pick = freeCells[Util.randomBelow(freeCells.length)];
         }
         free.delete(pick);
         mine.push(pick);
-        owner[pick] = ci;
+        owner[pick] = colorIndex;
       }
     }
     return owner;

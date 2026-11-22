@@ -52,26 +52,26 @@ export const Abilities = {
   // stats = App.roundStats.games ({ id: { correct, total, think: { limitMs, spareMs } } }), exercise = 속도 유지율 0~1 (두뇌 게임만 한 판은 null)
   // → AXES 순서로 [{ id, name, praise, acc (0~1, 데이터가 없으면 null), hasData }]
   //   영역의 정답률 = 그 영역을 쓰는 게임들의 맞힌 수 / 낸 문제 수 (게임마다 영역 가중치를 곱해 더한다)
-  //   답하는 속도 = 모든 문제의 제한 시간 가운데 남긴 시간의 몫 (시간 초과는 0). 제한 시간 막대를 끈 판에도 잰다 (main.js startQTimer)
+  //   답하는 속도 = 모든 문제의 제한 시간 가운데 남긴 시간의 몫 (시간 초과는 0). 제한 시간 막대를 끈 판에도 잰다 (main.js startQuestionTimer)
   compute(stats, exercise = null) {
     const correct = {};
     const total = {};
     let limitMs = 0;
     let spareMs = 0;
-    for (const T of GAME_TYPES) {
-      const s = stats[T.id];
-      if (!s || !(s.total > 0)) continue;
-      for (const [domain, w] of Object.entries(DOMAIN_GAMES[T.id] || {})) {
-        correct[domain] = (correct[domain] || 0) + w * s.correct;
-        total[domain] = (total[domain] || 0) + w * s.total;
+    for (const gameType of GAME_TYPES) {
+      const gameStats = stats[gameType.id];
+      if (!gameStats || !(gameStats.total > 0)) continue;
+      for (const [domain, weight] of Object.entries(DOMAIN_GAMES[gameType.id] || {})) {
+        correct[domain] = (correct[domain] || 0) + weight * gameStats.correct;
+        total[domain] = (total[domain] || 0) + weight * gameStats.total;
       }
-      if (s.think && s.think.limitMs > 0) {
-        limitMs += s.think.limitMs;
-        spareMs += s.think.spareMs;
+      if (gameStats.think && gameStats.think.limitMs > 0) {
+        limitMs += gameStats.think.limitMs;
+        spareMs += gameStats.think.spareMs;
       }
     }
     const acc = {
-      ...Object.fromEntries(DOMAINS.map((d) => [d.id, total[d.id] > 0 ? correct[d.id] / total[d.id] : null])),
+      ...Object.fromEntries(DOMAINS.map((domain) => [domain.id, total[domain.id] > 0 ? correct[domain.id] / total[domain.id] : null])),
       speed: limitMs > 0 ? spareMs / limitMs : null,
       exercise: exercise == null ? null : Math.min(1, Math.max(0, exercise)),
     };

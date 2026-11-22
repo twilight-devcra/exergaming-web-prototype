@@ -10,7 +10,7 @@
 
 // 필드 → 형. number: 유한한 수 · string: 글 (수는 글로 바꾼다, 200자까지) · date: Date 로 읽히는 글 · object: 배열 아닌 객체
 export const HISTORY_FIELDS = Object.freeze({
-  at: 'date', // 필수. 없거나 날짜가 아니면 항목을 버린다
+  at: 'date', // eslint-disable-line id-length -- 저장된 기록 형식. 필수. 없거나 날짜가 아니면 항목을 버린다
   min: 'number',
   difficulty: 'string',
   track: 'string',
@@ -24,49 +24,49 @@ export const HISTORY_FIELDS = Object.freeze({
   look: 'object',
 });
 
-const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+const finiteNumber = (value) => (typeof value === 'number' && isFinite(value) ? value : null);
 
 const COERCE = {
-  number: num,
-  string: (v) => (typeof v === 'string' ? v.slice(0, 200) : num(v) !== null ? String(v) : null),
-  date: (v) => (typeof v === 'string' && !isNaN(Date.parse(v)) ? v : null),
-  object: (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null),
+  number: finiteNumber,
+  string: (value) => (typeof value === 'string' ? value.slice(0, 200) : finiteNumber(value) !== null ? String(value) : null),
+  date: (value) => (typeof value === 'string' && !isNaN(Date.parse(value)) ? value : null),
+  object: (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : null),
 };
 
 // 아무 값 → 형을 지킨 회원 기록 항목, 또는 null (at 이 없을 때)
-export function cleanEntry(x) {
-  if (!x || typeof x !== 'object') return null;
+export function cleanEntry(raw) {
+  if (!raw || typeof raw !== 'object') return null;
   const out = {};
-  for (const [k, type] of Object.entries(HISTORY_FIELDS)) out[k] = COERCE[type](x[k]);
+  for (const [field, type] of Object.entries(HISTORY_FIELDS)) out[field] = COERCE[type](raw[field]);
   return out.at === null ? null : out;
 }
 
 // 세션 로그 하나 → 회원 기록 항목 하나 (또는 null)
 export function summarize(log) {
-  const m = (log && log.meta) || {};
-  const sum = m.summary || {};
-  const ex = sum.exercise || {};
-  const stats = Object.values(sum.stats || {}).filter((s) => s && typeof s === 'object');
-  // 게임 정확도 = 맞힌 문제 / 낸 문제 (js/stars.js Stars.gameAcc 와 같다). 0~1, 소수 둘째 자리
+  const meta = (log && log.meta) || {};
+  const summary = meta.summary || {};
+  const exercise = summary.exercise || {};
+  const stats = Object.values(summary.stats || {}).filter((gameStats) => gameStats && typeof gameStats === 'object');
+  // 게임 정확도 = 맞힌 문제 / 낸 문제 (js/stars.js Stars.gameAccuracy 와 같다). 0~1, 소수 둘째 자리
   let correct = 0, total = 0;
-  for (const s of stats) {
-    correct += num(s.correct) || 0;
-    total += num(s.total) || 0;
+  for (const gameStats of stats) {
+    correct += finiteNumber(gameStats.correct) || 0;
+    total += finiteNumber(gameStats.total) || 0;
   }
-  const levels = stats.map((s) => num(s.level) || 0);
+  const levels = stats.map((gameStats) => finiteNumber(gameStats.level) || 0);
   return cleanEntry({
-    at: m.startedAt,
-    min: m.session && m.session.min,
-    difficulty: m.session && m.session.difficulty,
+    at: meta.startedAt, // eslint-disable-line id-length -- 저장된 기록 형식
+    min: meta.session && meta.session.min,
+    difficulty: meta.session && meta.session.difficulty,
     // 운동 방식: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). meta.track 이 없는 예전 세션은 모두 dual
-    track: m.track || 'dual',
-    score: sum.score,
-    device: m.device,
-    sid: m.id,
+    track: meta.track || 'dual',
+    score: summary.score,
+    device: meta.device,
+    sid: meta.id,
     gameAcc: total > 0 ? Math.round((correct / total) * 100) / 100 : null,
     level: levels.length ? Math.max(...levels) : 0,
-    distM: ex.distM,
-    kcal: ex.kcal,
-    look: m.landmark,
+    distM: exercise.distM,
+    kcal: exercise.kcal,
+    look: meta.landmark,
   });
 }

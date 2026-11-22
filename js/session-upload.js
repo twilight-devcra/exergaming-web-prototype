@@ -24,7 +24,7 @@ export const SessionUpload = {
   // 칸마다: 운영 메뉴에 적은 값이 있으면 그것, 비어 있으면 js/config.js 의 SESSION_UPLOAD
   settings() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { }
+    try { saved = JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch { /* 저장된 값이 없으면 기본값 */ }
     return {
       url: (saved.url || SESSION_UPLOAD.url || '').trim(),
       key: saved.key || SESSION_UPLOAD.key || '',
@@ -43,7 +43,7 @@ export const SessionUpload = {
     try {
       if (Object.keys(own).length) localStorage.setItem(this.KEY, JSON.stringify(own));
       else localStorage.removeItem(this.KEY);
-    } catch (e) { }
+    } catch { /* 저장 못 해도 이번 실행에는 쓴다 */ }
     this.failures = 0;
     this.kick();
   },
@@ -59,7 +59,7 @@ export const SessionUpload = {
   async pending() {
     const [all, done] = await Promise.all([SessionStore.keys(), SessionStore.uploadedKeys()]);
     const sent = new Set(done);
-    return all.filter((k) => !sent.has(k)).sort();
+    return all.filter((sessionId) => !sent.has(sessionId)).sort();
   },
 
   // 아직 안 보낸 세션을 보낸다. 보내는 중에 불리면 끝난 뒤 한 번 더 돈다
@@ -75,9 +75,9 @@ export const SessionUpload = {
     this.busy = true;
     try {
       for (const id of await this.pending()) {
-        const rec = await SessionStore.get(id);
-        if (!rec) continue;
-        await this.send(url, key, rec);
+        const log = await SessionStore.get(id);
+        if (!log) continue;
+        await this.send(url, key, log);
         await SessionStore.markUploaded(id);
         this.failures = 0;
         this.state.sent++;
@@ -85,12 +85,12 @@ export const SessionUpload = {
         this.state.lastError = null;
         this.refresh();
       }
-    } catch (e) {
+    } catch (error) {
       this.failures++;
-      this.state.lastError = e.message || String(e);
-      const sec = Math.min(this.RETRY_MAX_SEC, this.RETRY_MIN_SEC * 2 ** (this.failures - 1));
-      this.state.retryAt = new Date(Date.now() + sec * 1000);
-      this.timer = setTimeout(() => this.kick(), sec * 1000);
+      this.state.lastError = error.message || String(error);
+      const retrySec = Math.min(this.RETRY_MAX_SEC, this.RETRY_MIN_SEC * 2 ** (this.failures - 1));
+      this.state.retryAt = new Date(Date.now() + retrySec * 1000);
+      this.timer = setTimeout(() => this.kick(), retrySec * 1000);
     } finally {
       this.busy = false;
       await this.refresh();
@@ -101,28 +101,28 @@ export const SessionUpload = {
     }
   },
 
-  async send(url, key, rec) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), this.TIMEOUT_MS);
+  async send(url, key, log) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
     const headers = { 'Content-Type': 'application/json' };
     if (key) headers.Authorization = `Bearer ${key}`;
     try {
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(rec), signal: ctrl.signal });
-      if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
-    } catch (e) {
-      if (e.name === 'AbortError') throw new Error('시간 초과');
+      const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(log), signal: controller.signal });
+      if (!response.ok) throw new Error(`서버 응답 ${response.status}`);
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('시간 초과');
       // 주소가 틀렸거나, 인터넷이 없거나, 서버가 이 사이트(CORS)를 허락하지 않은 경우 브라우저는 이유를 알려 주지 않는다
-      if (e instanceof TypeError) throw new Error('연결 실패 (인터넷·주소·CORS 확인)');
-      throw e;
+      if (error instanceof TypeError) throw new Error('연결 실패 (인터넷·주소·CORS 확인)');
+      throw error;
     } finally {
-      clearTimeout(t);
+      clearTimeout(timeout);
     }
   },
 
   async refresh() {
     try {
       this.state.pending = (await this.pending()).length;
-    } catch (e) {
+    } catch {
       this.state.pending = null;
     }
     if (this.onChange) this.onChange(this.state, this.settings());
@@ -131,10 +131,10 @@ export const SessionUpload = {
   // 운영 메뉴에 보일 한 줄
   describe(state = this.state, { url } = this.settings()) {
     if (!url) return '꺼짐';
-    const hm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const clockTime = (date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     const parts = [this.busy ? '보내는 중' : state.pending == null ? '' : state.pending ? `남은 세션 ${state.pending}건` : '모두 보냄'];
-    if (state.lastOk) parts.push(`마지막 성공 ${hm(state.lastOk)}`);
-    if (state.lastError) parts.push(`실패: ${state.lastError}${state.retryAt ? ` · ${hm(state.retryAt)}에 다시 시도` : ''}`);
+    if (state.lastOk) parts.push(`마지막 성공 ${clockTime(state.lastOk)}`);
+    if (state.lastError) parts.push(`실패: ${state.lastError}${state.retryAt ? ` · ${clockTime(state.retryAt)}에 다시 시도` : ''}`);
     return parts.filter(Boolean).join(' · ');
   },
 };

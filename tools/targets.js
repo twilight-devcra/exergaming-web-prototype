@@ -13,7 +13,7 @@
 // priority: 빈 영역일 때의 우선순위 (높음 · 중간 · 낮음). idea: 터치만으로, 페달을 밟으면서 할 수 있는 게임 아이디어
 const DOMAINS = [
   {
-    id: 'attention', name: '복합 주의', en: 'Complex attention',
+    id: 'attention', name: '복합 주의', english: 'Complex attention',
     subs: [
       { id: 'selective', name: '선택적 주의', what: '방해 자극 속에서 목표만 골라 보는 능력', test: '시각 탐색 과제, 지우기 검사', priority: '중간' },
       { id: 'tracking', name: '지속적 주의 · 시각 추적', what: '움직이거나 이어지는 대상을 놓치지 않고 계속 따라가는 능력', test: 'CPT(연속 수행 검사), 다중 대상 추적(MOT)', priority: '중간' },
@@ -24,7 +24,7 @@ const DOMAINS = [
     ],
   },
   {
-    id: 'executive', name: '실행 기능', en: 'Executive function',
+    id: 'executive', name: '실행 기능', english: 'Executive function',
     subs: [
       { id: 'wm', name: '작업 기억', what: '머릿속에 정보를 유지하면서 갱신하거나 계산하는 능력', test: '숫자 거꾸로 따라 하기, n-back', priority: '중간' },
       { id: 'inhibition', name: '억제', what: '자동으로 나오는 반응을 참는 능력', test: 'Stroop 검사, go/no-go', priority: '높음',
@@ -38,13 +38,13 @@ const DOMAINS = [
     ],
   },
   {
-    id: 'numeracy', name: '계산', en: 'Numeracy · SNSB 계산, CHC Gq',
+    id: 'numeracy', name: '계산', english: 'Numeracy · SNSB 계산, CHC Gq',
     subs: [
       { id: 'calc', name: '계산 · 수 감각', what: '수를 세고 더하고 빼는 능력', test: 'MMSE 100-7, SNSB 계산', priority: '중간' },
     ],
   },
   {
-    id: 'memory', name: '학습 및 기억', en: 'Learning & memory',
+    id: 'memory', name: '학습 및 기억', english: 'Learning & memory',
     subs: [
       { id: 'stm', name: '즉시 기억 (시각·위치)', what: '방금 본 것을 바로 떠올리는 능력', test: '공간 폭 검사, 그림 재인', priority: '낮음' },
       { id: 'sequence', name: '순서 기억', what: '본 순서대로 떠올리는 능력', test: '숫자 따라 하기, 코르시 블록', priority: '낮음' },
@@ -58,7 +58,7 @@ const DOMAINS = [
     ],
   },
   {
-    id: 'language', name: '언어', en: 'Language',
+    id: 'language', name: '언어', english: 'Language',
     subs: [
       { id: 'comprehension', name: '언어 이해', what: '읽거나 들은 말을 이해하고 따르는 능력', test: '토큰 검사, 지시 따르기', priority: '중간' },
       { id: 'fluency', name: '낱말 인출 · 유창성', what: '단서(첫 글자 등)에 맞는 낱말을 머릿속에서 찾아 꺼내는 능력', test: '음소 유창성 검사(COWAT: ㄱ으로 시작하는 낱말 말하기)', priority: '중간',
@@ -70,7 +70,7 @@ const DOMAINS = [
     ],
   },
   {
-    id: 'visuospatial', name: '지각-운동 기능', en: 'Perceptual-motor',
+    id: 'visuospatial', name: '지각-운동 기능', english: 'Perceptual-motor',
     subs: [
       { id: 'discrim', name: '시각 변별', what: '비슷한 모양의 작은 차이를 알아보는 능력', test: '시각 변별 검사', priority: '낮음' },
       { id: 'rotation', name: '심상 회전', what: '모양을 머릿속에서 돌려 보는 능력', test: '심상 회전 과제(Shepard-Metzler)', priority: '중간',
@@ -81,14 +81,14 @@ const DOMAINS = [
     ],
   },
   {
-    id: 'social', name: '사회 인지', en: 'Social cognition',
+    id: 'social', name: '사회 인지', english: 'Social cognition',
     subs: [
       { id: 'emotion', name: '정서 인식', what: '얼굴 표정에서 감정을 읽는 능력', test: '표정 인식 검사', priority: '낮음',
         idea: '표정 그림 4개 중 "기뻐하는 사람" 고르기. 그림 자원이 많이 필요해 우선순위를 낮춘다.' },
     ],
   },
   {
-    id: 'everyday', name: '일상생활 기능', en: 'Everyday function · IADL',
+    id: 'everyday', name: '일상생활 기능', english: 'Everyday function · IADL',
     subs: [
       { id: 'iadl', name: '도구적 일상생활 과제', what: '돈 계산, 장보기, 시계·달력 보기처럼 일상에서 하는 인지 과제', test: 'K-IADL', priority: '중간',
         idea: '시곗바늘을 보고 시각 고르기, 달력에서 "다음 주 화요일" 찾기, 약 봉투의 복용 시간 맞추기.' },

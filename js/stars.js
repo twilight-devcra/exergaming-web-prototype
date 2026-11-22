@@ -13,37 +13,38 @@ export const Stars = {
   RECOMMEND_DOWN: 0.65,
 
   // App.roundStats.games → 게임 정확도 0~1 (문제가 하나도 없으면 null)
-  gameAcc(stats) {
-    let c = 0, t = 0;
-    for (const s of Object.values(stats || {})) {
-      if (!s) continue;
-      c += s.correct || 0;
-      t += s.total || 0;
+  gameAccuracy(stats) {
+    let correct = 0, total = 0;
+    for (const gameStats of Object.values(stats || {})) {
+      if (!gameStats) continue;
+      correct += gameStats.correct || 0;
+      total += gameStats.total || 0;
     }
-    return t > 0 ? c / t : null;
+    return total > 0 ? correct / total : null;
   },
 
-  // 다음 난이도 권하기. list = 쉬운 것부터 어려운 것 순서의 난이도 목록, id = 이번 난이도 (목록에 없으면 오르내리지 않는다)
+  // 다음 난이도 권하기. list = 쉬운 것부터 어려운 것 순서의 난이도 목록, id = 이번 난이도 (목록에 없으면 오르내리지 않는다),
+  // accuracy = 게임 정확도 0~1
   //   → { kind: 'up' | 'keep' | 'down', to: { id, label } (up·down 일 때), why }
   //   why (keep 일 때 까닭): 'fit' 알맞음 · 'top' 가장 높은 난이도에서 잘함 · 'bottom' 가장 쉬운 난이도에서 어려워함 · 'nodata' 푼 문제 없음
-  advise(list, id, acc) {
-    const i = list.findIndex((d) => d.id === id);
-    const pick = (d) => ({ id: d.id, label: d.label });
-    if (acc == null) return { kind: 'keep', why: 'nodata' };
-    if (acc >= this.RECOMMEND_UP) {
-      return i >= 0 && list[i + 1] ? { kind: 'up', to: pick(list[i + 1]) } : { kind: 'keep', why: i >= 0 ? 'top' : 'fit' };
+  advise(list, id, accuracy) {
+    const i = list.findIndex((difficulty) => difficulty.id === id);
+    const pick = (difficulty) => ({ id: difficulty.id, label: difficulty.label });
+    if (accuracy == null) return { kind: 'keep', why: 'nodata' };
+    if (accuracy >= this.RECOMMEND_UP) {
+      return i >= 0 && list[i + 1] ? { kind: 'up', target: pick(list[i + 1]) } : { kind: 'keep', why: i >= 0 ? 'top' : 'fit' };
     }
-    if (acc < this.RECOMMEND_DOWN) {
-      return i > 0 ? { kind: 'down', to: pick(list[i - 1]) } : { kind: 'keep', why: i === 0 ? 'bottom' : 'fit' };
+    if (accuracy < this.RECOMMEND_DOWN) {
+      return i > 0 ? { kind: 'down', target: pick(list[i - 1]) } : { kind: 'keep', why: i === 0 ? 'bottom' : 'fit' };
     }
     return { kind: 'keep', why: 'fit' };
   },
   // 운영 버전의 세션 난이도 (SESSION_DIFFICULTIES)
-  nextSession(id, acc) {
-    return this.advise(SESSION_DIFFICULTIES, id, acc);
+  nextSession(id, accuracy) {
+    return this.advise(SESSION_DIFFICULTIES, id, accuracy);
   },
   // 테스트 화면의 라운드 난이도 프리셋 (ROUND_PRESETS). 'custom' 이면 오르내리지 않고 이대로 계속하기만 권한다
-  nextPreset(id, acc) {
-    return this.advise(ROUND_PRESETS, id, acc);
+  nextPreset(id, accuracy) {
+    return this.advise(ROUND_PRESETS, id, accuracy);
   },
 };

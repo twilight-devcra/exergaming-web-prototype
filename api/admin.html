@@ -139,158 +139,159 @@
 <div class="tip" id="tip"></div>
 
 <script>
-const $ = (s) => document.querySelector(s);
+const $ = (selector) => document.querySelector(selector);
 const form = $('#f');
 let TITLES = {};
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const pct = (v, d = 0) => (v == null ? '–' : `${(v * 100).toFixed(d)}%`);
-const sec = (ms) => (ms == null ? '–' : `${(ms / 1000).toFixed(1)}초`);
-const fmt = (v, d = 0) => (v == null ? '–' : Number(v).toLocaleString('ko-KR', { maximumFractionDigits: d }));
-const title = (id) => TITLES[id] || id;
-const MIN_N = 20;
+const escapeHtml = (text) => String(text ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+const percent = (value, digits = 0) => (value == null ? '–' : `${(value * 100).toFixed(digits)}%`);
+const seconds = (milliseconds) => (milliseconds == null ? '–' : `${(milliseconds / 1000).toFixed(1)}초`);
+const formatNumber = (value, digits = 0) => (value == null ? '–' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits }));
+const gameTitle = (id) => TITLES[id] || id;
+const MIN_QUESTIONS = 20;
 
 function query() {
-  const p = new URLSearchParams();
-  for (const [k, v] of new FormData(form)) if (v) p.set(k, v);
-  return p.toString();
+  const params = new URLSearchParams();
+  for (const [name, value] of new FormData(form)) if (value) params.set(name, value);
+  return params.toString();
 }
 // 주소는 /admin/ 기준 절대 주소로 (끝에 / 없는 /admin 에서도, 주소에 비밀번호를 넣어 연 경우에도 되게)
 const BASE = `${location.origin}/admin/`;
 async function get(path) {
-  const r = await fetch(BASE + path, { cache: 'no-store' });
-  if (!r.ok) throw new Error(`${path} → ${r.status}`);
-  return r.json();
+  const response = await fetch(BASE + path, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`${path} → ${response.status}`);
+  return response.json();
 }
 
 // 툴팁: 마크보다 넓은 칸에 붙인다
 const tip = $('#tip');
-function hover(el, html) {
-  el.addEventListener('pointerenter', () => { tip.innerHTML = html; tip.style.display = 'block'; });
-  el.addEventListener('pointermove', (e) => {
-    const w = tip.offsetWidth, h = tip.offsetHeight;
-    tip.style.left = `${Math.min(e.clientX + 14, innerWidth - w - 8)}px`;
-    tip.style.top = `${Math.max(8, e.clientY - h - 12)}px`;
+function hover(element, html) {
+  element.addEventListener('pointerenter', () => { tip.innerHTML = html; tip.style.display = 'block'; });
+  element.addEventListener('pointermove', (event) => {
+    const tipWidth = tip.offsetWidth, tipHeight = tip.offsetHeight;
+    tip.style.left = `${Math.min(event.clientX + 14, innerWidth - tipWidth - 8)}px`;
+    tip.style.top = `${Math.max(8, event.clientY - tipHeight - 12)}px`;
   });
-  el.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+  element.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
 }
 
-function tiles(t) {
+function tiles(totals) {
   const items = [
-    ['세션', fmt(t.n)], ['회원', fmt(t.users)], ['태블릿', fmt(t.devices)], ['문제', fmt(t.questions)],
-    ['전체 정답률', pct(t.accuracy, 1)], ['평균 플레이', t.avg_sec == null ? '–' : `${(t.avg_sec / 60).toFixed(1)}분`],
-    ['평균 점수', fmt(t.avg_score)], ['목표 속도 유지', pct(t.in_zone)],
+    ['세션', formatNumber(totals.n)], ['회원', formatNumber(totals.users)], ['태블릿', formatNumber(totals.devices)], ['문제', formatNumber(totals.questions)],
+    ['전체 정답률', percent(totals.accuracy, 1)], ['평균 플레이', totals.avg_sec == null ? '–' : `${(totals.avg_sec / 60).toFixed(1)}분`],
+    ['평균 점수', formatNumber(totals.avg_score)], ['목표 속도 유지', percent(totals.in_zone)],
   ];
-  $('#tiles').innerHTML = items.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  $('#tiles').innerHTML = items.map(([label, value]) => `<div class="tile"><div class="k">${label}</div><div class="v">${value}</div></div>`).join('');
 }
 
 function heat(cells) {
-  const games = [...new Set(cells.map((c) => c.game))].sort((a, b) => title(a).localeCompare(title(b), 'ko'));
+  const games = [...new Set(cells.map((cell) => cell.game))].sort((a, b) => gameTitle(a).localeCompare(gameTitle(b), 'ko'));
   // 기록이 있는 레벨만 칸으로 둔다 (좁은 화면에서 빈 칸이 자리를 차지하지 않게)
-  const levels = [...new Set(cells.map((c) => c.level).filter((l) => l != null))].sort((a, b) => a - b);
-  const at = new Map(cells.map((c) => [`${c.game}|${c.level}`, c]));
+  const levels = [...new Set(cells.map((cell) => cell.level).filter((level) => level != null))].sort((a, b) => a - b);
+  const cellByKey = new Map(cells.map((cell) => [`${cell.game}|${cell.level}`, cell]));
   const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
-  let h = `<tr><th>게임</th>${levels.map((lv) => `<th style="text-align:center">Lv${lv}</th>`).join('')}</tr>`;
-  for (const g of games) {
-    h += `<tr><td>${esc(title(g))}</td>`;
-    for (const lv of levels) {
-      const c = at.get(`${g}|${lv}`);
-      if (!c) { h += '<td class="c"></td>'; continue; }
-      const target = c.target ?? 0.6;
-      const d = Math.max(-0.3, Math.min(0.3, c.accuracy - target));
-      const share = Math.round((Math.abs(d) / 0.3) * 100);
-      const few = c.n < MIN_N;
-      const bg = few ? '' : `background: color-mix(in oklab, var(${d < 0 ? '--div-hard' : '--div-easy'}) ${share}%, var(--div-mid));`;
+  let html = `<tr><th>게임</th>${levels.map((level) => `<th style="text-align:center">Lv${level}</th>`).join('')}</tr>`;
+  for (const game of games) {
+    html += `<tr><td>${escapeHtml(gameTitle(game))}</td>`;
+    for (const level of levels) {
+      const cell = cellByKey.get(`${game}|${level}`);
+      if (!cell) { html += '<td class="c"></td>'; continue; }
+      const target = cell.target ?? 0.6;
+      const gap = Math.max(-0.3, Math.min(0.3, cell.accuracy - target));
+      const share = Math.round((Math.abs(gap) / 0.3) * 100);
+      const few = cell.n < MIN_QUESTIONS;
+      const background = few ? '' : `background: color-mix(in oklab, var(${gap < 0 ? '--div-hard' : '--div-easy'}) ${share}%, var(--div-mid));`;
       const ink = few ? '' : `color: ${share > 55 && !dark ? 'var(--on-strong)' : 'var(--ink)'};`;
-      h += `<td class="c"><div class="cell${few ? ' few' : ''}" style="${bg}${ink}" data-k="${esc(g)}|${lv}"><b>${pct(c.accuracy)}</b><small>${c.n}문제</small></div></td>`;
+      html += `<td class="c"><div class="cell${few ? ' few' : ''}" style="${background}${ink}" data-k="${escapeHtml(game)}|${level}"><b>${percent(cell.accuracy)}</b><small>${cell.n}문제</small></div></td>`;
     }
-    h += '</tr>';
+    html += '</tr>';
   }
-  $('#heat').innerHTML = cells.length ? h : '<tr><td class="l">아직 문제 기록이 없습니다.</td></tr>';
-  for (const el of document.querySelectorAll('#heat .cell')) {
-    const c = at.get(el.dataset.k);
-    const diff = c.target == null ? '' : ` (기준 ${pct(c.target)}, ${c.accuracy - c.target >= 0 ? '+' : ''}${((c.accuracy - c.target) * 100).toFixed(0)}%p)`;
-    hover(el, `<b>${esc(title(c.game))} Lv${c.level}</b><br>정답률 ${pct(c.accuracy, 1)}${diff}<br>시간 초과 ${pct(c.timeoutRate, 1)}<br>걸린 시간 중앙값 ${sec(c.msMedian)} · 90% ${sec(c.msP90)}<br>제한 시간 사용 중앙값 ${pct(c.limitUseMedian)}<br>문제 ${c.n}개${c.n < MIN_N ? ' — 판단하기엔 적음' : ''}`);
+  $('#heat').innerHTML = cells.length ? html : '<tr><td class="l">아직 문제 기록이 없습니다.</td></tr>';
+  for (const element of document.querySelectorAll('#heat .cell')) {
+    const cell = cellByKey.get(element.dataset.k);
+    const targetNote = cell.target == null ? '' : ` (기준 ${percent(cell.target)}, ${cell.accuracy - cell.target >= 0 ? '+' : ''}${((cell.accuracy - cell.target) * 100).toFixed(0)}%p)`;
+    hover(element, `<b>${escapeHtml(gameTitle(cell.game))} Lv${cell.level}</b><br>정답률 ${percent(cell.accuracy, 1)}${targetNote}<br>시간 초과 ${percent(cell.timeoutRate, 1)}<br>걸린 시간 중앙값 ${seconds(cell.msMedian)} · 90% ${seconds(cell.msP90)}<br>제한 시간 사용 중앙값 ${percent(cell.limitUseMedian)}<br>문제 ${cell.n}개${cell.n < MIN_QUESTIONS ? ' — 판단하기엔 적음' : ''}`);
   }
-  const rows = [...cells].sort((a, b) => title(a.game).localeCompare(title(b.game), 'ko') || a.level - b.level);
+  const rows = [...cells].sort((a, b) => gameTitle(a.game).localeCompare(gameTitle(b.game), 'ko') || a.level - b.level);
   $('#cells').innerHTML = `<tr><th>게임</th><th>Lv</th><th>문제</th><th>정답률</th><th>기준</th><th>시간 초과</th><th>시간 중앙값</th><th>시간 90%</th><th>제한 시간 사용</th></tr>` +
-    rows.map((c) => `<tr><td>${esc(title(c.game))}</td><td>${c.level}</td><td>${c.n}</td><td>${pct(c.accuracy, 1)}</td><td>${pct(c.target)}</td><td>${pct(c.timeoutRate, 1)}</td><td>${sec(c.msMedian)}</td><td>${sec(c.msP90)}</td><td>${pct(c.limitUseMedian)}</td></tr>`).join('');
+    rows.map((cell) => `<tr><td>${escapeHtml(gameTitle(cell.game))}</td><td>${cell.level}</td><td>${cell.n}</td><td>${percent(cell.accuracy, 1)}</td><td>${percent(cell.target)}</td><td>${percent(cell.timeoutRate, 1)}</td><td>${seconds(cell.msMedian)}</td><td>${seconds(cell.msP90)}</td><td>${percent(cell.limitUseMedian)}</td></tr>`).join('');
 }
 
 function gamesTable(games) {
   $('#games').innerHTML = `<tr><th>게임</th><th>판 수</th><th>평균 레벨</th><th>최고 레벨</th><th>판 정답률</th><th>잘림</th><th>평균 점수</th></tr>` +
-    (games.length ? games.map((g) => `<tr><td>${esc(title(g.game))}</td><td>${fmt(g.plays)}</td><td>${fmt(g.avg_level, 2)}</td><td>${fmt(g.max_level)}</td><td>${pct(g.acc, 1)}</td><td>${pct(g.aborted, 1)}</td><td>${fmt(g.points)}</td></tr>`).join('')
+    (games.length ? games.map((game) => `<tr><td>${escapeHtml(gameTitle(game.game))}</td><td>${formatNumber(game.plays)}</td><td>${formatNumber(game.avg_level, 2)}</td><td>${formatNumber(game.max_level)}</td><td>${percent(game.acc, 1)}</td><td>${percent(game.aborted, 1)}</td><td>${formatNumber(game.points)}</td></tr>`).join('')
       : '<tr><td class="l" colspan="7">아직 없습니다.</td></tr>');
 }
 
 // 날짜별 막대 (한 계열, 빈 날도 0 으로 채운다)
 function days(list) {
   const box = $('#days');
-  list = list.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.day || '')); // 시작 시각이 없는 예전 세션은 뺀다
+  list = list.filter((entry) => /^\d{4}-\d{2}-\d{2}$/.test(entry.day || '')); // 시작 시각이 없는 예전 세션은 뺀다
   if (!list.length) { box.innerHTML = '<p class="note">아직 없습니다.</p>'; return; }
-  const map = new Map(list.map((d) => [d.day, d.n]));
+  const countByDay = new Map(list.map((entry) => [entry.day, entry.n]));
   const all = [];
-  for (let t = new Date(list[0].day); t <= new Date(list[list.length - 1].day); t = new Date(t.getTime() + 864e5)) {
-    const k = t.toISOString().slice(0, 10);
-    all.push({ day: k, n: map.get(k) || 0 });
+  for (let date = new Date(list[0].day); date <= new Date(list[list.length - 1].day); date = new Date(date.getTime() + 864e5)) {
+    const day = date.toISOString().slice(0, 10);
+    all.push({ day, count: countByDay.get(day) || 0 });
   }
-  const W = Math.max(box.clientWidth, 300), H = 160, L = 32, B = 22, T = 8;
-  const max = Math.max(...all.map((d) => d.n), 1);
-  const step = (W - L) / all.length;
-  const bw = Math.max(2, Math.min(28, step - 2));
-  const y = (v) => H - B - (v / max) * (H - B - T);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 세션 수">`;
-  for (const v of [0, max]) s += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(${v ? '--grid' : '--axis'})"/><text class="lbl" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
-  all.forEach((d, i) => {
-    const x = L + i * step + (step - bw) / 2;
-    if (d.n) s += `<path d="M${x},${y(0)} V${y(d.n) + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${y(0)} Z" fill="var(--series)"/>`;
-    s += `<rect class="hit" x="${L + i * step}" y="${T}" width="${step}" height="${H - B - T}" fill="transparent" data-i="${i}"/>`;
+  const width = Math.max(box.clientWidth, 300), height = 160, padLeft = 32, padBottom = 22, padTop = 8;
+  const max = Math.max(...all.map((entry) => entry.count), 1);
+  const step = (width - padLeft) / all.length;
+  const barWidth = Math.max(2, Math.min(28, step - 2));
+  const yOf = (value) => height - padBottom - (value / max) * (height - padBottom - padTop);
+  let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="날짜별 세션 수">`;
+  for (const value of [0, max]) svg += `<line x1="${padLeft}" x2="${width}" y1="${yOf(value)}" y2="${yOf(value)}" stroke="var(${value ? '--grid' : '--axis'})"/><text class="lbl" x="${padLeft - 6}" y="${yOf(value) + 4}" text-anchor="end">${value}</text>`;
+  all.forEach((entry, i) => {
+    const x = padLeft + i * step + (step - barWidth) / 2;
+    if (entry.count) svg += `<path d="M${x},${yOf(0)} V${yOf(entry.count) + 4} q0,-4 4,-4 h${barWidth - 8} q4,0 4,4 V${yOf(0)} Z" fill="var(--series)"/>`;
+    svg += `<rect class="hit" x="${padLeft + i * step}" y="${padTop}" width="${step}" height="${height - padBottom - padTop}" fill="transparent" data-i="${i}"/>`;
   });
-  const every = Math.ceil(all.length / Math.floor((W - L) / 70));
-  all.forEach((d, i) => { if (i % every === 0) s += `<text class="lbl" x="${L + i * step + step / 2}" y="${H - 6}" text-anchor="middle">${d.day.slice(5)}</text>`; });
-  box.innerHTML = s + '</svg>';
-  for (const r of box.querySelectorAll('.hit')) { const d = all[r.dataset.i]; hover(r, `<b>${d.day}</b><br>세션 ${d.n}개`); }
+  const every = Math.ceil(all.length / Math.floor((width - padLeft) / 70));
+  all.forEach((entry, i) => { if (i % every === 0) svg += `<text class="lbl" x="${padLeft + i * step + step / 2}" y="${height - 6}" text-anchor="middle">${entry.day.slice(5)}</text>`; });
+  box.innerHTML = svg + '</svg>';
+  for (const hit of box.querySelectorAll('.hit')) { const entry = all[hit.dataset.i]; hover(hit, `<b>${entry.day}</b><br>세션 ${entry.count}개`); }
 }
 
 function recent(list, env) {
   $('#recent').innerHTML = `<tr><th>시작</th><th class="l">태블릿</th><th class="l">버전·모드</th><th class="l">방식·난이도</th><th>분</th><th class="l">회원</th><th class="l">끝</th><th>게임</th><th>점수</th><th>운동</th><th>인지</th><th>속도 유지</th><th>크기</th><th></th></tr>` +
-    (list.length ? list.map((s) => `<tr>
-      <td>${esc((s.started_at || '').replace('T', ' ').slice(0, 16))}</td><td class="l" title="${esc(s.device)}">${esc(String(s.device).slice(0, 8))}</td>
-      <td class="l">${esc(s.edition || '–')} · ${esc(s.mode || '–')}</td><td class="l">${esc(s.track || '–')} · ${esc(s.difficulty || '–')}</td><td>${fmt(s.min)}</td>
-      <td class="l">${esc(s.user || '')}</td><td class="l">${esc(s.ended || '')}</td><td>${s.games}</td><td>${fmt(s.score)}</td><td>${fmt(s.ex_score)}</td><td>${fmt(s.cog_score)}</td>
-      <td>${pct(s.in_zone)}</td><td>${fmt(s.bytes / 1024)} KB</td>
-      <td class="links"><a href="${BASE}replay?env=${encodeURIComponent(env)}&amp;device=${encodeURIComponent(s.device)}&amp;sid=${encodeURIComponent(s.sid)}" target="_blank" rel="noopener">재생</a><a href="${BASE}raw/${encodeURIComponent(env)}/${encodeURIComponent(s.device)}/${encodeURIComponent(s.sid)}">원본</a></td></tr>`).join('')
+    (list.length ? list.map((session) => `<tr>
+      <td>${escapeHtml((session.started_at || '').replace('T', ' ').slice(0, 16))}</td><td class="l" title="${escapeHtml(session.device)}">${escapeHtml(String(session.device).slice(0, 8))}</td>
+      <td class="l">${escapeHtml(session.edition || '–')} · ${escapeHtml(session.mode || '–')}</td><td class="l">${escapeHtml(session.track || '–')} · ${escapeHtml(session.difficulty || '–')}</td><td>${formatNumber(session.min)}</td>
+      <td class="l">${escapeHtml(session.user || '')}</td><td class="l">${escapeHtml(session.ended || '')}</td><td>${session.games}</td><td>${formatNumber(session.score)}</td><td>${formatNumber(session.ex_score)}</td><td>${formatNumber(session.cog_score)}</td>
+      <td>${percent(session.in_zone)}</td><td>${formatNumber(session.bytes / 1024)} KB</td>
+      <td class="links"><a href="${BASE}replay?env=${encodeURIComponent(env)}&amp;device=${encodeURIComponent(session.device)}&amp;sid=${encodeURIComponent(session.sid)}" target="_blank" rel="noopener">재생</a><a href="${BASE}raw/${encodeURIComponent(env)}/${encodeURIComponent(session.device)}/${encodeURIComponent(session.sid)}">원본</a></td></tr>`).join('')
       : '<tr><td class="l" colspan="14">아직 없습니다.</td></tr>');
 }
 
 async function load() {
-  const q = query();
-  for (const t of ['sessions', 'games', 'questions']) $(`#x-${t}`).href = `${BASE}export/${t}.csv?${q}`;
+  const queryString = query();
+  for (const table of ['sessions', 'games', 'questions']) $(`#x-${table}`).href = `${BASE}export/${table}.csv?${queryString}`;
   try {
     $('#status').textContent = '불러오는 중…';
-    const [o, b] = await Promise.all([get(`api/overview?${q}`), get(`api/balance?${q}`)]);
-    tiles(o.totals);
-    heat(b.cells);
-    gamesTable(b.games);
-    days(o.days);
-    recent(o.recent, form.env.value || 'prod');
+    const [overview, balance] = await Promise.all([get(`api/overview?${queryString}`), get(`api/balance?${queryString}`)]);
+    tiles(overview.totals);
+    heat(balance.cells);
+    gamesTable(balance.games);
+    days(overview.days);
+    recent(overview.recent, form.env.value || 'prod');
     $('#status').textContent = `불러옴 ${new Date().toLocaleTimeString('ko-KR')}`;
-  } catch (e) {
-    $('#status').innerHTML = `<span class="err">불러오지 못했습니다: ${esc(e.message)}</span>`;
+  } catch (error) {
+    $('#status').innerHTML = `<span class="err">불러오지 못했습니다: ${escapeHtml(error.message)}</span>`;
   }
 }
 
+let resizeTimer = null;
 (async () => {
-  const opt = await get('api/options');
-  TITLES = opt.titles || {};
-  const envs = opt.env.length ? opt.env : ['prod'];
-  form.env.innerHTML = envs.map((e) => `<option${e === 'prod' ? ' selected' : ''}>${esc(e)}</option>`).join('');
-  for (const k of ['edition', 'mode', 'track', 'difficulty', 'device']) {
-    form[k].insertAdjacentHTML('beforeend', opt[k].map((v) => `<option value="${esc(v)}">${esc(k === 'device' ? String(v).slice(0, 8) : v)}</option>`).join(''));
+  const options = await get('api/options');
+  TITLES = options.titles || {};
+  const envs = options.env.length ? options.env : ['prod'];
+  form.env.innerHTML = envs.map((env) => `<option${env === 'prod' ? ' selected' : ''}>${escapeHtml(env)}</option>`).join('');
+  for (const field of ['edition', 'mode', 'track', 'difficulty', 'device']) {
+    form[field].insertAdjacentHTML('beforeend', options[field].map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(field === 'device' ? String(value).slice(0, 8) : value)}</option>`).join(''));
   }
   form.addEventListener('change', load);
-  addEventListener('resize', () => clearTimeout(window._r) || (window._r = setTimeout(load, 300)));
+  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(load, 300); });
   load();
-})().catch((e) => { $('#status').innerHTML = `<span class="err">${esc(e.message)}</span>`; });
+})().catch((error) => { $('#status').innerHTML = `<span class="err">${escapeHtml(error.message)}</span>`; });
 </script>
 </body>
 </html>

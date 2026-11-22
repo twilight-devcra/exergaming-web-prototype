@@ -5,8 +5,11 @@ export class RoundStats {
   constructor(gameTypes) {
     // 게임 id → 성적. level = 도달한 최고 난이도, runs = 판마다 [레벨, 맞힌 수, 문제 수],
     // ms = 게임을 푸는 데 쓴 시간 (피드백 포함), think = 문제별 생각한 시간 (think()). runs · think 는 능력 점수에 쓴다
-    this.games = Object.fromEntries(gameTypes.map((T) => [T.id, {
+    this.games = Object.fromEntries(gameTypes.map((gameType) => [gameType.id, {
+      // 짧은 이름 ms · n 은 세션 로그(summary.stats)에 그대로 실려 서버로 가는 형식이라 그대로 둔다
+      // eslint-disable-next-line id-length -- 세션 로그 형식
       plays: 0, cleared: 0, correct: 0, total: 0, points: 0, level: 0, runs: [], ms: 0,
+      // eslint-disable-next-line id-length -- 세션 로그 형식
       think: { n: 0, ms: 0, first: 0, out: 0, outMs: 0, limitMs: 0, spareMs: 0 },
     }]));
     this.streak = 0;     // 지금 이어지는 연속 정답
@@ -29,36 +32,37 @@ export class RoundStats {
     this.games[gameId].points += points;
   }
 
-  // 게임 한 판이 끝났다. result = 게임의 { cleared, correct, total }, ms = 그 판에 쓴 게임 시계 시간
-  record(gameId, result, level, ms) {
+  // 게임 한 판이 끝났다. result = 게임의 { cleared, correct, total }, elapsedMs = 그 판에 쓴 게임 시계 시간
+  record(gameId, result, level, elapsedMs) {
     const game = this.games[gameId];
     game.plays++;
     game.level = Math.max(game.level, level);
     game.runs.push([level, result.correct, result.total]);
-    game.ms += ms;
+    // eslint-disable-next-line id-length -- 세션 로그 형식
+    game.ms += elapsedMs;
     if (result.cleared) game.cleared++;
     game.correct += result.correct;
     game.total += result.total;
   }
 
   // 문제 하나의 생각한 시간 (게임 시계 ms, 입력이 열린 뒤부터. js/session-log.js 의 answer).
-  // 제때 답한 문제: n 개, ms = 답이 정해질 때까지의 합, first = 처음 입력할 때까지의 합.
+  // 제때 답한 문제: n 개, ms = 답이 정해질 때까지의 합 (thinkMs 를 더한다), first = 처음 입력할 때까지의 합.
   // 시간 초과: out 개, outMs = 그 문제들에 쓴 시간 합. 입력이 열리기 전에 누른 답(지시 따르기의 램프 전에 누름)은 시간이 없어 세지 않는다
   // limit = 그 문제의 제한 시간 (ms, 모르면 null): limitMs = 제한 시간 합, spareMs = 남긴 시간 합 (시간 초과는 0) — 답하는 속도 (js/abilities.js)
-  think(gameId, ms, first, timedOut, limit = null) {
-    if (ms == null) return;
+  think(gameId, thinkMs, first, timedOut, limit = null) {
+    if (thinkMs == null) return;
     const think = this.games[gameId].think;
     if (limit > 0) {
       think.limitMs += limit;
-      think.spareMs += timedOut ? 0 : Math.max(0, limit - ms);
+      think.spareMs += timedOut ? 0 : Math.max(0, limit - thinkMs);
     }
     if (timedOut) {
       think.out++;
-      think.outMs += ms;
+      think.outMs += thinkMs;
       return;
     }
     think.n++;
-    think.ms += ms;
-    think.first += first ?? ms;
+    think.ms += thinkMs; // eslint-disable-line id-length -- 세션 로그 형식
+    think.first += first ?? thinkMs;
   }
 }

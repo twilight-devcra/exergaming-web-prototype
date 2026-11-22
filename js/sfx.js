@@ -11,6 +11,6 @@ export const Sfx = Object.freeze({
   BUILD_TOP: 'buildTop', // 지붕을 얹을 때
   TICK: 'tick',
   COUNT: 'count',        // 시작 전 셋·둘·하나
-  GO: 'go',
+  START: 'go',
   END: 'end',            // 라운드 끝
 });

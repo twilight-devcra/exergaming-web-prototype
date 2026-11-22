@@ -28,8 +28,8 @@ const ROOT = path.resolve(__dirname, '..');
 const CACHE = path.join(__dirname, '.cache');
 const PER_LEVEL = Number(process.argv[2] || 160);
 let seed = Number(process.argv[3] || 1);
-const UA = 'exergame-blank-build/0.1';
-const SRC = {
+const USER_AGENT = 'exergame-blank-build/0.1';
+const SOURCES = {
   hunspell: 'https://raw.githubusercontent.com/spellcheck-ko/hunspell-dict-ko/master/dict-ko-data.yaml',
   kaikki: 'https://kaikki.org/dictionary/Korean/kaikki.org-dictionary-Korean.jsonl',
 };
@@ -48,20 +48,24 @@ async function loadLevels() {
 }
 
 const HANGUL = /^[가-힣]+$/;
-const rand = () => { // mulberry32
+const random = () => { // mulberry32
   seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  let state = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  state = (state + Math.imul(state ^ (state >>> 7), 61 | state)) ^ state;
+  return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
 };
-const shuffle = (a) => { const c = a.slice(); for (let i = c.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [c[i], c[j]] = [c[j], c[i]]; } return c; };
+const shuffle = (list) => {
+  const copy = list.slice();
+  for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; }
+  return copy;
+};
 
 async function download(url, file) {
   if (fs.existsSync(file)) return;
   console.log(`내려받는 중: ${url}`);
-  const res = await fetch(url, { headers: { 'User-Agent': UA } });
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  await new Promise((ok, fail) => Readable.fromWeb(res.body).pipe(fs.createWriteStream(file)).on('finish', ok).on('error', fail));
+  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  await new Promise((resolve, reject) => Readable.fromWeb(response.body).pipe(fs.createWriteStream(file)).on('finish', resolve).on('error', reject));
 }
 
 // 거르는 사전: 낱말 한 줄에 하나 (tools/.cache/lexicon.txt). 없으면 원본을 내려받아 만든다
@@ -69,52 +73,52 @@ async function lexicon(niklAll) {
   const out = path.join(CACHE, 'lexicon.txt');
   if (!fs.existsSync(out)) {
     fs.mkdirSync(CACHE, { recursive: true });
-    const hun = path.join(CACHE, 'hunspell-dict-ko-data.yaml');
-    const kai = path.join(CACHE, 'kaikki-korean.jsonl');
-    await download(SRC.hunspell, hun);
-    await download(SRC.kaikki, kai);
+    const hunspellFile = path.join(CACHE, 'hunspell-dict-ko-data.yaml');
+    const kaikkiFile = path.join(CACHE, 'kaikki-korean.jsonl');
+    await download(SOURCES.hunspell, hunspellFile);
+    await download(SOURCES.kaikki, kaikkiFile);
     const words = new Set();
     // hunspell: '- pos: 명사' 다음 줄 '  word: 바다'. 조사·특수 항목은 낱말이 아니므로 뺀다
-    let pos = null;
-    for (const line of fs.readFileSync(hun, 'utf8').split('\n')) {
-      let m = line.match(/pos: (\S+)/);
-      if (m) pos = m[1];
-      m = line.match(/word: (\S+)/);
-      if (m && pos !== '조사' && !pos.startsWith('특수') && HANGUL.test(m[1])) words.add(m[1]);
+    let partOfSpeech = null;
+    for (const line of fs.readFileSync(hunspellFile, 'utf8').split('\n')) {
+      let match = line.match(/pos: (\S+)/);
+      if (match) partOfSpeech = match[1];
+      match = line.match(/word: (\S+)/);
+      if (match && partOfSpeech !== '조사' && !partOfSpeech.startsWith('특수') && HANGUL.test(match[1])) words.add(match[1]);
     }
     // kaikki: 낱말 조각(음절·접사·어근·조사)은 뺀다
     const SKIP = new Set(['syllable', 'suffix', 'prefix', 'root', 'particle', 'affix', 'character', 'symbol', 'postp']);
-    const rl = readline.createInterface({ input: fs.createReadStream(kai, 'utf8'), crlfDelay: Infinity });
-    for await (const line of rl) {
+    const lines = readline.createInterface({ input: fs.createReadStream(kaikkiFile, 'utf8'), crlfDelay: Infinity });
+    for await (const line of lines) {
       if (!line) continue;
-      let e;
-      try { e = JSON.parse(line); } catch { continue; }
-      if (e.lang_code === 'ko' && HANGUL.test(e.word || '') && !SKIP.has(e.pos)) words.add(e.word);
+      let entry;
+      try { entry = JSON.parse(line); } catch { continue; }
+      if (entry.lang_code === 'ko' && HANGUL.test(entry.word || '') && !SKIP.has(entry.pos)) words.add(entry.word);
     }
     fs.writeFileSync(out, [...words].sort().join('\n') + '\n');
   }
-  const set = new Set(fs.readFileSync(out, 'utf8').split('\n').filter(Boolean));
-  for (const w of niklAll) set.add(w);
-  return set;
+  const dictionary = new Set(fs.readFileSync(out, 'utf8').split('\n').filter(Boolean));
+  for (const word of niklAll) dictionary.add(word);
+  return dictionary;
 }
 
 // 문제 낱말 목록: 순위 · 단어(뒤의 숫자는 동음이의어 번호) · 품사 · 풀이(한자) · 등급
 function readNikl() {
   const rows = fs.readFileSync(path.join(__dirname, 'data/nikl-vocab.tsv'), 'utf8').split(/\r?\n/).slice(1)
-    .map((l) => l.split('\t')).filter((r) => r.length >= 5 && r[1]);
+    .map((line) => line.split('\t')).filter((row) => row.length >= 5 && row[1]);
   const all = new Set();
   const nouns = new Map(); // 낱말 → 가장 쉬운 등급
   const rank = new Map(); // 낱말 → 빈도 순위 (작을수록 자주 쓰는 말. 동음이의어는 가장 높은 순위)
-  for (const r of rows) {
-    const w = r[1].replace(/\d+$/, '');
-    if (!HANGUL.test(w)) continue;
-    all.add(w);
-    const g = r[4].trim();
-    if (r[2] !== '명' || !'ABC'.includes(g) || !g) continue;
+  for (const row of rows) {
+    const word = row[1].replace(/\d+$/, '');
+    if (!HANGUL.test(word)) continue;
+    all.add(word);
+    const grade = row[4].trim();
+    if (row[2] !== '명' || !'ABC'.includes(grade) || !grade) continue;
     // 외래어는 풀이 칸에 원어가 적혀 있다. 커피·버스처럼 흔한 것은 두고, 영문 약자(PC, PD)만 뺀다
-    if (/^[A-Z]{2,}$/.test(r[3].trim()) && w !== '티브이') continue;
-    if (!nouns.has(w) || g < nouns.get(w)) nouns.set(w, g);
-    if (!rank.has(w) || +r[0] < rank.get(w)) rank.set(w, +r[0]);
+    if (/^[A-Z]{2,}$/.test(row[3].trim()) && word !== '티브이') continue;
+    if (!nouns.has(word) || grade < nouns.get(word)) nouns.set(word, grade);
+    if (!rank.has(word) || +row[0] < rank.get(word)) rank.set(word, +row[0]);
   }
   return { all, nouns, rank };
 }
@@ -129,98 +133,101 @@ const ABSTRACT = new Set(['다음', '이번', '사이', '그때', '동안', '필
 (async () => {
   const LEVELS = await loadLevels();
   const { all: known, nouns, rank } = readNikl();
-  const lex = await lexicon(known);
-  console.log(`문제 낱말 ${nouns.size}개 · 거르는 사전 ${lex.size}개`);
+  const dictionary = await lexicon(known);
+  console.log(`문제 낱말 ${nouns.size}개 · 거르는 사전 ${dictionary.size}개`);
 
   // 오답 보기 후보: 문제 낱말에 자주 나오는 글자
-  const sylCount = new Map();
-  for (const w of nouns.keys()) for (const s of new Set(w)) sylCount.set(s, (sylCount.get(s) || 0) + 1);
-  const common = [...sylCount].filter(([, n]) => n >= 6).map(([s]) => s);
+  const syllableCount = new Map();
+  for (const word of nouns.keys()) for (const syllable of new Set(word)) syllableCount.set(syllable, (syllableCount.get(syllable) || 0) + 1);
+  const common = [...syllableCount].filter(([, count]) => count >= 6).map(([syllable]) => syllable);
 
-  const fill = (word, at, s) => word.slice(0, at) + s + word.slice(at + 1);
+  const fill = (word, position, syllable) => word.slice(0, position) + syllable + word.slice(position + 1);
   const bank = [];
   const report = [];
-  for (const [li, L] of LEVELS.entries()) {
-    // 글자 → 그 글자가 한 번만 들어 있는 문제 낱말들 [{ w, at }]
-    const bySyl = new Map();
-    for (const [w, g] of nouns) {
-      if (!L.grades.includes(g) || !L.lens.includes(w.length) || BLOCK.has(w)) continue;
-      if (L.top && rank.get(w) > L.top) continue;
-      if (L.words === 1 && ABSTRACT.has(w)) continue;
-      for (let i = 0; i < w.length; i++) {
-        const s = w[i];
-        if (w.indexOf(s) !== w.lastIndexOf(s)) continue;
-        if (!bySyl.has(s)) bySyl.set(s, []);
-        bySyl.get(s).push({ w, at: i });
+  for (const [levelIndex, level] of LEVELS.entries()) {
+    // 글자 → 그 글자가 한 번만 들어 있는 문제 낱말들 [{ word, position }]
+    const bySyllable = new Map();
+    for (const [word, grade] of nouns) {
+      if (!level.grades.includes(grade) || !level.lengths.includes(word.length) || BLOCK.has(word)) continue;
+      if (level.top && rank.get(word) > level.top) continue;
+      if (level.words === 1 && ABSTRACT.has(word)) continue;
+      for (let i = 0; i < word.length; i++) {
+        const syllable = word[i];
+        if (word.indexOf(syllable) !== word.lastIndexOf(syllable)) continue;
+        if (!bySyllable.has(syllable)) bySyllable.set(syllable, []);
+        bySyllable.get(syllable).push({ word, position: i });
       }
     }
     // 낱말 여럿을 고를 때는 서로 겹치지 않는 낱말을 찾을 여유가 있게 후보가 둘 더 있는 글자만 답으로 쓴다
-    const answers = [...bySyl].filter(([, list]) => list.length >= (L.words === 1 ? 1 : L.words + 2)).map(([s]) => s);
+    const answers = [...bySyllable].filter(([, list]) => list.length >= (level.words === 1 ? 1 : level.words + 2)).map(([syllable]) => syllable);
     const out = [];
     const seen = new Set();
-    const useAns = new Map(); // 같은 답 글자가 몰리지 않게: 답 글자 하나가 묶음에 나오는 횟수의 상한
+    const answerUses = new Map(); // 같은 답 글자가 몰리지 않게: 답 글자 하나가 묶음에 나오는 횟수의 상한
     const cap = Math.max(3, Math.ceil((PER_LEVEL / answers.length) * 1.5));
     let tries = 0;
     while (out.length < PER_LEVEL && tries < PER_LEVEL * 400) {
       tries++;
-      const a = answers[Math.floor(rand() * answers.length)];
-      if ((useAns.get(a) || 0) >= cap) continue;
+      const answer = answers[Math.floor(random() * answers.length)];
+      if ((answerUses.get(answer) || 0) >= cap) continue;
       // 서로 너무 닮지 않은 낱말: 빈칸 밖의 글자가 겹치지 않게 (학교 · 학생 처럼 같은 글자로 시작하는 둘은 피한다)
       const picks = [];
-      for (const c of shuffle(bySyl.get(a))) {
-        const rest = c.w.slice(0, c.at) + c.w.slice(c.at + 1);
-        if (picks.some((p) => [...rest].some((ch) => p.w.includes(ch)))) continue;
-        picks.push(c);
-        if (picks.length === L.words) break;
+      for (const candidate of shuffle(bySyllable.get(answer))) {
+        const rest = candidate.word.slice(0, candidate.position) + candidate.word.slice(candidate.position + 1);
+        if (picks.some((pick) => [...rest].some((char) => pick.word.includes(char)))) continue;
+        picks.push(candidate);
+        if (picks.length === level.words) break;
       }
-      if (picks.length < L.words) continue;
-      const key = picks.map((p) => `${p.w}${p.at}`).sort().join(); // 같은 낱말이라도 빈칸 자리가 다르면 다른 문제
+      if (picks.length < level.words) continue;
+      const key = picks.map((pick) => `${pick.word}${pick.position}`).sort().join(); // 같은 낱말이라도 빈칸 자리가 다르면 다른 문제
       if (seen.has(key)) continue;
 
-      // 오답 후보마다: 거르는 사전으로 맞는 빈칸 수(big), 아는 낱말로 맞는 빈칸 수(known)와 그 빈칸들
-      const cands = [];
-      for (const d of common) {
-        if (d === a) continue;
-        const forms = picks.map((p) => fill(p.w, p.at, d));
-        const big = forms.filter((f) => lex.has(f)).length;
-        if (big >= L.words) continue; // 모든 빈칸에 맞으면 답이 둘
-        if (L.clean && big > 0) continue; // 아주 쉬운 단계: 오답은 어느 빈칸에서도 사전에 있는 말이 되지 않는다
-        const hits = forms.map((f) => known.has(f));
-        cands.push({ d, known: hits.filter(Boolean).length, hits });
+      // 오답 후보마다: 거르는 사전으로 맞는 빈칸 수(inDictionary), 아는 낱말로 맞는 빈칸 수(known)와 그 빈칸들
+      const wrongOptions = [];
+      for (const letter of common) {
+        if (letter === answer) continue;
+        const forms = picks.map((pick) => fill(pick.word, pick.position, letter));
+        const inDictionary = forms.filter((form) => dictionary.has(form)).length;
+        if (inDictionary >= level.words) continue; // 모든 빈칸에 맞으면 답이 둘
+        if (level.clean && inDictionary > 0) continue; // 아주 쉬운 단계: 오답은 어느 빈칸에서도 사전에 있는 말이 되지 않는다
+        const hits = forms.map((form) => known.has(form));
+        wrongOptions.push({ letter, known: hits.filter(Boolean).length, hits });
       }
-      const traps = shuffle(cands.filter((c) => c.known >= L.words - 1));
-      if (traps.length < L.traps) continue;
+      const traps = shuffle(wrongOptions.filter((option) => option.known >= level.words - 1));
+      if (traps.length < level.traps) continue;
       // 함정 다음으로는 빈칸 하나 이상에 맞는 그럴듯한 오답을, 그다음은 아무 흔한 글자를 쓴다
       // 함정이 없는 단계(Lv1)는 어느 빈칸에도 맞지 않는 오답만 쓴다 — 낱말 하나만 보고도 풀린다
-      const plaus = L.traps ? shuffle(cands.filter((c) => c.known >= 1 && c.known < L.words - 1)) : [];
-      if (!L.traps) traps.length = 0;
-      const rest = shuffle(cands.filter((c) => c.known === 0));
+      const plausible = level.traps ? shuffle(wrongOptions.filter((option) => option.known >= 1 && option.known < level.words - 1)) : [];
+      if (!level.traps) traps.length = 0;
+      const rest = shuffle(wrongOptions.filter((option) => option.known === 0));
       const chosen = [];
-      const take = (list, n) => { for (const c of list) { if (chosen.length >= n) break; if (!chosen.includes(c)) chosen.push(c); } };
-      take(traps, L.traps);
+      const take = (list, limit) => { for (const option of list) { if (chosen.length >= limit) break; if (!chosen.includes(option)) chosen.push(option); } };
+      take(traps, level.traps);
       // 혼자 풀리는 빈칸을 줄이도록: 아직 아무 오답도 맞지 않는 빈칸을 맞추는 후보를 먼저
-      while (chosen.length < L.opts - 1) {
-        const open = picks.map((_, i) => !chosen.some((c) => c.hits[i]));
-        const pool = [...plaus, ...traps].filter((c) => !chosen.includes(c));
-        const best = pool.find((c) => c.hits.some((h, i) => h && open[i]));
+      while (chosen.length < level.optionCount - 1) {
+        const unmatched = picks.map((_, i) => !chosen.some((option) => option.hits[i]));
+        const pool = [...plausible, ...traps].filter((option) => !chosen.includes(option));
+        const best = pool.find((option) => option.hits.some((hit, i) => hit && unmatched[i]));
         if (best) chosen.push(best);
         else if (pool.length) chosen.push(pool[0]);
         else if (rest.length) chosen.push(rest.shift());
         else break;
       }
-      if (chosen.length < L.opts - 1) continue;
-      const solo = picks.filter((_, i) => !chosen.some((c) => c.hits[i])).length;
-      if (solo > L.solo) continue;
+      if (chosen.length < level.optionCount - 1) continue;
+      const solo = picks.filter((_, i) => !chosen.some((option) => option.hits[i])).length;
+      if (solo > level.solo) continue;
       seen.add(key);
-      useAns.set(a, (useAns.get(a) || 0) + 1);
-      out.push({ w: picks.map((p) => p.w), at: picks.map((p) => p.at), a, o: chosen.map((c) => c.d), solo, traps: L.words > 1 ? chosen.filter((c) => c.known >= L.words - 1).length : 0 }); // 낱말이 하나면 함정이 없다
+      answerUses.set(answer, (answerUses.get(answer) || 0) + 1);
+      out.push({
+        words: picks.map((pick) => pick.word), positions: picks.map((pick) => pick.position), answer, wrong: chosen.map((option) => option.letter), solo,
+        traps: level.words > 1 ? chosen.filter((option) => option.known >= level.words - 1).length : 0, // 낱말이 하나면 함정이 없다
+      });
     }
-    report.push(`Lv${li + 1}: ${out.length}문제 (시도 ${tries}, 답 글자 ${answers.length}종)`);
+    report.push(`Lv${levelIndex + 1}: ${out.length}문제 (시도 ${tries}, 답 글자 ${answers.length}종)`);
     bank.push(out);
   }
 
   // 게임용 묶음: 레벨마다 [낱말들, 빈칸 자리, 답, 오답들]
-  const rows = bank.map((lv) => '  [\n' + lv.map((q) => `    [${JSON.stringify(q.w)}, ${JSON.stringify(q.at)}, '${q.a}', ${JSON.stringify(q.o)}],`).join('\n') + '\n  ],').join('\n');
+  const rows = bank.map((levelQuestions) => '  [\n' + levelQuestions.map((question) => `    [${JSON.stringify(question.words)}, ${JSON.stringify(question.positions)}, '${question.answer}', ${JSON.stringify(question.wrong)}],`).join('\n') + '\n  ],').join('\n');
   const head = `// 이 파일은 node tools/blank-build.js 가 만듭니다. 직접 고치지 마세요.
 // 같은 글자 넣기(js/games/blank.js)의 문제 묶음. 레벨마다 [낱말들, 빈칸 자리(음절 번호), 답 글자, 오답 글자들].
 // 문제 낱말: 국립국어원 「한국어 학습용 어휘 목록」(2003), 공공누리 제1유형.
@@ -229,11 +236,11 @@ const ABSTRACT = new Set(['다음', '이번', '사이', '그때', '동안', '필
   console.log(report.join('\n'));
 
   // 레벨마다 예시 몇 개
-  for (const [li, lv] of bank.entries()) {
-    console.log(`\nLv${li + 1} 예시`);
-    for (const q of lv.slice(0, 5)) {
-      const shown = q.w.map((w, i) => w.slice(0, q.at[i]) + '□' + w.slice(q.at[i] + 1)).join(' · ');
-      console.log(`  ${shown.padEnd(28)} 답 ${q.a} · 오답 ${q.o.join(' ')}   (${q.w.join(' ')} · 함정 ${q.traps} · 혼자 풀림 ${q.solo})`);
+  for (const [levelIndex, levelQuestions] of bank.entries()) {
+    console.log(`\nLv${levelIndex + 1} 예시`);
+    for (const question of levelQuestions.slice(0, 5)) {
+      const shown = question.words.map((word, i) => word.slice(0, question.positions[i]) + '□' + word.slice(question.positions[i] + 1)).join(' · ');
+      console.log(`  ${shown.padEnd(28)} 답 ${question.answer} · 오답 ${question.wrong.join(' ')}   (${question.words.join(' ')} · 함정 ${question.traps} · 혼자 풀림 ${question.solo})`);
     }
   }
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch((error) => { console.error(error); process.exit(1); });

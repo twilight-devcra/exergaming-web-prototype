@@ -13,46 +13,46 @@ const PAGE = path.join(ROOT, 'app/index.html');
 const SKIP = ['js/pedal-debug.js']; // 센서 디버그 페이지 전용
 
 function jsFiles(dir) {
-  return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((d) => {
-    const rel = `${dir}/${d.name}`;
-    if (d.isDirectory()) return d.name === 'vendor' ? [] : jsFiles(rel); // vendor/ 는 모듈이 아닌 보통 스크립트
-    return d.name.endsWith('.js') && !SKIP.includes(rel) ? [rel] : [];
+  return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return entry.name === 'vendor' ? [] : jsFiles(relativePath); // vendor/ 는 모듈이 아닌 보통 스크립트
+    return entry.name.endsWith('.js') && !SKIP.includes(relativePath) ? [relativePath] : [];
   });
 }
 
 let html = fs.readFileSync(PAGE, 'utf8');
-const eol = html.includes('\r\n') ? '\r\n' : '\n';
+const lineEnd = html.includes('\r\n') ? '\r\n' : '\n';
 
 // 새 값: 오늘 날짜. 오늘 이미 올렸으면 끝 글자를 b, c … 로 올린다 (20261110 → 20261110b → 20261110c)
 const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-const old = (html.match(/\?v=(\w+)/) || [])[1] || '';
-let v = process.argv[2] || today;
-if (!/^\w+$/.test(v)) throw new Error(`?v= 값은 영문·숫자만: ${v}`);
-if (!process.argv[2] && old.startsWith(today)) {
-  const tail = old.slice(today.length);
-  v = today + (tail ? String.fromCharCode(tail.charCodeAt(0) + 1) : 'b');
+const previous = (html.match(/\?v=(\w+)/) || [])[1] || '';
+let version = process.argv[2] || today;
+if (!/^\w+$/.test(version)) throw new Error(`?v= 값은 영문·숫자만: ${version}`);
+if (!process.argv[2] && previous.startsWith(today)) {
+  const tail = previous.slice(today.length);
+  version = today + (tail ? String.fromCharCode(tail.charCodeAt(0) + 1) : 'b');
 }
-html = html.replace(/\?v=\w+/g, `?v=${v}`);
+html = html.replace(/\?v=\w+/g, `?v=${version}`);
 
 // importmap: app/index.html 기준 주소 → 같은 주소 + ?v=
 const files = [...jsFiles('js'), ...jsFiles('app')].sort();
-const entries = files.map((f) => {
-  const rel = path.posix.relative('app', f);
-  const key = rel.startsWith('.') ? rel : `./${rel}`;
-  return `      "${key}": "${key}?v=${v}"`;
+const entries = files.map((file) => {
+  const relativePath = path.posix.relative('app', file);
+  const key = relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+  return `      "${key}": "${key}?v=${version}"`;
 });
-const map = [
+const importmap = [
   '<script type="importmap">',
   '  {',
   '    "imports": {',
-  entries.join(',' + eol),
+  entries.join(',' + lineEnd),
   '    }',
   '  }',
   '  </script>',
-].join(eol);
-const re = /<script type="importmap">[\s\S]*?<\/script>/;
-if (!re.test(html)) throw new Error('app/index.html 에 <script type="importmap"> 이 없습니다');
-html = html.replace(re, map);
+].join(lineEnd);
+const importmapPattern = /<script type="importmap">[\s\S]*?<\/script>/;
+if (!importmapPattern.test(html)) throw new Error('app/index.html 에 <script type="importmap"> 이 없습니다');
+html = html.replace(importmapPattern, importmap);
 
 fs.writeFileSync(PAGE, html);
-console.log(`app/index.html: ?v=${v}, importmap ${files.length}개 파일`);
+console.log(`app/index.html: ?v=${version}, importmap ${files.length}개 파일`);

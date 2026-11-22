@@ -40,6 +40,7 @@ export const Landmarks = {
   // 연기·깃발 박자 같은 작은 차이를 정한다
   look(kind, size, seed) {
     const { WALLS, ROOFS } = Landmarks;
+    // eslint-disable-next-line id-length -- 저장된 기록 형식 (v = 생김새 형식 판)
     return { v: 1, kind, size, seed, wall: WALLS[seed % WALLS.length], roof: ROOFS[(seed * 3 + 1) % ROOFS.length] };
   },
 
@@ -69,11 +70,11 @@ export const Landmarks = {
 
 // 세션 key 에서 늘 같은 seed 를 뽑는다
 function seedOf(key) {
-  return [...String(key)].reduce((hash, ch) => (hash * 31 + ch.charCodeAt(0)) % 100003, 7);
+  return [...String(key)].reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) % 100003, 7);
 }
 
 // 팻말 글자: '11/20'. 날짜가 아니면 빈 글자
-function dateTag(at) {
-  const date = new Date(at);
+function dateTag(when) {
+  const date = new Date(when);
   return isNaN(date) ? '' : `${date.getMonth() + 1}/${date.getDate()}`;
 }

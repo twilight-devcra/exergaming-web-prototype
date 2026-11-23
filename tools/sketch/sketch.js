@@ -81,9 +81,10 @@ export const Sketch = {
   },
 
   // 게임 소개 화면 (진짜는 main.js 의 intro). steps = diagram() 이 돌려주는 [{ svg, caption }, …]. stage 자리를 소개로 바꾼다
-  intro(stage, { tag = '새 게임', name, steps, hint }) {
+  // level 이 있으면 이름 옆에 작은 레벨 알약을 둔다
+  intro(stage, { name, level, steps, hint }) {
     const intro = element('div', 'intro');
-    intro.innerHTML = `<div class="tag">${tag}</div><div class="name">${name}</div>
+    intro.innerHTML = `<div class="title"><div class="name">${name}</div>${level ? `<span class="level">Lv.${level}</span>` : ''}</div>
       ${Diagram.render({ diagram: () => steps })}
       <div class="hint">${hint}</div><div class="skip">화면을 누르면 바로 시작합니다</div>`;
     stage.replaceWith(intro);
@@ -160,7 +161,7 @@ export const Sketch = {
       if (intro && GameClass.diagram && params.get('intro') !== '0') {
         const placeholder = element('div', 'stage');
         cog.append(placeholder);
-        Sketch.intro(placeholder, { tag: '새 게임', name: GameClass.title, steps: GameClass.diagram(level),
+        Sketch.intro(placeholder, { name: GameClass.title, level, steps: GameClass.diagram(level),
           hint: typeof GameClass.hint === 'function' ? GameClass.hint(level) : GameClass.hint });
         const proceed = () => mine === generation && begin(false);
         setTimeout(proceed, 4500);

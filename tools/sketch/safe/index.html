@@ -52,7 +52,7 @@ const variants = (layout, prefix) => [
   shot(`${prefix}-lv7`, 'Lv7 (6줄): ☾ = ◆ + ■ → 9 · ● 는 5 와 8 사이의 짝수 → 6', { ...first(7), layout }, { timer: 0.95 }),
   shot(`${prefix}-lv8`, 'Lv8 (6줄): ▲ + ■ = 9, ▲ = ■ × 2 → ■ 3, ▲ 6 · ● 는 7 보다 큰 짝수 → 8', { ...first(8), layout }, { timer: 0.95 }),
 ];
-const INTRO = { name: TITLE, steps: SafeGame.diagram(), hint: SafeGame.hint };
+const INTRO = { name: TITLE, level: 1, steps: SafeGame.diagram(), hint: SafeGame.hint };
 const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음). ② 의 숫자가 차례로 채워진다 (움직임은 눌러 보기 화면에서)', render: (stage) => Sketch.intro(stage, INTRO) });
 
 Sketch.page({

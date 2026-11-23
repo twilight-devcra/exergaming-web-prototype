@@ -494,6 +494,9 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 }
 .intro .tag { font-size: 18px; color: var(--accent); font-weight: 700; letter-spacing: 0.06em; }
 .intro .name { font-size: clamp(40px, 6vh, 56px); font-weight: 800; }
+/* 게임 소개의 이름 줄: 이름 옆에 지금 레벨을 작은 알약으로 */
+.intro .title { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.intro .level { font-size: 18px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
 .intro .hint { font-size: clamp(21px, 3.1vh, 28px); color: var(--ink); max-width: 860px; line-height: 1.45; font-weight: 500; }
 .intro .skip { font-size: 15px; color: var(--ink-soft); }
 
@@ -2055,6 +2058,8 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
   /* 게임 소개: 설명 그림 두 장을 위아래로 (화살표도 아래로) */
   .intro { gap: 10px; padding: 0 14px; }
   .intro .name { font-size: 32px; }
+  .intro .title { gap: 10px; }
+  .intro .level { font-size: 15px; padding: 3px 10px; }
   .intro .hint { font-size: 17px; }
   .dg { flex-direction: column; gap: 4px; }
   .dg-step { gap: 6px; }
@@ -2101,6 +2106,7 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
   .intro { gap: 6px; }
   .intro .tag { font-size: 15px; }
   .intro .name { font-size: 26px; }
+  .intro .level { font-size: 13px; padding: 2px 8px; }
   .intro .hint { font-size: 15px; line-height: 1.35; }
   .intro .skip { display: none; }
   .dg-svg { height: 12vh; padding: 6px; }

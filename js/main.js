@@ -483,7 +483,7 @@ const App = {
     this.pass = [];                     // 이번 바퀴에 남은 게임 (planPass)
     this.inIntro = false;               // 게임 소개 중이면 라운드 시계·운동 점수가 멈춘다 (updatePlay)
     this.previousType = null;
-    this.lastLevel = {};                // 게임별 지난번 레벨 (소개 문구용)
+    this.lastLevel = {};                // 게임별 지난번 레벨 (처음 나오는 게임은 소개를 길게 보여 준다)
     this.current = null;
     this.types = this.enabledTypes();   // 이번 라운드에 돌릴 게임 (중간에 바뀌지 않게 여기서 고정)
     this.difficulty = new Difficulty(this.config, this.types.length); // 다음 게임의 레벨 (js/difficulty.js)
@@ -547,7 +547,6 @@ const App = {
     const multiplier = Config.levelMultiplier(this.config, level);
     const previousLevel = this.lastLevel[GameType.id];
     const firstTime = previousLevel == null;
-    const tag = firstTime ? '새 게임' : level > previousLevel ? '레벨 업' : level < previousLevel ? '숨 고르기' : '한 번 더';
     this.lastLevel[GameType.id] = level;
     this.gameIndex++;
     this.current = null;
@@ -558,8 +557,7 @@ const App = {
     cog.innerHTML = '';
     const intro = Util.element('div', 'intro');
     intro.innerHTML = `
-      <div class="tag">${tag}${multiplier > 1 ? ` · x${multiplier.toFixed(1)}` : ''}</div>
-      <div class="name">${GameType.title}</div>
+      <div class="title"><div class="name">${GameType.title}</div><span class="level">Lv.${level}</span></div>
       ${Diagram.render(GameType, level)}
       <div class="hint">${typeof GameType.hint === 'function' ? GameType.hint(level) : GameType.hint}</div>
       <div class="skip">화면을 누르면 바로 시작합니다</div>`;

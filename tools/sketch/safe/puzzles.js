@@ -1,6 +1,6 @@
-// 금고 열기 — 손으로 쓴 문제 (3단계 스케치용: Lv1–4 는 3개, Lv5–8 은 단서 종류마다 하나씩 4–5개). 진짜 게임에서는 생성기가 만든다.
+// 금고 열기 — 손으로 쓴 문제 (3단계 스케치용: Lv1–4 는 3개, Lv5–8 은 단서 종류마다 하나씩 5–6개). 진짜 게임에서는 생성기가 만든다.
 // LEVELS 는 레벨표 (docs/games/drafts/safe.md 와 같게). node tools/sketch/safe/check.js 로 모든 문제를 확인한다.
-//   key     — 열쇠 표의 줄 수 (숫자 줄 + 단서 줄, 최대 6)
+//   key     — 암호 표의 줄 수 (숫자 줄 + 단서 줄, 최대 6)
 //   code    — 암호 자릿수
 //   hidden  — 단서로 알아낼 그림 수
 //   clues   — 단서의 종류
@@ -13,9 +13,9 @@ export const LEVELS = [
   { key: 4, code: 5, hidden: 0, clues: '– (같은 그림이 되풀이된다)' },
   { key: 5, code: 5, hidden: 0, clues: '–' },
   { key: 5, code: 5, hidden: 1, clues: '계산 한 번: 더하기 · 빼기 · 거꾸로 · 두 배 · 두 그림 더하기' },
-  { key: 5, code: 5, hidden: 1, clues: '한 번 더 생각: 사이 · 같은 그림 둘 · 빼서 맞추기 · 세 배 거꾸로' },
-  { key: 6, code: 5, hidden: 2, clues: '계산 + 논리 (단서 2–3줄): 사이·짝홀 · 이어 풀기 · 경계·짝홀' },
-  { key: 6, code: 5, hidden: 3, clues: '두 그림을 함께 (합과 두 배 · 합과 차 · 곱과 차) 또는 같은 그림 셋, 그 답으로 하나 더' },
+  { key: 5, code: 5, hidden: 1, clues: '한 번 더 생각: 사이 · 같은 그림 둘 · 빼서 맞추기 · 같은 그림 둘 + 하나' },
+  { key: 6, code: 5, hidden: 2, clues: '계산 + 논리 (단서 2–3줄): 사이·짝홀·배수 · 이어 풀기 · 경계·짝홀' },
+  { key: 6, code: 5, hidden: 3, clues: '두 그림을 함께 (합과 두 배 · 합과 차 · 곱과 차) 또는 같은 그림 둘 + 하나, 그 답으로 하나 더 (짝홀·배수 경계)' },
 ];
 
 export const PUZZLES = {
@@ -62,7 +62,7 @@ export const PUZZLES = {
       code: ['plus', 'star', 'plus', 'moon', 'triangle'] },
     { kind: '빼서 맞추기 (● − ▲ = ★)', known: [['circle', 9], ['star', 3], ['diamond', 1], ['moon', 7]], clues: [['circle', '−', 'triangle', '=', 'star']], hidden: { triangle: 6 },
       code: ['triangle', 'diamond', 'triangle', 'circle', 'moon'] },
-    { kind: '세 배 거꾸로 (▲ × 3 = ●)', known: [['circle', 6], ['heart', 9], ['square', 4], ['star', 8]], clues: [['triangle', '×', 3, '=', 'circle']], hidden: { triangle: 2 },
+    { kind: '같은 그림 둘 + 하나 (▲ + ▲ + ★ = ●)', known: [['circle', 9], ['heart', 6], ['star', 1], ['square', 8]], clues: [['triangle', '+', 'triangle', '+', 'star', '=', 'circle']], hidden: { triangle: 4 },
       code: ['triangle', 'heart', 'triangle', 'square', 'star'] },
   ],
   // Lv7 (숨은 그림 2, 표 6줄): 계산과 논리를 섞는다. 단서 2–3줄
@@ -82,6 +82,9 @@ export const PUZZLES = {
     { kind: '빼기 → 그 답으로 사이·짝수', known: [['circle', 9], ['square', 5], ['star', 2]],
       clues: [['moon', '−', 'square', '=', 3], ['square', '<', 'plus', '<', 'moon'], ['plus', '=', '짝수']], hidden: { moon: 8, plus: 6 },
       code: ['plus', 'moon', 'star', 'plus', 'circle'] },
+    { kind: '두 그림 더하기 + 사이·3의 배수', known: [['heart', 4], ['diamond', 8], ['star', 1]],
+      clues: [['moon', '=', 'heart', '+', 'star'], ['heart', '<', 'circle', '<', 'diamond'], ['circle', '=', '3의 배수']], hidden: { moon: 5, circle: 6 },
+      code: ['circle', 'moon', 'heart', 'circle', 'diamond'] },
   ],
   // Lv8 (숨은 그림 3, 표 6줄): 두 그림을 함께 정하거나 이어 풀고, 그 답으로 하나를 더 구한다
   8: [
@@ -94,8 +97,11 @@ export const PUZZLES = {
     { kind: '곱과 차 → 두 답 더하기', known: [['star', 9], ['heart', 1], ['moon', 6]],
       clues: [['triangle', '×', 'square', '=', 12], ['triangle', '=', 'square', '+', 1], ['circle', '=', 'triangle', '+', 'square']], hidden: { triangle: 4, square: 3, circle: 7 },
       code: ['circle', 'triangle', 'star', 'square', 'circle'] },
-    { kind: '같은 그림 셋 → 이어 풀기', known: [['heart', 2], ['moon', 5], ['square', 8]],
-      clues: [['star', '+', 'star', '+', 'star', '=', 9], ['triangle', '=', 'star', '×', 2], ['diamond', '=', 'triangle', '+', 'star']], hidden: { star: 3, triangle: 6, diamond: 9 },
+    { kind: '같은 그림 둘 + 하나 → 이어 풀기', known: [['heart', 2], ['moon', 5], ['square', 8]],
+      clues: [['star', '+', 'star', '+', 'heart', '=', 8], ['triangle', '=', 'star', '×', 2], ['diamond', '=', 'triangle', '+', 'star']], hidden: { star: 3, triangle: 6, diamond: 9 },
       code: ['triangle', 'star', 'diamond', 'moon', 'triangle'] },
+    { kind: '합과 차 + 경계·4의 배수', known: [['star', 9], ['heart', 1]],
+      clues: [['triangle', '+', 'square', '=', 7], ['triangle', '=', 'square', '+', 3], ['triangle', '<', 'circle'], ['circle', '=', '4의 배수']], hidden: { triangle: 5, square: 2, circle: 8 },
+      code: ['circle', 'triangle', 'square', 'star', 'circle'] },
   ],
 };

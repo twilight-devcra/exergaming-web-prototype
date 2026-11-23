@@ -58,7 +58,7 @@ const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음). ② �
 Sketch.page({
   title: '금고 열기 (safe) · 목업 4회차',
   notes: `<p>설계 카드: <code>docs/games/drafts/safe.md</code>. <b>눌러 보기: <a href="play.html">play.html</a></b> (레벨마다 손으로 쓴 문제 3개).</p>
-    <p>3회차 의견: 소개는 하나로 (② 에서 숫자가 차례로 채워짐) · 번호판에서 0 을 뺌 (휴대폰 2×5 의 마지막 칸은 빈칸) · 열쇠 표는 6줄까지 · Lv1 은 첫 칸을 채워 둔다.</p>`,
+    <p>3회차 의견: 소개는 하나로 (② 에서 숫자가 차례로 채워짐) · 번호판에서 0 을 뺌 (휴대폰 2×5 의 마지막 칸은 빈칸) · 암호 표는 6줄까지 · Lv1 은 첫 칸을 채워 둔다.</p>`,
   groups: [
     { title: '태블릿 1280×800 — 배치 C', shots: [...variants('below', 'c'), introShot('intro')] },
     { title: '휴대폰 390×844', device: 'phone', notes: '판 자리 330×494.', shots: [...variants('phone', 'p').filter((one) => !one.id.endsWith('-shut')), introShot('p-intro')] },

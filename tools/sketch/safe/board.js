@@ -3,15 +3,15 @@
 //
 // state = 문제(logic.js 의 모양: known · clues · hidden · code)에 진행 상황을 더한 것
 //   layout: 'below' | 'phone'
-//       below — 태블릿: 열쇠 표 | 금고 문, 그 아래 번호판 한 줄 (1–9)
-//       phone — 휴대폰(세로, 판 자리가 좁고 길다): 열쇠 표 · 금고 문 · 번호판 2×5(마지막 칸은 빈칸)를 위에서 아래로.
+//       below — 태블릿: 암호 표 | 금고 문, 그 아래 번호판 한 줄 (1–9)
+//       phone — 휴대폰(세로, 판 자리가 좁고 길다): 암호 표 · 금고 문 · 번호판 2×5(마지막 칸은 빈칸)를 위에서 아래로.
 //               크기는 판 자리에 맞춰 함께 줄어든다 (safe.css 의 --u, fitPhone)
 //   typed: [숫자, …]               — 지금까지 들어간 칸 (틀린 칸은 정답 숫자가 들어간다)
 //   wrong: [{ slot, tapped }]      — 틀린 칸과 그때 누른 숫자 (시간 초과로 채운 칸은 tapped 가 null)
 //   pressed, answer                — 번호판에서 방금 누른 숫자 / 정답으로 보여 줄 숫자 (틀렸을 때)
 //   result: 'open' | 'shut'        — 다 채운 뒤
 import { Sketch } from '../sketch.js';
-import { PAD, PARITY, problemsOf, statementsOf } from './logic.js';
+import { PAD, problemsOf, propertyOf, statementsOf } from './logic.js';
 
 export { digitFor, valuesOf } from './logic.js';
 
@@ -28,14 +28,14 @@ const LOCK_OPEN = '<svg viewBox="0 0 24 24" class="sf-lock"><rect x="4.5" y="10.
 const tokenHtml = (token) => {
   if (typeof token === 'string' && Sketch.symbol(token)) return Sketch.glyph(token, 'sf-kglyph');
   if (typeof token === 'number') return `<b>${token}</b>`;
-  if (token in PARITY) return `<span class="sf-word">${token}</span>`;
+  if (propertyOf(token)) return `<span class="sf-word">${token}</span>`;
   return `<span class="sf-op">${token}</span>`;
 };
 
-// 열쇠 표: 숫자 줄도 단서 줄도 같은 모양의 줄 (단서라고 따로 칠하거나 줄을 바꾸지 않는다)
+// 암호 표: 숫자 줄도 단서 줄도 같은 모양의 줄 (단서라고 따로 칠하거나 줄을 바꾸지 않는다)
 function keyTable(state) {
   const box = element('div', 'sf-key');
-  box.append(element('div', 'sf-label', '열쇠 표'));
+  box.append(element('div', 'sf-label', '암호 표'));
   const rows = element('div', 'sf-krows');
   const statements = statementsOf(state);
   for (const tokens of statements) rows.append(element('div', 'sf-krow', tokens.map(tokenHtml).join('')));

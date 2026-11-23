@@ -18,4 +18,4 @@ When a game is built, keep its card. It records why the design is the way it is,
 ## Drafts
 | Game | Status |
 |---|---|
-| [금고 열기 (`safe`)](safe.md) | clickable sketch round 2 (`play.html`, varied clue kinds at Lv5–8): waiting for verdict |
+| [금고 열기 (`safe`)](safe.md) | clickable sketch round 3 (x + x + y, multiples, 암호 표) → moving into the app on `dev` |

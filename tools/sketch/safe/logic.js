@@ -1,9 +1,9 @@
 // 금고 열기 — 문제 규칙 (화면과 상관없는 부분). 브라우저(board.js, safe-game.js)와 Node(check.js)가 같이 쓴다.
 //
 // 문제 = {
-//   known: [[그림 id, 숫자], …]    — 열쇠 표에 숫자가 그대로 나오는 그림 (표에 놓인 차례대로)
+//   known: [[그림 id, 숫자], …]    — 암호 표에 숫자가 그대로 나오는 그림 (표에 놓인 차례대로)
 //   clues: [[토큰, …], …]          — 단서 문장. 표에서 known 줄 다음에, 같은 모양의 줄로 이어진다
-//       토큰: 그림 id, 수, 연산자(+ − ×), 관계(= < >), '홀수' / '짝수'
+//       토큰: 그림 id, 수, 연산자(+ − ×), 관계(= < >), 성질 낱말 '홀수' / '짝수' / '3의 배수'
 //       예: ['heart', '=', 'moon', '+', 2] · ['star', '<', 'triangle', '<', 'moon'] · ['circle', '=', '짝수'] · ['triangle', '+', 'square', '=', 9]
 //   hidden: { 그림 id: 숫자 }       — 단서로 알아내야 하는 그림의 답
 //   code: [그림 id, …]             — 금고의 암호
@@ -11,12 +11,19 @@
 
 // 번호판: 1–9 (0 은 어느 그림의 숫자도 아니라 뺀다)
 export const PAD = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-export const PARITY = { '홀수': 1, '짝수': 0 };
-export const MAX_STATEMENTS = 6; // 열쇠 표의 줄 수 (숫자 줄 + 단서 줄) 상한
+// 성질 낱말: 짝수 · 홀수 · 'N의 배수' (N = 2–5). '● = 3의 배수' 처럼 = 오른쪽에 혼자 온다
+const PARITY = { '홀수': { divisor: 2, remainder: 1 }, '짝수': { divisor: 2, remainder: 0 } };
+export const propertyOf = (token) => {
+  if (typeof token !== 'string') return null;
+  if (token in PARITY) return PARITY[token];
+  const multiple = /^([2-5])의 배수$/.exec(token);
+  return multiple ? { divisor: Number(multiple[1]), remainder: 0 } : null;
+};
+export const MAX_STATEMENTS = 6; // 암호 표의 줄 수 (숫자 줄 + 단서 줄) 상한
 
 export const valuesOf = (puzzle) => ({ ...Object.fromEntries(puzzle.known), ...(puzzle.hidden || {}) });
 export const digitFor = (puzzle, id) => valuesOf(puzzle)[id];
-// 열쇠 표의 줄: 숫자 줄 '★ = 4' 다음에 단서 줄
+// 암호 표의 줄: 숫자 줄 '★ = 4' 다음에 단서 줄
 export const statementsOf = (puzzle) => [...puzzle.known.map(([id, digit]) => [id, '=', digit]), ...(puzzle.clues || [])];
 
 // 문장 하나가 참인가. values = 그림마다 숫자
@@ -34,7 +41,7 @@ export function holds(tokens, values) {
   }
   sides.push(side);
   const evaluate = (terms) => {
-    if (terms.length === 1 && terms[0] in PARITY) return { parity: PARITY[terms[0]] };
+    if (terms.length === 1 && propertyOf(terms[0])) return { property: propertyOf(terms[0]) };
     let total = value(terms[0]);
     for (let i = 1; i < terms.length; i += 2) {
       const operand = value(terms[i + 1]);
@@ -45,7 +52,7 @@ export function holds(tokens, values) {
   const results = sides.map(evaluate);
   return relations.every((relation, i) => {
     const [left, right] = [results[i], results[i + 1]];
-    if (right?.parity != null) return left % 2 === right.parity;
+    if (right?.property) return left % right.property.divisor === right.property.remainder;
     return relation === '=' ? left === right : relation === '<' ? left < right : left > right;
   });
 }
@@ -71,7 +78,7 @@ export function problemsOf(puzzle, { codeLength } = {}) {
   if (new Set(digits).size !== digits.length) problems.push(`숫자가 겹침: ${digits.join(' ')}`);
   if (digits.some((digit) => !PAD.includes(digit))) problems.push(`번호판에 없는 숫자: ${digits.join(' ')}`);
   const statements = statementsOf(puzzle).length;
-  if (statements > MAX_STATEMENTS) problems.push(`열쇠 표 ${statements}줄 (최대 ${MAX_STATEMENTS})`);
+  if (statements > MAX_STATEMENTS) problems.push(`암호 표 ${statements}줄 (최대 ${MAX_STATEMENTS})`);
   const missing = puzzle.code.filter((id) => !(id in values));
   if (missing.length) problems.push(`표에 없는 그림: ${missing.join(' ')}`);
   const skipped = hiddenIds.filter((id) => !puzzle.code.includes(id));

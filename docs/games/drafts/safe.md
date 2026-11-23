@@ -2,11 +2,12 @@
 
 > Stage 1 of the game-draft workflow ([README.md](README.md)). Mockup: [`tools/sketch/safe/`](../../../tools/sketch/safe/index.html), clickable sketch: [`play.html`](../../../tools/sketch/safe/play.html) (`node server.js` → http://localhost:5173/tools/sketch/safe/play.html). Puzzle check: `node tools/sketch/safe/check.js`.
 
-**Status:** card · mockup · **sketch (round 2)** · approved · built
+**Status:** card · mockup · **sketch (round 3)** · approved · built
 **Gap it fills:** 처리 속도 (SDMT/기호 바꾸기 — TARGETS.md notes no game targets speed itself) at Lv1–4. Lv5–8 add 추론 · 규칙 찾기 (☐/△, priority high: comparisons, parity, two clues that pin down two shapes together) and 계산, and partly 작업 기억 (holding worked-out digits).
 **Tags / clashes:** `Tag.NUMBER` (high levels calculate), so it won't run back to back with arith/cover/box/coin.
 
 ## Review log
+- **Sketch round 2 → round 3:** × 3 backwards only fits three ways (1/3, 2/6, 3/9), so it and ★ + ★ + ★ = 9 became x + x + y (▲ + ▲ + ★ = ●). Add 'N의 배수' (multiple of N) next to 짝수/홀수. Rename 열쇠 표 to 암호 표.
 - **Sketch round 1 → round 2:** diversify the math and logic. Each of Lv5–8 now has 4–5 puzzles, each a different clue kind; difficulty per level unchanged.
 - **Mockup round 3 → sketch:** approved for the first level draft. One intro for every level, without the ★ → 4 tile; step ② shows the digits filling in one by one. No 0 on the keypad (the phone's 2×5 grid keeps an empty cell). At most 6 key rows, with Lv7–8 keeping their difficulty. Lv1 starts with the first window already filled, as a silent tutorial.
 - **Round 3:** layout C chosen for the tablet. High levels may be harder: mix in logic. Codes capped at 5 digits. Clue rows get no special background and no line break of their own. Phone keypad 2×5 (so the keypad becomes 1–9 plus 0). Round-1 structure questions (one long code, continue after a wrong digit, name) accepted for now.
@@ -17,7 +18,7 @@
 "그림마다 정해진 숫자를 표에서 찾아, 금고 암호를 차례대로 누르세요." (Lv5+: "숫자 대신 식이 있으면 계산해서 그 그림의 숫자를 구하세요." Lv6, Lv8: a hint for the new clue kind.)
 
 ## One code, step by step
-1. A safe shows a row of shapes (the code), each with an empty digit window under it. A **key** (열쇠 표) pairs each shape with a digit, or gives clues for it. A **keypad 1–9** sits under the door. Instruction line: `act` "암호를 누르세요".
+1. A safe shows a row of shapes (the code), each with an empty digit window under it. A **key** (암호 표) pairs each shape with a digit, or gives clues for it. A **keypad 1–9** sits under the door. Instruction line: `act` "암호를 누르세요".
 2. The current window is highlighted. The player taps the digit for that shape. The digit drops in and the highlight moves on.
 3. A wrong digit shows the right digit in the window (green ring, the tapped digit struck through in red) and **play continues**. The keypad's right key is outlined. A timeout fills in the rest for ~1 s.
 4. When the last window fills, the lock on the door turns into an open padlock and goes green (all right), or turns red (any wrong).
@@ -41,17 +42,19 @@ Each level draws from a pool of clue kinds, so two games at the same level rarel
 | 6 | **between** (logic) | ★ < ▲ < ☾ (★ 3, ☾ 5) | only one number between → 4 |
 | 6 | same shape twice | ■ + ■ = ☾ (☾ 8) | halve → 4 |
 | 6 | missing part | ● − ▲ = ★ (● 9, ★ 3) | 9 − ? = 3 → 6 |
-| 6 | triple, backwards | ▲ × 3 = ● (● 6) | undo the × → 2 |
+| 6 | twice plus one | ▲ + ▲ + ★ = ● (★ 1, ● 9) | 9 − 1 = 8, halve → 4 |
 | 7 | sum + **between with parity** | ☾ = ◆ + ■ · ★ < ● < ◆, ● = 짝수 | 5 < ● < 8 → 6 or 7 → 6 |
 | 7 | **chain** | ■ = ★ + 2, ● = ■ × 2 | solve ■ first, then ● |
 | 7 | twice + **bound with parity** | ▲ + ▲ = ◆ · ★ < ♥, ♥ = 홀수 (★ 7) | ♥ is 8 or 9 → 9 |
 | 7 | subtract → between with that answer | ☾ − ■ = 3 · ■ < ✚ < ☾, ✚ = 짝수 | ☾ 8, then 5 < ✚ < 8 → 6 |
+| 7 | sum + **between with a multiple** | ☾ = ♥ + ★ · ♥ < ● < ◆, ● = 3의 배수 (♥ 4, ◆ 8) | 5, 6 or 7 → 6 |
 | 8 | **two shapes together**: sum + double | ▲ + ■ = 9, ▲ = ■ × 2 + bound/parity | ■ 3, ▲ 6 |
 | 8 | sum + difference | ● + ◆ = 8, ● = ◆ + 2 + between/parity | ◆ 3, ● 5 |
 | 8 | product + difference → sum | ▲ × ■ = 12, ▲ = ■ + 1, ● = ▲ + ■ | 4 × 3 → ● 7 |
-| 8 | triple → chain | ★ + ★ + ★ = 9, ▲ = ★ × 2, ◆ = ▲ + ★ | ★ 3 → ▲ 6 → ◆ 9 |
+| 8 | twice plus one → chain | ★ + ★ + ♥ = 8, ▲ = ★ × 2, ◆ = ▲ + ★ (♥ 2) | ★ 3 → ▲ 6 → ◆ 9 |
+| 8 | sum + difference + **bound with a multiple** | ▲ + ■ = 7, ▲ = ■ + 3 · ▲ < ●, ● = 4의 배수 | ■ 2, ▲ 5 → ● 8 |
 
-Rows use only shapes, digits, + − ×, = < > and the words 짝수/홀수. No division: "backwards" and "same shape twice" cover halving without a new sign.
+Rows use only shapes, digits, + − ×, = < > and the property words 짝수 / 홀수 / N의 배수 (N = 2–5). No division: "backwards" and "same shape twice" cover halving without a new sign. Kinds that only fit a handful of digit sets (× 3 backwards, ★ + ★ + ★) were dropped: a generator would keep repeating them.
 
 **At most 6 key rows** (plain rows + clue rows). Lv7 is 3 plain + 3 clues (4 + 2 for the chain), Lv8 is 2 + 4 or 3 + 3: the clues stay as hard as round 3, and plain rows were dropped instead. Fewer plain rows only means fewer shapes to look up.
 
@@ -66,8 +69,8 @@ Rows use only shapes, digits, + − ×, = < > and the words 짝수/홀수. No di
 | 4 | 5 | 5 | – | – |
 | 5 | 5 | 5 | 1 | one calculation (5 kinds) |
 | 6 | 5 | 5 | 1 | one step of reasoning (4 kinds) |
-| 7 | 6 (2–3 clues) | 5 | 2 | calculation + logic, or a chain (5 puzzles) |
-| 8 | 6 (3–4 clues) | 5 | 3 | two shapes together, or a triple chain, then one more (4 puzzles) |
+| 7 | 6 (2–3 clues) | 5 | 2 | calculation + logic, or a chain (6 puzzles) |
+| 8 | 6 (3–4 clues) | 5 | 3 | two shapes together, or twice-plus-one then a chain, then one more (5 puzzles) |
 
 Every hidden shape appears in the code at least once. The key and its digits are new each game. Key digits are never consecutive in key order, so position can't stand in for lookup.
 
@@ -76,12 +79,12 @@ Every hidden shape appears in the code at least once. The key and its digits are
 - [~] **Lv7–8:** 5 digits ≈ 6.5 s plus solving the clues. Lv7 ≈ 4 s → ~11 s; **Lv8 ≈ 6–8 s → ~13–15 s**. Harder high levels were asked for, so I'd give the question timer a per-clue allowance (`questionTime: { base, per }` with load = digits + 3 × clues) instead of trimming the clues.
 - [x] Taps ≥ 56 px on the tablet (60 px) and on a 390×844 phone (56–57 px at every level). Small phones: see below.
 - [x] Colour never the only cue (`SYMBOLS` differ in shape and colour). Intro diagrams and hints never use text glyphs like "▲", whose colour wouldn't match the shape.
-- [x] Reading: one instruction line. Clues are shapes, digits and signs; the only words are 짝수/홀수.
+- [x] Reading: one instruction line. Clues are shapes, digits and signs; the only words are 짝수/홀수 and N의 배수.
 - [x] Exactly one answer: brute-force check above.
 - [x] Intro diagram (one for all levels): ① 표에서 그림의 숫자 찾기 → ② 차례대로 누르기, animated: the key row lights up while that window fills. Clue kinds have no intro of their own; the sketch checks whether players need one.
 
 ## Clickable sketch (round 1)
-- `play.html`: the real game shape (`SafeGame` in `safe-game.js`, ready to move to `js/games/`) on a stub host. Hand-written puzzles (`puzzles.js`): 3 per level at Lv1–4, one per clue kind at Lv5–8 (4–5). Never the same one twice in a row. Level bar at the bottom; `?level=N`, `?intro=0`, `?puzzle=N` (one puzzle only, to try each kind).
+- `play.html`: the real game shape (`SafeGame` in `safe-game.js`, ready to move to `js/games/`) on a stub host. Hand-written puzzles (`puzzles.js`): 3 per level at Lv1–4, one per clue kind at Lv5–8 (5–6). Never the same one twice in a row. Level bar at the bottom; `?level=N`, `?intro=0`, `?puzzle=N` (one puzzle only, to try each kind).
 - Timer: `questionTime { base: 3, per: 1.3 }` × (digits + 3 × clue rows) → Lv1 6.9 s, Lv3 9.5 s, Lv5 13 s, Lv7 18.2 s, Lv8 22.1 s (before EASY_TIME).
 - Scoring: 60 % spread over the digits the player enters, 40 % for opening the safe. Correct digits play TAP; GOOD/BAD only at the end, since those drive the streak.
 - Automated playthrough (tablet + phone, all 8 levels): correct input opens the safe, a wrong digit is replaced and play continues, a timeout fills the rest, the next round starts by itself.

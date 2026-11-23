@@ -68,9 +68,12 @@ if (branch) {
   const label = `v${semver}${branch === 'dev' ? '-dev' : ''}`;
   for (const page of [PAGE, path.join(ROOT, 'index.html')]) {
     const text = fs.readFileSync(page, 'utf8');
-    const tagPattern = /(<span class="build-tag">)[^<]*(<\/span>)/;
+    const tagPattern = /<span class="build-tag"[^>]*>[^<]*<\/span>/;
     if (!tagPattern.test(text)) throw new Error(`${path.relative(ROOT, page)} 에 <span class="build-tag"> 이 없습니다`);
-    fs.writeFileSync(page, text.replace(tagPattern, `$1${label}$2`));
+    // data-build: 이 페이지의 빌드 값. 열려 있는 페이지가 version.json 과 견준다 (js/update-check.js)
+    fs.writeFileSync(page, text.replace(tagPattern, `<span class="build-tag" data-build="${version}">${label}</span>`));
   }
-  console.log(`build-tag: ${label}`);
+  // 새 버전 알아차리기: 열려 있는 페이지가 가끔 읽어서 자기 data-build 와 다르면 새 버전이 올라온 것으로 안다
+  fs.writeFileSync(path.join(ROOT, 'version.json'), `${JSON.stringify({ build: version, version: semver })}\n`);
+  console.log(`build-tag: ${label}, version.json: ${version}`);
 }

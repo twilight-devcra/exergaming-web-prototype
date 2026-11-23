@@ -86,6 +86,11 @@ export class PedalLink {
     return !!navigator.bluetooth;
   }
 
+  // 전에 고른 페달을 사람이 누르지 않고 다시 찾을 수 있는가 (navigator.bluetooth.getDevices. 브라우저에 따라 없다)
+  get canRemember() {
+    return !!(navigator.bluetooth && navigator.bluetooth.getDevices);
+  }
+
   // 기기 선택 창을 띄우므로 클릭 같은 사용자 동작 안에서 호출해야 한다
   async connect() {
     if (!this.supported) {
@@ -103,12 +108,54 @@ export class PedalLink {
       if (error.name !== 'NotFoundError') this.setState(this.state, `페달을 찾지 못했습니다: ${error.message}`);
       return;
     }
+    try { localStorage.setItem(PedalLink.REMEMBER_KEY, device.id); } catch { /* 저절로 다시 붙지 못할 뿐 */ }
+    await this.use(device);
+  }
+
+  async use(device) {
     this.release();
     this.device = device;
     device.addEventListener('gattserverdisconnected', this.handleGone);
     this.wantLink = true;
     this.retries = 0;
     await this.open();
+  }
+
+  // 페이지를 다시 불러온 뒤 (js/update-check.js): 기기 선택 창 없이 전에 고른 페달에 다시 붙는다.
+  // 브라우저가 기억한 기기 중 마지막으로 고른 것(없으면 하나뿐인 페달)을 쓴다. waitMs 안에 연결되면 true
+  async reconnectRemembered(waitMs = 30000) {
+    if (!this.canRemember || this.wantLink) return false;
+    let devices;
+    try { devices = await navigator.bluetooth.getDevices(); } catch { return false; }
+    let rememberedId = null;
+    try { rememberedId = localStorage.getItem(PedalLink.REMEMBER_KEY); } catch { /* 하나뿐인 페달을 쓴다 */ }
+    const pedals = devices.filter((candidate) => (candidate.name || '').startsWith(NUS.NAME_PREFIX));
+    const device = devices.find((candidate) => candidate.id === rememberedId) || (pedals.length === 1 ? pedals[0] : null);
+    if (!device) return false;
+    const deadline = performance.now() + waitMs;
+    this.setState('connecting', '페달에 다시 연결하는 중…');
+    // 기억만 하고 있던 기기는 광고를 한 번 받아야 연결되는 브라우저가 있다. 못 받아도 그냥 연결해 본다
+    if (device.watchAdvertisements) {
+      const watching = new AbortController();
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, 10000);
+        const done = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        device.addEventListener('advertisementreceived', done, { once: true });
+        device.watchAdvertisements({ signal: watching.signal }).catch(done);
+      });
+      watching.abort();
+    }
+    // 기다리는 동안 사람이 직접 연결했으면 그것을 쓴다
+    if (this.wantLink) return this.state === 'ready';
+    await this.use(device);
+    // 실패하면 lost() 가 몇 번 다시 시도하므로, 연결되거나 포기할 때까지 기다린다
+    while (this.state !== 'ready' && this.wantLink && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return this.state === 'ready';
   }
 
   async open() {
@@ -218,3 +265,4 @@ export class PedalLink {
 
 PedalLink.MAX_RETRIES = 5;
 PedalLink.SHORT_LIVED_MS = 8000;
+PedalLink.REMEMBER_KEY = 'exergame.pedal.device'; // 마지막으로 고른 페달의 id (reconnectRemembered)

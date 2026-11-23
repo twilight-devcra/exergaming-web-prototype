@@ -11,6 +11,7 @@ import { SessionStore } from './session-log.js';
 import { SessionUpload } from './session-upload.js';
 import { RoundStats } from './round-stats.js';
 import { RoundReport } from './round-report.js';
+import { UpdateCheck } from './update-check.js';
 import { Abilities } from './abilities.js';
 import { AttractVisual } from '../app/attract-visual.js';
 import { CalibVisual } from '../app/calib-visual.js';
@@ -141,11 +142,18 @@ export const Demo = {
     if (pedalButton) pedalButton.hidden = this.app.link.state === 'ready';
   },
 
+  reloadForUpdate() {
+    this.leaving = true; // beforeunload 경고 없이
+    UpdateCheck.reload();
+  },
+
   // via: tap(화면을 눌러서) | pedal(페달을 밟아서)
   // 운영 버전은 먼저 세션 설정 화면에서 시간과 난이도를 고른다
   start(via = 'tap') {
     const app = this.app;
     if (app.state !== 'attract' || this.menu.isOpen || this.menu.pinOpen || !this.canStart()) return;
+    // 새 버전이 있으면 시작하는 대신 다시 불러온다. 새 버전의 대기 화면에서 한 번 더 시작하면 된다
+    if (UpdateCheck.ready()) return this.reloadForUpdate();
     this.enterKiosk();
     if (this.simResult) return this.simulateRound();
     if (this.members) return this.members.openLogin(via);
@@ -303,6 +311,9 @@ export const Demo = {
       const ready = (app.clock - this.attractAt) / 1000 > this.ATTRACT_LOCK_SEC && !this.menu.isOpen && this.canStart();
       this.pedalHold = ready && rpm > this.RPM_ACTIVE ? this.pedalHold + deltaSec : Math.max(0, this.pedalHold - deltaSec);
       if (this.pedalHold >= this.PEDAL_START_SEC) this.start('pedal');
+      // 아무도 없는 대기 화면: 새 버전이 있으면 다시 불러온다 (js/update-check.js)
+      const quietSec = (app.clock - Math.max(this.attractAt, this.activeAt)) / 1000;
+      if (quietSec > UpdateCheck.QUIET_SEC && !this.menu.isOpen && !this.menu.pinOpen && UpdateCheck.ready()) this.reloadForUpdate();
     } else if (app.state === 'setup') {
       if ((app.clock - this.activeAt) / 1000 > this.SETUP_IDLE_SEC) app.show('attract');
     } else if (app.state === 'calib') {

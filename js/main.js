@@ -19,6 +19,7 @@ import { SessionLog } from './session-log.js';
 import { StationEdition } from './demo.js';
 import { TestEdition } from './edition.js';
 import { Sfx } from './sfx.js';
+import { UpdateCheck } from './update-check.js';
 
 // 이 페이지의 판: 운영 버전(app/)은 스테이션 흐름, 테스트 화면은 메뉴 흐름 (js/edition.js)
 const PAGE_EDITION = DEMO ? StationEdition : TestEdition;
@@ -73,10 +74,12 @@ const App = {
     this.edition.bindScreens(this);
     this.bindKeys();
     this.bindLink();
+    UpdateCheck.init(this.link); // 새 버전이 올라오면 안전할 때 다시 불러온다
     this.rotated.addEventListener('change', () => this.onRotate());
     this.pedal.onStroke = (key) => this.onStroke(key);
     this.edition.start(this);
-    $('#btn-start').onclick = () => this.startRound();
+    // 새 버전이 있으면 시작하는 대신 다시 불러온다 (휴대폰). 새 버전에서 한 번 더 누르면 된다
+    $('#btn-start').onclick = () => (UpdateCheck.ready() ? UpdateCheck.reload() : this.startRound());
     $('#btn-resume').onclick = () => this.setPaused(false);
     $('#btn-quit').onclick = () => this.quit();
     this.lastFrameAt = performance.now();

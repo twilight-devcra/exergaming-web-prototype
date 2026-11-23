@@ -17,13 +17,26 @@ const CLUE_LOAD = 3;                // 제한 시간: 단서 줄 하나 = 숫자
 const WRONG_MS = 900;               // 틀린 자리의 정답을 보여 주는 시간
 const END_MS = 1400;                // 다 채운 뒤 결과를 보여 주는 시간
 
-// 소개 그림 한 프레임(DURATION) 안에서 i번째 자리를 고르는 때: [i, i+1) 초. 다 채운 뒤 잠깐 멈췄다가 되풀이
+// 소개 그림 한 바퀴(DURATION 초). i번째 자리는 [i, i+1) 초 동안 켜지고, i + PRESS 초에 번호판을 눌러 그 숫자가 들어간다.
+// 다 채운 뒤 잠깐 멈췄다가 되풀이. 모든 움직임이 같은 SVG 시계를 쓴다 (CSS 애니메이션은 따로 돌아 어긋난다)
 const DURATION = 4.4;
-// since~until 초에만 보이는 조각 (until 이 없으면 끝까지). SVG 애니메이션이라 소개 화면 그림 안에서 저절로 되풀이된다
+const PRESS = 0.55;
+const RIPPLE = 0.45; // 누른 자리에 퍼지는 고리가 사라지는 시간
+const keyTime = (seconds) => (seconds / DURATION).toFixed(4);
+// since~until 초에만 보이는 조각 (until 이 없으면 끝까지)
 const during = (since, until, content) => {
-  const times = until == null ? `0;${since / DURATION}` : `0;${since / DURATION};${until / DURATION}`;
+  const times = until == null ? `0;${keyTime(since)}` : `0;${keyTime(since)};${keyTime(until)}`;
   const values = until == null ? '0;1' : '0;1;0';
   return `<g opacity="0">${content}<animate attributeName="opacity" dur="${DURATION}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${times}" values="${values}"/></g>`;
+};
+// moment 초에 누른 자리: 고리가 작게 나타나 커지며 사라진다 (Diagram.tap 과 같은 모양, 시계만 소개 그림의 것)
+const pulse = (x, y, radius, moment) => {
+  const times = `0;${keyTime(moment)};${keyTime(moment + RIPPLE)};1`;
+  const repeat = `dur="${DURATION}s" repeatCount="indefinite" keyTimes="${times}"`;
+  return `<circle class="dg-tap" style="animation: none" cx="${x}" cy="${y}" r="${radius * 0.7}" opacity="0">` +
+    `<animate attributeName="r" ${repeat} values="${radius * 0.7};${radius * 0.7};${radius * 1.4};${radius * 1.4}"/>` +
+    `<animate attributeName="opacity" ${repeat} calcMode="discrete" values="0;1;0;0"/>` +
+    `<animate attributeName="stroke-opacity" ${repeat} values="1;1;0;0"/></circle>`;
 };
 
 export class SafeGame {
@@ -48,14 +61,17 @@ export class SafeGame {
     const table = code.map((id, i) => during(i, i + 1, Diagram.rect(40, rowY(key.findIndex(([shape]) => shape === id)) - 16, 96, 32, 'dg-slot active', 7))).join('') +
       key.map(([id, digit], row) => glyph(id, 62, rowY(row), 24) + Diagram.text(88, rowY(row), '=', 18) + Diagram.text(112, rowY(row), digit, 22)).join('');
     const pad = (digit) => 4 + (digit - 1) * 19;
-    const press = code.map((id, i) => {
+    const digitOf = (id) => key.find(([shape]) => shape === id)[1];
+    const windows = code.map((id, i) => {
       const x = 30 + i * 42;
-      const digit = key.find(([shape]) => shape === id)[1];
       return Diagram.rect(x, 6, 34, 34, 'dg-cell', 7) + glyph(id, x + 17, 23, 24) + Diagram.rect(x, 46, 34, 30, 'dg-slot', 6) +
         during(i, i + 1, Diagram.rect(x, 46, 34, 30, 'dg-slot active', 6)) +
-        during(i + 0.5, i + 1, Diagram.tap(pad(digit) + 8, 115, 12)) +
-        during(i + 1, null, Diagram.text(x + 17, 61, digit, 20));
-    }).join('') + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => Diagram.rect(pad(digit), 104, 16, 22, 'dg-cell', 4) + Diagram.text(pad(digit) + 8, 115, digit, 13)).join('');
+        during(i + PRESS, null, Diagram.text(x + 17, 61, digitOf(id), 20)); // 누르는 순간 숫자가 들어간다
+    }).join('');
+    const keypad = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => Diagram.rect(pad(digit), 104, 16, 22, 'dg-cell', 4) + Diagram.text(pad(digit) + 8, 115, digit, 13)).join('');
+    // 누른 고리는 번호판 위에 그린다 (아래에 두면 단추에 가린다)
+    const taps = code.map((id, i) => pulse(pad(digitOf(id)) + 8, 115, 12, i + PRESS)).join('');
+    const press = windows + keypad + taps;
     return [
       { svg: Diagram.svg('0 0 176 140', table), caption: '표에서 그림의 숫자 찾기' },
       { svg: Diagram.svg('0 0 176 140', press), caption: '차례대로 누르기' },

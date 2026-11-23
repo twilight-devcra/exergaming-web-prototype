@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,5 +52,14 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+      # 배포는 가끔 GitHub 쪽 사정으로 실패한다 (방금 올린 묶음을 'No artifacts named "github-pages"' 라며 못 찾는 등).
+      # 그래서 첫 시도가 실패해도 작업을 멈추지 않고, 20초 기다렸다가 한 번 더 한다. 두 번째도 실패하면 그때 실패로 끝난다
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Wait before retrying the deploy
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 20
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4

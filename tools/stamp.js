@@ -1,6 +1,8 @@
 // 운영 버전(app/index.html)의 파일 주소 끝 ?v= 를 새 값으로 바꾸고, 가져오기 지도(importmap)를 다시 만든다.
 // GitHub Pages 에 올릴 때 .github/workflows/pages.yml 이 커밋 번호를 값으로 넣어 돌린다 (node tools/stamp.js <값>).
 // 손으로 돌릴 일은 없다. 값 없이 돌리면 오늘 날짜를 쓴다 (새 모듈 파일을 더한 뒤 저장소의 지도를 맞춰 두고 싶을 때).
+// 둘째 값(브랜치: main 또는 dev)을 주면 저장소의 VERSION(유의적 버전, 예: 1.2.0)을 읽어 두 버전 첫 화면 구석 표시(.build-tag)에 넣는다:
+// main → 'v1.2.0', dev → 'v1.2.0-dev'. 스크립트가 아니라 HTML 글자라 모듈을 못 불러와도 보인다
 //
 // 왜: 브라우저는 고친 파일과 예전 파일을 섞어 쓰다 멈출 수 있다 (대기 화면이 안 뜨고 빈 화면).
 // 스크립트는 ES 모듈이라 main.js 가 다른 파일을 import 로 불러오는데, import 주소에는 ?v= 가 붙지 않는다.
@@ -56,3 +58,19 @@ html = html.replace(importmapPattern, importmap);
 
 fs.writeFileSync(PAGE, html);
 console.log(`app/index.html: ?v=${version}, importmap ${files.length}개 파일`);
+
+// 첫 화면의 버전 표시: 운영 버전(app/index.html)과 테스트 버전(index.html)
+const branch = process.argv[3];
+if (branch) {
+  if (!['main', 'dev'].includes(branch)) throw new Error(`브랜치는 main 또는 dev: ${branch}`);
+  const semver = fs.readFileSync(path.join(ROOT, 'VERSION'), 'utf8').trim();
+  if (!/^\d+\.\d+\.\d+$/.test(semver)) throw new Error(`VERSION 은 1.2.3 꼴이어야 합니다: ${semver}`);
+  const label = `v${semver}${branch === 'dev' ? '-dev' : ''}`;
+  for (const page of [PAGE, path.join(ROOT, 'index.html')]) {
+    const text = fs.readFileSync(page, 'utf8');
+    const tagPattern = /(<span class="build-tag">)[^<]*(<\/span>)/;
+    if (!tagPattern.test(text)) throw new Error(`${path.relative(ROOT, page)} 에 <span class="build-tag"> 이 없습니다`);
+    fs.writeFileSync(page, text.replace(tagPattern, `$1${label}$2`));
+  }
+  console.log(`build-tag: ${label}`);
+}

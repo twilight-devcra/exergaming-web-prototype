@@ -1,7 +1,8 @@
 # main 이나 dev 에 올리면 GitHub Pages 에 배포한다. 한 저장소에는 사이트가 하나뿐이라, 올릴 때마다 두 가지를 함께 만든다:
 #   main → https://twilight-devcra.github.io/exergaming-web-prototype/      (운영, 체육관 태블릿)
 #   dev  → https://twilight-devcra.github.io/exergaming-web-prototype/dev/  (시험·다른 기기에서 미리 보기)
-# 배포본의 app/index.html 에만 ?v=<커밋 번호> 와 가져오기 지도를 넣는다 (tools/stamp.js). 저장소의 파일은 바뀌지 않는다.
+# 배포본의 app/index.html 에만 ?v=<커밋 번호> 와 가져오기 지도를 넣고, 두 버전 첫 화면의 버전 표시(.build-tag)를 VERSION 으로 채운다 (tools/stamp.js).
+# 저장소의 파일은 바뀌지 않는다.
 # 저장소 Settings → Pages → Source 가 'GitHub Actions' 여야 하고,
 # Settings → Environments → github-pages 의 배포 허용 브랜치에 main 과 dev 가 있어야 한다.
 name: Deploy to Pages
@@ -37,12 +38,13 @@ jobs:
         with:
           ref: dev
           path: dev-src
+      # 둘째 값(브랜치)을 주면 첫 화면 구석에 그 브랜치의 VERSION 을 넣는다 (main 'v1.2.0', dev 'v1.2.0-dev')
       - name: Stamp each branch with its commit and put dev under /dev/
         run: |
-          node site/tools/stamp.js "$(git -C site rev-parse --short=8 HEAD)"
+          node site/tools/stamp.js "$(git -C site rev-parse --short=8 HEAD)" main
           rm -rf site/.git
           if [ -f dev-src/tools/stamp.js ]; then
-            node dev-src/tools/stamp.js "dev$(git -C dev-src rev-parse --short=8 HEAD)"
+            node dev-src/tools/stamp.js "dev$(git -C dev-src rev-parse --short=8 HEAD)" dev
             rm -rf dev-src/.git dev-src/.github
             mv dev-src site/dev
           fi

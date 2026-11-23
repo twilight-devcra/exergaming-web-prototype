@@ -629,7 +629,9 @@ body[data-theme="scenic"] {
   .att-hint { text-align: center; }
   .att-pedal { align-self: center; }
   /* 스테이션 표시는 구석에 띄우면 시작 버튼을 가리므로 맨 아래 줄로 */
-  .station-tag { position: static; flex: none; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+  .station-tag { position: static; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; margin-top: 12px; }
+  /* 버전 표시는 한 줄에 다 들어가지 않아 맨 아래 줄로 따로 */
+  .station-tag .build-tag { order: 1; flex-basis: 100%; text-align: right; }
 
   /* ----- 로그인 · 기록 · 세션 설정 ----- */
   #setup, #login, #history { justify-content: flex-start; gap: 14px; padding: 14px 18px 24px; overflow-y: auto; }

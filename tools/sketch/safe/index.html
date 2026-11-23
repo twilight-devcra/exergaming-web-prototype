@@ -13,12 +13,14 @@
 </head>
 <body data-theme="scenic">
 <script type="module">
-// 금고 열기 목업 (2단계, 3회차). 설계 카드: docs/games/drafts/safe.md. 판은 board.js 가 그리고, 여기에는 손으로 쓴 상태만 있다.
-// board.js 가 판마다 단서의 답이 꼭 하나인지 0–9 를 모두 넣어 확인한다 (어긋나면 콘솔 경고).
-import { Sketch, Diagram } from '../sketch.js';
+// 금고 열기 목업 (2단계, 4회차). 설계 카드: docs/games/drafts/safe.md. 판은 board.js 가 그리고, 문제는 3단계와 같은 puzzles.js 를 쓴다.
+// board.js 가 판마다 logic.js 로 단서의 답이 꼭 하나인지 확인한다 (어긋나면 경고). 눌러 보기는 play.html.
+import { Sketch } from '../sketch.js';
 import { drawBoard, staticTimer, digitFor } from './board.js';
+import { LEVELS, PUZZLES } from './puzzles.js';
+import { SafeGame } from './safe-game.js';
 
-const TITLE = '금고 열기';
+const TITLE = SafeGame.title;
 
 // 한 화면: 머리 줄 + 판. timer = 남은 시간 비율 (없으면 막대 없음)
 const shot = (id, caption, state, { msg = '암호를 누르세요', kind = 'act', timer = null } = {}) => ({
@@ -29,102 +31,38 @@ const shot = (id, caption, state, { msg = '암호를 누르세요', kind = 'act'
     drawBoard(body, state);
   },
 });
+// 레벨의 첫 문제. 처음부터 채워 둔 칸(given)이 있으면 채워서
+const first = (level) => {
+  const puzzle = PUZZLES[level][0];
+  const given = LEVELS[level - 1].given || 0;
+  return { ...puzzle, level, typed: puzzle.code.slice(0, given).map((id) => digitFor(puzzle, id)) };
+};
 const filled = (state, count) => state.code.slice(0, count).map((id) => digitFor(state, id));
 
-// ---------- 판 (태블릿 · 휴대폰이 같은 상태를 쓴다) ----------
-// known = 표에 숫자가 그대로 나오는 그림, clues = 단서 문장, hidden = 단서로 알아낼 그림의 답
-const LV1 = { level: 1, known: [['star', 4], ['circle', 7], ['triangle', 2]], code: ['triangle', 'star', 'circle'] };
-const LV3 = { level: 3, known: [['heart', 8], ['square', 3], ['star', 6], ['circle', 1]], code: ['square', 'star', 'square', 'heart', 'circle'] };
-// Lv5 식: 표의 숫자에 작은 수를 더하거나 뺀다
-const LV5 = { level: 5, known: [['moon', 5], ['plus', 9], ['triangle', 2], ['diamond', 4]], clues: [['heart', '=', 'moon', '+', 2]], hidden: { heart: 7 },
-  code: ['heart', 'moon', 'triangle', 'heart', 'plus'] };
-// Lv6 논리가 처음: 두 숫자 사이 (★ 3 과 ☾ 5 사이는 4 뿐)
-const LV6 = { level: 6, known: [['star', 3], ['square', 8], ['circle', 1], ['moon', 5]], clues: [['star', '<', 'triangle', '<', 'moon']], hidden: { triangle: 4 },
-  code: ['triangle', 'circle', 'square', 'triangle', 'moon'] };
-// Lv7 식 + 논리: ☾ = ◆ + ■ (두 그림 더하기), ● 는 ★ 과 ◆ 사이의 짝수 (5 < ● < 8 → 6 · 7 → 짝수 6)
-const LV7 = { level: 7, known: [['diamond', 8], ['star', 5], ['heart', 3], ['square', 1]],
-  clues: [['moon', '=', 'diamond', '+', 'square'], ['star', '<', 'circle', '<', 'diamond'], ['circle', '=', '짝수']], hidden: { moon: 9, circle: 6 },
-  code: ['circle', 'moon', 'diamond', 'circle', 'heart'] };
-// Lv8 두 그림을 함께: ▲ + ■ = 9 이고 ▲ = ■ × 2 → ■ 3, ▲ 6. ● 는 ✚ 보다 큰 짝수 → 8
-const LV8 = { level: 8, known: [['star', 2], ['heart', 1], ['plus', 7]],
-  clues: [['triangle', '+', 'square', '=', 9], ['triangle', '=', 'square', '×', 2], ['plus', '<', 'circle'], ['circle', '=', '짝수']], hidden: { triangle: 6, square: 3, circle: 8 },
-  code: ['triangle', 'circle', 'square', 'triangle', 'star'] };
-
-const LV3_WRONG = { ...LV3, typed: [3, 6, 3], wrong: [{ at: 2, tapped: 6 }], pressed: 6, answer: 3 };
+const LV3 = first(3);
 const variants = (layout, prefix) => [
-  shot(`${prefix}-lv1`, 'Lv1: 표 3칸, 암호 3자리. 첫 칸이 켜져 있다', { ...LV1, layout }, { timer: 0.9 }),
+  shot(`${prefix}-lv1`, 'Lv1: 표 3줄, 암호 3자리. 첫 칸은 처음부터 채워 두어 할 일을 말없이 보여 준다', { ...first(1), layout }, { timer: 0.9 }),
   shot(`${prefix}-lv3`, 'Lv3 (표준): 암호 5자리, 같은 그림이 되풀이된다. 두 자리를 넣은 뒤', { ...LV3, layout, typed: filled(LV3, 2), pressed: 6 }, { timer: 0.7 }),
-  shot(`${prefix}-wrong`, '틀린 숫자: 누른 6 은 지우고 정답 3 을 넣은 채 다음 칸으로 (번호판에 정답 테두리)', { ...LV3_WRONG, layout }, { msg: '정답은 3', kind: 'bad', timer: 0.55 }),
+  shot(`${prefix}-wrong`, '틀린 숫자: 누른 6 은 지우고 정답 3 을 넣은 채 다음 칸으로 (번호판에 정답 테두리)',
+    { ...LV3, layout, typed: [3, 6, 3], wrong: [{ slot: 2, tapped: 6 }], pressed: 6, answer: 3 }, { msg: '정답은 3', kind: 'bad', timer: 0.55 }),
   shot(`${prefix}-open`, '다 맞혔을 때: 풀린 자물쇠, 초록', { ...LV3, layout, typed: filled(LV3, 5), result: 'open' }, { msg: '금고가 열렸어요!', kind: 'good' }),
-  shot(`${prefix}-shut`, '한 칸이라도 틀렸을 때: 자물쇠가 빨강', { ...LV3, layout, typed: [3, 6, 3, 8, 1], wrong: [{ at: 2, tapped: 6 }], result: 'shut' }, { msg: '아쉬워요, 한 칸이 틀렸어요', kind: 'bad' }),
-  shot(`${prefix}-lv5`, 'Lv5 식: ♥ = ☾ + 2 → 7', { ...LV5, layout }, { timer: 0.95 }),
-  shot(`${prefix}-lv6`, 'Lv6 논리 (사이): ★ < ▲ < ☾ → 3 과 5 사이 = 4', { ...LV6, layout }, { timer: 0.95 }),
-  shot(`${prefix}-lv7`, 'Lv7 식 + 논리: ☾ = ◆ + ■ → 9 · ● 는 5 와 8 사이의 짝수 → 6', { ...LV7, layout }, { timer: 0.95 }),
-  shot(`${prefix}-lv8`, 'Lv8 두 그림 함께: ▲ + ■ = 9, ▲ = ■ × 2 → ■ 3, ▲ 6 · ● 는 7 보다 큰 짝수 → 8. 가장 빽빽한 판', { ...LV8, layout }, { timer: 0.95 }),
+  shot(`${prefix}-shut`, '한 칸이라도 틀렸을 때: 자물쇠가 빨강', { ...LV3, layout, typed: [3, 6, 3, 8, 1], wrong: [{ slot: 2, tapped: 6 }], result: 'shut' }, { msg: '아쉬워요, 1칸이 틀렸어요', kind: 'bad' }),
+  shot(`${prefix}-lv5`, 'Lv5 식: ♥ = ☾ + 2 → 7', { ...first(5), layout }, { timer: 0.95 }),
+  shot(`${prefix}-lv6`, 'Lv6 사이: ★ < ▲ < ☾ → 3 과 5 사이 = 4', { ...first(6), layout }, { timer: 0.95 }),
+  shot(`${prefix}-lv7`, 'Lv7 (6줄): ☾ = ◆ + ■ → 9 · ● 는 5 와 8 사이의 짝수 → 6', { ...first(7), layout }, { timer: 0.95 }),
+  shot(`${prefix}-lv8`, 'Lv8 (6줄): ▲ + ■ = 9, ▲ = ■ × 2 → ■ 3, ▲ 6 · ● 는 7 보다 큰 짝수 → 8', { ...first(8), layout }, { timer: 0.95 }),
 ];
-
-// ---------- 소개 그림 ----------
-const glyph = (id, x, y, size) => Diagram.glyph(Sketch.symbol(id).svg, x, y, size);
-// 표 한 줄: 토큰을 왼쪽부터 (그림 id 는 그림, 나머지는 글자). highlight 면 테두리
-const keyRow = (y, tokens, highlight) => {
-  let x = 22;
-  const parts = tokens.map((token) => {
-    const word = typeof token === 'string' && !Sketch.symbol(token) && token.length > 1;
-    const width = word ? 34 : 22;
-    const drawn = Sketch.symbol(String(token)) ? glyph(token, x, y, 20) : Diagram.text(x + (word ? 6 : 0), y, token, word ? 15 : 18, 'dg-txt');
-    x += width;
-    return drawn;
-  }).join('');
-  return (highlight ? Diagram.rect(6, y - 14, x - 2, 28, 'dg-slot active', 6) : '') + parts;
-};
-// 가운데 맞춘 한 줄 (그림 id 는 그림으로): '▲ = 4'. 글자 ▲ 는 색이 달라 그림과 헷갈리므로 그림을 쓴다
-const eqLine = (y, tokens) => {
-  const step = 17;
-  let x = 88 - ((tokens.length - 1) * step) / 2;
-  return tokens.map((token) => {
-    const drawn = Sketch.symbol(String(token)) ? glyph(token, x, y, 18) : Diagram.text(x, y, token, 18, 'dg-txt num');
-    x += step;
-    return drawn;
-  }).join('');
-};
-const windows = (ids, digits, y, active) => ids.map((id, i) => {
-  const x = 30 + i * 42;
-  return Diagram.rect(x, y, 34, 34, 'dg-cell', 7) + glyph(id, x + 17, y + 17, 24) +
-    Diagram.rect(x, y + 40, 34, 30, i === active ? 'dg-slot active' : 'dg-slot', 6) + (digits[i] != null ? Diagram.text(x + 17, y + 55, digits[i], 20) : '');
-}).join('');
-const padRow = (y, tapAt) => [1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((digit, i) => {
-  const x = 4 + i * 17;
-  return Diagram.rect(x, y, 15, 22, 'dg-cell', 4) + Diagram.text(x + 7.5, y + 11, digit, 12, digit === tapAt ? 'dg-txt num' : 'dg-txt') + (digit === tapAt ? Diagram.tap(x + 7.5, y + 11, 11) : '');
-}).join('');
-
-const STEP_PRESS = { svg: Diagram.svg('0 0 176 140', windows(['triangle', 'star', 'circle'], [2, 4], 4, 2) + padRow(104, 7)), caption: '차례대로 누르기' };
-const INTROS = [
-  { id: 'intro-lv1', caption: 'Lv1–4 소개', name: TITLE, hint: '그림마다 정해진 숫자를 표에서 찾아<br>금고 암호를 차례대로 누르세요',
-    steps: [{ svg: Diagram.svg('0 0 176 140', keyRow(30, ['star', '=', 4], true) + keyRow(62, ['circle', '=', 7]) + keyRow(94, ['triangle', '=', 2]) +
-      Diagram.rect(118, 40, 46, 46, 'dg-slot active', 9) + glyph('star', 141, 63, 32) + Diagram.text(141, 110, '→ 4', 18, 'dg-txt num')), caption: '표에서 그림의 숫자 찾기' }, STEP_PRESS] },
-  { id: 'intro-lv5', caption: 'Lv5 소개 (식이 처음 나올 때)', name: TITLE, tag: '레벨 업', hint: '숫자 대신 식이 있으면<br>계산해서 그 그림의 숫자를 구하세요',
-    steps: [{ svg: Diagram.svg('0 0 176 140', keyRow(30, ['star', '=', 4]) + keyRow(66, ['triangle', '=', 'star', '+', 2], true) + eqLine(112, ['triangle', '=', 4, '+', 2, '=', 6])), caption: '식으로 숫자 구하기' }, STEP_PRESS] },
-  { id: 'intro-lv6', caption: 'Lv6 소개 (사이가 처음 나올 때)', name: TITLE, tag: '레벨 업', hint: '가운데 그림의 숫자는<br>양쪽 두 숫자 사이에 있어요',
-    steps: [{ svg: Diagram.svg('0 0 176 140', keyRow(26, ['star', '=', 3]) + keyRow(56, ['moon', '=', 5]) + keyRow(88, ['star', '<', 'triangle', '<', 'moon'], true) + eqLine(122, [3, '<', 'triangle', '<', 5, '→', 4])), caption: '두 숫자 사이의 수' }, STEP_PRESS] },
-  { id: 'intro-lv8', caption: 'Lv8 소개 (두 그림을 함께 구할 때)', name: TITLE, tag: '레벨 업', hint: '두 줄을 함께 만족하는<br>숫자를 찾으세요',
-    steps: [{ svg: Diagram.svg('0 0 176 140', keyRow(30, ['triangle', '+', 'square', '=', 9], true) + keyRow(64, ['triangle', '=', 'square', '×', 2], true) +
-      eqLine(108, ['square', '=', 3]) + eqLine(130, ['triangle', '=', 6])), caption: '두 줄을 함께' }, STEP_PRESS] },
-];
-const introShot = (prefix, intro) => ({ id: `${prefix}${intro.id}`, caption: intro.caption, render: (stage) => Sketch.intro(stage, intro) });
+const INTRO = { name: TITLE, steps: SafeGame.diagram(), hint: SafeGame.hint };
+const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음). ② 의 숫자가 차례로 채워진다 (움직임은 눌러 보기 화면에서)', render: (stage) => Sketch.intro(stage, INTRO) });
 
 Sketch.page({
-  title: '금고 열기 (safe) · 목업 3회차',
-  notes: `<p>설계 카드: <code>docs/games/drafts/safe.md</code>. 2회차 의견: 배치 C 로 정함 · 높은 단계에 논리를 섞어 더 어렵게 · 암호는 5자리까지 · 식을 따로 칠하거나 줄을 바꾸지 않기 · 휴대폰 번호판 2×5.</p>
-    <p>단서: 식(+ − ×, 두 그림 더하기) · 사이(★ &lt; ▲ &lt; ☾) · 짝수/홀수 · 두 그림을 함께 정하는 두 줄. 판마다 0–9 를 모두 넣어 답이 꼭 하나인지 확인한다 (그림끼리 숫자가 다르다는 가정 없이). 번호판은 1–9 와 0. 화면 이름을 누르면 그 화면만 창 크기로 열린다.</p>`,
+  title: '금고 열기 (safe) · 목업 4회차',
+  notes: `<p>설계 카드: <code>docs/games/drafts/safe.md</code>. <b>눌러 보기: <a href="play.html">play.html</a></b> (레벨마다 손으로 쓴 문제 3개).</p>
+    <p>3회차 의견: 소개는 하나로 (② 에서 숫자가 차례로 채워짐) · 번호판에서 0 을 뺌 (휴대폰 2×5 의 마지막 칸은 빈칸) · 열쇠 표는 6줄까지 · Lv1 은 첫 칸을 채워 둔다.</p>`,
   groups: [
-    { title: '태블릿 1280×800 — 배치 C: 열쇠 표 | 금고 문 + 아래에 번호판', shots: variants('below', 'c') },
-    { title: '휴대폰 390×844 — 열쇠 표 · 금고 문 · 번호판 2×5', device: 'phone',
-      notes: '판 자리 330×494. 표의 줄은 자리가 나는 대로 이어 담는다 (단서 줄도 같은 모양). 크기는 판 자리에 맞춰 함께 줄어든다.',
-      shots: [...variants('phone', 'p').filter((one) => !one.id.endsWith('-shut')), introShot('p-', INTROS[2])] },
-    { title: '작은 휴대폰 360×640 — 가장 좁은 경우', device: 'phone-small',
-      notes: '판 자리 300×339 라 같은 배치가 통째로 줄어든다.',
-      shots: [...variants('phone', 's').filter((one) => /-(lv3|lv8)$/.test(one.id)), introShot('s-', INTROS[1])] },
-    { title: '소개 화면 (태블릿)', notes: 'diagram(level): 식이 처음 나오는 Lv5, 사이가 처음 나오는 Lv6, 두 그림을 함께 구하는 Lv8 에서 ① 을 바꾼다.', shots: INTROS.map((intro) => introShot('', intro)) },
+    { title: '태블릿 1280×800 — 배치 C', shots: [...variants('below', 'c'), introShot('intro')] },
+    { title: '휴대폰 390×844', device: 'phone', notes: '판 자리 330×494.', shots: [...variants('phone', 'p').filter((one) => !one.id.endsWith('-shut')), introShot('p-intro')] },
+    { title: '작은 휴대폰 360×640', device: 'phone-small', notes: '판 자리 300×339 라 같은 배치가 통째로 줄어든다.', shots: variants('phone', 's').filter((one) => /-(lv3|lv8)$/.test(one.id)) },
   ],
 });
 </script>

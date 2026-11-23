@@ -133,6 +133,7 @@ export const Sketch = {
   // ---------- 3단계: 눌러 보는 스케치 ----------
   // GameClass 는 진짜 게임과 같은 모양(constructor(host), start(), abort())이면 된다. 판이 끝나면 다음 판을 연다.
   // 화면 아래에 레벨 고르기를 둔다. ?level=N 으로 시작 레벨을 정할 수 있다.
+  // 처음과 레벨을 바꿀 때 게임 소개(GameClass.diagram · hint)를 보여 준다. ?intro=0 이면 건너뛴다.
   play(GameClass, { levels = GameClass.maxLevel || 8 } = {}) {
     document.body.classList.add('sk-single');
     const params = new URLSearchParams(location.search);
@@ -148,14 +149,26 @@ export const Sketch = {
     const score = { games: 0, cleared: 0 };
     const showScore = () => (bar.querySelector('.sk-score').textContent = `판 ${score.games} · 다 맞힘 ${score.cleared}`);
 
-    const begin = () => {
+    // 판 하나를 연다. intro 면 먼저 게임 소개를 보여 준다 (앱처럼 4.5초, 누르면 바로 넘어감)
+    const begin = (intro = false) => {
       generation++;
       const mine = generation;
       current?.abort?.();
+      current = null;
       cog.innerHTML = '';
+      bar.querySelectorAll('button').forEach((button) => button.classList.toggle('on', Number(button.dataset.level) === level));
+      if (intro && GameClass.diagram && params.get('intro') !== '0') {
+        const placeholder = element('div', 'stage');
+        cog.append(placeholder);
+        Sketch.intro(placeholder, { tag: '새 게임', name: GameClass.title, steps: GameClass.diagram(level),
+          hint: typeof GameClass.hint === 'function' ? GameClass.hint(level) : GameClass.hint });
+        const proceed = () => mine === generation && begin(false);
+        setTimeout(proceed, 4500);
+        setTimeout(() => cog.querySelector('.intro')?.addEventListener('pointerdown', proceed), 600);
+        return;
+      }
       const stage = element('div', 'stage');
       cog.append(stage);
-      bar.querySelectorAll('button').forEach((button) => button.classList.toggle('on', Number(button.dataset.level) === level));
       const start = performance.now();
       const host = {
         stage, level, multiplier: 1, startClock: 0, base: 100,
@@ -182,16 +195,17 @@ export const Sketch = {
         },
       };
       current = new GameClass(host);
+      window.SKETCH_GAME = current; // 콘솔에서 살펴보거나 자동으로 눌러 보는 데 쓴다
       current.start();
     };
     bar.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-level]');
       if (!button) return;
       level = Number(button.dataset.level);
-      begin();
+      begin(true);
     });
     showScore();
-    begin();
+    begin(true);
   },
 
   // 문제 제한 시간 막대 (진짜는 main.js startQuestionTimer · updateQuestionTimer). seconds = 0 이면 그 자리에 멈춘다

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko" data-edition="app">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>금고 열기 · 눌러 보기</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
+  <link rel="stylesheet" href="../../../css/style.css">
+  <link rel="stylesheet" href="../../../css/themes.css">
+  <link rel="stylesheet" href="../../../app/app.css">
+  <link rel="stylesheet" href="../sketch.css">
+  <link rel="stylesheet" href="safe.css">
+</head>
+<body data-theme="scenic">
+<script type="module">
+// 금고 열기 3단계: 손으로 쓴 문제(puzzles.js)를 진짜 게임과 같은 모양의 host 로 돌린다.
+// 아래 막대에서 레벨을 고른다. ?level=N 으로 시작 레벨, ?intro=0 이면 게임 소개를 건너뛴다. 휴대폰(너비 600px 이하)에서는 휴대폰 배치.
+import { Sketch } from '../sketch.js';
+import { SafeGame } from './safe-game.js';
+
+Sketch.play(SafeGame);
+</script>
+</body>
+</html>

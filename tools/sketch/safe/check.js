@@ -12,7 +12,7 @@ for (const [level, puzzles] of Object.entries(PUZZLES)) {
     if (statementsOf(puzzle).length !== spec.key) problems.push(`열쇠 표 ${statementsOf(puzzle).length}줄 (레벨은 ${spec.key}줄)`);
     if (hidden !== spec.hidden) problems.push(`숨은 그림 ${hidden}개 (레벨은 ${spec.hidden}개)`);
     bad += problems.length ? 1 : 0;
-    console.log(`Lv${level} #${i + 1}  ${problems.length ? `✗ ${problems.join(' · ')}` : '✓'}`);
+    console.log(`Lv${level} #${i + 1}  ${problems.length ? `✗ ${problems.join(' · ')}` : '✓'}${puzzle.kind ? `  ${puzzle.kind}` : ''}`);
   });
 }
 console.log(bad ? `\n문제 ${bad}개에 잘못이 있습니다` : '\n모든 문제가 맞습니다');

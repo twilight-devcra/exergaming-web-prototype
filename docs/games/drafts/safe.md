@@ -2,11 +2,12 @@
 
 > Stage 1 of the game-draft workflow ([README.md](README.md)). Mockup: [`tools/sketch/safe/`](../../../tools/sketch/safe/index.html), clickable sketch: [`play.html`](../../../tools/sketch/safe/play.html) (`node server.js` → http://localhost:5173/tools/sketch/safe/play.html). Puzzle check: `node tools/sketch/safe/check.js`.
 
-**Status:** card · mockup · **sketch (round 1)** · approved · built
+**Status:** card · mockup · **sketch (round 2)** · approved · built
 **Gap it fills:** 처리 속도 (SDMT/기호 바꾸기 — TARGETS.md notes no game targets speed itself) at Lv1–4. Lv5–8 add 추론 · 규칙 찾기 (☐/△, priority high: comparisons, parity, two clues that pin down two shapes together) and 계산, and partly 작업 기억 (holding worked-out digits).
 **Tags / clashes:** `Tag.NUMBER` (high levels calculate), so it won't run back to back with arith/cover/box/coin.
 
 ## Review log
+- **Sketch round 1 → round 2:** diversify the math and logic. Each of Lv5–8 now has 4–5 puzzles, each a different clue kind; difficulty per level unchanged.
 - **Mockup round 3 → sketch:** approved for the first level draft. One intro for every level, without the ★ → 4 tile; step ② shows the digits filling in one by one. No 0 on the keypad (the phone's 2×5 grid keeps an empty cell). At most 6 key rows, with Lv7–8 keeping their difficulty. Lv1 starts with the first window already filled, as a silent tutorial.
 - **Round 3:** layout C chosen for the tablet. High levels may be harder: mix in logic. Codes capped at 5 digits. Clue rows get no special background and no line break of their own. Phone keypad 2×5 (so the keypad becomes 1–9 plus 0). Round-1 structure questions (one long code, continue after a wrong digit, name) accepted for now.
 - **Round 2b:** add a phone mockup. The workflow now always designs a separate phone layout.
@@ -28,16 +29,31 @@
 ## Clues at Lv5+
 Clue rows sit in the key after the plain rows and **look exactly like them**: same row, same colours, no background, no line break of their own. A clue is a short statement of shapes, digits and signs.
 
-| Kind | Example | Thinking | First at |
-|---|---|---|---|
-| formula: ± small number | ♥ = ☾ + 2 | look up, add | Lv5 |
-| **between** (logic) | ★ < ▲ < ☾ (★ 3, ☾ 5) | only one number between → 4 | Lv6 |
-| formula: two shapes added | ☾ = ◆ + ■ | two lookups, add | Lv7 |
-| **between + parity** (logic) | ★ < ● < ◆, ● = 짝수 (5 < ● < 8) | 6 or 7 → the even one, 6 | Lv7 |
-| **two shapes together** | ▲ + ■ = 9, ▲ = ■ × 2 | try pairs, or substitute → ■ 3, ▲ 6 | Lv8 |
-| **bound + parity** (logic) | ✚ < ●, ● = 짝수 (✚ 7) | 8 or 9 → 8 | Lv8 |
+Each level draws from a pool of clue kinds, so two games at the same level rarely ask for the same kind of thinking.
 
-**At most 6 key rows** (plain rows + clue rows). Lv7 is 3 plain + 3 clues, Lv8 is 2 plain + 4 clues: the clues stay as hard as round 3, and plain rows were dropped instead. Fewer plain rows only means fewer shapes to look up.
+| Lv | Kind | Example | Thinking |
+|---|---|---|---|
+| 5 | add | ♥ = ☾ + 2 | look up, add |
+| 5 | subtract | ▲ = ● − 3 | look up, subtract |
+| 5 | backwards | ● + 3 = ✚ (✚ 9) | undo the + → 6 |
+| 5 | double | ■ = ♥ × 2 | look up, double |
+| 5 | two shapes added | ◆ = ■ + ★ | two lookups, add |
+| 6 | **between** (logic) | ★ < ▲ < ☾ (★ 3, ☾ 5) | only one number between → 4 |
+| 6 | same shape twice | ■ + ■ = ☾ (☾ 8) | halve → 4 |
+| 6 | missing part | ● − ▲ = ★ (● 9, ★ 3) | 9 − ? = 3 → 6 |
+| 6 | triple, backwards | ▲ × 3 = ● (● 6) | undo the × → 2 |
+| 7 | sum + **between with parity** | ☾ = ◆ + ■ · ★ < ● < ◆, ● = 짝수 | 5 < ● < 8 → 6 or 7 → 6 |
+| 7 | **chain** | ■ = ★ + 2, ● = ■ × 2 | solve ■ first, then ● |
+| 7 | twice + **bound with parity** | ▲ + ▲ = ◆ · ★ < ♥, ♥ = 홀수 (★ 7) | ♥ is 8 or 9 → 9 |
+| 7 | subtract → between with that answer | ☾ − ■ = 3 · ■ < ✚ < ☾, ✚ = 짝수 | ☾ 8, then 5 < ✚ < 8 → 6 |
+| 8 | **two shapes together**: sum + double | ▲ + ■ = 9, ▲ = ■ × 2 + bound/parity | ■ 3, ▲ 6 |
+| 8 | sum + difference | ● + ◆ = 8, ● = ◆ + 2 + between/parity | ◆ 3, ● 5 |
+| 8 | product + difference → sum | ▲ × ■ = 12, ▲ = ■ + 1, ● = ▲ + ■ | 4 × 3 → ● 7 |
+| 8 | triple → chain | ★ + ★ + ★ = 9, ▲ = ★ × 2, ◆ = ▲ + ★ | ★ 3 → ▲ 6 → ◆ 9 |
+
+Rows use only shapes, digits, + − ×, = < > and the words 짝수/홀수. No division: "backwards" and "same shape twice" cover halving without a new sign.
+
+**At most 6 key rows** (plain rows + clue rows). Lv7 is 3 plain + 3 clues (4 + 2 for the chain), Lv8 is 2 + 4 or 3 + 3: the clues stay as hard as round 3, and plain rows were dropped instead. Fewer plain rows only means fewer shapes to look up.
 
 **Every board has exactly one answer, without assuming the digits are all different.** `logic.js` tries every 0–9 value for each hidden shape and flags a board unless exactly one assignment satisfies all its clues. Tested: widening Lv6's clue to ★ < ▲ < ■ is flagged as "4 answers." The real generator should use the same check. It also checks that digits stay distinct within 1–9, that the key has at most 6 rows, and that every hidden shape appears in the code.
 
@@ -48,10 +64,10 @@ Clue rows sit in the key after the plain rows and **look exactly like them**: sa
 | 2 | 4 | 4 | – | – |
 | 3 | 4 | 5 | – | – (standard: shapes may repeat) |
 | 4 | 5 | 5 | – | – |
-| 5 | 5 | 5 | 1 | formula ± 1–3 |
-| 6 | 5 | 5 | 1 | between (or a × 2 formula) |
-| 7 | 6 (3 + 3 clues) | 5 | 2 | two-shape sum + between with parity |
-| 8 | 6 (2 + 4 clues) | 5 | 3 | two shapes together + bound with parity |
+| 5 | 5 | 5 | 1 | one calculation (5 kinds) |
+| 6 | 5 | 5 | 1 | one step of reasoning (4 kinds) |
+| 7 | 6 (2–3 clues) | 5 | 2 | calculation + logic, or a chain (5 puzzles) |
+| 8 | 6 (3–4 clues) | 5 | 3 | two shapes together, or a triple chain, then one more (4 puzzles) |
 
 Every hidden shape appears in the code at least once. The key and its digits are new each game. Key digits are never consecutive in key order, so position can't stand in for lookup.
 
@@ -65,7 +81,7 @@ Every hidden shape appears in the code at least once. The key and its digits are
 - [x] Intro diagram (one for all levels): ① 표에서 그림의 숫자 찾기 → ② 차례대로 누르기, animated: the key row lights up while that window fills. Clue kinds have no intro of their own; the sketch checks whether players need one.
 
 ## Clickable sketch (round 1)
-- `play.html`: the real game shape (`SafeGame` in `safe-game.js`, ready to move to `js/games/`) on a stub host. Three hand-written puzzles per level (`puzzles.js`), never the same one twice in a row. Level bar at the bottom; `?level=N`, `?intro=0`.
+- `play.html`: the real game shape (`SafeGame` in `safe-game.js`, ready to move to `js/games/`) on a stub host. Hand-written puzzles (`puzzles.js`): 3 per level at Lv1–4, one per clue kind at Lv5–8 (4–5). Never the same one twice in a row. Level bar at the bottom; `?level=N`, `?intro=0`, `?puzzle=N` (one puzzle only, to try each kind).
 - Timer: `questionTime { base: 3, per: 1.3 }` × (digits + 3 × clue rows) → Lv1 6.9 s, Lv3 9.5 s, Lv5 13 s, Lv7 18.2 s, Lv8 22.1 s (before EASY_TIME).
 - Scoring: 60 % spread over the digits the player enters, 40 % for opening the safe. Correct digits play TAP; GOOD/BAD only at the end, since those drive the streak.
 - Automated playthrough (tablet + phone, all 8 levels): correct input opens the safe, a wrong digit is replaced and play continues, a timeout fills the rest, the next round starts by itself.
@@ -84,6 +100,6 @@ Every hidden shape appears in the code at least once. The key and its digits are
 - **Full 1–9 keypad:** does scanning 9 buttons slow Lv1–2 noticeably?
 
 ## Open questions for review
-1. Playing the sketch: does each level feel right, especially the Lv5 → Lv6 and Lv7 → Lv8 steps?
+1. Playing the sketch: does each level feel right, especially the Lv5 → Lv6 and Lv7 → Lv8 steps? Are any clue kinds clearly harder or easier than the others at their level (candidates to move or drop)?
 2. Timer: are Lv7 18 s and Lv8 22 s about right?
 3. Do the clue kinds (between, parity) need their own intro, or is the single intro enough?

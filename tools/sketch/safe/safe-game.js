@@ -67,8 +67,10 @@ export class SafeGame {
     this.host = host;
     this.spec = LEVELS[host.level - 1];
     const choices = PUZZLES[host.level];
-    let index = Math.floor(Math.random() * choices.length);
-    if (choices.length > 1 && index === SafeGame.lastPick[host.level]) index = (index + 1) % choices.length;
+    // 스케치 전용: ?puzzle=N 이면 그 레벨의 N번째 문제만 (단서 종류를 하나씩 보려고)
+    const forced = Number(new URLSearchParams(location.search).get('puzzle'));
+    let index = forced >= 1 && forced <= choices.length ? forced - 1 : Math.floor(Math.random() * choices.length);
+    if (!forced && choices.length > 1 && index === SafeGame.lastPick[host.level]) index = (index + 1) % choices.length;
     SafeGame.lastPick[host.level] = index;
     this.puzzle = choices[index];
     this.phase = Phase.SHOW;

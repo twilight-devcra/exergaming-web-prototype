@@ -1,7 +1,7 @@
 // 스케치의 화면(shot)을 저마다 그 기기 크기(태블릿 1280×800, 휴대폰 390×844 …)의 그림으로 모두 찍는다: node tools/sketch/shoot.js <스케치 폴더 이름> [저장 폴더]
 // 예: node tools/sketch/shoot.js safe   → tools/.cache/sketch/safe/<shot id>.png
 // 서버를 따로 띄우지 않아도 된다 (잠깐 띄웠다 끈다). 헤드리스 Edge 는 docs/build/cdp.js 를 쓴다.
-// 화면마다 판 자리(.stage-body) 크기와 가장 작은 누르는 칸(56px 미만이면 ⚠)을 찍고, 판이 그 자리를 넘치면 ⚠ 넘침 을 붙인다.
+// 화면마다 Sketch.warn 경고(답이 둘 등), 판 자리(.stage-body) 크기와 가장 작은 누르는 칸(56px 미만이면 ⚠)을 찍고, 판이 그 자리를 넘치면 ⚠ 넘침 을 붙인다.
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -48,7 +48,9 @@ const PORT = 5190 + Math.floor(Math.random() * 40);
       })()`);
       const file = path.join(out, `${id}.png`);
       await page.shot(file);
-      console.log(`${id}  ${width}×${height}  ${fit}`);
+      const warnings = await page.eval('window.SKETCH_WARNINGS || []');
+      console.log(`${id}  ${width}×${height}  ${fit}${warnings.map((warning) => `
+    ⚠ ${warning}`).join('')}`);
     }
   } finally {
     await page.close();

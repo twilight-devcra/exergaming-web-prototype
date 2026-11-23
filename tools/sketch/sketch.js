@@ -66,6 +66,12 @@ export const Sketch = {
     return `<svg class="${cls}" viewBox="0 0 100 100">${Sketch.symbol(id).svg}</svg>`;
   },
 
+  // 손으로 쓴 판의 잘못(답이 둘 · 식이 틀림 …)을 알린다. 콘솔에 찍고, shoot.js 가 화면마다 모아 보여 준다
+  warn(message, ...details) {
+    console.warn(message, ...details);
+    (window.SKETCH_WARNINGS ||= []).push([message, ...details.map((detail) => JSON.stringify(detail))].join(' '));
+  },
+
   // 진짜 게임의 머리 줄 (게임 이름 · 진행 점 · 안내 문구). kind = look | act | good | bad | ''
   frame(stage, title, message = '', kind = '', rounds = 0) {
     const messageBox = element('div', 'stage-msg');

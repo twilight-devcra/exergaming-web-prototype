@@ -98,3 +98,36 @@
 .strip .ar-cand.sf-num { width: 58px; height: 58px; font-size: 30px; }
 
 .dg-txt.dg-dim { opacity: 0.3; }
+
+/* 휴대폰 (세로): 판 자리가 약 346×520 (390×844), 작은 휴대폰은 약 316×380 (360×640).
+   열쇠 표 → 금고 문 → 번호판 3×3 을 쌓고, 크기는 모두 --u 의 배수라 함께 줄어든다.
+   --u 는 board.js fitPhone 이 판을 재어 정한다 (설계 크기에서 1px, 판 자리가 모자라면 그만큼 작게) */
+.sf-wrap.phone { --u: 1px; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 16); }
+.phone .sf-key { padding: calc(var(--u) * 6) calc(var(--u) * 12) calc(var(--u) * 8); gap: calc(var(--u) * 2); }
+.phone .sf-label { font-size: calc(var(--u) * 13); }
+/* 표를 세 칸씩 나눠 담고, 식이 있는 줄은 한 줄을 다 쓴다 */
+.phone .sf-krows { display: grid; grid-template-columns: repeat(3, auto); column-gap: calc(var(--u) * 16); row-gap: calc(var(--u) * 2); justify-content: center; }
+.phone .sf-krow { height: calc(var(--u) * 33); gap: calc(var(--u) * 6); padding: 0 calc(var(--u) * 4); }
+.phone .sf-krow + .sf-krow { border-top: 0; }
+.phone .sf-krow.formula { grid-column: 1 / -1; justify-content: center; }
+.phone .sf-kglyph { width: calc(var(--u) * 28); height: calc(var(--u) * 28); }
+.phone .sf-eq { font-size: calc(var(--u) * 18); }
+.phone .sf-krow b { font-size: calc(var(--u) * 27); min-width: calc(var(--u) * 20); }
+.phone .sf-fglyph { width: calc(var(--u) * 24); height: calc(var(--u) * 24); }
+.phone .sf-op { font-size: calc(var(--u) * 24); }
+.phone .sf-formula { gap: calc(var(--u) * 5); }
+/* 금고 문: 창 크기는 칸 수에 맞춘다 (6칸이면 좁아진다). 자물쇠는 창 줄 오른쪽 */
+.phone .sf-door {
+  --w: min(calc(var(--u) * 52), calc((var(--u) * 268 - (var(--n) - 1) * var(--u) * 6) / var(--n)));
+  gap: calc(var(--u) * 10); padding: calc(var(--u) * 12); border-radius: calc(var(--u) * 16);
+}
+.phone .sf-windows { gap: calc(var(--u) * 6); }
+.phone .sf-col { gap: calc(var(--u) * 5); }
+.phone .sf-tile { border-radius: calc(var(--u) * 9); }
+.phone .sf-win { height: calc(var(--w) * 0.92); font-size: calc(var(--w) * 0.62); border-radius: calc(var(--u) * 8); }
+.phone .sf-win.cur::after { height: 55%; width: calc(var(--u) * 3); }
+.phone .sf-win s { font-size: calc(var(--w) * 0.3); right: calc(var(--u) * 3); }
+.phone .sf-lockplate { width: calc(var(--u) * 42); height: calc(var(--u) * 42); font-size: calc(var(--u) * 26); box-shadow: 0 0 0 calc(var(--u) * 3) #8f9ba1, inset 0 2px 4px rgba(0, 0, 0, 0.5); }
+/* 번호판: 전화 번호판처럼 3×3 (1 2 3 이 맨 위) */
+.phone .sf-pad { grid-template-columns: repeat(3, auto); gap: calc(var(--u) * 8); padding: calc(var(--u) * 10); }
+.phone .ar-cand.sf-num { width: calc(var(--u) * 64); height: calc(var(--u) * 60); font-size: calc(var(--u) * 30); border-radius: calc(var(--u) * 14); }

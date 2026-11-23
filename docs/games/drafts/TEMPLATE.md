@@ -34,9 +34,21 @@ Three questions per game. <Say what carries over between them, e.g. the same boa
 
 <In a line or two, say the axes the in-between levels move along.>
 
+## Board space: tablet and phone are different layouts
+The app also runs on portrait phones (`max-width: 600px` rules in `css/style.css` and `app/app.css`). The board area there is the opposite shape, so plan **a separate phone layout**, not a shrunken tablet one. Measured by `tools/sketch/shoot.js`:
+
+| Device | Board area (`.stage-body`) | Shape | What fits |
+|---|---|---|---|
+| Tablet 1280×800 | **1136 × 337** | wide, short | side by side; stacked layouts rarely fit |
+| Phone 390×844 | **330 × 494** | narrow, tall | one stack, top to bottom |
+| Small phone 360×640 | **300 × 339** | small | the phone stack, shrunk. Check 56 px here |
+
+- Tablet layout: <…>
+- Phone layout: <… how the board stacks. Rows that are side by side on the tablet usually wrap or stack here.>
+
 ## Constraint check
 - [ ] Under 10 s per game at Lv3: <estimate: N questions × M s>
-- [ ] Taps only, targets ≥ 56 px on 1280×800. The game card is about **1240 × 455**, so the board body is about **1160 × 340** (wide and short: side-by-side layouts fit, stacked ones rarely do).
+- [ ] Taps only, targets ≥ 56 px on the tablet **and** a 390×844 phone (say what happens on 360×640)
 - [ ] Nothing told apart by colour alone
 - [ ] ≤ a few words to read while pedalling
 - [ ] Exactly one right answer; how the generator guarantees it: <…>

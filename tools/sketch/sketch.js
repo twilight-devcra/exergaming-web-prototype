@@ -1,10 +1,12 @@
 // 미니게임 초안(스케치) 도구. 코드를 쓰기 전에 게임 판을 진짜 앱 화면 안에 그려 보고, 손으로 짠 문제로 눌러 본다.
 // 쓰는 법은 tools/sketch/README.md. 게임 코드(js/)는 바꾸지 않고, 앱의 css 와 모양(SYMBOLS, Util)을 그대로 빌려 쓴다.
 //
-//   Sketch.page({ title, notes, groups: [{ title, notes, shots: [{ id, caption, render(stage) }] }] })
-//     목업 페이지 (2단계). 각 shot 은 1280×800 태블릿 화면 하나: 위는 풍경 카드 자리, 아래는 게임 카드.
+//   Sketch.page({ title, notes, groups: [{ title, notes, device, shots: [{ id, caption, device, render(stage) }] }] })
+//     목업 페이지 (2단계). 각 shot 은 기기(device) 화면 하나: 위는 풍경 카드 자리, 아래는 게임 카드.
+//     device = 'tablet'(1280×800, 기본) | 'phone'(390×844) | 'phone-small'(360×640). shot 에 없으면 group 의 것을 쓴다.
 //     render(stage) 는 진짜 게임처럼 stage(.stage) 안에 그린다 (Sketch.frame 으로 머리 줄을 단다).
-//     주소에 ?shot=<id> 를 붙이면 그 화면 하나만 실제 창 크기로 연다 (태블릿에서 크기·글자를 확인할 때).
+//     목록의 화면은 저마다 그 기기 크기의 iframe(?shot=<id>)이라 앱 css 의 휴대폰 규칙(@media max-width)과 vh 가 진짜처럼 먹는다.
+//     화면 이름을 누르면 그 화면 하나만 창 크기로 연다 (태블릿·휴대폰에서 직접 확인할 때).
 //
 //   Sketch.play(GameClass, { level, puzzles })
 //     눌러 보는 스케치 (3단계). 진짜 게임과 같은 모양의 host 를 주고 판을 끝없이 이어서 돌린다.
@@ -16,7 +18,13 @@ import { Diagram } from '../../js/diagram.js';
 
 export { Util, SYMBOLS, Diagram };
 
-export const SCREEN = { width: 1280, height: 800 }; // 체육관 태블릿
+// 앱이 맞추는 기기. 휴대폰 크기는 app/app.css · css/style.css 의 '휴대폰'(max-width: 600px) 규칙이 먹는 크기
+export const DEVICES = {
+  tablet: { width: 1280, height: 800, label: '태블릿 1280×800' },          // 체육관 태블릿
+  phone: { width: 390, height: 844, label: '휴대폰 390×844' },             // 흔한 세로 휴대폰
+  'phone-small': { width: 360, height: 640, label: '작은 휴대폰 360×640' }, // 키가 작은 휴대폰 (max-height: 720px 규칙도 먹는다)
+};
+export const SCREEN = DEVICES.tablet;
 
 const element = (tag, cls, html) => Util.element(tag, cls, html);
 
@@ -31,15 +39,21 @@ function screen(parent) {
   return { root, stage };
 }
 
-// 목록에서는 1280×800 화면을 칸 너비에 맞게 줄여 보여 준다
-function scaledScreen(parent) {
+// 목록의 화면 하나: 그 기기 크기의 iframe 을 칸 너비에 맞게 줄인다 (--k)
+function framedShot(parent, shot, device) {
+  const { width, height } = DEVICES[device];
   const viewport = element('div', 'sk-viewport');
+  viewport.style.aspectRatio = `${width} / ${height}`;
+  const frame = element('iframe');
+  frame.src = shotUrl(shot.id);
+  frame.loading = 'lazy';
+  frame.width = width;
+  frame.height = height;
+  viewport.append(frame);
   parent.append(viewport);
-  const made = screen(viewport);
-  const fit = () => viewport.style.setProperty('--k', viewport.clientWidth / SCREEN.width);
+  const fit = () => viewport.style.setProperty('--k', viewport.clientWidth / width);
   new ResizeObserver(fit).observe(viewport);
   fit();
-  return made;
 }
 
 const shotUrl = (id) => `${location.pathname}?shot=${encodeURIComponent(id)}`;
@@ -72,7 +86,9 @@ export const Sketch = {
   page({ title, notes = '', groups }) {
     document.title = `${title} · 스케치`;
     const wanted = new URLSearchParams(location.search).get('shot');
-    const all = groups.flatMap((group) => group.shots);
+    const all = groups.flatMap((group) => group.shots.map((shot) => ({ ...shot, device: shot.device || group.device || 'tablet' })));
+    // tools/sketch/shoot.js 가 읽는다: 찍을 화면과 기기 크기
+    window.SKETCH_SHOTS = all.map((shot) => ({ id: shot.id, ...DEVICES[shot.device] }));
     if (wanted) {
       const shot = all.find((candidate) => candidate.id === wanted);
       document.body.classList.add('sk-single');
@@ -80,9 +96,11 @@ export const Sketch = {
       const { root, stage } = screen(document.body);
       root.classList.add('sk-full');
       shot.render(stage);
-      const back = element('a', 'sk-back', '← 모두 보기');
-      back.href = location.pathname;
-      document.body.append(back);
+      if (window === window.top) {
+        const back = element('a', 'sk-back', '← 모두 보기');
+        back.href = location.pathname;
+        document.body.append(back);
+      }
       return;
     }
     const main = element('main', 'sk-page');
@@ -92,14 +110,13 @@ export const Sketch = {
       const section = element('section', 'sk-group');
       section.append(element('h2', '', group.title));
       if (group.notes) section.append(element('div', 'sk-notes', group.notes));
-      const grid = element('div', 'sk-grid');
-      for (const shot of group.shots) {
+      const grid = element('div', `sk-grid ${(group.device || 'tablet').startsWith('phone') ? 'phone' : ''}`);
+      for (const shot of all.filter((candidate) => group.shots.some((own) => own.id === candidate.id))) {
         const figure = element('figure', 'sk-shot');
         grid.append(figure);
-        const { stage } = scaledScreen(figure);
-        shot.render(stage);
-        const caption = element('figcaption', '', `<a href="${shotUrl(shot.id)}" title="이 화면만 실제 크기로">${shot.id}</a> ${shot.caption || ''}`);
-        figure.append(caption);
+        framedShot(figure, shot, shot.device);
+        const size = shot.device === 'tablet' ? '' : ` <small>${DEVICES[shot.device].label}</small>`;
+        figure.append(element('figcaption', '', `<a href="${shotUrl(shot.id)}" title="이 화면만 창 크기로">${shot.id}</a>${size} ${shot.caption || ''}`));
       }
       section.append(grid);
       main.append(section);

@@ -7,6 +7,7 @@
 **Tags / clashes:** `Tag.NUMBER` now that high levels calculate, so it won't run back to back with arith/cover/box/coin. **Note:** 계산 is already the most-served area (4 games). This game's distinct value is the lookup speed at Lv1–4, so the formulas stay light.
 
 ## Review log
+- **Round 2b:** add a phone mockup. The workflow now always designs a separate phone layout.
 - **Round 1 (mockup):** deduction clues (빈칸 elimination, 열린 쪽지 worked examples) rejected as unlikely to work well. Switch to math and logic clues. Add layout C (like A, with a 1–9 keypad under the door). Replace the ✱ handle with a lock that unlocks on success.
 
 ## The rule in one sentence
@@ -71,6 +72,24 @@ Every formula shape appears in the code at least once (usually twice). The key a
 - Lock plate: grey padlock → green open padlock on success, red on failure. It reads at a glance, and the door's green outline backs it up.
 - Earlier finding still stands: intros overflow the 455 px card by a few lines, and the existing 심볼 위치 외우기 intro does the same at 1280×800. Check intros on the tablet in general.
 
+## Phone layout (round 2b)
+The phone board is 330 × 494 (390×844) and the small phone's is 300 × 339 (360×640), so the tablet layouts don't carry over. The phone layout is one stack:
+- **Key** as a grid, three plain rows per line. Formula rows take a whole line.
+- **Door** with the code windows. Windows narrow to fit the code (6 windows ≈ 38 px at Lv8), and the lock plate stays at the right.
+- **3×3 keypad**, laid out like a phone dial (1 2 3 on top).
+
+Everything is sized in one unit and scaled to the measured board, like the real games' `ResizeObserver` layouts. It never grows above design size.
+
+| | Lv1 | Lv3 | Lv5 | Lv8 |
+|---|---|---|---|---|
+| Phone 390×844: smallest key | 60 px | 58 px | 58 px | 56 px ✓ |
+| Small phone 360×640 | — | **43 px** ⚠ | — | **39 px** ⚠ |
+
+**Small phones can't meet 56 px**, even at Lv3: the stack needs about 490 px of height and there are 339. Options:
+1. Accept it on small phones (the existing games shrink too; phone play is secondary to the gym tablet). **Recommended.**
+2. Cap small phones at a lighter level table (code ≤ 4, at most one formula).
+3. Shrink the scenic card further during this game on short phones. That's an app-wide change.
+
 ## Risks to check in the clickable sketch
 - **Lv4 → Lv5:** will an older player compute "☾ + 2" from the key while pedalling, or stall? Watch whether they find ☾'s digit first.
 - **Lost place on repeated shapes** (■★■♥●): is the highlighted window enough?
@@ -81,4 +100,5 @@ Every formula shape appears in the code at least once (usually twice). The key a
 1. Layout C (★), A, or B?
 2. Formula kinds: are + − ×2 and two-shape sums the right "math & logic" level, or do you want a logic-style clue I should mock up?
 3. Lv7–8 at ~12–13 s: accept, or cap the code at 5 digits?
-4. One long code (★) vs three short ones · continue after a wrong digit (★) vs end · name 금고 열기 (★): still open from round 1.
+4. Small phones (360×640) fall below 56 px: accept (★), cap the levels, or shrink the scenic card?
+5. One long code (★) vs three short ones · continue after a wrong digit (★) vs end · name 금고 열기 (★): still open from round 1.

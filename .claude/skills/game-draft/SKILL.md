@@ -21,14 +21,16 @@ Work out which stage the idea is at from `docs/games/drafts/<id>.md` (its **Stat
 ## Stage 2: mockup
 1. Create `tools/sketch/<id>/` with `board.js` (a `drawBoard(body, state)` that renders one hand-written state), `index.html` (the shots) and `<id>.css`. Copy the `<head>` from `tools/sketch/safe/index.html`.
 2. Shots: Lv1 · standard level · wrong-answer feedback · success · each level where a new rule appears · the densest level · intro screens via `Sketch.intro` with a `diagram(level)`-style SVG built from `js/diagram.js`. Draw them in **2–3 layout or style variants** as separate groups.
-3. Run `node tools/sketch/shoot.js <id> <job tmp dir>` and **look at the PNGs**. Fix overflow and clipping before showing the user. The densest level is the real test.
-4. Add a short "Mockup verdict" section to the card: what fits, what doesn't, the recommended variant. Fold any design changes back into the card.
+3. **Phone layout, designed separately.** The phone board is narrow and tall (330×494 on 390×844), the opposite of the tablet's 1136×337, so a tablet layout doesn't carry over. Add a `phone` layout to `board.js` (usually one top-to-bottom stack), and add groups with `device: 'phone'` (the same key shots) and `device: 'phone-small'` (standard and densest level). Size the phone board in multiples of one unit and scale it to the measured board area, like `fitPhone` in `tools/sketch/safe/board.js`. Never let it grow above design size. The app's own phone rules (title above the instruction line, smaller scenic card, stacked intro diagrams) apply automatically, because each shot is an iframe at the device's size.
+4. Run `node tools/sketch/shoot.js <id> <job tmp dir>` and **look at the PNGs**. It prints each shot's board area, the smallest tap target (⚠ under 56 px) and ⚠ 넘침 for overflow. Fix overflow and clipping before showing the user. The densest level is the real test, on the tablet and on the 390×844 phone. If 360×640 can't reach 56 px, report it as a decision for the user instead of hiding it.
+5. Add a short "Mockup verdict" section to the card: what fits on the tablet and the phone, what doesn't, the recommended variant. Fold any design changes back into the card.
 
 ## Stage 3: clickable sketch
 1. `tools/sketch/<id>/play.html` with a game class in the real game shape (`constructor(host)`, `start()`, `abort()`, using `host.after`, `host.timer(load)`, `host.answer`, `host.done`) and `static questionTime`. Run it with `Sketch.play(GameClass)`.
 2. Puzzles are **hard-coded** (about 3–5 per level that matters). No generator.
 3. Reuse `board.js` for drawing. Follow the shared rules: show the right answer for ~1 s on a mistake; the instruction line goes through `Util.say`.
-4. Give the user a playtest checklist from the card's "Risks" section: what to watch for when an older player tries it.
+4. The sketch runs in any window, so it also works on a phone (open `play.html` there, or narrow the browser to under 600 px). Make the game class switch between the tablet and phone layouts by the board size, as the real games do with `ResizeObserver`.
+5. Give the user a playtest checklist from the card's "Risks" section: what to watch for when an older player tries it.
 
 ## After each stage
 - Update **Status** in the card and the drafts table.

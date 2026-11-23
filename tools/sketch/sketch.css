@@ -13,10 +13,13 @@ body { background: #e9ede5; }
 .sk-shot figcaption { font-size: 14px; margin-top: 8px; color: var(--ink-soft); line-height: 1.5; }
 .sk-shot figcaption a { font-family: ui-monospace, monospace; font-weight: 700; color: var(--ink); margin-right: 6px; }
 
-/* 1280×800 화면을 칸 너비로 줄인다 (--k 는 sketch.js 가 정한다).
-   주의: vh·vw 로 크기를 정한 앱 css 는 이 틀이 아니라 브라우저 창을 따른다 — 정확한 크기는 ?shot= 으로 태블릿에서 본다 */
-.sk-viewport { position: relative; width: 100%; aspect-ratio: 1280 / 800; overflow: hidden; border-radius: 14px; box-shadow: 0 0 0 6px #2b2f2c, 0 6px 18px rgba(0, 0, 0, 0.18); }
-.sk-viewport .sk-screen { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; transform: scale(var(--k, 0.45)); transform-origin: 0 0; }
+/* 목록의 화면: 기기 크기의 iframe 을 칸 너비로 줄인다 (--k, aspect-ratio 는 sketch.js 가 정한다).
+   iframe 이라 앱 css 의 @media(휴대폰 규칙)와 vh 가 그 기기 크기로 먹는다 */
+.sk-viewport { position: relative; width: 100%; overflow: hidden; border-radius: 14px; box-shadow: 0 0 0 6px #2b2f2c, 0 6px 18px rgba(0, 0, 0, 0.18); background: var(--bg); }
+.sk-viewport iframe { position: absolute; left: 0; top: 0; border: 0; transform: scale(var(--k, 0.45)); transform-origin: 0 0; }
+.sk-grid.phone { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); align-items: start; }
+.sk-grid.phone .sk-viewport { border-radius: 22px; }
+.sk-shot figcaption small { font-size: 12px; opacity: 0.8; }
 .sk-screen { background: var(--bg); overflow: hidden; }
 .sk-screen #game { position: absolute; inset: 0; }
 .sk-band { height: 100%; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.9); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; background: linear-gradient(#a9d8ef, #cfe9f2 55%, #b9dc9c 56%, #8fc477); }

@@ -6,6 +6,8 @@
 //       door  — A. 열쇠 표 | 금고 문 | 번호판(3×3) 을 옆으로
 //       below — C. 열쇠 표 | 금고 문, 그 아래 번호판 1–9 한 줄
 //       strip — B. 기호표 줄(그림 위 · 숫자 아래) 위에, 금고 문, 번호판 한 줄
+//       phone — 휴대폰(세로, 판 자리가 좁고 길다): 열쇠 표(여러 칸에 나눠 담음) · 금고 문 · 번호판 3×3 을 위에서 아래로.
+//               크기는 판 자리에 맞춰 함께 줄어든다 (safe.css 의 --u, fitPhone)
 //   key: [[그림 id, 숫자, 식?], …]  — 열쇠 표. 식이 있으면 숫자 대신 식을 보여 준다 (높은 단계)
 //       식 = 토큰 배열. 그림 id 는 그림으로, 나머지(연산자 · 수)는 글자로: ['star', '+', 2], ['star', '×', 2], ['square', '+', 'plus']
 //   code: [그림 id, …]             — 이번 금고의 암호
@@ -119,7 +121,7 @@ export function drawBoard(body, state) {
   check(state);
   const layout = state.layout || 'below';
   const wrap = element('div', `sf-wrap ${layout}`);
-  if (layout === 'door') {
+  if (layout === 'door' || layout === 'phone') {
     wrap.append(keyTable(state), door(state), pad(state));
   } else if (layout === 'below') {
     const right = element('div', 'sf-right');
@@ -131,7 +133,21 @@ export function drawBoard(body, state) {
     wrap.append(top, door(state), pad(state));
   }
   body.append(wrap);
+  if (layout === 'phone') fitPhone(body, wrap);
   return wrap;
+}
+
+// 휴대폰: 판을 설계 크기(--u = 1px)로 놓고 재어 판 자리에 들어가게 --u 를 줄인다 (진짜 게임이 ResizeObserver 로 하는 일).
+// 낮은 단계는 판이 작아 덜 줄어든다. 키우지는 않는다
+function fitPhone(body, wrap) {
+  const fit = () => {
+    wrap.style.setProperty('--u', '1px');
+    const scale = Math.min(1, body.clientWidth / wrap.offsetWidth, body.clientHeight / wrap.offsetHeight);
+    wrap.style.setProperty('--u', `${scale}px`);
+  };
+  new ResizeObserver(fit).observe(body);
+  document.fonts?.ready.then(fit);
+  fit();
 }
 
 // 안내 문구 안의 제한 시간 막대를 멈춘 모습으로 (목업용). left = 남은 비율

@@ -105,6 +105,18 @@ Sketch.page({
     { title: 'C. 열쇠 표 | 금고 문 + 아래에 번호판 1–9 (새 안)', notes: 'A 처럼 표가 왼쪽, 번호판은 문 바로 아래 한 줄. 눈은 표 → 문, 손은 문 아래로.', shots: variants('below', 'c') },
     { title: 'A. 옆으로 놓기 — 열쇠 표 | 금고 문 | 번호판 3×3', shots: variants('door', 'a') },
     { title: 'B. 위아래로 놓기 — SDMT 식 가로 열쇠 줄, 식은 옆 상자', shots: variants('strip', 'b') },
+    { title: '휴대폰 (세로 390×844) — 열쇠 표 · 금고 문 · 번호판 3×3', device: 'phone',
+      notes: '판 자리가 좁고 길어(330×494) 태블릿 배치를 쓸 수 없다. 표는 세 칸씩 나눠 담고 식은 한 줄을 다 쓴다. 번호판은 전화 번호판 모양. 크기는 판 자리에 맞춰 함께 줄어든다.',
+      shots: [
+        ...variants('phone', 'p').filter((one) => /-(lv1|lv3|wrong|open|lv5|lv8)$/.test(one.id)),
+        ...INTROS.filter((intro) => intro.id !== 'intro-lv8').map((intro) => ({ id: `p-${intro.id}`, caption: intro.caption, render: (stage) => Sketch.intro(stage, intro) })),
+      ] },
+    { title: '작은 휴대폰 (360×640) — 가장 좁은 경우', device: 'phone-small',
+      notes: '판 자리가 300×339 라 같은 배치가 통째로 줄어든다. 단추가 56px 아래로 내려가는지 볼 것.',
+      shots: [
+        ...variants('phone', 's').filter((one) => /-(lv3|lv8)$/.test(one.id)),
+        { id: 's-intro-lv5', caption: 'Lv5 소개', render: (stage) => Sketch.intro(stage, INTROS[1]) },
+      ] },
     { title: '소개 화면', notes: 'diagram(level): 식이 처음 나오는 Lv5, 이어지는 Lv8 에서 ① 을 바꾼다.', shots: INTROS.map((intro) => ({ id: intro.id, caption: intro.caption, render: (stage) => Sketch.intro(stage, intro) })) },
   ],
 });

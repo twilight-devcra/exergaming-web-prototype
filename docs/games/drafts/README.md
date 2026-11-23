@@ -5,7 +5,7 @@ New minigames go through three cheap stages before anyone writes `js/games/<id>.
 | Stage | Artifact | Answers | Cost |
 |---|---|---|---|
 | 1. Design card | `docs/games/drafts/<id>.md` from [TEMPLATE.md](TEMPLATE.md) | Is the rule one sentence? Does it fill a gap in [TARGETS.md](../TARGETS.md)? Does it fit 10 s, 56 px, no colour-only cues? | minutes |
-| 2. Mockup | `tools/sketch/<id>/index.html`: hand-written board states drawn inside the real app card, with 2–3 layout or style variants | Does it fit the 1160 × 340 board? Is it readable at a glance? Which look? | an hour |
+| 2. Mockup | `tools/sketch/<id>/index.html`: hand-written board states drawn inside the real app card, with 2–3 layout or style variants, **plus a separate phone layout** | Does it fit the tablet board (1136 × 337) and the phone board (330 × 494)? Are taps ≥ 56 px? Is it readable at a glance? Which look? | an hour |
 | 3. Clickable sketch | `tools/sketch/<id>/play.html`: hard-coded puzzles, real tap → feedback, stub host | Does an older player get Lv1 (and the first harder rule) without help? | a couple of hours |
 | Build | `js/games/<id>.js` + the checklist in [NEW_GAMES_BRIEF.md](../NEW_GAMES_BRIEF.md) | — | as before, but with the design settled |
 
@@ -18,4 +18,4 @@ When a game is built, keep its card. It records why the design is the way it is,
 ## Drafts
 | Game | Status |
 |---|---|
-| [금고 열기 (`safe`)](safe.md) | mockup round 2 (math clues, layout C): waiting for verdict |
+| [금고 열기 (`safe`)](safe.md) | mockup round 2 (math clues, layout C, phone layout): waiting for verdict |

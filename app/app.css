@@ -106,7 +106,8 @@ body[data-theme="scenic"] {
    길 따라 그리기·가린 숫자 더하기는 판이 카드 너비를 다 써서 게임이 판 자리를 --mat-* 로 알려 준다 (js/games/path.js, cover.js) */
 #cog :is(.nv-wrap, .tr-wrap, .cp-wrap, .pr-wrap, .seek-side, .seek-board, .pipe-svg,
          .sym-target, .sym-grid, .ar-eq, .ar-cands, .cnt-grid, .cnt-opts, .fit-board, .fit-cands,
-         .bx-arena, .bx-opts, .cmp-board, .cmp-opts, .cv-opts, .cn-arena, .cn-legend, .cn-opts, .rc-show, .rc-slots, .rc-opts, .ch-rowbox, .ch-tray, .bl-board, .bl-opts) {
+         .bx-arena, .bx-opts, .cmp-board, .cmp-opts, .cv-opts, .cn-arena, .cn-legend, .cn-opts, .rc-show, .rc-slots, .rc-opts, .ch-rowbox, .ch-tray, .bl-board, .bl-opts,
+         .sf-key, .sf-pad) {
   background: var(--panel);
   border-radius: 12px;
   box-shadow: var(--mat-shadow);

@@ -115,6 +115,7 @@ const GAME_TARGETS = {
   recall: ['sequence', 'verbal'],
   chain: ['planning'],
   blank: ['fluency', '~naming', '~wm'],
+  safe: ['speed', 'reasoning', '~calc', '~wm'],
 };
 
 // 기획만 된 게임 (아직 js/games 에 없다)

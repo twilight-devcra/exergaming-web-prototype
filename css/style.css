@@ -1570,6 +1570,89 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .pipe-trace.right { stroke: var(--good); }
 .pipe-trace.wrong { stroke: var(--bad); }
 
+/* 금고 열기 (js/games/safe.js): 암호 표 · 금고 문 · 번호판. 크기는 모두 --u 의 배수라, 게임이 판 자리에 맞춰 --u 를 줄인다 (layout).
+   넓은 판(.wide): 암호 표 | (금고 문 위, 번호판 한 줄 아래). 좁고 긴 판(.stacked, 휴대폰): 위아래로 쌓고 번호판은 5칸씩 두 줄.
+   금고 문 색은 동전 세기의 탁자처럼 그림 안에 정해 둔다 (화면 스타일과 상관없이 진짜 물건처럼) */
+.sf-wrap { --u: 1px; color: var(--ink); }
+.sf-key, .sf-pad { background: var(--panel); border-radius: 12px; }
+.sf-label { text-align: center; font-size: calc(var(--u) * 14); font-weight: 700; color: var(--ink-soft); letter-spacing: 0.04em; white-space: nowrap; }
+.sf-lock { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.sf-lock rect { fill: currentColor; fill-opacity: 0.25; }
+/* 암호 표: 숫자 줄 '★ = 4' 와 단서 줄 '♥ = ☾ + 2' · '★ < ▲ < ☾' · '● = 짝수' 가 모두 같은 모양 (단서라고 따로 칠하지 않는다) */
+.sf-key { display: flex; flex-direction: column; gap: calc(var(--u) * 4); padding: calc(var(--u) * 8) calc(var(--u) * 16) calc(var(--u) * 10); }
+.sf-krows { display: flex; flex-direction: column; }
+.sf-krow { display: flex; align-items: center; gap: calc(var(--u) * 8); height: calc(var(--u) * 42); padding: 0 calc(var(--u) * 4); white-space: nowrap; }
+.sf-krow + .sf-krow { border-top: 1px solid var(--line); }
+.sf-kglyph { width: calc(var(--u) * 32); height: calc(var(--u) * 32); flex: none; }
+.sf-krow b { font-family: var(--font-num); font-size: calc(var(--u) * 30); font-weight: 900; min-width: 0.7em; text-align: center; }
+.sf-op { font-family: var(--font-num); font-size: calc(var(--u) * 24); font-weight: 800; color: var(--ink-soft); line-height: 1; }
+.sf-word { font-size: calc(var(--u) * 21); font-weight: 700; }
+/* 금고 문: 그림 칸 줄 + 숫자 창 줄, 손잡이 자리에 자물쇠. --n = 암호 자릿수 */
+.sf-door {
+  --w: min(calc(var(--u) * 74), calc(var(--u) * 450 / var(--n)));
+  display: flex; align-items: center; gap: calc(var(--u) * 20);
+  padding: calc(var(--u) * 16) calc(var(--u) * 18); border-radius: calc(var(--u) * 22);
+  background: linear-gradient(160deg, #6f7c83, #4a565c);
+  box-shadow: inset 0 0 0 5px #3a4449, inset 0 0 0 7px #7e8b92, 0 8px 18px rgba(20, 30, 35, 0.25);
+}
+.sf-windows { display: flex; gap: calc(var(--u) * 10); }
+.sf-col { width: var(--w); display: flex; flex-direction: column; gap: calc(var(--u) * 8); }
+.sf-tile { height: var(--w); display: flex; align-items: center; justify-content: center; background: #fff; border-radius: calc(var(--u) * 12); box-shadow: 0 2px 0 #39434a; }
+.sf-cglyph { width: 68%; height: 68%; }
+.sf-col.cur .sf-tile { box-shadow: 0 0 0 4px var(--accent), 0 2px 0 #39434a; }
+.sf-win {
+  position: relative; height: calc(var(--w) * 0.8); display: flex; align-items: center; justify-content: center;
+  background: #f6f3e9; border-radius: calc(var(--u) * 10); box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.28);
+  font-family: var(--font-num); font-size: calc(var(--w) * 0.52); font-weight: 900; color: #1d2b24;
+}
+.sf-win.cur { box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.2), 0 0 0 4px var(--accent); }
+.sf-win.cur::after { content: ''; width: calc(var(--u) * 4); height: 55%; border-radius: 2px; background: var(--accent); animation: sf-blink 1s steps(2) infinite; }
+@keyframes sf-blink { 50% { opacity: 0; } }
+.sf-win.good { background: color-mix(in srgb, var(--good-soft) 70%, #fff); }
+.sf-win.bad { background: color-mix(in srgb, var(--bad-soft) 70%, #fff); color: var(--good); box-shadow: inset 0 0 0 3px var(--good); }
+.sf-win s { position: absolute; top: 2px; right: calc(var(--u) * 6); font-size: calc(var(--w) * 0.27); color: var(--bad); text-decoration-thickness: 3px; }
+/* 자물쇠: 잠김(회색) → 다 맞히면 풀린 자물쇠(초록), 틀린 자리가 있으면 빨강 */
+.sf-lockplate {
+  flex: none; width: calc(var(--u) * 62); height: calc(var(--u) * 62); display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: #2f383d; color: #d9e0e3; font-size: calc(var(--u) * 40);
+  box-shadow: 0 0 0 calc(var(--u) * 4) #8f9ba1, inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  transition: background 0.3s, color 0.3s;
+}
+.sf-door.open { box-shadow: inset 0 0 0 5px #3a4449, inset 0 0 0 7px #7e8b92, 0 0 0 6px var(--good), 0 8px 24px color-mix(in srgb, var(--good) 45%, transparent); }
+.sf-door.open .sf-lockplate { background: var(--good); color: #fff; box-shadow: 0 0 0 calc(var(--u) * 4) color-mix(in srgb, var(--good) 55%, #fff); }
+.sf-door.shut .sf-lockplate { background: var(--bad); color: #fff; box-shadow: 0 0 0 calc(var(--u) * 4) color-mix(in srgb, var(--bad) 55%, #fff); }
+/* 번호판 1–9: 자리를 외울 수 있게 늘 같은 차례. 표에 없는 숫자도 있어 '남는 숫자' 로 풀리지 않는다 */
+.sf-pad { display: grid; gap: calc(var(--u) * 8); padding: calc(var(--u) * 8) calc(var(--u) * 10); }
+.sf-pad .ar-cand.sf-num { width: calc(var(--u) * 60); height: calc(var(--u) * 62); font-size: calc(var(--u) * 32); font-family: var(--font-num); border-radius: calc(var(--u) * 14); }
+.sf-pad .ar-cand.sf-num.hit { background: var(--good); color: var(--on-accent); }
+.sf-wrap.wide { display: flex; align-items: center; gap: calc(var(--u) * 36); }
+.sf-right { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 40); }
+.wide .sf-pad { grid-auto-flow: column; }
+/* 쌓는 배치: 암호 표는 줄을 이어 담는다 (짧은 줄은 한 줄에 여럿, 긴 단서도 자리가 나는 대로) */
+.sf-wrap.stacked { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 16); }
+.stacked .sf-key { max-width: calc(var(--u) * 340); padding: calc(var(--u) * 6) calc(var(--u) * 12) calc(var(--u) * 8); gap: calc(var(--u) * 2); }
+.stacked .sf-label { font-size: calc(var(--u) * 13); }
+.stacked .sf-krows { flex-direction: row; flex-wrap: wrap; justify-content: center; column-gap: calc(var(--u) * 18); }
+.stacked .sf-krow { height: calc(var(--u) * 34); gap: calc(var(--u) * 5); padding: 0; }
+.stacked .sf-krow + .sf-krow { border-top: 0; }
+.stacked .sf-kglyph { width: calc(var(--u) * 26); height: calc(var(--u) * 26); }
+.stacked .sf-krow b { font-size: calc(var(--u) * 26); }
+.stacked .sf-op { font-size: calc(var(--u) * 21); }
+.stacked .sf-word { font-size: calc(var(--u) * 18); }
+.stacked .sf-door {
+  --w: min(calc(var(--u) * 52), calc((var(--u) * 268 - (var(--n) - 1) * var(--u) * 6) / var(--n)));
+  gap: calc(var(--u) * 10); padding: calc(var(--u) * 12); border-radius: calc(var(--u) * 16);
+}
+.stacked .sf-windows { gap: calc(var(--u) * 6); }
+.stacked .sf-col { gap: calc(var(--u) * 5); }
+.stacked .sf-tile { border-radius: calc(var(--u) * 9); }
+.stacked .sf-win { height: calc(var(--w) * 0.92); font-size: calc(var(--w) * 0.62); border-radius: calc(var(--u) * 8); }
+.stacked .sf-win s { font-size: calc(var(--w) * 0.3); right: calc(var(--u) * 3); }
+.stacked .sf-lockplate { width: calc(var(--u) * 42); height: calc(var(--u) * 42); font-size: calc(var(--u) * 26); box-shadow: 0 0 0 calc(var(--u) * 3) #8f9ba1, inset 0 2px 4px rgba(0, 0, 0, 0.5); }
+.stacked .sf-pad { grid-template-columns: repeat(5, auto); gap: calc(var(--u) * 7); padding: calc(var(--u) * 9); }
+.stacked .sf-pad .ar-cand.sf-num { width: calc(var(--u) * 58); height: calc(var(--u) * 60); font-size: calc(var(--u) * 30); }
+@media (prefers-reduced-motion: reduce) { .sf-win.cur::after { animation: none; } }
+
 /* ---------- 측정 화면 ---------- */
 #calib {
   align-items: center;

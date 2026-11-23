@@ -1,4 +1,4 @@
-[← 목차·공통 규칙](README.md) · [← 조각 잇기](chain.md)
+[← 목차·공통 규칙](README.md) · [← 조각 잇기](chain.md) · [금고 열기 →](safe.md)
 
 # 같은 글자 넣기 (`blank`)
 

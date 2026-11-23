@@ -18,4 +18,4 @@ When a game is built, keep its card. It records why the design is the way it is,
 ## Drafts
 | Game | Status |
 |---|---|
-| [금고 열기 (`safe`)](safe.md) | clickable sketch round 3 (x + x + y, multiples, 암호 표) → moving into the app on `dev` |
+| [금고 열기 (`safe`)](safe.md) | built: [`js/games/safe.js`](../../../js/games/safe.js) (generator checked by `node tools/safe-check.js`) |

@@ -2,7 +2,7 @@
 
 > Stage 1 of the game-draft workflow ([README.md](README.md)). Mockup: [`tools/sketch/safe/`](../../../tools/sketch/safe/index.html), clickable sketch: [`play.html`](../../../tools/sketch/safe/play.html) (`node server.js` → http://localhost:5173/tools/sketch/safe/play.html). Puzzle check: `node tools/sketch/safe/check.js`.
 
-**Status:** card · mockup · **sketch (round 3)** · approved · built
+**Status:** card · mockup · sketch · approved · **built** (`js/games/safe.js`, 2026-11-23). Puzzles come from a generator (one template per clue kind), not the hand-written sketch puzzles.
 **Gap it fills:** 처리 속도 (SDMT/기호 바꾸기 — TARGETS.md notes no game targets speed itself) at Lv1–4. Lv5–8 add 추론 · 규칙 찾기 (☐/△, priority high: comparisons, parity, two clues that pin down two shapes together) and 계산, and partly 작업 기억 (holding worked-out digits).
 **Tags / clashes:** `Tag.NUMBER` (high levels calculate), so it won't run back to back with arith/cover/box/coin.
 

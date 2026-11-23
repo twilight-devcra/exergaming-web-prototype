@@ -79,7 +79,7 @@ const App = {
     this.pedal.onStroke = (key) => this.onStroke(key);
     this.edition.start(this);
     // 새 버전이 있으면 시작하는 대신 다시 불러온다 (휴대폰). 새 버전에서 한 번 더 누르면 된다
-    $('#btn-start').onclick = () => (UpdateCheck.ready() ? UpdateCheck.reload() : this.startRound());
+    $('#btn-start').onclick = () => UpdateCheck.beforeStart(() => this.startRound());
     $('#btn-resume').onclick = () => this.setPaused(false);
     $('#btn-quit').onclick = () => this.quit();
     this.lastFrameAt = performance.now();

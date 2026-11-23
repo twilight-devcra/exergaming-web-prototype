@@ -74,6 +74,8 @@ if (branch) {
     fs.writeFileSync(page, text.replace(tagPattern, `<span class="build-tag" data-build="${version}">${label}</span>`));
   }
   // 새 버전 알아차리기: 열려 있는 페이지가 가끔 읽어서 자기 data-build 와 다르면 새 버전이 올라온 것으로 안다
-  fs.writeFileSync(path.join(ROOT, 'version.json'), `${JSON.stringify({ build: version, version: semver })}\n`);
+  // deployedAt: 배포 시각. 페이지는 응답의 Date 와 견주어 GitHub Pages 캐시(10분)가 지났는지 본다
+  const deployedAt = new Date().toISOString();
+  fs.writeFileSync(path.join(ROOT, 'version.json'), `${JSON.stringify({ build: version, version: semver, deployedAt })}\n`);
   console.log(`build-tag: ${label}, version.json: ${version}`);
 }

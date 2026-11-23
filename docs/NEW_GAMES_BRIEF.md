@@ -22,6 +22,8 @@ These match the eight existing games (`js/games/*.js`), so a new game slots into
 
 ### Checklist for adding a game
 
+Before step 1, draft the game first: design card → mockup → clickable sketch ([games/drafts/README.md](games/drafts/README.md)). Start building only once the sketch is approved.
+
 1. Write `js/games/<id>.js` with `id`, `title`, `hint`, `tags`, `levels`, `maxLevel`, `diagram()`, a constructor taking `host`, `start()`, `result()` and `abort()`. Layout follows the stage size (`ResizeObserver`).
 2. `export` the class, then import it in `js/games/index.js` and add it to `GAME_TYPES` there. Import what the game uses at the top of its file (usually `U` from `../config.js` and `Dg` from `../diagram.js`). No `<script>` tag is needed.
 3. In `app/app.css`, add the game's board wrapper to the "판 바탕" selector list, so the app's dotted card texture stays out of the playing field. This works when the wrapper is sized to the board. If the board fills the card width, report the field's rectangle as `--mat-x/y/w/h` the way `js/games/path.js` does. If the game has a problem plus answer buttons, tray them separately instead (the problem element and the answers container both go in that list), and read the gap between them with `U.gapOf(wrap, fallback)` in the size math, since the app widens it (see `js/games/count.js`).

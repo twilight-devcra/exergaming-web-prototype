@@ -64,17 +64,13 @@ export const Demo = {
     this.bindSetup();
     this.bindHolds();
     this.bindGuards();
-    // 대기 화면에서 시작된 터치만 시작으로 친다. 결과 화면의 '다음 참가자'를 길게 누르고 손을 떼면
-    // 터치는 그 자리(이제 대기 화면)에 click 을 만들어서, 그대로 두면 바로 다음 판이 시작돼 버린다.
+    // 대기 화면에서는 '트레이닝 시작' 버튼(또는 페달)으로만 시작한다. 화면의 다른 곳을 누른 것은 시작이 아니다.
+    // 버튼에서 시작된 터치만 친다: 결과 화면의 '다음 참가자'를 길게 누르고 손을 떼면 터치는 그 자리(이제 대기 화면)에
+    // click 을 만들어서, 그 자리가 시작 버튼이면 바로 다음 판이 시작돼 버린다.
     let pressed = false;
-    // 대기 화면의 '페달 연결' 버튼을 누른 것은 시작으로 치지 않는다
-    const pedalButton = $('#att-pedal');
-    if (pedalButton) {
-      pedalButton.addEventListener('pointerdown', (event) => event.stopPropagation());
-      pedalButton.addEventListener('click', (event) => event.stopPropagation());
-    }
-    $('#attract').addEventListener('pointerdown', () => (pressed = true));
-    $('#attract').addEventListener('click', () => {
+    const startButton = $('#att-start');
+    startButton.addEventListener('pointerdown', () => (pressed = true));
+    startButton.addEventListener('click', () => {
       if (pressed) this.start();
       pressed = false;
     });
@@ -135,7 +131,7 @@ export const Demo = {
     $('#att-hint').textContent = this.simResult
       ? '가상 결과 모드 · 누르면 게임 없이 결과 화면으로 갑니다'
       : kbdOnly ? '키보드 테스트 모드 · A/D 키를 번갈아 눌러 페달링합니다'
-      : pedal ? '화면을 누르거나 페달을 밟으면 시작합니다'
+      : pedal ? '시작 버튼을 누르거나 페달을 밟으면 시작합니다'
       : ok ? '페달이 연결되지 않았어요 · 지금은 두뇌 게임만 할 수 있어요'
       : '페달 연결을 기다리는 중입니다 · 진행 요원에게 알려주세요';
     $('#att-hint').classList.toggle('warn', !pedal || kbdOnly || this.simResult);

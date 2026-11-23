@@ -73,7 +73,7 @@ export const OperatorMenu = {
     };
     $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
     this.bindSettings();
-    // 운영 버전: 대기 화면 오른쪽 아래의 '운영' 버튼 → PIN. 대기 화면을 눌러 시작하는 것과 겹치지 않게 막는다
+    // 운영 버전: 대기 화면 오른쪽 아래의 '운영' 버튼 → PIN. 누른 것이 대기 화면으로 퍼지지 않게 막는다
     const openButton = $('#op-open');
     if (openButton) {
       openButton.addEventListener('pointerdown', (event) => event.stopPropagation());

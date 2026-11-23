@@ -15,7 +15,7 @@ Work out which stage the idea is at from `docs/games/drafts/<id>.md` (its **Stat
    - Give **2–4 mechanic options** with a recommendation. That's where cheap iteration happens.
    - Only the levels that matter (1, 3, 8, and any level where a new rule appears).
    - Be honest in the constraint check (10 s per game, 56 px, colour plus shape, little reading). Flag anything over budget instead of hiding it.
-   - Look for loopholes: can the player shortcut the intended thinking? (In 금고 열기, the elimination trick solved every note puzzle until decoy digits were added.)
+   - Look for loopholes: can the player shortcut the intended thinking? (In 금고 열기 round 1, a keypad showing only the key's digits let the leftover digit give away every clue.)
 3. Add the draft to the table in `docs/games/drafts/README.md`.
 
 ## Stage 2: mockup

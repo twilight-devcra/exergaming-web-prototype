@@ -1,46 +1,38 @@
 /* 금고 열기 스케치. 크기는 1280×800 태블릿의 게임 판 자리(약 1160×340)에 맞춘 px 이다.
    금고 문 색은 동전 세기의 탁자처럼 그림 안에 정해 둔다 (화면 스타일과 상관없이 진짜 물건처럼) */
 .sf-wrap { --tray-r: 12px; color: var(--ink); }
-.sf-key, .sf-pad { background: var(--panel); border-radius: var(--tray-r); box-shadow: var(--mat-shadow); }
-.sf-label { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--ink-soft); letter-spacing: 0.04em; }
-.sf-lock { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-.sf-lock rect { fill: currentColor; fill-opacity: 0.18; }
+.sf-key, .sf-pad, .sf-clues { background: var(--panel); border-radius: var(--tray-r); box-shadow: var(--mat-shadow); }
+.sf-label { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--ink-soft); letter-spacing: 0.04em; white-space: nowrap; }
+.sf-lock { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.sf-lock rect { fill: currentColor; fill-opacity: 0.25; }
 
-/* 열쇠 표 */
+/* 열쇠 표 (A · C: 세로) */
 .sf-key { padding: 8px 14px 10px; display: flex; flex-direction: column; gap: 4px; }
 .sf-krows { display: flex; flex-direction: column; gap: 2px; }
-.sf-krow { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 6px; border-radius: 8px; }
-.sf-krow + .sf-krow { border-top: 1px solid var(--line); border-radius: 0; }
+.sf-krow { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 6px; }
+.sf-krow + .sf-krow { border-top: 1px solid var(--line); }
 .sf-kglyph { width: 34px; height: 34px; flex: none; }
 .sf-eq { color: var(--ink-soft); font-weight: 700; font-size: 22px; }
 .sf-krow b { font-family: var(--font-num); font-size: 32px; font-weight: 900; min-width: 28px; text-align: center; }
-.sf-krow.unknown b { color: var(--accent); border: 2.5px dashed var(--accent); border-radius: 8px; padding: 0 6px; line-height: 34px; }
+/* 식: 숫자 자리에 '★ + 2'. 알아내야 할 줄이라 옅은 강조 바탕 */
+.sf-krow.formula { background: var(--accent-soft); border-radius: 8px; border-top-color: transparent; }
+.sf-krow.formula + .sf-krow { border-top-color: transparent; }
+.sf-formula { display: flex; align-items: center; gap: 6px; }
+.sf-fglyph { width: 28px; height: 28px; flex: none; }
+.sf-op { font-family: var(--font-num); font-size: 28px; font-weight: 900; color: var(--accent); line-height: 1; }
 
-/* 열렸던 암호 쪽지: 크림색 종이 + 테이프 */
-.sf-notes { display: flex; flex-direction: column; gap: 14px; }
-.sf-note { position: relative; padding: 12px 14px 10px; background: #fff7dc; border-radius: 6px; box-shadow: 0 2px 6px rgba(60, 50, 20, 0.16); rotate: -1.2deg; }
-.sf-note:nth-child(2) { rotate: 1deg; }
-.sf-note::before { content: ''; position: absolute; top: -8px; left: 50%; width: 54px; height: 16px; translate: -50% 0; background: rgba(214, 200, 160, 0.7); rotate: 2deg; }
-.sf-note .sf-label { color: #8a7440; margin-bottom: 6px; white-space: nowrap; }
-.sf-nrow { display: flex; gap: 8px; justify-content: center; }
-.sf-ncol { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.sf-nglyph { width: 32px; height: 32px; }
-.sf-ncol b { font-family: var(--font-num); font-size: 26px; font-weight: 900; color: #4a3c18; }
-
-/* 금고 문: 그림 칸 줄 + 숫자 창 줄, 오른쪽에 손잡이 바퀴 */
+/* 금고 문: 그림 칸 줄 + 숫자 창 줄, 손잡이 자리에 자물쇠 */
 .sf-door {
   --w: min(84px, calc(470px / var(--n)));
-  position: relative; display: flex; align-items: center;
-  padding: 22px 84px 22px 22px; border-radius: 22px;
+  position: relative; display: flex; align-items: center; gap: 22px;
+  padding: 22px 22px; border-radius: 22px;
   background: linear-gradient(160deg, #6f7c83, #4a565c);
   box-shadow: inset 0 0 0 5px #3a4449, inset 0 0 0 7px #7e8b92, 0 8px 18px rgba(20, 30, 35, 0.25);
-  transition: box-shadow 0.3s;
 }
 .sf-windows { display: flex; gap: 10px; }
 .sf-col { width: var(--w); display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 .sf-tile { height: var(--w); display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 12px; box-shadow: 0 2px 0 #39434a; }
 .sf-cglyph { width: 68%; height: 68%; }
-.sf-col:not(.cur) .sf-tile { opacity: 0.92; }
 .sf-col.cur .sf-tile { box-shadow: 0 0 0 4px var(--accent), 0 2px 0 #39434a; }
 .sf-win {
   position: relative; height: 66px; display: flex; align-items: center; justify-content: center;
@@ -53,31 +45,38 @@
 .sf-win.good { background: color-mix(in srgb, var(--good-soft) 70%, #fff); }
 .sf-win.bad { background: color-mix(in srgb, var(--bad-soft) 70%, #fff); color: var(--good); box-shadow: inset 0 0 0 3px var(--good); }
 .sf-win s { position: absolute; top: 2px; right: 6px; font-size: 20px; color: var(--bad); text-decoration-thickness: 3px; }
-.sf-handle { position: absolute; right: 18px; top: 50%; width: 50px; height: 50px; translate: 0 -50%; border-radius: 50%; background: radial-gradient(circle, #c9d1d5 0 7px, #39434a 8px 12px, transparent 13px), #2f383d; box-shadow: 0 0 0 4px #8f9ba1; transition: rotate 0.5s; }
-.sf-handle i { position: absolute; left: 50%; top: 50%; width: 6px; height: 34px; margin: -17px 0 0 -3px; border-radius: 3px; background: #c9d1d5; }
-.sf-handle i:nth-child(2) { rotate: 60deg; }
-.sf-handle i:nth-child(3) { rotate: -60deg; }
-.sf-state { position: absolute; right: 30px; top: 12px; color: #d9e0e3; font-size: 22px; }
+/* 자물쇠 판: 잠김(회색) → 열림(초록, 풀린 자물쇠) / 틀린 칸이 있으면 빨강 */
+.sf-lockplate {
+  flex: none; width: 62px; height: 62px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: #2f383d; color: #d9e0e3; font-size: 40px;
+  box-shadow: 0 0 0 4px #8f9ba1, inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  transition: background 0.3s, color 0.3s;
+}
 .sf-door.open { box-shadow: inset 0 0 0 5px #3a4449, inset 0 0 0 7px #7e8b92, 0 0 0 6px var(--good), 0 8px 24px color-mix(in srgb, var(--good) 45%, transparent); }
-.sf-door.open .sf-handle { rotate: 90deg; }
-.sf-door.open .sf-state { color: var(--good); }
-.sf-door.shut .sf-state { color: var(--bad); }
+.sf-door.open .sf-lockplate { background: var(--good); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 55%, #fff); }
+.sf-door.shut .sf-lockplate { background: var(--bad); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 55%, #fff); }
 
-/* 번호판: 열쇠 표에 있는 숫자만, 작은 수부터 */
+/* 번호판: 늘 1–9 (자리를 외울 수 있게, 표에 없는 숫자도 있어 '남는 숫자'로 풀리지 않게) */
 .sf-pad { display: grid; gap: 10px; padding: 12px; }
-.ar-cand.sf-num { width: 78px; height: 78px; font-size: 40px; font-family: var(--font-num); }
+.ar-cand.sf-num { width: 68px; height: 68px; font-size: 36px; font-family: var(--font-num); }
 .ar-cand.sf-num.hit { background: var(--good); color: var(--on-accent); }
 
-/* A. 옆으로: 열쇠 표 | (쪽지) | 금고 문 | 번호판 2열 */
+/* A. 옆으로: 열쇠 표 | 금고 문 | 번호판 3×3 */
 .sf-wrap.door { display: flex; align-items: center; gap: 30px; }
-.sf-wrap.door .sf-pad { grid-template-columns: repeat(2, auto); }
-.sf-wrap.door .sf-pad:has(> :nth-child(3):last-child) { grid-template-columns: auto; }
-.sf-wrap.door .sf-pad:has(> :nth-child(7)) { grid-template-columns: repeat(3, auto); } /* 미끼까지 7개 이상: 세 줄을 넘지 않게 */
-.sf-wrap.door .sf-pad:has(> :nth-child(7)) .ar-cand.sf-num { width: 68px; height: 68px; font-size: 34px; }
+.sf-wrap.door .sf-pad { grid-template-columns: repeat(3, auto); gap: 8px; padding: 10px; }
+.sf-wrap.door .ar-cand.sf-num { width: 62px; height: 62px; font-size: 32px; }
 
-/* B. 위아래로: 열쇠 표를 기호 바꾸기 검사처럼 가로 한 줄(그림 위 · 숫자 아래)로, 금고 문, 번호판 한 줄 */
+/* C. 열쇠 표 | (금고 문 위, 번호판 1–9 한 줄 아래) */
+.sf-wrap.below { display: flex; align-items: center; gap: 32px; }
+.sf-right { display: flex; flex-direction: column; align-items: center; gap: 40px; }
+.below .sf-door { --w: min(74px, calc(470px / var(--n))); padding: 16px 18px; }
+.below .sf-win { height: 58px; font-size: 38px; }
+.below .sf-pad { grid-auto-flow: column; gap: 8px; padding: 8px 10px; }
+.below .ar-cand.sf-num { width: 62px; height: 62px; font-size: 32px; }
+
+/* B. 위아래로: 열쇠 표를 기호 바꾸기 검사처럼 가로 한 줄(그림 위 · 숫자 아래)로, 식은 옆 상자, 금고 문, 번호판 한 줄 */
 .sf-wrap.strip { display: flex; flex-direction: column; align-items: center; gap: 22px; }
-.sf-top { display: flex; align-items: stretch; gap: 22px; }
+.sf-top { display: flex; align-items: stretch; gap: 40px; }
 .strip .sf-key { flex-direction: row; align-items: center; gap: 10px; padding: 6px 10px; }
 .strip .sf-key > .sf-label { writing-mode: vertical-rl; letter-spacing: 0.2em; }
 .strip .sf-krows { flex-direction: row; gap: 0; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -86,18 +85,16 @@
 .strip .sf-kglyph { width: 30px; height: 30px; margin: 5px 0; }
 .strip .sf-eq { display: none; }
 .strip .sf-krow b { width: 100%; border-top: 2px solid var(--line); font-size: 26px; line-height: 34px; }
-.strip .sf-krow.unknown b { border: 0; border-top: 2px solid var(--line); border-radius: 0; padding: 0; background: var(--accent-soft); }
-.strip .sf-notes { flex-direction: row; align-items: center; }
-.strip .sf-note { padding: 8px 12px 6px; }
-.strip .sf-nglyph { width: 26px; height: 26px; }
-.strip .sf-ncol b { font-size: 22px; }
-.strip .sf-door { --w: min(60px, calc(520px / var(--n))); padding: 12px 74px 12px 14px; border-radius: 18px; }
+.strip .sf-krow.unknown b { color: var(--accent); background: var(--accent-soft); }
+.sf-clues { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 8px 14px; }
+.sf-clue { display: flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 8px; background: var(--accent-soft); }
+.strip .sf-door { --w: min(60px, calc(520px / var(--n))); padding: 12px 14px; gap: 18px; border-radius: 18px; }
 .strip .sf-col { flex-direction: row; width: auto; gap: 6px; }
 .strip .sf-tile { width: var(--w); }
 .strip .sf-win { width: var(--w); height: var(--w); font-size: 36px; }
 .strip .sf-windows { gap: 14px; }
-.strip .sf-handle { width: 42px; height: 42px; right: 16px; }
-.strip .sf-state { display: none; }
-.strip .sf-pad { grid-auto-flow: column; padding: 8px 12px; }
-.strip .ar-cand.sf-num { width: 66px; height: 62px; font-size: 34px; }
+.strip .sf-lockplate { width: 48px; height: 48px; font-size: 26px; }
+.strip .sf-pad { grid-auto-flow: column; padding: 8px 12px; gap: 8px; }
+.strip .ar-cand.sf-num { width: 58px; height: 58px; font-size: 30px; }
+
 .dg-txt.dg-dim { opacity: 0.3; }

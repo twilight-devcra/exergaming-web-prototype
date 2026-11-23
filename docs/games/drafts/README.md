@@ -18,4 +18,4 @@ When a game is built, keep its card. It records why the design is the way it is,
 ## Drafts
 | Game | Status |
 |---|---|
-| [금고 열기 (`safe`)](safe.md) | mockup: waiting for verdict |
+| [금고 열기 (`safe`)](safe.md) | mockup round 2 (math clues, layout C): waiting for verdict |

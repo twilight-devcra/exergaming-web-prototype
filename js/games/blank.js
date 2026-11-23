@@ -50,6 +50,9 @@ export class BlankGame {
   ];
   static maxLevel = BlankGame.levels.length;
   static ROUNDS = 3;
+  // 글자 칸을 가장 크게 키울 때 (px, fit). 4낱말 판은 조금 작게
+  static MAX_LETTER = 108;
+  static MAX_LETTER_MANY = 92;
 
   // 소개 그림: ① 빈칸에 같은 글자가 들어가는 낱말들 ② 모두에 맞는 글자 고르기. Lv1 은 낱말 하나 (바□ → 다)
   static diagram(level = 2) {
@@ -110,15 +113,21 @@ export class BlankGame {
     this.host.after(200, () => this.ask());
   }
 
-  // 글자 칸 크기(--ch)는 CSS 가 화면 높이로 정한다. 그래도 판과 보기가 게임 영역보다 크면(휴대폰에서 4낱말이 한 줄에 하나씩 쌓일 때)
-  // 들어갈 때까지 줄인다. 줄면 낱말이 한 줄에 둘씩 들어가 금방 맞는다
+  // 글자 칸 크기(--ch)를 판 자리에 맞춘다. 가장 크게(MAX_LETTER) 놓아 보고 판과 보기가 게임 영역에 들어갈 때까지 줄인다.
+  // 가로로 눕힌 태블릿처럼 낮고 넓은 화면에서는 남는 높이만큼 커지고, 휴대폰에서 4낱말이 한 줄에 하나씩 쌓이면
+  // 줄어들면서 낱말이 한 줄에 둘씩 들어가 금방 맞는다. 낱말이 한 줄에 다 들어가던 화면에서 커지느라 줄이 넘어가지는 않게 한다
   fit() {
     this.board.style.removeProperty('--ch');
     const room = this.body.clientHeight - 8;
     const first = this.board.querySelector('.bl-ch');
     if (!room || !first) return;
-    for (let letterSize = first.offsetWidth - 2; this.wrap.offsetHeight > room && letterSize >= 30; letterSize -= 2) {
+    const lines = () => new Set([...this.board.children].map((word) => word.offsetTop)).size;
+    const baseLines = lines();
+    const baseSize = first.offsetWidth; // CSS 가 정한 처음 크기
+    const max = this.board.classList.contains('many') ? BlankGame.MAX_LETTER_MANY : BlankGame.MAX_LETTER;
+    for (let letterSize = Math.max(max, baseSize); letterSize >= 30; letterSize -= 2) {
       this.board.style.setProperty('--ch', `${letterSize}px`);
+      if (this.wrap.offsetHeight <= room && (letterSize <= baseSize || lines() <= baseLines)) return;
     }
   }
 

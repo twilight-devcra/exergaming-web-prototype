@@ -190,9 +190,13 @@ export class BoxGame {
   layout() {
     const { body } = this;
     const aspect = this.puzzle.width / this.puzzle.height;
-    const optionsHeight = this.optionBar.offsetHeight || 104;
+    // 보기가 없는 동안(과일이 오가는 것을 보는 동안)은 보기 줄을 접어 두어 상자 판이 판 자리를 다 쓰고,
+    // 보기가 나오면 그만큼 줄어든다 (css .bx-arena transition)
+    const hasOptions = this.optionBar.childElementCount > 0;
+    const optionsHeight = hasOptions ? this.optionBar.offsetHeight : 0;
+    const gap = hasOptions ? Util.gapOf(this.wrap, 22) : 0;
     // 최소 200px: 화면이 낮아도 상자와 보기가 판 자리를 넘치지 않게
-    const fitHeight = body.clientHeight - optionsHeight - Util.gapOf(this.wrap, 22) - 18;
+    const fitHeight = body.clientHeight - optionsHeight - gap - 18;
     const width = Math.max(200, Math.min(body.clientWidth - 40, fitHeight * aspect, 960));
     this.svg.style.width = `${width}px`;
     this.svg.style.height = `${width / aspect}px`;

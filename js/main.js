@@ -656,7 +656,7 @@ const App = {
     // 이 문제의 제한 시간: 답하는 속도(js/abilities.js)가 쓴다. 제한 시간 막대를 끈 판에도 잰다
     this.questionLimitMs = limitMs;
     if (!this.config.questionTimer) return;
-    // 막대는 게임의 안내 문구 안, 글자 바로 아래에 붙인다 (눈이 가 있는 곳 · 문구를 바꿔도 남는다 — Util.say).
+    // 막대는 게임의 안내 문구 안에 붙여 문구 알약의 바탕으로 줄어들게 한다 (눈이 가 있는 곳 · 문구를 바꿔도 남는다 — Util.say).
     // 문구가 없는 게임은 게임 영역 맨 위
     let bar = stage.querySelector('.qtimer');
     if (!bar) {

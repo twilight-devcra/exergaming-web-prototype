@@ -161,10 +161,10 @@ export class CoinGame {
       `<rect class="cn-felt" x="${RIM}" y="${RIM}" width="${WIDTH - 2 * RIM}" height="${HEIGHT - 2 * RIM}" rx="8" fill="url(#${this.idPrefix}-felt)"/>` +
       '<g class="cn-coins"></g>';
     this.coinsGroup = this.svg.querySelector('.cn-coins');
-    // 옆 칸: 값 표(값을 물을 때) 위, 보기 아래
+    // 옆 칸: 값 표(값을 물을 때) 위, 보기 아래. 값 표에는 제목이 없다 (동전 = 'N점' 만으로 뜻이 통한다)
     this.side = Util.element('div', 'cn-side');
     if (this.valueMode) {
-      this.legend = Util.element('div', 'cn-legend', '<div class="cn-legend-title">동전 값</div><div class="cn-rows"></div>');
+      this.legend = Util.element('div', 'cn-legend', '<div class="cn-rows"></div>');
       this.rows = this.legend.querySelector('.cn-rows');
       this.side.append(this.legend);
     }

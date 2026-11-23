@@ -132,8 +132,8 @@ export class CountGame {
   layout() {
     const body = this.body;
     const [rows, columns] = this.spec.grid;
-    // 보기 버튼과 그 위 간격이 쓰는 높이를 뺀 나머지에 격자를 맞춘다 (보기가 아직 없으면 버튼 한 줄 + 아래 여백 114px 로 친다)
-    const availableHeight = body.clientHeight - (this.optionRow.offsetHeight || 114) - Util.gapOf(this.wrap, 26) - 10;
+    // 보기 버튼과 그 위 간격이 쓰는 높이를 뺀 나머지에 격자를 맞춘다 (보기가 아직 없으면 버튼 한 줄 + 아래 여백 84px 로 친다)
+    const availableHeight = body.clientHeight - (this.optionRow.offsetHeight || 84) - Util.gapOf(this.wrap, 26) - 10;
     const gap = 6;   // css .cnt-grid gap
     const cellSize = Util.clamp(Math.min((availableHeight - (rows - 1) * gap) / rows, (body.clientWidth - 40 - (columns - 1) * gap) / columns), 22, 92);
     this.wrap.style.setProperty('--csz', `${cellSize}px`);

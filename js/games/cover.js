@@ -54,6 +54,7 @@ export class CoverGame {
   ];
   static maxLevel = CoverGame.levels.length;
   static ROUNDS = 3;
+  static HEIGHT_IN_TILES = 4.8; // 판 높이가 숫자 크기의 몇 배인지 (layout, 조금 여유를 둔 값)
   static MIN_VALUE = 2;   // 1 은 더해도 거의 생각할 게 없어서 뺀다
   static MAX_VALUE = 9;   // 숫자는 모두 서로 다르다 (상자 속 숫자가 겹치면 섞어 기억한 것을 가려낼 수 없다)
   static SHOW_MS = 1500;  // 외우는 시간 = SHOW_MS + SHOW_PER × 덮을 수
@@ -144,10 +145,12 @@ export class CoverGame {
     const width = board.clientWidth;
     const height = board.clientHeight;
     if (!width || !height) return;
-    // 안내 문구와 제한 시간 막대가 쓰는 높이(약 70px)를 빼고 맞춘다. 운영 버전은 식과 보기 사이를 더 띄우므로 그만큼도 뺀다
-    const previousTileSize = parseFloat(board.style.getPropertyValue('--tk'));
-    const extra = previousTileSize ? Math.max(0, Util.gapOf(this.center, previousTileSize * 0.3) - previousTileSize * 0.3) : 0;
-    const tileSize = Math.round(Util.clamp(Math.min((height - 70 - extra) / 5.6, width / (this.tokens.length * 1.3 + 0.5)), 36, 110));
+    // 판 높이 = 숫자 크기의 약 4.7배 (줄: 뚜껑 자리 0.75 + 숫자 1, 식: 위 여백 0.75 + 1, 식과 보기 사이 0.3, 보기 0.9 — css .cv-*).
+    // 안내 문구는 판 밖(.stage-head)이라 따로 빼지 않는다. 운영 버전은 식과 보기 사이를 더 띄우므로(--answer-gap) 그만큼 뺀다
+    if (!board.style.getPropertyValue('--tk')) board.style.setProperty('--tk', '50px');
+    const currentTileSize = parseFloat(board.style.getPropertyValue('--tk'));
+    const extra = Math.max(0, Util.gapOf(this.center, currentTileSize * 0.3) - currentTileSize * 0.3);
+    const tileSize = Math.round(Util.clamp(Math.min((height - 8 - extra) / CoverGame.HEIGHT_IN_TILES, width / (this.tokens.length * 1.3 + 0.5)), 36, 110));
     board.style.setProperty('--tk', `${tileSize}px`);
     const boardRect = board.getBoundingClientRect();
     // 숫자 줄과 식을 함께 감싼 자리 (문제): 운영 버전은 여기에 판 바탕을 깐다 (app/app.css .cv-board::before). 보기는 따로 감싼다

@@ -35,6 +35,7 @@ export class ArithGame {
   ];
   static maxLevel = ArithGame.levels.length;
   static ROUNDS = 3;
+  static MAX_SCALE = 1.45; // 식·숫자 단추를 기본 크기의 몇 배까지 키울지 (fit)
   static MIN_DIGIT = 1;
   static MAX_DIGIT = 9;
   static TRIES = 120; // 문제 하나를 만들 때 후보 묶음을 다시 뽑아 보는 횟수 (화면이 멈칫하지 않을 만큼만)
@@ -75,7 +76,23 @@ export class ArithGame {
     this.candidateRow = Util.element('div', 'ar-cands');
     this.wrap.append(this.equation, this.candidateRow);
     body.append(this.wrap);
+    this.body = body;
+    this.resizeObserver = new ResizeObserver(() => this.fit());
+    this.resizeObserver.observe(body);
     this.next();
+  }
+
+  // 판 자리가 남으면 식과 숫자 단추를 함께 키운다 (css --ars). 기본 크기는 화면 높이(vh)로 정해져 있어
+  // 가로로 눕힌 태블릿처럼 낮고 넓은 화면에서는 판 자리 아래위가 많이 남는다. 가장 크게 놓아 보고 들어갈 때까지 줄인다
+  fit() {
+    const room = this.body.clientHeight - 8;
+    const roomWidth = this.body.clientWidth - 40;
+    if (!room) return;
+    for (let scale = ArithGame.MAX_SCALE; scale >= 1; scale -= 0.05) {
+      this.wrap.style.setProperty('--ars', scale.toFixed(2));
+      if (this.wrap.offsetHeight <= room && this.equation.offsetWidth <= roomWidth) return;
+    }
+    this.wrap.style.setProperty('--ars', '1');
   }
 
   next() {
@@ -107,6 +124,7 @@ export class ArithGame {
     });
     this.phase = Phase.INPUT;
     this.render();
+    this.fit();
     this.host.question({ ops: puzzle.operators, cands: shown, ans: puzzle.answer, sol: puzzle.solution, solutions: puzzle.count, given: givenAt });
     this.host.timer(this.spec.blanks - givenAt.length, () => this.judge(true));
   }
@@ -171,8 +189,9 @@ export class ArithGame {
 
   advance() {
     this.round++;
-    if (this.round < ArithGame.ROUNDS) this.next();
-    else this.host.done(this.result());
+    if (this.round < ArithGame.ROUNDS) return this.next();
+    this.resizeObserver.disconnect();
+    this.host.done(this.result());
   }
 
   result() {
@@ -180,6 +199,7 @@ export class ArithGame {
   }
 
   abort() {
+    this.resizeObserver.disconnect();
     return abortedResult(this.correct, this.round);
   }
 

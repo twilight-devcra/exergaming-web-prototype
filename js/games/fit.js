@@ -133,8 +133,8 @@ export class FitGame {
     const body = this.body;
     const choiceCount = this.spec.choiceCount;
     const ratio = FitGame.PIECE_VIEW / FitGame.BOARD_VIEW;   // 버튼 크기 = 판 크기 * ratio
-    // 판과 조각 사이 간격(css gap)을 뺀 높이에 판 + 조각 한 줄을 맞춘다
-    const availableHeight = body.clientHeight - 88 - Util.gapOf(this.wrap, 24);
+    // 판과 조각 사이 간격(css gap)을 뺀 높이에 판 + 조각 한 줄을 맞춘다 (12 = 위아래 조금의 여유)
+    const availableHeight = body.clientHeight - 12 - Util.gapOf(this.wrap, 24);
     const pieceSize = Util.clamp(Math.min(availableHeight / (1 / ratio + 1.1), (body.clientWidth - 40) / choiceCount - 16), 52, 132);
     this.wrap.style.setProperty('--psz', `${pieceSize}px`);
     this.wrap.style.setProperty('--bsz', `${Math.round(pieceSize / ratio)}px`);

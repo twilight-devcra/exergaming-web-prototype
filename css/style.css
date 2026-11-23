@@ -437,25 +437,32 @@ body.sensor .kbd-only, body.sensor #keyhint { display: none; }
 @keyframes qpulse { to { box-shadow: 0 0 0 3px var(--bad-soft); } }
 /* 게임 안내 문구 (U.say). 판 바로 위에 두고, 할 일의 종류를 아이콘으로 먼저 보여 준다:
    look 👁 보기 · act ◎ 누르기 · good ✓ · bad ✕. 빈 문구도 자리는 지켜서 판이 위아래로 움직이지 않게 한다.
-   제한 시간 막대는 문구 안에 붙어 아래 여백에 놓인다 (막대가 생겨도 판이 밀리지 않는다) */
+   제한 시간 막대는 문구 알약의 바탕이 되어 글자 뒤에서 줄어든다. 따로 줄을 차지하지 않아 판 자리가 그만큼 넓다 */
 .stage-msg {
   position: relative;
   flex: none;
   min-height: 46px;
+  min-width: min(440px, 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 2px 20px;
-  margin-bottom: 26px;
+  padding: 2px 24px;
   border-radius: 999px;
+  isolation: isolate; /* 바탕 막대(z-index: -1)를 알약 바탕색 위, 글자 뒤에 둔다 */
   font-size: clamp(23px, 3.3vh, 31px);
   font-weight: 800;
   line-height: 1.15;
   text-align: center;
   color: var(--ink);
 }
-.stage-msg .qtimer { top: auto; bottom: -15px; }
+/* 문구 안의 막대: 알약 전체를 채우는 바탕. 글자가 늘 또렷하게 읽히도록 진한 색 대신 옅게 섞은 색으로 채운다 */
+.stage-msg .qtimer { inset: 0; z-index: -1; width: auto; height: auto; transform: none; border-radius: inherit; }
+.stage-msg .qtimer i { background: color-mix(in srgb, var(--accent) 26%, var(--panel)); }
+.stage-msg .qtimer.warn i { background: color-mix(in srgb, var(--warn) 34%, var(--panel)); }
+.stage-msg .qtimer.low i { background: color-mix(in srgb, var(--bad) 30%, var(--panel)); }
+/* 맞음·틀림의 바탕색을 막대가 가리지 않게 */
+.stage-msg:is(.good, .bad) .qtimer { opacity: 0; }
 .stage-msg:empty { visibility: hidden; }
 .stage-msg::before {
   content: "";
@@ -961,7 +968,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 /* 상자 속 과일 세기: 테두리 두른 칸 가운데의 검은 상자. 과일은 한 줄로 칸 끝에서 밀려 들어와 상자 뒤로 사라지고, 나와서 칸 끝 밖으로 나간다.
    상자가 열리면(.open) 속이 보인다 */
 .bx-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
-.bx-arena { display: block; overflow: hidden; touch-action: none; }
+.bx-arena { display: block; overflow: hidden; touch-action: none; transition: width 0.35s ease, height 0.35s ease; }
 .bx-field { fill: var(--panel); }
 .bx-frame { fill: none; stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 2; }
 .bx-ground { stroke: var(--line); stroke-width: 1.5; }
@@ -979,12 +986,15 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 @keyframes bx-ring { from { opacity: 0.55; transform: scale(0.6); } to { opacity: 0; transform: scale(1.5); } }
 @media (prefers-reduced-motion: reduce) {
   .bx-box.fx-in, .bx-box.fx-out { animation: none; }
+  .bx-arena { transition: none; }
 }
 .bx-box.asked .bx-shell { stroke: var(--accent); stroke-width: 3; }
 /* 과일 그림의 자리는 transform 속성으로 정하므로 css transform 을 쓰는 pop 대신 흐려졌다 나타나게만 */
 .bx-in > g { animation: bx-in 0.2s ease-out both; }
 @keyframes bx-in { from { opacity: 0; } }
 .bx-opts { min-height: clamp(72px, 12vh, 104px); }
+/* 보기가 나오기 전에는 자리를 차지하지 않는다 (판이 그만큼 크다, js/games/box.js layout) */
+.bx-opts:empty { display: none; }
 .bx-opt { animation: pop 0.18s ease-out; }
 .bx-opt svg { width: 66%; height: 66%; display: block; margin: auto; }
 .bx-opt:disabled:not(.right, .wrong, .answer) { opacity: 0.25; }
@@ -1056,7 +1066,6 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .cn-legend { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 14px; background: var(--cell); }
 .cn-legend.flash { animation: cn-flash 0.9s ease-out; }
 @keyframes cn-flash { 0%, 60% { box-shadow: 0 0 0 4px var(--accent); } }
-.cn-legend-title { font-size: 15px; font-weight: 700; color: var(--ink-soft); text-align: center; }
 .cn-rows { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 22px; }
 .cn-legend { max-width: 100%; }
 .cn-wrap:not(.side) .cn-rows { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; }
@@ -1076,9 +1085,8 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .cn-wrap.mix .cn-side { display: contents; }
 .cn-wrap.mix .cn-opts { grid-column: 1 / -1; justify-self: center; }
 .cn-wrap.mix .cn-rows { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
-/* 탁자 옆 자리는 너비가 귀하다: 제목을 빼고 (아이콘 = 값 만으로 뜻이 통한다) 여백을 줄인다 */
+/* 탁자 옆 자리는 너비가 귀하다: 여백을 줄인다 */
 .cn-wrap.mix .cn-legend { padding: 8px 10px; justify-self: center; } /* 칸을 채워 늘어나지 않게: 보기 줄이 두 칸에 걸쳐 칸을 넓히면 값 표가 따라 넓어져 탁자 자리를 잘못 잰다 */
-.cn-wrap.mix .cn-legend-title { display: none; }
 .cn-wrap.mix .cn-row { gap: 4px; }
 .cn-wrap.mix .cn-n:empty { min-width: 0; } /* 개수 칸은 답한 뒤에만 채워진다. 그 전에는 자리를 비워 두지 않는다 */
 .ar-cand.cn-opt { width: auto; min-width: clamp(72px, 12vh, 104px); padding: 0 10px; white-space: nowrap; animation: pop 0.18s ease-out; }
@@ -1178,7 +1186,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 }
 
 /* 같은 글자 넣기: 위에 빈칸이 하나씩 있는 낱말들, 아래에 글자 보기 (js/games/blank.js).
-   글자 칸 크기 --ch 는 화면 높이에 맞춘다. 4낱말은 조금 작게, 좁은 화면에서는 두 줄로 넘어간다 */
+   글자 칸 크기 --ch 는 판 자리에 맞춘다 (js/games/blank.js fit, 아래 값은 그 전의 처음 크기). 4낱말은 조금 작게, 좁은 화면에서는 두 줄로 넘어간다 */
 .bl-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; max-width: 100%; }
 .bl-board {
   --ch: clamp(46px, 9.5vh, 80px);
@@ -1241,7 +1249,8 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   display: flex;
   align-items: center;
   gap: 22px;
-  font-size: clamp(48px, 9vh, 88px);
+  /* --ars: 판 자리가 남으면 식과 숫자 단추를 함께 키우는 배율 (js/games/arith.js fit) */
+  font-size: calc(clamp(48px, 9vh, 88px) * var(--ars, 1));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1258,7 +1267,7 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
   color: var(--ink-soft);
 }
 /* 빈칸이 셋 이상이면 한 줄에 들어가도록 조금 줄인다 */
-.ar-eq.long { gap: 16px; font-size: clamp(40px, 7.5vh, 72px); }
+.ar-eq.long { gap: 16px; font-size: calc(clamp(40px, 7.5vh, 72px) * var(--ars, 1)); }
 .ar-eq.long .ar-slot { min-width: 1.6em; }
 .ar-slot.filled { cursor: pointer; }
 .ar-slot.given { cursor: default; background: var(--cell); }
@@ -1284,6 +1293,12 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .ar-cand:disabled { opacity: 0.25; cursor: default; }
 .ar-cand.wrong { background: var(--bad); color: var(--on-accent); opacity: 1; }
 .ar-cand.answer { box-shadow: inset 0 0 0 4px var(--good); opacity: 1; }
+/* 사칙연산 역산의 숫자 단추는 식과 함께 커진다 (.ar-cand 는 다른 게임의 보기 단추도 쓰므로 여기서만) */
+.ar-wrap .ar-cand {
+  width: calc(clamp(72px, 12vh, 104px) * var(--ars, 1));
+  height: calc(clamp(72px, 12vh, 104px) * var(--ars, 1));
+  font-size: calc(clamp(30px, 5.5vh, 46px) * var(--ars, 1));
+}
 
 /* 우세한 색 찾기 */
 .cnt-wrap { display: flex; flex-direction: column; align-items: center; gap: 26px; justify-content: center; }
@@ -1297,16 +1312,18 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .ccell svg { width: 100%; height: 100%; display: block; fill: rgba(255, 255, 255, 0.7); }
 .ccell.dim { opacity: 0.2; }
 .cnt-opts { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; padding-bottom: 26px; }
+/* 보기 단추는 납작하게: 색과 모양만 알아보면 되므로 높이를 줄여 그만큼 격자를 키운다 (js/games/count.js layout 이 단추 줄 높이를 잰다) */
 .cnt-opt {
   position: relative;
-  width: clamp(60px, 10vh, 88px);
-  height: clamp(60px, 10vh, 88px);
+  width: clamp(80px, 13vh, 120px);
+  height: clamp(46px, 6.5vh, 58px);
   padding: 0;
   border: 4px solid transparent;
   border-radius: 16px;
 }
-/* 모양은 격자 칸과 같은 크기: 칸의 svg 와 같은 --csz 상자에 같은 그림을 가운데 둔다 (버튼보다 커도 그림은 상자 가운데 절반쯤이라 버튼 안에 든다) */
-.cnt-opt svg { position: absolute; left: 50%; top: 50%; width: var(--csz); height: var(--csz); transform: translate(-50%, -50%); display: block; overflow: visible; pointer-events: none; fill: rgba(255, 255, 255, 0.8); }
+/* 모양은 격자 칸과 같은 크기: 칸의 svg 와 같은 --csz 상자에 같은 그림을 가운데 둔다 (버튼보다 커도 그림은 상자 가운데 절반쯤이라 버튼 안에 든다).
+   납작한 단추에서 삐져나오지 않게 단추 높이의 1.7배까지만 */
+.cnt-opt svg { position: absolute; left: 50%; top: 50%; height: min(var(--csz), 170%); aspect-ratio: 1; transform: translate(-50%, -50%); display: block; overflow: visible; pointer-events: none; fill: rgba(255, 255, 255, 0.8); }
 .cnt-opt .n {
   position: absolute;
   left: 0;
@@ -2028,7 +2045,7 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
   #hud-score, #streak { right: 14px; }
   .hud .value { font-size: 28px; }
   .stage { padding: 10px 12px 16px; }
-  .stage-msg { min-height: 40px; margin-bottom: 20px; padding: 2px 10px; gap: 8px; font-size: 20px; }
+  .stage-msg { min-height: 40px; padding: 2px 14px; gap: 8px; font-size: 20px; }
   .qtimer { width: min(300px, 80vw); }
   #shift-msg .name { font-size: 30px; }
   #shift-msg .hint { font-size: 17px; padding: 0 16px; }
@@ -2047,11 +2064,12 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 
   /* 미니게임: 화면 높이(vh)로 정한 크기가 휴대폰 너비에 넘치는 것들 */
   .ar-wrap { gap: 24px; }
-  .ar-eq { gap: 2.4vw; font-size: 10.5vw; }
-  .ar-eq.long { gap: 1.6vw; font-size: 8.4vw; }
+  .ar-eq { gap: 2.4vw; font-size: calc(10.5vw * var(--ars, 1)); }
+  .ar-eq.long { gap: 1.6vw; font-size: calc(8.4vw * var(--ars, 1)); }
   .ar-slot { border-width: 3px; border-radius: 12px; }
   .ar-cands { gap: 10px; }
   .ar-cand { width: 64px; height: 64px; font-size: 28px; }
+  .ar-wrap .ar-cand { width: calc(64px * var(--ars, 1)); height: calc(64px * var(--ars, 1)); font-size: calc(28px * var(--ars, 1)); }
   .cmp-opts { gap: 10px; }
   .ar-cand.cmp-btn { min-width: 132px; padding: 0 14px; gap: 8px; font-size: 22px; }
   /* 지시 따르기: 조작판이 통째로 작아지므로 (js/games/follow.js layout) 지시 화면 글자와 버튼 사이를 조정해 읽기 쉽게 */

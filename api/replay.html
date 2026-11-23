@@ -85,6 +85,19 @@
   .s-ink { stroke: var(--ink); } .s-axis { stroke: var(--axis); } .s-good { stroke: var(--good); } .s-bad { stroke: var(--bad); } .s-series { stroke: var(--series); }
   .f-good { fill: var(--good); } .f-bad { fill: var(--bad); } .f-series { fill: var(--series); } .f-on { fill: var(--on-strong); }
   .board text { font-family: var(--font); }
+  /* HTML 로 그리는 판 (지시 따르기 · 상자 속 과일) */
+  .rp-col { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 100%; }
+  .rp-text { margin: 0; font-size: 15px; font-weight: 600; text-align: center; text-wrap: balance; max-width: 480px; }
+  .rp-note { margin: 0; font-size: 12px; color: var(--ink-2); text-align: center; }
+  .rp-mut { color: var(--muted); }
+  .rp-ico { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; }
+  .rp-fruit { font-size: 18px; line-height: 1; }
+  .rp-steps { width: auto; font-size: 13px; }
+  .rp-steps th, .rp-steps td { text-align: left; white-space: normal; padding: 5px 10px; position: static; background: none; }
+  .rp-steps th { color: var(--muted); font-weight: 500; }
+  .rp-opts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .rp-opt { min-width: 44px; padding: 6px 10px; text-align: center; font-weight: 600; background: var(--surface); border: 1px solid var(--axis); border-radius: 8px; }
+  .rp-opt.good { border: 3px solid var(--good); } .rp-opt.bad { border: 3px solid var(--bad); } .rp-opt.right { border: 2px dashed var(--good); }
   .think { margin-top: 14px; }
   .think .k { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
   .think svg { display: block; width: 100%; height: 34px; }
@@ -161,9 +174,9 @@
   // 서버가 /admin/api/options 로 모든 게임 이름을 주면 덮어쓴다
   const TITLES = {
     path: '길 따라 그리기', symbol: '심볼 위치 외우기', arith: '사칙연산 역산', count: '우세한 색 찾기', fit: '빈자리 채우기',
-    seek: '숨은 순서 찾기', cover: '가린 숫자 더하기', ladder: '사다리 타기', pipe: '배관 타기', novel: '새로 나타난 그림', track: '공 따라가기',
-    follow: '지시 따르기', pair: '짝 없는 양말', box: '상자 속 과일', compare: '두 그림 비교하기', coin: '동전 세기',
-    recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기',
+    seek: '숨은 순서 찾기', cover: '가린 숫자 더하기', ladder: '사다리 타기', pipe: '배관 타기', novel: '없던 그림 찾기', track: '공 따라가기',
+    follow: '지시 따르기', pair: '짝 없는 것 찾기', box: '상자 속 과일 세기', compare: '두 그림 비교하기', coin: '동전 세기',
+    recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기', safe: '금고 열기',
   };
   const clockText = (milliseconds, tenths = true) => {
     if (milliseconds == null || !isFinite(milliseconds)) return '–';
@@ -227,7 +240,11 @@
       }
       return `<polygon points="${points}"/>`;
     },
-    moon: (x, y, radius) => `<path d="M${x + radius * 0.3} ${y - radius} a${radius} ${radius} 0 1 0 0 ${2 * radius} a${radius * 0.75} ${radius * 0.75} 0 1 1 0 ${-2 * radius}z"/>`,
+    // 심볼 위치 외우기의 초승달 (100×100 판의 M64 6 A45 45 0 1 0 94 72 A37 37 0 1 1 64 6 Z 를 반지름 radius 로 줄인 것)
+    moon: (x, y, radius) => {
+      const point = (px, py) => `${(x + ((px - 50) / 45) * radius).toFixed(1)} ${(y + ((py - 50) / 45) * radius).toFixed(1)}`;
+      return `<path d="M${point(64, 6)} A${radius} ${radius} 0 1 0 ${point(94, 72)} A${(radius * 37) / 45} ${(radius * 37) / 45} 0 1 1 ${point(64, 6)} Z"/>`;
+    },
     heart: (x, y, radius) => `<path d="M${x} ${y + radius * 0.85} C${x - radius * 1.3} ${y - radius * 0.1} ${x - radius * 0.6} ${y - radius * 1.1} ${x} ${y - radius * 0.35} C${x + radius * 0.6} ${y - radius * 1.1} ${x + radius * 1.3} ${y - radius * 0.1} ${x} ${y + radius * 0.85}z"/>`,
   };
   const SEEK_GLYPHS = ['circle', 'triangle', 'square', 'diamond', 'star', 'plus', 'heart', 'moon'];
@@ -235,6 +252,113 @@
   const COUNT_GLYPH = { red: 'circle', blue: 'square', green: 'triangle', yellow: 'diamond', purple: 'plus' };
   const svg = (width, height, body, label) => `<svg viewBox="0 0 ${width} ${height}" width="${width}" role="img" aria-label="${escapeHtml(label)}">${body}</svg>`;
   const badge = (x, y, label, className = 'f-series') => `<circle cx="${x}" cy="${y}" r="9" class="${className}"/><text x="${x}" y="${y + 3.5}" text-anchor="middle" font-size="10" font-weight="700" class="f-on">${label}</text>`;
+  // 심볼 위치 외우기의 그림 id (SYMBOLS) 와 조각 잇기의 tee. 모르는 id 는 동그라미
+  const glyph = (id, x, y, radius) => (id === 'tee'
+    ? `<path d="M${x - radius} ${y - radius}h${2 * radius}v${radius * 0.7}h${-radius * 0.6}v${radius * 1.3}h${-radius * 0.8}v${-radius * 1.3}h${-radius * 0.6}z"/>`
+    : (SHAPES[id] || SHAPES.circle)(x, y, radius));
+  // 고른 칸·보기의 테두리. 답한 뒤: 고른 것은 맞으면 초록 · 틀리면 빨강 실선, 고르지 않은 정답은 초록 점선
+  const pickRing = (x, y, width, height, answer, picked, right) => {
+    if (!answer || (!picked && !right)) return '';
+    return `<rect x="${x - 2}" y="${y - 2}" width="${width + 4}" height="${height + 4}" rx="9" fill="none" class="${picked ? (right ? 's-good' : 's-bad') : 's-good'}" stroke-width="${picked ? 3 : 2}" ${picked ? '' : 'stroke-dasharray="4 3"'}/>`;
+  };
+  // 수·글자 보기 한 줄 (판 가운데 정렬). 판 너비는 optionRowWidth 보다 작지 않게 잡는다
+  const optionRowWidth = (count) => count * 60 + 8;
+  const optionRow = (values, width, top, { right, answer, unit = '' }) => {
+    const optionWidth = 52, gap = 8, left = (width - (values.length * (optionWidth + gap) - gap)) / 2;
+    return values.map((value, i) => {
+      const x = left + i * (optionWidth + gap), picked = answer && answer.picked === value, isRight = value === right;
+      return `<rect x="${x}" y="${top}" width="${optionWidth}" height="34" rx="8" class="b-surf s-axis" stroke-width="1"/>` +
+        `<text x="${x + optionWidth / 2}" y="${top + 22}" text-anchor="middle" font-size="15" font-weight="600" class="${answer && isRight ? 'b-ink' : 'b-ink2'}">${escapeHtml(value)}${unit}</text>` +
+        pickRing(x, top, optionWidth, 34, answer, picked, isRight);
+    }).join('');
+  };
+  // HTML 판(지시 따르기 · 상자 속 과일)의 보기
+  const optionChips = (values, { right, answer, label }) => `<div class="rp-opts">${values.map((value) => {
+    const picked = answer && answer.picked === value, isRight = value === right;
+    return `<span class="rp-opt${answer && picked ? (isRight ? ' good' : ' bad') : answer && isRight ? ' right' : ''}">${label(value)}</span>`;
+  }).join('')}</div>`;
+
+  // 빈자리 채우기: 꼭짓점이 위인 육각형. 변 edge 의 바깥 방향은 -60° + 60°·edge (시계 방향). 모양 문자열은 docs/SESSION_LOG.md
+  const FIT_COLORS = ['#e5484d', '#f5b301', '#2f6fed'];
+  function fitHex(centerX, centerY, size, code, turns, isGap) {
+    const edges = String(code).split('/').map((edge) => [...edge].map(Number));
+    const corners = Array.from({ length: 6 }, (_, corner) => { const angle = ((-90 + 60 * corner) * Math.PI) / 180; return `${(centerX + size * Math.cos(angle)).toFixed(1)},${(centerY + size * Math.sin(angle)).toFixed(1)}`; }).join(' ');
+    const apothem = (size * Math.sqrt(3)) / 2;
+    const port = (edge, j) => {
+      const angle = ((-60 + 60 * edge) * Math.PI) / 180, normalX = Math.cos(angle), normalY = Math.sin(angle);
+      const offset = edges[edge].length < 2 ? 0 : (j === 0 ? -1 : 1) * size * 0.2;
+      return [centerX + apothem * normalX - normalY * offset, centerY + apothem * normalY + normalX * offset, normalX, normalY];
+    };
+    let out = `<g transform="rotate(${turns * 60} ${centerX} ${centerY})"><polygon points="${corners}" class="${isGap ? 'b-grid' : 'b-surf'} s-axis" stroke-width="1.5" ${isGap ? 'stroke-dasharray="5 4"' : ''}/>`;
+    const ends = {};
+    edges.forEach((colors, edge) => colors.forEach((color, j) => (ends[color] ||= []).push(port(edge, j))));
+    for (const [color, points] of Object.entries(ends)) {
+      const stroke = `stroke="${FIT_COLORS[color] || 'var(--ink)'}" stroke-width="${size * 0.14}" stroke-linecap="round" fill="none"`;
+      if (isGap) { for (const [x, y, normalX, normalY] of points) out += `<line x1="${x}" y1="${y}" x2="${x - normalX * size * 0.3}" y2="${y - normalY * size * 0.3}" ${stroke}/>`; continue; }
+      const [[x1, y1], [x2, y2] = [centerX, centerY]] = points;
+      out += `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} Q${centerX} ${centerY} ${x2.toFixed(1)} ${y2.toFixed(1)}" ${stroke}/>`;
+    }
+    return out + '</g>';
+  }
+
+  // 가린 숫자 더하기의 상자 표시 색
+  const MARK_COLORS = { ...COUNT_COLORS, cyan: '#06aed5' };
+
+  // 없던 그림 찾기의 그림 (js/games/novel.js 의 NOVEL_SHAPES · NOVEL_MARKS 와 같다, 100×100)
+  const novelPolygon = (sides, radius, centerY, inner = 0) => Array.from({ length: inner ? sides * 2 : sides }, (_, i) => {
+    const angle = ((-90 + (360 / (inner ? sides * 2 : sides)) * i) * Math.PI) / 180, r = inner && i % 2 ? inner : radius;
+    return `${(50 + Math.cos(angle) * r).toFixed(1)},${(centerY + Math.sin(angle) * r).toFixed(1)}`;
+  }).join(' ');
+  const NOVEL_SHAPES = {
+    circle: [50, '<circle cx="50" cy="50" r="42" fill="#e5484d"/>'],
+    square: [50, '<rect x="10" y="10" width="80" height="80" rx="7" fill="#2f6fed"/>'],
+    triangle: [63, '<polygon points="50,6 96,92 4,92" fill="#1f9d55"/>'],
+    star: [56, `<polygon points="${novelPolygon(5, 48, 54, 24)}" fill="#e09b00"/>`],
+    plus: [50, '<path d="M35 5h30v30h30v30H65v30H35V65H5V35h30z" fill="#f76808"/>'],
+    heart: [48, '<path d="M50 93 L10 54 A23 23 0 0 1 50 19 A23 23 0 0 1 90 54 Z" fill="#e5484d"/>'],
+    drop: [62, '<path d="M50 4 C62 24 86 44 86 62 A36 36 0 0 1 14 62 C14 44 38 24 50 4 Z" fill="#06aed5"/>'],
+    hexagon: [50, `<polygon points="${novelPolygon(6, 46, 50)}" fill="#8e4ec6"/>`],
+    pentagon: [55, `<polygon points="${novelPolygon(5, 47, 55)}" fill="#1f9d55"/>`],
+    dome: [62, '<path d="M6 86 A44 44 0 0 1 94 86 Z" fill="#8e4ec6"/>'],
+    cloud: [58, '<path d="M24 82 A18 18 0 0 1 22 46 A22 22 0 0 1 60 30 A20 20 0 0 1 82 50 A16 16 0 0 1 78 82 Z" fill="#2f6fed"/>'],
+  };
+  const NOVEL_MARKS = {
+    none: () => '',
+    dot: (y) => `<circle cx="50" cy="${y}" r="10"/>`,
+    bar: (y) => `<rect x="31" y="${y - 6}" width="38" height="12" rx="4"/>`,
+    ring: (y) => `<circle cx="50" cy="${y}" r="12" fill="none" stroke="#fff" stroke-width="7"/>`,
+    tri: (y) => `<polygon points="50,${y - 13} 63,${y + 10} 37,${y + 10}"/>`,
+  };
+  const novelPicture = (shapeId, markId) => {
+    const [markY, picture] = NOVEL_SHAPES[shapeId] || [50, '<circle cx="50" cy="50" r="42" fill="var(--axis)"/>'];
+    const mark = (NOVEL_MARKS[markId] || NOVEL_MARKS.none)(markY);
+    return picture + (mark ? `<g fill="#fff" stroke="rgba(0,0,0,0.22)" stroke-width="2.5" paint-order="stroke">${mark}</g>` : '');
+  };
+
+  // 짝 없는 것 찾기의 양말 (js/games/pair.js 와 같다, 80×110 · 발목이 위)
+  const PAIR_COLORS = [['#e5484d', '#fff'], ['#2f6fed', '#fff'], ['#1f9d55', '#fff'], ['#f5b301', '#7a4b00'], ['#8e4ec6', '#fff'], ['#f76808', '#fff'], ['#06aed5', '#fff']].map(([fill, ink]) => ({ fill, ink }));
+  const PAIR_SOCK = 'M16 8 H46 V62 C46 70 50 74 58 78 L70 84 C80 89 80 102 70 104 C64 106 58 104 52 101 L28 89 C18 84 16 76 16 66 Z';
+  const PAIR_PATTERNS = {
+    plain: () => '',
+    stripes: (ink) => [30, 44, 58].map((y) => `<rect x="0" y="${y}" width="80" height="6" fill="${ink}"/>`).join(''),
+    thin: (ink) => [32, 40, 48, 56].map((y) => `<rect x="0" y="${y}" width="80" height="2.5" fill="${ink}"/>`).join(''),
+    dots: (ink) => [[24, 30], [38, 36], [24, 44], [38, 52], [26, 62], [40, 76], [56, 88], [68, 96]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.6" fill="${ink}"/>`).join(''),
+    zigzag: (ink) => [38, 54].map((y) => `<polyline points="14,${y} 21,${y - 6} 28,${y} 35,${y - 6} 42,${y} 49,${y - 6}" fill="none" stroke="${ink}" stroke-width="3.2" stroke-linejoin="round"/>`).join(''),
+    heart: (ink) => `<path d="M31 56 L22 47 A5.2 5.2 0 0 1 31 39 A5.2 5.2 0 0 1 40 47 Z" fill="${ink}"/>`,
+    star: (ink) => `<g fill="${ink}">${SHAPES.star(31, 47, 10)}</g>`,
+    vstripe: (ink) => [21, 29, 37].map((x) => `<rect x="${x}" y="20" width="4" height="46" fill="${ink}"/>`).join(''),
+    toe: (ink) => `<path d="M56 74 L84 88 L84 112 L44 112 Z" fill="${ink}" opacity="0.9"/><circle cx="20" cy="84" r="9" fill="${ink}" opacity="0.9"/>`,
+  };
+
+  // 상자 속 과일 세기의 과일
+  const FRUIT_ICONS = { apple: '🍎', watermelon: '🍉', grape: '🍇', pear: '🍐', orange: '🍊' };
+  const fruitIcon = (id) => `<span class="rp-fruit" title="${escapeHtml(id)}">${FRUIT_ICONS[id] || escapeHtml(id)}</span>`;
+
+  // 동전 세기의 동전·배지: 색마다 무늬가 따로 있다 (js/games/coin.js 의 TOKENS)
+  const COIN_STYLE = {
+    bronze: { fill: '#c7763f', mark: 'circle' }, red: { fill: '#d1343a', mark: 'star' }, blue: { fill: '#2557c9', mark: 'square' },
+    green: { fill: '#1d8a4c', mark: 'triangle' }, black: { fill: '#2a2e36', mark: 'diamond' }, purple: { fill: '#7b3fb3', mark: 'plus' },
+  };
 
   // 각 그리기는 (문제, 지금까지의 입력, 보이는 답 또는 null) → SVG
   const DRAW = {
@@ -425,6 +549,306 @@
         if (picked) body += `<polygon points="${hexPoints(cellX, cellY, cellSize * 0.82)}" fill="none" class="${answer.correct ? 's-good' : 's-bad'}" stroke-width="3"/>`;
       });
       return svg(width, Math.max(...centerYs) - minY + cellSize + top, body, '육각 판과 찾을 순서');
+    },
+
+    // 심볼 위치 외우기: 2×4 판에 외울 때 보여 준 심볼을 옅게, 위에 물은 심볼
+    symbol(question, inputs, answer) {
+      const data = question.data, cellSize = 58, pad = 8, top = 58, placed = new Map(data.board || []);
+      let body = `<text x="${pad}" y="14" font-size="11" class="b-mut">이 그림이 있던 칸은?</text>`;
+      body += `<rect x="${pad}" y="20" width="30" height="30" rx="6" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${glyph(data.target, pad + 15, 35, 10)}</g>`;
+      for (let slot = 0; slot < 8; slot++) {
+        const x = pad + (slot % 4) * cellSize, y = top + Math.floor(slot / 4) * cellSize, isAnswer = answer && slot === data.slot;
+        body += `<rect x="${x + 3}" y="${y + 3}" width="${cellSize - 6}" height="${cellSize - 6}" rx="8" class="${isAnswer ? 'f-good' : 'b-surf'} s-axis" stroke-width="1" ${isAnswer ? 'fill-opacity="0.2"' : ''}/>`;
+        if (placed.has(slot)) body += `<g class="${slot === data.slot ? 'b-ink2' : 'b-mut'}" opacity="0.75">${glyph(placed.get(slot), x + cellSize / 2, y + cellSize / 2, 14)}</g>`;
+        body += pickRing(x + 3, y + 3, cellSize - 6, cellSize - 6, answer, answer && answer.picked === slot, isAnswer);
+      }
+      return svg(pad * 2 + 4 * cellSize, top + 2 * cellSize + pad, body, '심볼 판과 고른 칸');
+    },
+
+    // 빈자리 채우기: 위에 빈자리(선이 끝나는 자리), 아래에 화면에 보인 대로 돌린 보기 조각
+    fit(question, inputs, answer) {
+      const data = question.data, choices = data.shown || [], gapSize = 46, size = 30, choiceWidth = 76, pad = 10;
+      const width = Math.max(gapSize * 2 + pad * 2, choices.length * choiceWidth + pad * 2), choicesTop = gapSize * 2 + 34;
+      let body = `<text x="${width / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">빈자리</text>`;
+      body += fitHex(width / 2, 18 + gapSize, gapSize, data.gap, 0, true);
+      choices.forEach((choice, i) => {
+        const centerX = pad + i * choiceWidth + choiceWidth / 2, centerY = choicesTop + size + 6;
+        body += fitHex(centerX, centerY, size, choice.piece, choice.rot || 0, false);
+        body += pickRing(centerX - size - 6, centerY - size - 6, 2 * size + 12, 2 * size + 12, answer, answer && answer.picked === i, choice.answer);
+      });
+      return svg(width, choicesTop + 2 * size + 20, body, '빈자리와 보기 조각');
+    },
+
+    // 가린 숫자 더하기: 판의 숫자(덮인 것은 상자 색, 숫자는 옅게), 식에 든 두 숫자, 보기
+    cover(question, inputs, answer) {
+      const data = question.data, tokenSize = 44, gap = 8, pad = 8, terms = data.terms || [];
+      const width = Math.max(pad * 2 + data.values.length * (tokenSize + gap) - gap, optionRowWidth((data.opts || []).length), 280);
+      const left = (width - (data.values.length * (tokenSize + gap) - gap)) / 2;
+      let body = '';
+      data.values.forEach((value, i) => {
+        const x = left + i * (tokenSize + gap), mark = data.marks[i], term = terms.indexOf(i);
+        body += mark
+          ? `<rect x="${x}" y="${pad + 10}" width="${tokenSize}" height="${tokenSize}" rx="8" fill="${MARK_COLORS[mark] || 'var(--axis)'}"/><text x="${x + tokenSize / 2}" y="${pad + 10 + tokenSize / 2 + 6}" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" opacity="0.75">${value}</text>`
+          : `<rect x="${x}" y="${pad + 10}" width="${tokenSize}" height="${tokenSize}" rx="8" class="b-surf s-axis" stroke-width="1"/><text x="${x + tokenSize / 2}" y="${pad + 10 + tokenSize / 2 + 7}" text-anchor="middle" font-size="20" font-weight="700" class="b-ink">${value}</text>`;
+        if (term >= 0) body += `<rect x="${x - 3}" y="${pad + 7}" width="${tokenSize + 6}" height="${tokenSize + 6}" rx="10" fill="none" class="s-series" stroke-width="2.5"/>` + badge(x + tokenSize / 2, pad + 4, term + 1);
+      });
+      // 덮인 숫자는 상자 색 ■ 를 앞에 붙인다
+      const termText = (i) => (data.marks[i] ? `<tspan fill="${MARK_COLORS[data.marks[i]] || 'var(--axis)'}">■</tspan>${data.values[i]}` : data.values[i]);
+      body += `<text x="${width / 2}" y="${pad + tokenSize + 40}" text-anchor="middle" font-size="15" font-weight="600" class="b-ink">${terms.map(termText).join(' + ')} = ${answer ? data.ans : '?'}</text>`;
+      const optionsTop = pad + tokenSize + 56;
+      body += optionRow(data.opts || [], width, optionsTop, { right: data.ans, answer });
+      return svg(width, optionsTop + 44, body, '숫자 판과 식, 보기');
+    },
+
+    // 없던 그림 찾기: 바뀌기 전과 뒤의 판. 답한 뒤 새 그림 칸을 보인다
+    novel(question, inputs, answer) {
+      const data = question.data, [rows, cols] = data.grid, cellSize = 46, pad = 6, gap = 26, top = 18;
+      const side = cols * cellSize, width = side * 2 + gap + pad * 2;
+      const board = (left, items, isAfter) => {
+        let out = '';
+        for (let cell = 0; cell < rows * cols; cell++) {
+          const x = left + (cell % cols) * cellSize, y = top + Math.floor(cell / cols) * cellSize;
+          out += `<rect x="${x + 2}" y="${y + 2}" width="${cellSize - 4}" height="${cellSize - 4}" rx="7" class="b-surf s-axis" stroke-width="1"/>`;
+        }
+        for (const [cell, shapeId, markId] of items) {
+          const x = left + (cell % cols) * cellSize, y = top + Math.floor(cell / cols) * cellSize;
+          out += `<g transform="translate(${x + 6} ${y + 6}) scale(${(cellSize - 12) / 100})">${novelPicture(shapeId, markId)}</g>`;
+          if (isAfter) out += pickRing(x + 2, y + 2, cellSize - 4, cellSize - 4, answer, answer && answer.cell === cell, cell === data.at);
+        }
+        return out;
+      };
+      let body = `<text x="${pad + side / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">바뀌기 전</text><text x="${pad + side + gap + side / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">바뀐 뒤 (답하는 판)</text>`;
+      body += board(pad, data.before || [], false) + board(pad + side + gap, data.after || [], true);
+      body += `<text x="${pad + side + gap / 2}" y="${top + (rows * cellSize) / 2 + 5}" text-anchor="middle" font-size="16" class="b-mut">→</text>`;
+      const note = [data.mode === 'replace' ? '있던 그림 하나를 바꿈' : '빈 칸에 하나를 더함', data.moved ? `자리 바꾼 그림 ${data.moved}개` : null, data.similar ? '모양이 같은 그림이 판에 있음' : null].filter(Boolean).join(' · ');
+      body += `<text x="${width / 2}" y="${top + rows * cellSize + 18}" text-anchor="middle" font-size="11" class="b-ink2">${escapeHtml(note)}</text>`;
+      return svg(width, top + rows * cellSize + 26, body, '바뀌기 전과 뒤의 판');
+    },
+
+    // 공 따라가기: 처음 자리(★ = 따라갈 공)와 끝 자리. 고른 공에 누른 차례
+    track(question, inputs, answer) {
+      const data = question.data, scale = 1.5, radius = 7, arenaWidth = (160 + 2 * radius) * scale, arenaHeight = (100 + 2 * radius) * scale, gap = 20, top = 18;
+      const targets = new Set(data.targets || []), toX = (left, x) => left + (x + radius) * scale, toY = (y) => top + (y + radius) * scale;
+      const arena = (left) => `<rect x="${left}" y="${top}" width="${arenaWidth}" height="${arenaHeight}" rx="${radius * scale}" class="b-surf s-axis" stroke-width="1"/>`;
+      let body = `<text x="${arenaWidth / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">처음 (★ 따라갈 공)</text><text x="${arenaWidth + gap + arenaWidth / 2}" y="12" text-anchor="middle" font-size="11" class="b-mut">끝 (고르는 판)</text>`;
+      body += arena(0) + arena(arenaWidth + gap);
+      (data.start || []).forEach(([x, y], i) => {
+        body += `<circle cx="${toX(0, x)}" cy="${toY(y)}" r="${radius * scale}" class="${targets.has(i) ? 'f-series' : 'b-grid'}" ${targets.has(i) ? 'fill-opacity="0.85"' : ''}/>`;
+        if (targets.has(i)) body += `<text x="${toX(0, x)}" y="${toY(y) + 4}" text-anchor="middle" font-size="11" class="f-on">★</text>`;
+      });
+      const order = new Map(inputs.map((input, i) => [input.ball, { n: i + 1, correct: input.correct }]));
+      const picked = new Set(answer && answer.picked ? answer.picked : inputs.map((input) => input.ball));
+      (data.end || []).forEach(([x, y], i) => {
+        const centerX = toX(arenaWidth + gap, x), centerY = toY(y), pick = order.get(i);
+        body += `<circle cx="${centerX}" cy="${centerY}" r="${radius * scale}" class="b-grid s-axis" stroke-width="1"/>`;
+        if (picked.has(i)) {
+          const right = targets.has(i);
+          body += `<circle cx="${centerX}" cy="${centerY}" r="${radius * scale + 3}" fill="none" class="${right ? 's-good' : 's-bad'}" stroke-width="3"/>`;
+          if (pick) body += badge(centerX, centerY, pick.n, right ? 'f-good' : 'f-bad');
+        } else if (answer && targets.has(i)) body += `<circle cx="${centerX}" cy="${centerY}" r="${radius * scale + 3}" fill="none" class="s-good" stroke-width="2" stroke-dasharray="4 3"/>`;
+      });
+      const caption = `공 ${(data.start || []).length}개 중 ${targets.size}개 · ${((data.move || 0) / 1000).toFixed(1)}초 움직임${data.pass ? ' · 서로 지나감' : ''}${answer ? ` · 맞힌 공 ${answer.hits ?? '–'}/${answer.of ?? targets.size}` : ''}`;
+      body += `<text x="${arenaWidth + gap / 2}" y="${top + arenaHeight + 18}" text-anchor="middle" font-size="11" class="b-ink2">${escapeHtml(caption)}</text>`;
+      return svg(arenaWidth * 2 + gap, top + arenaHeight + 26, body, '처음과 끝의 공 자리');
+    },
+
+    // 지시 따르기: 지시 글, 조작판(램프 · 스위치 · 버튼)에 누른 차례. 답한 뒤 정답 조작을 점선으로
+    follow(question, inputs, answer) {
+      const data = question.data, size = 46, gap = 10, pad = 8;
+      const rows = [['l', data.lamps || []], ['s', data.swOn || []], ['b', data.buttons || []]].filter(([, items]) => items.length);
+      const longest = Math.max(1, ...rows.map(([, items]) => items.length)), width = pad * 2 + longest * (size + gap) - gap;
+      const presses = {};
+      inputs.forEach((input, i) => (presses[input.ctrl] ||= []).push({ n: i + 1, ok: input.correct && !input.early }));
+      const expected = new Set(data.answer || []);
+      let body = '', y = pad + 12;
+      for (const [prefix, items] of rows) {
+        const left = (width - (items.length * (size + gap) - gap)) / 2;
+        items.forEach((item, i) => {
+          const id = `${prefix}${i}`, x = left + i * (size + gap), pressed = presses[id] || [];
+          if (prefix === 'l') body += `<circle cx="${x + size / 2}" cy="${y + size / 2}" r="${size / 2 - 6}" ${item ? 'fill="var(--late)"' : 'class="b-grid s-axis" stroke-width="1"'}/>`;
+          else if (prefix === 's') {
+            const on = item || pressed.length > 0;
+            body += `<rect x="${x + 4}" y="${y + 12}" width="${size - 8}" height="${size - 24}" rx="${(size - 24) / 2}" class="${on ? 'f-series' : 'b-grid'} s-axis" stroke-width="1"/><circle cx="${on ? x + size - 15 : x + 15}" cy="${y + size / 2}" r="${(size - 30) / 2}" class="b-surf"/>`;
+          } else body += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="10" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${glyph(item, x + size / 2, y + size / 2, 13)}</g>`;
+          if (answer && expected.has(id)) body += `<rect x="${x - 3}" y="${y - 3}" width="${size + 6}" height="${size + 6}" rx="12" fill="none" class="s-good" stroke-width="2" stroke-dasharray="4 3"/>`;
+          pressed.forEach((press, j) => (body += badge(x + size - 4 - j * 14, y + 2, press.n, press.ok ? 'f-good' : 'f-bad')));
+        });
+        y += size + gap + 8;
+      }
+      const nameOf = (id) => (id[0] === 'b' ? `<svg class="rp-ico" viewBox="-12 -12 24 24"><g class="b-ink">${glyph((data.buttons || [])[Number(id.slice(1))], 0, 0, 10)}</g></svg>` : id[0] === 's' ? `스위치 ${Number(id.slice(1)) + 1}` : `램프 ${Number(id.slice(1)) + 1}`);
+      const ordered = (data.groups || []).some((group) => group.ordered);
+      const notes = [data.read ? '읽는 단계 뒤 지시를 가림' : null, data.go ? `기다림: ${escapeHtml(typeof data.go === 'string' ? data.go : JSON.stringify(data.go))}` : null, `종류 ${escapeHtml(data.kind || '?')}`].filter(Boolean).join(' · ');
+      return `<div class="rp-col"><p class="rp-text">${escapeHtml(data.text || '')}</p>${svg(width, y - 8, body, '조작판과 누른 차례')}` +
+        (answer ? `<p class="rp-note">정답 조작: ${(data.answer || []).map(nameOf).join(ordered ? ' → ' : ' · ') || '없음'}</p>` : '') + `<p class="rp-note">${notes}</p></div>`;
+    },
+
+    // 짝 없는 것 찾기: 빨랫줄의 양말들. 답한 뒤 짝 없는 양말을 보인다
+    pair(question, inputs, answer) {
+      const data = question.data, socks = data.socks || [], perRow = Math.min(socks.length, 8), scale = 0.56, cellWidth = 54, cellHeight = 72, pad = 6;
+      let body = `<defs><clipPath id="rp-sock"><path d="${PAIR_SOCK}"/></clipPath></defs>`;
+      socks.forEach(([pattern, cuff, color, flip], i) => {
+        const x = pad + (i % perRow) * cellWidth, y = pad + Math.floor(i / perRow) * cellHeight, palette = PAIR_COLORS[color] || PAIR_COLORS[0];
+        const cuffBand = cuff ? '<rect x="0" y="0" width="80" height="20" fill="#f7f8fa"/>' : '<rect x="0" y="18" width="80" height="2.5" fill="rgba(0,0,0,0.22)"/>';
+        const sock = `<path d="${PAIR_SOCK}" fill="${palette.fill}"/><g clip-path="url(#rp-sock)">${(PAIR_PATTERNS[pattern] || PAIR_PATTERNS.plain)(palette.ink)}${cuffBand}</g><path d="${PAIR_SOCK}" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="2"/>`;
+        body += `<g transform="translate(${x + 3} ${y + 4}) scale(${scale})"><g ${flip ? 'transform="translate(84 0) scale(-1 1)"' : ''}>${sock}</g></g>`;
+        body += pickRing(x, y, cellWidth - 4, cellHeight - 6, answer, answer && answer.picked === i, i === data.odd);
+      });
+      const rows = Math.ceil(socks.length / perRow);
+      return svg(pad * 2 + perRow * cellWidth, pad * 2 + rows * cellHeight + (data.lure ? 14 : 0), body + (data.lure ? `<text x="${pad}" y="${pad + rows * cellHeight + 10}" font-size="11" class="b-ink2">미끼: 한 짝과 ${data.lure === 'cuff' ? '발목' : '무늬'}만 다름</text>` : ''), '양말들과 고른 양말');
+    },
+
+    // 상자 속 과일 세기: 처음 든 과일, 차례마다 드나든 과일, (답한 뒤) 끝에 든 과일, 질문과 보기
+    box(question, inputs, answer) {
+      const data = question.data, boxes = data.boxes || ['A'], twoBoxes = boxes.length > 1, ask = data.ask || {};
+      const where = (spot) => ({ L: '밖', R: '밖', A: twoBoxes ? '위 상자' : '상자', B: '아래 상자' })[spot] || spot;
+      const fruits = (counts) => Object.entries(counts || {}).flatMap(([kind, count]) => Array(count).fill(fruitIcon(kind))).join('') || '<span class="rp-mut">비었음</span>';
+      const contents = (label, all) => `<tr><th>${label}</th><td>${boxes.map((spot) => `${twoBoxes ? `<b>${where(spot)}</b> ` : ''}${fruits(all && all[spot])}`).join('<br>')}</td></tr>`;
+      const moveText = (move) => {
+        const route = move.from === 'L' && move.to === 'R' ? '지나감' : move.from === 'L' ? `${where(move.to)}에 들어감` : move.to === 'R' ? `${where(move.from)}에서 나감` : `${where(move.from)} → ${where(move.to)}`;
+        return `<span class="${move.decoy ? 'rp-mut' : ''}">${(move.fruits || []).map(fruitIcon).join('')} ${route}</span>`;
+      };
+      const stepRows = (data.steps || []).map((moves, i) => `<tr><th>${i + 1}</th><td>${moves.map(moveText).join('<br>')}</td></tr>`).join('');
+      const place = twoBoxes ? `${where(ask.box)} 안에` : '상자 안에';
+      const kinds = ask.kinds || [];
+      const text = { total: `${place} 과일이 모두 몇 개?`, kind: `${place} ${fruitIcon(kinds[0])} 몇 개?`, most: `${place} 가장 많은 과일은?` }[ask.type] || `${fruitIcon(kinds[0])} 가 ${fruitIcon(kinds[1])} 보다 몇 개 더?`;
+      return `<div class="rp-col"><table class="rp-steps">${contents('처음', data.start)}${stepRows}${answer ? contents('끝', data.end) : ''}</table>` +
+        `<p class="rp-text">${text}</p>${optionChips(data.opts || [], { right: data.ans, answer, label: ask.type === 'most' ? fruitIcon : escapeHtml })}</div>`;
+    },
+
+    // 동전 세기: 탁자 위 동전(나중 것이 위), 값 표, 보기
+    coin(question, inputs, answer) {
+      const data = question.data, scale = 1.2, tableSize = 220 * scale, radius = 22 * scale, tableWidth = 150;
+      const kinds = data.kinds || [], values = data.values || [], valueMode = data.mode === 'value';
+      let body = `<rect x="0" y="0" width="${tableSize}" height="${tableSize}" rx="12" fill="#2a4560"/>`;
+      for (const [kind, x, y, lift = 0, tilt = 0] of data.coins || []) {
+        const centerX = x * scale, centerY = (y - lift) * scale, style = COIN_STYLE[kind] || COIN_STYLE.bronze;
+        body += `<g transform="translate(${centerX} ${centerY}) rotate(${tilt})"><ellipse rx="${radius}" ry="${radius * 0.62}" fill="${style.fill}" stroke="rgba(0,0,0,0.45)" stroke-width="1.5"/>` +
+          `<g fill="#fff" transform="scale(1 0.62)">${glyph(style.mark, 0, 0, radius * 0.42)}</g></g>`;
+      }
+      let y = 14;
+      body += `<text x="${tableSize + 14}" y="${y}" font-size="11" class="b-mut">${valueMode ? '값 표' : '개수 세기'}</text>`;
+      kinds.forEach((kind, i) => {
+        y += 30;
+        const style = COIN_STYLE[kind] || COIN_STYLE.bronze;
+        body += `<g transform="translate(${tableSize + 28} ${y - 5})"><ellipse rx="12" ry="12" fill="${style.fill}"/><g fill="#fff">${glyph(style.mark, 0, 0, 6)}</g></g>`;
+        body += `<text x="${tableSize + 48}" y="${y}" font-size="14" font-weight="600" class="b-ink">${valueMode ? `${values[i]}점` : ''}${answer ? ` × ${(data.counts || [])[i] ?? '?'}` : ''}</text>`;
+      });
+      const width = Math.max(tableSize + tableWidth, optionRowWidth((data.opts || []).length)), optionsTop = tableSize + 14;
+      body += optionRow(data.opts || [], width, optionsTop, { right: data.ans, answer, unit: valueMode ? '점' : '' });
+      return svg(width, optionsTop + 44, body, '탁자 위 동전과 보기');
+    },
+
+    // 차례대로 외우기: 나온 차례대로의 그림, 칸마다 고른 값
+    recall(question, inputs, answer) {
+      const data = question.data, items = data.items || [], answers = data.ans || [], cellSize = 50, gap = 8, pad = 8;
+      const width = Math.max(pad * 2 + items.length * (cellSize + gap) - gap, 220), left = (width - (items.length * (cellSize + gap) - gap)) / 2;
+      const picture = ([shape, count], x, y, size) => Array.from({ length: count }, (_, i) => glyph(shape, x + (i - (count - 1) / 2) * size * 0.3, y, size * 0.15)).join('');
+      const valueOf = (value, x, y) => (data.ask === 'count' ? `<text x="${x}" y="${y + 7}" text-anchor="middle" font-size="20" font-weight="700" class="b-ink">${value}</text>` : `<g class="b-ink">${glyph(value, x, y, 12)}</g>`);
+      const picked = answer ? [...(answer.picked || [])] : [];
+      inputs.forEach((input) => (picked[input.slot] = input.picked));
+      let body = `<text x="${left}" y="12" font-size="11" class="b-mut">나온 차례</text><text x="${left}" y="${cellSize + 42}" font-size="11" class="b-mut">고른 ${data.ask === 'count' ? '개수' : '모양'}</text>`;
+      items.forEach((item, i) => {
+        const x = left + i * (cellSize + gap);
+        body += `<rect x="${x}" y="18" width="${cellSize}" height="${cellSize}" rx="8" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${picture(item, x + cellSize / 2, 18 + cellSize / 2, cellSize)}</g>`;
+        const slotTop = cellSize + 48, value = picked[i], right = value === answers[i];
+        body += `<rect x="${x}" y="${slotTop}" width="${cellSize}" height="${cellSize}" rx="8" class="b-surf ${value == null ? 's-axis' : right ? 's-good' : 's-bad'}" stroke-width="${value == null ? 1 : 3}" ${value == null && answer ? 'stroke-dasharray="4 3"' : ''}/>`;
+        if (value != null) body += valueOf(value, x + cellSize / 2, slotTop + cellSize / 2);
+        if (answer && !right) body += data.ask === 'count' ? `<text x="${x + cellSize / 2}" y="${slotTop + cellSize + 14}" text-anchor="middle" font-size="11" class="f-good">${answers[i]}</text>` : `<g class="f-good">${glyph(answers[i], x + cellSize / 2, slotTop + cellSize + 10, 6)}</g>`;
+      });
+      return svg(width, cellSize * 2 + 70, body, '나온 차례와 고른 값');
+    },
+
+    // 조각 잇기: 왼쪽 벽 돌기 → 칸마다 놓은 조각 → 오른쪽 벽 홈. 아래는 단추 차례의 조각들
+    chain(question, inputs, answer) {
+      const data = question.data, pieces = data.pieces || [], shapes = data.shapes || [], pieceWidth = 58, pieceHeight = 38, gap = 6, pad = 8, wallWidth = 34;
+      const shapeOf = (index) => shapes[index] || 'circle';
+      const hole = (index, x, y) => `<g fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="3 2">${glyph(shapeOf(index), x, y, 9)}</g>`;
+      const knob = (index, x, y) => `<g class="b-ink">${glyph(shapeOf(index), x, y, 9)}</g>`;
+      const piece = (x, y, [holeIndex, knobIndex], faded) => `<g opacity="${faded ? 0.35 : 1}"><rect x="${x}" y="${y}" width="${pieceWidth}" height="${pieceHeight}" rx="7" class="b-surf s-axis" stroke-width="1.5"/>` +
+        hole(holeIndex, x + 15, y + pieceHeight / 2) + knob(knobIndex, x + pieceWidth - 15, y + pieceHeight / 2) + '</g>';
+      // 아래 설명 한 줄이 들어가도록 판을 넓히고, 벽과 칸 줄은 가운데에 둔다
+      const trackWidth = wallWidth * 2 + pieces.length * (pieceWidth + gap) + gap, width = Math.max(trackWidth + pad * 2, 460);
+      const trackLeft = (width - trackWidth) / 2, rowTop = 20, wallRight = trackLeft + trackWidth - wallWidth;
+      let body = `<text x="${trackLeft}" y="12" font-size="11" class="b-mut">놓은 차례 (빈 모양 = 홈, 찬 모양 = 돌기)</text>`;
+      body += `<rect x="${trackLeft}" y="${rowTop}" width="${wallWidth}" height="${pieceHeight}" rx="5" class="b-grid"/>${knob(data.start, trackLeft + wallWidth - 12, rowTop + pieceHeight / 2)}`;
+      body += `<rect x="${wallRight}" y="${rowTop}" width="${wallWidth}" height="${pieceHeight}" rx="5" class="b-grid"/>${hole(data.finish, wallRight + 12, rowTop + pieceHeight / 2)}`;
+      const placed = answer && answer.placed ? answer.placed : inputs.map((input) => input.piece);
+      const deadAt = answer ? answer.deadAt : inputs.findIndex((input) => input.alive === false);
+      pieces.forEach((_, slot) => {
+        const x = trackLeft + wallWidth + gap + slot * (pieceWidth + gap);
+        if (placed[slot] != null && pieces[placed[slot]]) body += piece(x, rowTop, pieces[placed[slot]], false) + `<text x="${x + pieceWidth / 2}" y="${rowTop + pieceHeight + 12}" text-anchor="middle" font-size="10" class="b-mut">단추 ${placed[slot] + 1}</text>`;
+        else body += `<rect x="${x}" y="${rowTop}" width="${pieceWidth}" height="${pieceHeight}" rx="7" fill="none" class="s-axis" stroke-width="1" stroke-dasharray="4 3"/>`;
+        if (deadAt != null && deadAt >= 0 && slot === deadAt) body += `<rect x="${x - 3}" y="${rowTop - 3}" width="${pieceWidth + 6}" height="${pieceHeight + 6}" rx="9" fill="none" class="s-bad" stroke-width="3"/>`;
+      });
+      const buttonsTop = rowTop + pieceHeight + 40, buttonsLeft = (width - (pieces.length * (pieceWidth + gap) - gap)) / 2;
+      body += `<text x="${buttonsLeft}" y="${buttonsTop - 8}" font-size="11" class="b-mut">단추 (화면 차례)</text>`;
+      pieces.forEach((pair, i) => (body += piece(buttonsLeft + i * (pieceWidth + gap), buttonsTop, pair, placed.includes(i)) + `<text x="${buttonsLeft + i * (pieceWidth + gap) + pieceWidth / 2}" y="${buttonsTop + pieceHeight + 12}" text-anchor="middle" font-size="10" class="b-mut">${i + 1}</text>`));
+      const caption = [`정답 차례 ${data.sols ?? '?'}가지 · 함정 ${data.traps ?? '?'}개`, deadAt != null && deadAt >= 0 ? `${deadAt + 1}번째 칸부터 끝까지 이을 수 없음` : null, answer && answer.stuck ? '이을 조각이 없어 멈춤' : null].filter(Boolean).join(' · ');
+      body += `<text x="${width / 2}" y="${buttonsTop + pieceHeight + 30}" text-anchor="middle" font-size="11" class="b-ink2">${escapeHtml(caption)}</text>`;
+      return svg(width, buttonsTop + pieceHeight + 38, body, '놓은 조각과 단추');
+    },
+
+    // 같은 글자 넣기: 낱말마다 빈 글자 자리, 보기
+    blank(question, inputs, answer) {
+      const data = question.data, words = data.words || [], at = data.at || [], cellSize = 40, gap = 4, rowGap = 10, pad = 8;
+      const longest = Math.max(2, ...words.map((word) => [...word].length)), width = Math.max(pad * 2 + longest * (cellSize + gap), optionRowWidth((data.opts || []).length), 280);
+      const shown = answer ? answer.picked : null, right = shown === data.ans;
+      let body = '';
+      words.forEach((word, row) => {
+        const syllables = [...word], left = (width - syllables.length * (cellSize + gap) + gap) / 2, y = pad + row * (cellSize + rowGap);
+        syllables.forEach((syllable, i) => {
+          const x = left + i * (cellSize + gap), center = `x="${x + cellSize / 2}" y="${y + cellSize / 2 + 7}" text-anchor="middle" font-size="20"`;
+          if (i !== at[row]) { body += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="6" class="b-surf s-axis" stroke-width="1"/><text ${center} font-weight="600" class="b-ink">${escapeHtml(syllable)}</text>`; return; }
+          body += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="6" class="b-grid ${shown == null ? 's-axis' : right ? 's-good' : 's-bad'}" stroke-width="${shown == null ? 1.5 : 3}" ${shown == null ? 'stroke-dasharray="4 3"' : ''}/>`;
+          if (shown != null) body += `<text ${center} font-weight="700" class="${right ? 'f-good' : 'f-bad'}">${escapeHtml(shown)}</text>`;
+          else if (answer) body += `<text ${center} font-weight="700" class="f-good" opacity="0.6">${escapeHtml(data.ans)}</text>`;
+        });
+      });
+      const optionsTop = pad + words.length * (cellSize + rowGap) + 6;
+      body += optionRow(data.opts || [], width, optionsTop, { right: data.ans, answer });
+      return svg(width, optionsTop + 44, body, '낱말과 보기');
+    },
+
+    // 금고 열기: 암호 표(숫자 줄 · 단서 줄), 금고 문의 그림 줄과 자리마다 누른 숫자
+    safe(question, inputs, answer) {
+      const data = question.data, code = data.code || [], given = data.given || 0, known = data.known || [], hidden = data.hidden || {};
+      const pad = 8, rowHeight = 30, slotSize = 40, gap = 6, tableWidth = 240, codeLeft = pad + tableWidth + 18, codeTop = 20;
+      const values = { ...Object.fromEntries(known), ...hidden };
+      const rows = [...known.map(([id, digit]) => [id, '=', digit]), ...(data.clues || [])];
+      const isGlyph = (token) => typeof token === 'string' && SHAPES[token];
+      let body = `<text x="${pad}" y="12" font-size="11" class="b-mut">암호 표</text>`;
+      rows.forEach((tokens, row) => {
+        let x = pad + 6; const y = 20 + row * rowHeight + rowHeight / 2;
+        body += `<rect x="${pad}" y="${20 + row * rowHeight + 2}" width="${tableWidth}" height="${rowHeight - 4}" rx="5" class="${row < known.length ? 'b-surf' : 'b-grid'}"/>`;
+        for (const token of tokens) {
+          const tokenWidth = isGlyph(token) ? 22 : String(token).length * 9 + 8;
+          body += isGlyph(token) ? `<g class="b-ink">${glyph(token, x + 10, y, 8)}</g>` : `<text x="${x + tokenWidth / 2}" y="${y + 5}" text-anchor="middle" font-size="14" font-weight="600" class="b-ink">${escapeHtml(token)}</text>`;
+          x += tokenWidth;
+        }
+      });
+      body += `<text x="${codeLeft}" y="12" font-size="11" class="b-mut">금고 문 (암호)</text>`;
+      const typed = {};
+      inputs.forEach((input) => (typed[input.slot] = { digit: input.digit, ok: input.ok }));
+      if (answer) (answer.wrong || []).forEach(({ slot, tapped }) => (typed[slot] = { digit: tapped, ok: false }));
+      code.forEach((id, slot) => {
+        const x = codeLeft + slot * (slotSize + gap), entry = typed[slot], digitTop = codeTop + slotSize + 6;
+        const center = `x="${x + slotSize / 2}" y="${digitTop + slotSize / 2 + 7}" text-anchor="middle" font-size="19" font-weight="700"`;
+        body += `<rect x="${x}" y="${codeTop}" width="${slotSize}" height="${slotSize}" rx="6" class="b-surf s-axis" stroke-width="1"/><g class="b-ink">${glyph(id, x + slotSize / 2, codeTop + slotSize / 2, 11)}</g>`;
+        if (slot < given) body += `<rect x="${x}" y="${digitTop}" width="${slotSize}" height="${slotSize}" rx="6" class="b-grid"/><text ${center} class="b-ink2">${values[id]}</text>`;
+        else if (entry) {
+          const late = entry.digit == null;
+          body += `<rect x="${x}" y="${digitTop}" width="${slotSize}" height="${slotSize}" rx="6" class="b-surf ${entry.ok ? 's-good' : 's-bad'}" stroke-width="3"/><text ${center} class="${entry.ok ? 'f-good' : 'f-bad'}">${late ? '–' : entry.digit}</text>`;
+          if (!entry.ok) body += `<text x="${x + slotSize / 2}" y="${digitTop + slotSize + 13}" text-anchor="middle" font-size="11" class="f-good">${values[id]}</text>`;
+        } else body += `<rect x="${x}" y="${digitTop}" width="${slotSize}" height="${slotSize}" rx="6" fill="none" class="s-axis" stroke-width="1" stroke-dasharray="4 3"/>`;
+      });
+      const showHidden = answer && Object.keys(hidden).length, hiddenTop = codeTop + slotSize * 2 + 54;
+      if (showHidden) {
+        let x = codeLeft;
+        body += `<text x="${x}" y="${hiddenTop - 14}" font-size="11" class="b-mut">단서로 알아낼 숫자</text>`;
+        for (const [id, digit] of Object.entries(hidden)) { body += `<g class="b-ink">${glyph(id, x + 9, hiddenTop, 8)}</g><text x="${x + 20}" y="${hiddenTop + 5}" font-size="14" font-weight="600" class="b-ink">= ${digit}</text>`; x += 58; }
+      }
+      const width = Math.max(codeLeft + code.length * (slotSize + gap) + pad, 300);
+      return svg(width, Math.max(20 + rows.length * rowHeight + pad, showHidden ? hiddenTop + 12 : codeTop + slotSize * 2 + 26), body, '암호 표와 누른 숫자');
     },
   };
 

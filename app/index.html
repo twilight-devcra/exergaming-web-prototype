@@ -201,37 +201,70 @@
     </div>
   </section>
 
-  <!-- 로그인: 대기 화면 다음 (app/members.js). 카메라로 회원 QR 을 읽거나, 번호를 누르거나, 손님으로 -->
-  <section id="login" class="screen">
+  <!-- 로그인: 대기 화면 다음 (app/members.js). 한 화면에 보기 셋 (data-view, 맨 위 '‹' 는 home 이 아니면 home 으로):
+       home — 아이디로 들어가기 · 새 아이디 만들기 · 손님으로 하기, 그 아래 QR 회원 카드 (카메라 · 번호 · 사진)
+       list — 아이디 목록 (담당자가 골라 준다) · pad — 8자리 회원 번호 -->
+  <section id="login" class="screen" data-view="home">
     <header class="su-head">
       <button class="su-back" id="lg-back">‹ 처음으로</button>
-      <h2>회원 카드가 있으신가요?</h2>
+      <h2 id="lg-title">어떻게 시작할까요?</h2>
     </header>
-    <div class="lg-body">
-      <div class="lg-cam">
-        <video id="lg-video" playsinline muted></video>
-        <div class="lg-frame"></div>
-        <div class="lg-cam-msg" id="lg-cam-msg">카메라를 켜는 중…</div>
+
+    <div class="lg-view lg-home">
+      <div class="lg-main">
+        <button class="lg-opt lg-primary" id="lg-pick">
+          <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></i>
+          <b>아이디로 들어가기</b><small>목록에서 아이디를 골라요</small>
+        </button>
+        <button class="lg-opt" id="lg-new">
+          <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.6 3.1-6 7-6 1.3 0 2.5.3 3.5.8M18 14v6M15 17h6"/></svg></i>
+          <b>새 아이디 만들기</b><small>처음 오셨으면 아이디를 만들어요</small>
+        </button>
+        <button class="lg-opt" id="lg-guest">
+          <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.8 3.6-6 8-6s8 2.2 8 6"/></svg></i>
+          <b>손님으로 하기</b><small>기록 없이 해 봐요. <br>끝나고 아이디를 만들 수 있어요</small>
+        </button>
       </div>
-      <div class="lg-side">
-        <div class="lg-choices" id="lg-choices">
-          <button class="lg-opt lg-guest" id="lg-guest"><b>손님으로 하기</b><small>처음이시면 여기를 누르세요.<br>운동이 끝나면 회원 카드를 드려요</small></button>
-          <button class="lg-opt" id="lg-code"><b>번호로 들어가기</b><small>QR 코드 아래에 적힌 8자리 번호</small></button>
-          <!-- 휴대폰만: 휴대폰은 제 화면을 제 카메라로 비출 수 없으므로, 저장해 둔 회원 카드 사진에서 QR 을 읽는다 -->
-          <button class="lg-opt" id="lg-photo" hidden><b>사진으로 들어가기</b><small>휴대폰에 저장한 회원 카드 사진을 골라 주세요</small></button>
+      <p class="lg-note" id="lg-note"></p>
+      <!-- QR 회원 카드: 카메라는 이 보기에서만 켠다 -->
+      <div class="lg-card">
+        <div class="lg-cam">
+          <video id="lg-video" playsinline muted></video>
+          <div class="lg-frame"></div>
+        </div>
+        <div class="lg-card-text">
+          <b>회원 카드(QR)가 있으면</b>
+          <p class="lg-cam-msg" id="lg-cam-msg">카메라를 켜는 중…</p>
+          <div class="lg-card-btns">
+            <button class="btn secondary" id="lg-code">번호로 들어가기</button>
+            <!-- 휴대폰만: 휴대폰은 제 화면을 제 카메라로 비출 수 없으므로, 저장해 둔 회원 카드 사진에서 QR 을 읽는다 -->
+            <button class="btn secondary" id="lg-photo" hidden>사진으로 들어가기</button>
+          </div>
           <input type="file" id="lg-photo-file" accept="image/*" hidden>
           <p class="lg-photo-msg" id="lg-photo-msg" aria-live="polite"></p>
         </div>
-        <div class="lg-pad" id="lg-pad" hidden>
-          <div class="lg-digits" id="lg-digits"></div>
-          <p class="lg-pad-msg" id="lg-pad-msg"></p>
-          <div class="lg-keys" id="lg-keys">
-            <button>1</button><button>2</button><button>3</button>
-            <button>4</button><button>5</button><button>6</button>
-            <button>7</button><button>8</button><button>9</button>
-            <button data-k="del">지우기</button><button>0</button><button data-k="ok" class="ok">확인</button>
-          </div>
-          <button class="su-back" id="lg-pad-cancel">‹ 돌아가기</button>
+      </div>
+    </div>
+
+    <div class="lg-view lg-list">
+      <div class="lg-list-bar">
+        <div class="lg-sort" id="lg-sort" role="group" aria-label="순서">
+          <button data-sort="name">가나다순</button><button data-sort="recent">최근 운동순</button>
+        </div>
+        <p class="lg-list-msg" id="lg-list-msg"></p>
+      </div>
+      <div class="lg-ids" id="lg-ids"></div>
+    </div>
+
+    <div class="lg-view lg-number">
+      <div class="lg-pad">
+        <div class="lg-digits" id="lg-digits"></div>
+        <p class="lg-pad-msg" id="lg-pad-msg"></p>
+        <div class="lg-keys" id="lg-keys">
+          <button>1</button><button>2</button><button>3</button>
+          <button>4</button><button>5</button><button>6</button>
+          <button>7</button><button>8</button><button>9</button>
+          <button data-k="del">지우기</button><button>0</button><button data-k="ok" class="ok">확인</button>
         </div>
       </div>
     </div>
@@ -337,61 +370,108 @@
     </div>
   </template>
 
-  <!-- 운영 메뉴 (처음 열 때, 또는 왼쪽 위 모서리 길게 누르기 + PIN) -->
+  <!-- 새 아이디 만들기 (app/members.js openIdForm): 로그인 화면과 손님의 결과 화면이 함께 쓴다.
+       화면 키보드가 아래쪽을 가리므로 창은 위쪽에 둔다 -->
+  <div id="id-new" class="overlay">
+    <form class="idn-box" id="idn-form" autocomplete="off">
+      <h2 id="idn-title">새 아이디 만들기</h2>
+      <p class="idn-sub">한글 · 영문 · 숫자로 12자까지, 띄어쓰기 없이</p>
+      <input id="idn-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="아이디">
+      <p class="idn-msg" id="idn-msg" aria-live="polite"></p>
+      <div class="idn-btns">
+        <button type="button" class="btn secondary" id="idn-cancel">취소</button>
+        <button type="submit" class="btn" id="idn-ok">만들기</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 운영 메뉴 (⚙ 운영 버튼, 또는 왼쪽 위 모서리 길게 누르기 + PIN). 왼쪽은 하위 메뉴, 오른쪽은 고른 하위 메뉴의 칸 (app/operator-menu.js showTab).
+       .op-box 의 data-tab 이 보이는 칸을 정한다. 하위 메뉴 이름 아래 작은 글은 그 칸의 지금 상태 (renderTabs) -->
   <div id="op" class="overlay">
-    <div class="op-box">
-      <div class="op-col">
-        <h2>시연 스테이션</h2>
-        <label class="setting">스테이션 번호<input type="number" id="op-station" min="1" max="99" inputmode="numeric"></label>
-        <div class="pedal-row">
-          <span class="pedal-status"></span>
-          <button class="btn secondary small" data-pedal-btn>페달 연결</button>
+    <div class="op-box" data-tab="station">
+      <nav class="op-nav">
+        <h2>운영 메뉴</h2>
+        <div class="op-tabs" id="op-tabs" role="tablist">
+          <button data-tab="station" role="tab"><b>스테이션</b><small id="op-tab-station"></small></button>
+          <button data-tab="round" role="tab"><b>라운드</b><small id="op-tab-round"></small></button>
+          <button data-tab="members" role="tab"><b>회원 · 아이디</b><small id="op-tab-members"></small></button>
+          <button data-tab="server" role="tab"><b>서버 · 업로드</b><small id="op-tab-server"></small></button>
+          <button data-tab="records" role="tab"><b>기록 · 로그</b><small id="op-tab-records"></small></button>
+          <button data-tab="test" role="tab"><b>테스트</b><small id="op-tab-test"></small></button>
         </div>
-        <label class="setting">키보드로 시작 허용 (테스트용, 새로고침하면 꺼짐)<input type="checkbox" id="op-kbd"></label>
-        <label class="setting">게임 건너뛰고 가상 결과 보기 (테스트용, 기록 안 됨)<input type="checkbox" id="op-sim"></label>
-        <label class="setting">음악<select data-music-picker></select></label>
-        <button class="btn secondary small" data-music-try>미리 듣기</button>
-        <p class="setting-note" id="op-cfg"></p>
-        <button class="btn secondary small" id="op-set-open">라운드 설정</button>
+        <button class="btn" id="op-close">대기 화면 열기</button>
+      </nav>
+
+      <div class="op-main">
+        <!-- 라운드 중에만: 어느 하위 메뉴에서든 보인다 -->
         <div class="op-round" id="op-round">
           <p class="op-round-note" id="op-round-note"></p>
           <button class="btn secondary" id="op-end">지금 끝내고 결과 보기</button>
           <button class="btn secondary" id="op-abandon">중단하고 대기 화면으로 (기록 안 함)</button>
         </div>
-        <button class="btn" id="op-close">대기 화면 열기</button>
-      </div>
-      <div class="op-col">
-        <h2>이 태블릿의 기록 <small id="op-log-count"></small></h2>
-        <ol class="op-log" id="op-log"></ol>
-        <button class="btn secondary small" id="op-csv">CSV 저장</button>
-        <div class="op-sessions">
-          <h2>세션 로그 <small id="op-sess-count"></small></h2>
+
+        <section class="op-panel" data-panel="station">
+          <h2>스테이션</h2>
+          <label class="setting">스테이션 번호<input type="number" id="op-station" min="1" max="99" inputmode="numeric"></label>
+          <div class="pedal-row">
+            <span class="pedal-status"></span>
+            <button class="btn secondary small" data-pedal-btn>페달 연결</button>
+          </div>
+          <label class="setting">음악<select data-music-picker></select></label>
+          <button class="btn secondary small" data-music-try>미리 듣기</button>
+        </section>
+
+        <!-- 라운드 설정 (DEMO_SETTINGS). 라운드 중에는 fieldset 째 막는다 -->
+        <section class="op-panel" data-panel="round">
+          <h2>라운드 설정 <small id="op-set-code"></small></h2>
+          <p class="setting-note" id="op-cfg"></p>
+          <p class="setting-note">이 태블릿에 저장되고 다음 판부터 적용됩니다. 라운드 길이와 미니게임 난이도는 참가자가 세션 설정 화면에서 고릅니다 (js/config.js 의 SESSION_ 값).</p>
+          <p class="op-locked" id="op-set-locked">라운드 중에는 바꿀 수 없습니다</p>
+          <fieldset class="op-set-form" id="op-set-form">
+            <div class="op-set-fields" id="op-set-fields"></div>
+            <div class="op-set-btns">
+              <button class="btn" id="op-set-save">저장</button>
+              <button class="btn secondary" id="op-set-cancel">되돌리기</button>
+              <button class="btn secondary" id="op-set-reset">기본값으로</button>
+              <span class="op-set-state" id="op-set-state" aria-live="polite"></span>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="op-panel" data-panel="members">
+          <h2>회원 · 아이디</h2>
+          <!-- 글 아이디는 '<접두어>_<아이디>' 로 저장한다 (js/member-id.js). 시설마다 다르게 두면 한 서버를 함께 써도 아이디가 겹치지 않는다 -->
+          <label class="setting">아이디 접두어 (시설 이름, 한글 · 영문 소문자 · 숫자 · -)<input id="op-prefix" type="text" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="예: 강남, gangnam"></label>
+          <p class="setting-note" id="op-prefix-note"></p>
+          <label class="setting op-stack">회원 기록 주소 (선택, 달력과 아이디 목록을 서버 기록으로 채움)<input id="op-up-hist" type="url" inputmode="url" placeholder="https://… (비우면 이 태블릿 기록만)" autocomplete="off"></label>
+          <p class="setting-note">아이디 목록 · 새 아이디 확인은 이 주소의 끝 /history 를 /users 로 바꾼 곳에 묻습니다 (docs/SERVER.md '아이디'). 인증 키는 '서버 · 업로드' 의 것을 함께 씁니다.</p>
+          <label class="setting check">시험용: 회원 기록 서버 대신 이 태블릿의 세션 로그 쓰기<input id="op-up-local" type="checkbox"></label>
+        </section>
+
+        <!-- 끝난 세션을 서버로 자동 업로드 (js/session-upload.js, 형식은 docs/SERVER.md) -->
+        <section class="op-panel" data-panel="server">
+          <h2>서버 · 업로드</h2>
+          <p class="op-up-state" id="op-up-state"></p>
+          <label class="setting op-stack">업로드 주소<input id="op-up-url" type="url" inputmode="url" placeholder="https://… (비우면 업로드 안 함)" autocomplete="off"></label>
+          <label class="setting op-stack">인증 키 (선택, 업로드 · 회원 기록 · 아이디에 함께 쓴다)<input id="op-up-key" type="password" autocomplete="off"></label>
+          <button class="btn secondary small" id="op-up-now">지금 보내기</button>
+        </section>
+
+        <section class="op-panel" data-panel="records">
+          <h2>이 태블릿의 기록 <small id="op-log-count"></small></h2>
+          <ol class="op-log" id="op-log"></ol>
+          <button class="btn secondary small" id="op-csv">CSV 저장</button>
+          <h3>세션 로그 <small id="op-sess-count"></small></h3>
           <p class="setting-note">판마다 문제·답·걸린 시간과 페달 원시 파형(또는 키 입력)을 이 태블릿에 자동 저장합니다.</p>
           <button class="btn secondary small" id="op-sess-export">전체 내보내기 (.jsonl)</button>
-        </div>
-        <!-- 끝난 세션을 서버로 자동 업로드 (js/session-upload.js, 형식은 docs/SERVER.md) -->
-        <div class="op-upload">
-          <h2>자동 업로드 <small id="op-up-state"></small></h2>
-          <label class="setting">업로드 주소<input id="op-up-url" type="url" inputmode="url" placeholder="https://… (비우면 업로드 안 함)" autocomplete="off"></label>
-          <label class="setting">인증 키 (선택)<input id="op-up-key" type="password" autocomplete="off"></label>
-          <label class="setting">회원 기록 주소 (선택, 달력을 서버 기록으로 채움)<input id="op-up-hist" type="url" inputmode="url" placeholder="https://… (비우면 이 태블릿 기록만)" autocomplete="off"></label>
-          <label class="setting check">시험용: 회원 기록 서버 대신 이 태블릿의 세션 로그 쓰기<input id="op-up-local" type="checkbox"></label>
-          <button class="btn secondary small" id="op-up-now">지금 보내기</button>
-        </div>
-      </div>
-    </div>
-  </div>
+        </section>
 
-  <!-- 운영 메뉴 > 라운드 설정 (DEMO_SETTINGS) -->
-  <div id="op-set" class="overlay">
-    <div class="op-set-box">
-      <h2>라운드 설정 <small id="op-set-code"></small></h2>
-      <p class="setting-note">이 태블릿에 저장되고 다음 판부터 적용됩니다. 라운드 길이와 미니게임 난이도는 참가자가 세션 설정 화면에서 고릅니다 (js/config.js 의 SESSION_ 값).</p>
-      <div class="op-set-fields" id="op-set-fields"></div>
-      <div class="op-set-btns">
-        <button class="btn" id="op-set-save">저장</button>
-        <button class="btn secondary" id="op-set-cancel">취소</button>
-        <button class="btn secondary" id="op-set-reset">기본값으로</button>
+        <section class="op-panel" data-panel="test">
+          <h2>테스트</h2>
+          <p class="setting-note">시험할 때만 켭니다. 새로고침하면 둘 다 꺼집니다.</p>
+          <label class="setting">키보드로 시작 허용 (A · D 키로 페달 흉내)<input type="checkbox" id="op-kbd"></label>
+          <label class="setting">게임 건너뛰고 가상 결과 보기 (기록 안 됨)<input type="checkbox" id="op-sim"></label>
+        </section>
       </div>
     </div>
   </div>

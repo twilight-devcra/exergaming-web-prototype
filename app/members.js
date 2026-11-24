@@ -1,14 +1,18 @@
-// 회원 화면 (실험, 운영 버전만): 로그인 · 기록 · 결과의 회원 카드. 서버 없이 QR 코드로 같은 사람을 알아본다.
-// 번호·기록은 app/member-records.js, QR 그리기·읽기는 app/qr.js
-//  - 회원 번호: 8자리 숫자 (앞 7자리 무작위 + 끝 1자리 검사 숫자, Luhn). 이름 같은 개인 정보는 받지 않는다
+// 회원 화면 (운영 버전만): 로그인 · 기록 · 결과의 회원 카드.
+// 번호·아이디·기록은 app/member-records.js, 아이디 규칙은 js/member-id.js, QR 그리기·읽기는 app/qr.js
+//  - 아이디: 담당자가 로그인 과정을 맡는다. '새 아이디 만들기'로 글 아이디를 만들고(겹치면 안 됨), '아이디로 들어가기'의 목록에서 골라 준다.
+//    운영 메뉴의 '아이디 접두어'가 앞에 붙어 '<접두어>_<아이디>' 로 저장된다 (화면에는 아이디만)
+//  - 회원 번호: 8자리 숫자 (앞 7자리 무작위 + 끝 1자리 검사 숫자, Luhn). QR 회원 카드로 들어온다. 이름 같은 개인 정보는 받지 않는다
 //  - QR 코드: 회원 카드 주소 (app/card.html#번호). 휴대폰으로 찍으면 카드 화면이 열리고, 태블릿은 주소에서 번호만 읽는다
-//  - 기록: 이 태블릿의 localStorage (exergame.members). 다른 태블릿에서 만든 번호로 들어와도 되지만 기록은 태블릿마다 따로다.
-//    세션 로그에는 meta.user 로 번호가 붙어 업로드되므로, 바깥 DB 에서 모으면 태블릿을 넘어 이어 볼 수 있다
-// 흐름: 대기 화면 → 로그인(카메라로 QR · 번호 입력 · 손님) → 회원이면 기록(달력) → 세션 설정 → … → 결과
-//       손님은 결과 화면에서 새 회원 번호와 QR 코드를 받는다 (오늘 기록이 그 번호로 저장된다)
+//  - 기록: 이 태블릿의 localStorage (exergame.members) + 서버 기록. 세션 로그에는 meta.user 로 번호·아이디가 붙어 업로드된다
+// 흐름: 대기 화면 → 로그인 → 회원이면 기록(달력) → 세션 설정 → … → 결과
+//       로그인 화면: 아이디로 들어가기(목록) · 새 아이디 만들기 · 손님으로 하기 · QR 회원 카드(카메라 · 번호 · 사진)
+//       손님은 결과 화면에서 새 회원 번호와 QR 코드를 받고(오늘 기록이 그 번호로 저장된다), 그 대신 아이디를 만들어 저장할 수도 있다
 import { SESSION_DIFFICULTIES } from '../js/config.js';
 import { Stars } from '../js/stars.js';
+import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
+import { MemberId } from '../js/member-id.js';
 import { drawCard, saveCard } from './member-card.js';
 import { Sfx } from '../js/sfx.js';
 import { Members } from './member-records.js';
@@ -18,29 +22,53 @@ import { qrSvg, QrScanner } from './qr.js';
 // 화면의 짧은 쪽이 600px 보다 작은 터치 기기 (스테이션 태블릿은 800px 쯤이다)
 const onPhone = () => matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
 
+const $ = (selector) => document.querySelector(selector);
+
+// 로그인 화면의 보기마다 제목 (app/index.html #login 의 data-view)
+const LOGIN_TITLES = { home: '어떻게 시작할까요?', list: '아이디를 골라 주세요', number: '회원 번호를 눌러 주세요' };
+
+// 마지막 운동이 며칠 전인가 (아이디 목록의 작은 글)
+function daysAgoText(isoTime) {
+  if (!isoTime) return '';
+  const days = Math.round((new Date(new Date().toDateString()) - new Date(new Date(isoTime).toDateString())) / 86400000);
+  return days <= 0 ? '오늘' : days === 1 ? '어제' : `${days}일 전`;
+}
+
 // ---------------- 화면: 로그인 · 기록 · 결과의 회원 카드 ----------------
 // js/demo.js 가 부른다: openLogin(대기 화면에서 시작), tick(매 프레임), onResult(결과 화면을 열 때)
 export const MemberUI = {
   IDLE_SEC: 60, // 로그인·기록 화면에서 아무 입력이 없으면 대기 화면으로
-  user: null,   // 로그인한 회원 번호 (손님이면 null)
+  user: null,   // 로그인한 회원 번호 · 아이디 (손님이면 null)
   guest: false,
+  view: 'home',   // 로그인 화면의 보기: home · list · number
+  sort: 'name',   // 아이디 목록 순서: name(가나다) · recent(최근 운동)
+  namedUsers: null, // 아이디 목록 (Members.namedList). 받는 중이면 null
+  listServer: 'none',
+  listRequest: null, // 마지막으로 보낸 목록 요청 (늦게 온 앞 요청의 답은 버린다)
+  idForm: null,      // 열려 있는 새 아이디 창 { onCreated, busy }
+  resultLog: null,   // 결과 화면의 세션 로그 (손님이 아이디로 저장하면 meta.user 를 고쳐 다시 저장한다)
 
   init(demo, app) {
     if (!document.getElementById('login')) return null;
     this.demo = demo;
     this.app = app;
-    const $ = (selector) => document.querySelector(selector);
-    for (const id of ['#login', '#history']) {
+    for (const id of ['#login', '#history', '#id-new']) {
       $(id).addEventListener('pointerdown', () => {
         demo.activeAt = app.clock;
         app.audio.ensure();
       });
     }
-    $('#lg-back').onclick = () => app.show('attract');
+    $('#lg-back').onclick = () => (this.view === 'home' ? app.show('attract') : this.showView('home'));
     $('#hs-back').onclick = () => app.show('attract');
+    // 처음 보기: 아이디 · 새 아이디 · 손님
+    $('#lg-pick').onclick = () => this.openList();
+    $('#lg-new').onclick = () => this.openIdForm({
+      title: '새 아이디 만들기', okLabel: '만들기',
+      onCreated: (id) => { if (this.app.state === 'login') this.login(id); },
+    });
     $('#lg-guest').onclick = () => this.asGuest();
-    $('#lg-code').onclick = () => this.showPad(true);
-    $('#lg-pad-cancel').onclick = () => this.showPad(false);
+    // QR 회원 카드: 번호 · 사진
+    $('#lg-code').onclick = () => this.showView('number');
     $('#lg-photo').onclick = () => {
       const fileInput = $('#lg-photo-file');
       fileInput.value = ''; // 같은 사진을 다시 골라도 change 가 오게
@@ -50,6 +78,19 @@ export const MemberUI = {
       demo.activeAt = app.clock; // 사진을 고르는 동안 자리 비움으로 넘어가지 않게
       if (event.target.files[0]) this.fromPhoto(event.target.files[0]);
     });
+    // 아이디 목록
+    $('#lg-sort').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-sort]');
+      if (!button) return;
+      this.sort = button.dataset.sort;
+      this.renderList();
+    });
+    $('#lg-ids').addEventListener('click', (event) => {
+      if (event.target.closest('#lg-ids-new')) return $('#lg-new').click();
+      const button = event.target.closest('[data-id]');
+      if (button && app.state === 'login' && this.view === 'list') this.login(button.dataset.id);
+    });
+    // 회원 번호
     $('#lg-keys').addEventListener('click', (event) => {
       const key = event.target.closest('button');
       if (!key) return;
@@ -58,6 +99,17 @@ export const MemberUI = {
       else if (this.code.length < 8) this.code += key.textContent;
       this.renderPad();
     });
+    // 새 아이디 창
+    $('#idn-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      this.submitIdForm();
+    });
+    $('#idn-cancel').onclick = () => this.closeIdForm();
+    $('#idn-input').addEventListener('input', () => {
+      demo.activeAt = app.clock; // 화면 키보드로 적는 동안은 pointerdown 이 오지 않는다
+      if (!this.idForm || !this.idForm.busy) this.idFormMessage('');
+    });
+    // 기록 (달력)
     $('#hs-prev').onclick = () => this.moveMonth(-1);
     $('#hs-next').onclick = () => this.moveMonth(1);
     $('#hs-go').onclick = () => {
@@ -75,38 +127,57 @@ export const MemberUI = {
     this.via = via;
     this.user = null;
     this.guest = false;
-    this.showPad(false);
-    document.getElementById('lg-photo').hidden = !onPhone();
-    document.getElementById('lg-photo-msg').textContent = '';
+    $('#lg-photo').hidden = !onPhone();
+    $('#lg-photo-msg').textContent = '';
+    // 아이디 접두어가 없으면 아이디를 만들거나 고를 수 없다 (운영 메뉴에서 정한다)
+    const hasPrefix = MemberId.validPrefix(Members.prefix());
+    $('#lg-pick').disabled = !hasPrefix;
+    $('#lg-new').disabled = !hasPrefix;
+    $('#lg-note').textContent = hasPrefix ? '' : '아이디를 쓰려면 운영 메뉴에서 아이디 접두어를 정해 주세요';
     app.show('login');
     app.state = 'login';
     this.demo.activeAt = app.clock;
     if (app.config.sound) app.audio.ambient(true);
-    this.startCamera();
+    this.showView('home');
+  },
+
+  // 로그인 화면의 보기를 바꾼다. 카메라는 처음 보기에서만 켠다
+  showView(view) {
+    this.view = view;
+    $('#login').dataset.view = view;
+    $('#lg-title').textContent = LOGIN_TITLES[view];
+    $('#lg-back').textContent = view === 'home' ? '‹ 처음으로' : '‹ 돌아가기';
+    if (view === 'home') this.startCamera();
+    else QrScanner.stop();
+    if (view === 'number') {
+      this.code = '';
+      $('#lg-pad-msg').textContent = 'QR 코드 아래에 적힌 8자리 번호';
+      this.renderPad();
+    }
   },
 
   startCamera() {
-    const message = document.getElementById('lg-cam-msg');
-    const box = document.querySelector('.lg-cam');
+    const message = $('#lg-cam-msg');
+    const box = $('.lg-cam');
+    const fallback = onPhone() ? '사진이나 번호로 들어가 주세요' : '번호로 들어가 주세요';
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       box.classList.add('off');
-      message.textContent = onPhone() ? '이 기기에서는 카메라를 쓸 수 없어요. 사진이나 번호로 들어가 주세요' : '이 기기에서는 카메라를 쓸 수 없어요. 번호로 들어가 주세요';
+      message.textContent = `이 기기에서는 카메라를 쓸 수 없어요. ${fallback}`;
       return;
     }
-    QrScanner.start(document.getElementById('lg-video'), (text) => {
+    QrScanner.start($('#lg-video'), (text) => {
       const id = Members.parse(text);
-      if (id && this.app.state === 'login') this.login(id);
+      if (id && this.app.state === 'login' && this.view === 'home') this.login(id);
     }, (state) => {
       box.classList.toggle('off', state === 'denied');
-      message.textContent = state === 'denied'
-        ? (onPhone() ? '카메라를 켜지 못했어요. 사진이나 번호로 들어가 주세요' : '카메라를 켜지 못했어요. 번호로 들어가 주세요')
-        : state === 'starting' ? '카메라를 켜는 중…' : '휴대폰에 찍어 둔 QR 코드를 화면 위쪽 카메라에 비춰 주세요';
+      message.textContent = state === 'denied' ? `카메라를 켜지 못했어요. ${fallback}`
+        : state === 'starting' ? '카메라를 켜는 중…' : '휴대폰에 담아 둔 QR 코드를 화면 위쪽 카메라에 비춰 주세요';
     });
   },
 
   // 사진으로 들어가기: 고른 사진에서 회원 번호를 읽는다
   async fromPhoto(file) {
-    const message = document.getElementById('lg-photo-msg');
+    const message = $('#lg-photo-msg');
     message.className = 'lg-photo-msg';
     message.textContent = '사진을 읽는 중…';
     let id = null;
@@ -143,7 +214,7 @@ export const MemberUI = {
 
   // 서버에서 이 회원의 다른 태블릿 기록까지 받아 와 달력을 다시 그린다. 그동안은 이 태블릿 기록만 보인다
   async loadRemote(id) {
-    const sourceNote = document.getElementById('hs-src');
+    const sourceNote = $('#hs-src');
     delete Members.remote[id];
     if (!Members.hasRemote()) { sourceNote.textContent = ''; return; }
     const local = SessionUpload.settings().localHistory;
@@ -161,26 +232,56 @@ export const MemberUI = {
     if (this.app.state === 'history') this.renderHistory();
   },
 
-  showPad(visible) {
-    this.code = '';
-    document.getElementById('lg-pad').hidden = !visible;
-    document.getElementById('lg-choices').hidden = visible;
-    document.getElementById('lg-pad-msg').textContent = 'QR 코드 아래에 적힌 8자리 번호';
-    this.renderPad();
+  // ---------------- 아이디 목록 (담당자가 고른다) ----------------
+  async openList() {
+    if (this.app.state !== 'login') return;
+    this.showView('list');
+    this.namedUsers = null;
+    this.renderList();
+    const request = (this.listRequest = {});
+    const { users, server } = await Members.namedList();
+    if (this.listRequest !== request || this.view !== 'list') return;
+    this.namedUsers = users;
+    this.listServer = server;
+    this.renderList();
   },
 
+  renderList() {
+    const grid = $('#lg-ids');
+    const message = $('#lg-list-msg');
+    for (const button of document.querySelectorAll('#lg-sort [data-sort]')) button.classList.toggle('on', button.dataset.sort === this.sort);
+    if (!this.namedUsers) {
+      grid.innerHTML = '';
+      message.textContent = '아이디 목록을 불러오는 중…';
+      return;
+    }
+    const users = [...this.namedUsers].sort(this.sort === 'recent'
+      ? (a, b) => (Date.parse(b.last) || 0) - (Date.parse(a.last) || 0) || a.name.localeCompare(b.name, 'ko')
+      : (a, b) => a.name.localeCompare(b.name, 'ko'));
+    message.textContent = [
+      users.length ? `아이디 ${users.length}개` : '',
+      this.listServer === 'failed' ? '서버에 연결하지 못해 이 태블릿에서 쓴 아이디만 보여요'
+        : this.listServer === 'none' ? '이 태블릿에서 쓴 아이디만 보여요' : '',
+    ].filter(Boolean).join(' · ');
+    // 아이디는 Members.namedList 가 MemberId.isNamed 로 거른 것이라 (한글 · 영문 · 숫자만) 그대로 그려도 된다
+    grid.innerHTML = users.length
+      ? users.map((user) => `<button class="lg-id" data-id="${user.id}"><b>${user.name}</b><small>${daysAgoText(user.last)}</small></button>`).join('')
+      : '<div class="lg-ids-empty"><p>아직 만든 아이디가 없어요</p><button class="btn" id="lg-ids-new">새 아이디 만들기</button></div>';
+  },
+
+  // ---------------- 회원 번호 ----------------
   renderPad() {
     const slots = (this.code + '________').slice(0, 8);
-    document.getElementById('lg-digits').innerHTML = [...slots].map((digit, i) => `${i === 4 ? '<em></em>' : ''}<i class="${digit === '_' ? '' : 'on'}">${digit === '_' ? '' : digit}</i>`).join('');
+    $('#lg-digits').innerHTML = [...slots].map((digit, i) => `${i === 4 ? '<em></em>' : ''}<i class="${digit === '_' ? '' : 'on'}">${digit === '_' ? '' : digit}</i>`).join('');
   },
 
   submitCode() {
     const id = this.code;
-    const message = document.getElementById('lg-pad-msg');
+    const message = $('#lg-pad-msg');
     if (id.length < 8) { message.textContent = '8자리를 모두 눌러 주세요'; return; }
     if (!Members.valid(id)) {
       message.textContent = '번호가 맞지 않아요. 다시 확인해 주세요';
-      const digits = document.getElementById('lg-digits');
+      const digits = $('#lg-digits');
       digits.classList.remove('shake');
       void digits.offsetWidth;
       digits.classList.add('shake');
@@ -189,6 +290,57 @@ export const MemberUI = {
       return;
     }
     this.login(id);
+  },
+
+  // ---------------- 새 아이디 만들기 (창, 로그인 화면 · 결과 화면) ----------------
+  // onCreated(id): 서버(있으면)와 이 태블릿에서 겹치지 않음을 확인하고 만든 뒤 부른다. id 는 접두어까지 붙은 꼴
+  openIdForm({ title, okLabel, onCreated }) {
+    this.idForm = { onCreated, busy: false };
+    $('#idn-title').textContent = title;
+    $('#idn-ok').textContent = okLabel;
+    $('#idn-ok').disabled = false;
+    $('#idn-input').value = '';
+    this.idFormMessage('');
+    $('#id-new').classList.add('active');
+    $('#idn-input').focus(); // 누른 동작 안에서 불러야 화면 키보드가 뜬다
+  },
+
+  closeIdForm() {
+    this.idForm = null;
+    $('#idn-input').blur();
+    $('#id-new').classList.remove('active');
+  },
+
+  idFormMessage(text, bad = false) {
+    const message = $('#idn-msg');
+    message.textContent = text;
+    message.classList.toggle('bad', bad);
+  },
+
+  async submitIdForm() {
+    const form = this.idForm;
+    if (!form || form.busy) return;
+    const input = $('#idn-input');
+    const problem = MemberId.nameProblem(MemberId.cleanName(input.value));
+    if (problem) {
+      this.idFormMessage(problem, true);
+      input.focus();
+      return;
+    }
+    form.busy = true;
+    $('#idn-ok').disabled = true;
+    this.idFormMessage('겹치는 아이디가 있는지 확인하는 중…');
+    const result = await Members.createNamed(input.value);
+    form.busy = false;
+    $('#idn-ok').disabled = false;
+    if (this.idForm !== form) return; // 그 사이 창을 닫았거나 화면을 떠났다
+    if (result.error) {
+      this.idFormMessage(result.message, true);
+      input.focus();
+      return;
+    }
+    this.closeIdForm();
+    form.onCreated(result.id);
   },
 
   // ---------------- 기록 (달력) ----------------
@@ -223,7 +375,7 @@ export const MemberUI = {
     const now = new Date();
     const month = this.month;
     document.getElementById('hs-title').textContent = sessions.length ? '다시 오셨네요, 반가워요!' : '첫 트레이닝을 시작해 볼까요?';
-    document.getElementById('hs-id').textContent = `회원 번호 ${Members.format(id)}`;
+    document.getElementById('hs-id').textContent = Members.label(id);
     document.getElementById('hs-month').textContent = `${month.getFullYear()}년 ${month.getMonth() + 1}월`;
     const isThisMonth = month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth();
     document.getElementById('hs-next').disabled = isThisMonth;
@@ -273,7 +425,9 @@ export const MemberUI = {
 
   // ---------------- 매 프레임 ----------------
   tick(app, entered) {
-    if (app.state !== 'login') QrScanner.stop();
+    if (app.state !== 'login' || this.view !== 'home') QrScanner.stop();
+    // 새 아이디 창은 연 화면에서만 (자리 비움으로 대기 화면에 가면 닫는다)
+    if (entered && this.idForm) this.closeIdForm();
     if (app.state === 'attract' && entered) {
       this.user = null;
       this.guest = false;
@@ -303,13 +457,14 @@ export const MemberUI = {
   },
 
   // ---------------- 결과 화면 ----------------
-  // 손님이면 새 번호를 만들어 오늘 기록을 그 번호로 저장하고 QR 카드를 보여 준다. 회원이면 기록에 더한다
+  // 손님이면 새 번호를 만들어 오늘 기록을 그 번호로 저장하고 QR 카드를 보여 준다 (그 대신 아이디로 저장할 수도 있다). 회원이면 기록에 더한다
   onResult(app, simulated) {
     const box = document.getElementById('dr-member');
     if (!box) return;
     // 새 회원 카드를 보여 줄 때만 결과 화면의 첫 칸을 넓힌다 (app/app.css .with-card)
     const screen = document.getElementById('demo-result');
     screen.classList.remove('with-card');
+    this.resultLog = null;
     if (simulated) {
       box.innerHTML = '<p class="dm-note">가상 결과라 기록하지 않아요</p>';
       return;
@@ -320,6 +475,7 @@ export const MemberUI = {
     if (app.log) {
       app.log.meta.user = id;
       app.log.meta.userNew = fresh;
+      this.resultLog = app.log;
     }
     const games = (app.roundStats && app.roundStats.games) || {}; // 게임별 성적 (js/round-stats.js)
     const topLevel = Math.max(0, ...Object.values(games).map((game) => game.level || 0));
@@ -336,11 +492,19 @@ export const MemberUI = {
       // 풍경에 세운 기념물의 생김새 (js/landmarks.js Landmarks.look). 다음 라운드부터 이대로 그린다
       look: (app.log && app.log.meta.landmark) || null,
     });
-    document.getElementById('dr-id').textContent = `회원 ${Members.format(id)}`;
-    if (fresh && onPhone()) {
+    document.getElementById('dr-id').textContent = Members.label(id);
+    if (!fresh) {
+      const recordCount = Members.merged(id).length;
+      box.innerHTML = `<p class="dm-saved"><b>${recordCount}번째 트레이닝</b>을 기록했어요<br><span>${Members.label(id)}</span></p>`;
+      return;
+    }
+    // 손님: QR 회원 카드 대신 아이디로 저장하기 (아이디 접두어가 있을 때만)
+    const namedRow = MemberId.validPrefix(Members.prefix())
+      ? '<div class="dm-named"><span>QR 대신</span><button class="btn" type="button">아이디로 저장하기</button></div>' : '';
+    screen.classList.add('with-card');
+    if (onPhone()) {
       // 휴대폰: 이 휴대폰으로 QR 을 비출 수 없으니 회원 카드 그림을 바로 갤러리에 저장한다 (app/card.html 과 같은 그림).
       // 그림은 미리 그려 둔다: iPhone 의 공유 창(navigator.share)은 누른 순간 곧바로 불러야 열린다
-      screen.classList.add('with-card');
       box.innerHTML = `
         <div class="dm-new dm-phone">
           <h4><em>새 회원</em>회원 카드를 이 휴대폰에 저장하세요</h4>
@@ -349,7 +513,8 @@ export const MemberUI = {
             회원 카드 저장
           </button>
           <p class="dm-save-msg" aria-live="polite"></p>
-          <p class="dm-id">다음에는 '회원 카드가 있으신가요?' 화면에서 <strong>사진으로 들어가기</strong>를 누르고 저장한 카드를 고르세요. 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
+          <p class="dm-id">다음에는 로그인 화면에서 <strong>사진으로 들어가기</strong>를 누르고 저장한 카드를 고르세요. 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
+          ${namedRow}
         </div>`;
       const saveButton = box.querySelector('.dm-save');
       const saveMessage = box.querySelector('.dm-save-msg');
@@ -363,8 +528,7 @@ export const MemberUI = {
         const notice = await saveCard(cardBlob, id);
         if (notice) saveMessage.textContent = notice;
       };
-    } else if (fresh) {
-      screen.classList.add('with-card');
+    } else {
       // 사진으로 찍어 두면 QR 이 작아 태블릿이 잘 못 읽는다. 휴대폰 카메라로 비춰 링크를 열고, 회원 카드 화면(app/card.html)에서
       // '갤러리에 저장' 한 큰 QR 그림을 쓰도록 안내한다. 결과 화면에서 눈에 잘 띄도록 따로 강조한 칸에 둔다
       box.innerHTML = `
@@ -379,10 +543,31 @@ export const MemberUI = {
             </ol>
           </div>
           <p class="dm-id">다음에 오시면 저장한 사진을 태블릿 카메라에 보여 주세요. 안 되면 회원 번호 <b>${Members.format(id)}</b> 를 눌러도 돼요</p>
+          ${namedRow}
         </div>`;
-    } else {
-      const recordCount = Members.merged(id).length;
-      box.innerHTML = `<p class="dm-saved"><b>${recordCount}번째 트레이닝</b>을 기록했어요<br><span>회원 ${Members.format(id)}</span></p>`;
     }
+    const namedButton = box.querySelector('.dm-named button');
+    if (namedButton) namedButton.onclick = () => this.saveAsNamed(id);
+  },
+
+  // 손님 결과 화면: 받은 회원 번호 대신 아이디로 오늘 기록을 저장한다.
+  // 기록을 아이디로 옮기고, 세션 로그의 meta.user 를 고쳐 다시 저장 · 업로드한다 (서버는 같은 세션을 덮어쓴다)
+  saveAsNamed(numberId) {
+    const log = this.resultLog;
+    this.openIdForm({
+      title: '아이디로 저장하기', okLabel: '저장',
+      onCreated: (id) => {
+        Members.move(numberId, id);
+        if (this.user === numberId) this.user = id;
+        if (log) {
+          log.meta.user = id;
+          SessionStore.put(log).then(() => SessionUpload.resend(log.meta.id)).catch(() => { /* 태블릿 기록은 이미 옮겼다 */ });
+        }
+        document.getElementById('demo-result').classList.remove('with-card');
+        document.getElementById('dr-id').textContent = Members.label(id);
+        document.getElementById('dr-member').innerHTML =
+          `<p class="dm-saved"><b>${Members.format(id)}</b> 아이디로 오늘 기록을 저장했어요<br><span>다음에는 '아이디로 들어가기'에서 골라 주세요</span></p>`;
+      },
+    });
   },
 };

@@ -25,7 +25,7 @@ repo_git() { (cd "$HERE" && git "$@"); }
 
 # 운영 서버가 될 $BRANCH 의 서버 코드가 $DEV_BRANCH 와 같은가 (GitHub 기준)
 repo_git fetch -q origin "$BRANCH" "$DEV_BRANCH"
-SERVER_CODE=(api js/history-entry.js js/games)
+SERVER_CODE=(api js/history-entry.js js/member-id.js js/games)
 if ! repo_git diff --quiet "origin/$BRANCH" "origin/$DEV_BRANCH" -- "${SERVER_CODE[@]/#/:/}"; then
   echo "!! origin/$BRANCH 와 origin/$DEV_BRANCH 의 서버 코드가 다르다 (운영 서버는 $BRANCH 로 맞춰진다):"
   repo_git diff --stat "origin/$BRANCH" "origin/$DEV_BRANCH" -- "${SERVER_CODE[@]/#/:/}"

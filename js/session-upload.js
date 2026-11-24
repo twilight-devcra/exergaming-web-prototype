@@ -20,6 +20,15 @@ export const SessionUpload = {
   started: false,
   state: { pending: null, sent: 0, lastOk: null, lastError: null, retryAt: null },
   onChange: null, // (state) 운영 메뉴 표시용
+  changed: new Set(), // 보내는 동안 고쳐진 세션 (resend). 다 보낸 뒤 한 번 더 보낸다
+
+  // 이미 저장(SessionStore.put)한 세션을 고쳐 다시 저장했을 때 부른다. 서버는 device + id 로 덮어쓴다.
+  // 그 세션을 지금 보내는 중이면 고치기 전 것이 갔을 수 있으므로, 끝난 뒤 '보냄' 표시를 다시 지운다 (kick)
+  async resend(id) {
+    this.changed.add(id);
+    await SessionStore.unmarkUploaded(id);
+    this.kick();
+  },
 
   // 칸마다: 운영 메뉴에 적은 값이 있으면 그것, 비어 있으면 js/config.js 의 SESSION_UPLOAD
   settings() {
@@ -75,10 +84,15 @@ export const SessionUpload = {
     this.busy = true;
     try {
       for (const id of await this.pending()) {
+        this.changed.delete(id); // 읽기 전에 지운다: 읽은 뒤에 고쳐지면 아래에서 다시 보낸다
         const log = await SessionStore.get(id);
         if (!log) continue;
         await this.send(url, key, log);
         await SessionStore.markUploaded(id);
+        if (this.changed.has(id)) {
+          await SessionStore.unmarkUploaded(id);
+          this.again = true;
+        }
         this.failures = 0;
         this.state.sent++;
         this.state.lastOk = new Date();

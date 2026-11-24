@@ -5,7 +5,9 @@
 | 주소 | 하는 일 |
 |---|---|
 | `POST /sessions` | 세션 로그 하나 받기. `meta.device` + `meta.id` 로 덮어쓴다. 형식이 이상해도 2xx |
-| `GET /history?user=<번호>` | 회원 기록 (항목의 필드·형은 `js/history-entry.js`, 태블릿과 같은 파일). IP 마다 1분에 30번까지 |
+| `GET /history?user=<번호 또는 아이디>` | 회원 기록 (항목의 필드·형은 `js/history-entry.js`, 태블릿과 같은 파일). IP 마다 1분에 30번까지 |
+| `GET /users?prefix=<접두어>` | 그 접두어의 아이디 목록 (`users` 표 + 그 아이디로 올라온 세션). IP 마다 1분에 60번까지 |
+| `POST /users` | 새 아이디 `{ "id": "<접두어>_<아이디>" }`. 만들면 201, 이미 있으면(영문 대소문자 무시) 409, 꼴이 틀리면 400. IP 마다 1분에 20번까지. 규칙은 `js/member-id.js`, 태블릿과 같은 파일 |
 | `GET /health` | 살아 있는지 |
 | `/admin` | 관리 화면 (비밀번호). 세션 목록, 게임 × 레벨 정답률, 게임별 통계, CSV, 원본 내려받기, 세션 재생 |
 
@@ -26,6 +28,7 @@ node api/server.js --reindex   # 원본(raw/)에서 색인(SQLite)을 다시 만
 | `DATA_DIR` | `api/data` | 원본 `raw/<env>/<device>/<id>.json.gz` + 색인 `exergame.db` |
 | `UPLOAD_KEY` | 없음 | 있으면 업로드·회원 기록에 `Authorization: Bearer <키>` 를 요구. 태블릿에 그대로 들어가므로 비밀이 아니다 |
 | `ADMIN_PASSWORD` | 없음 | 관리 화면 비밀번호 (사용자 이름은 아무거나). 없으면 관리 화면이 닫힌다 |
+| `USERS_NEW_PER_MIN` | 20 | IP 하나가 1분에 아이디를 만들 수 있는 횟수 (`POST /users`, 틀린 꼴도 센다) |
 | `ALLOW_ORIGINS` | 배포 주소, `localhost:5173` | CORS 로 허락할 출처 (쉼표로) |
 
 ## 관리 화면 읽는 법
@@ -56,7 +59,7 @@ IAM 역할, 보안 그룹(80·443 만), EC2(Ubuntu 24.04 ARM, 20 GB 암호화 �
 |---|---|---|
 | 주소 | `https://exergame-api.devcra.com` | `https://exergame-api-dev.devcra.com` |
 | 따르는 브랜치 | `main` | `dev` |
-| 누가 올리나 | 운영 태블릿(`main` 배포), 로컬 서버 | dev 미리 보기(`/dev/`) — `js/config.js` 의 `API_DEV` |
+| 누가 올리나 | 운영 태블릿(`main` 배포) | dev 미리 보기(`/dev/`, `?env=dev`), 로컬 서버(`localhost`, `?env=local`) — `js/config.js` 의 `API_DEV` |
 | 서비스 · 포트 | `exergame-api` · 8787 | `exergame-api-dev` · 8788 |
 | 저장소 · 데이터 · 설정 | `/opt/exergame` · `/var/lib/exergame-api` · `/etc/exergame-api.env` | `/opt/exergame-dev` · `/var/lib/exergame-api-dev` · `/etc/exergame-api-dev.env` |
 
@@ -78,7 +81,7 @@ BRANCH=main bash api/deploy/deploy.sh   # 브랜치 바꾸기 (예전 기본값 
 
 **dev 서버가 없는 예전 인스턴스에 더하기** (이 구성 전에 `provision.sh` 로 만든 서버, 한 번):
 
-1. 운영 서버의 코드를 `main` 으로: `dev` 를 `main` 에 합쳐 push 한다. `add-dev.sh` 는 운영 서버도 `main` 으로 맞추므로, `main` 의 서버 코드(`api/` · `js/history-entry.js` · `js/games/`)가 `dev` 와 다르면 멈춘다
+1. 운영 서버의 코드를 `main` 으로: `dev` 를 `main` 에 합쳐 push 한다. `add-dev.sh` 는 운영 서버도 `main` 으로 맞추므로, `main` 의 서버 코드(`api/` · `js/history-entry.js` · `js/member-id.js` · `js/games/`)가 `dev` 와 다르면 멈춘다
 2. `bash api/deploy/add-dev.sh` — Route 53 에 `exergame-api-dev` 를 더하고, 서버에서 `setup.sh` 를 다시 돌려 dev 서버를 띄운다. 운영 서버는 몇 초 다시 켜지고, 데이터·설정은 그대로다
 3. `curl https://exergame-api-dev.devcra.com/health` 가 답하면 `js/config.js` 의 `API_DEV` 를 쓰는 커밋을 `dev` 에 push 한다 (그 전에 올리면 미리 보기의 업로드가 실패한다. 세션은 태블릿에 남아 나중에 다시 올라간다)
 4. 예전에 운영 서버의 `?env=dev` 로 올라간 미리 보기 세션은 운영 서버에 그대로 남는다 (관리 화면의 환경 칸에서 dev). dev 서버로 옮기려면 운영의 `/var/lib/exergame-api/raw/dev` 를 dev 서버의 같은 자리로 복사하고 `--reindex` 한다

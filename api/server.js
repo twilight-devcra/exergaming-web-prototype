@@ -5,6 +5,7 @@
 //   - 원본 세션 — DATA_DIR/raw/<env>/<device>/<id>.json.gz (받은 그대로, 다시 올라오면 덮어쓴다)
 //   - 색인 — DATA_DIR/exergame.db (SQLite). sessions(세션 하나 한 줄) · games(게임 한 판) · questions(문제 하나)
 //     색인은 원본에서 언제든 다시 만들 수 있다 (node api/server.js --reindex)
+//   - 아이디 — 같은 DB 의 users (태블릿에서 만든 글 아이디). 원본에서 다시 만들 수 없으므로 --reindex 가 건드리지 않는다
 // env: 업로드·회원 기록 주소의 ?env= (없으면 'prod'). dev 브랜치 미리 보기(/dev/)가 운영 데이터와 섞이지 않게 쓴다.
 'use strict';
 const http = require('http');
@@ -24,6 +25,8 @@ const config = {
   origins: (process.env.ALLOW_ORIGINS || 'https://twilight-devcra.github.io,http://localhost:5173').split(',').map((origin) => origin.trim()).filter(Boolean),
   maxBody: 10 * 1024 * 1024, // 가장 긴 15분 판이 약 2 MB. 413 은 그 태블릿의 업로드를 멈추게 하므로 넉넉히
   historyPerMin: 30, // IP 하나가 1분에 회원 기록을 물을 수 있는 횟수 (번호를 차례로 넣어 보는 것 막기)
+  usersPerMin: 60, // IP 하나가 1분에 아이디 목록을 받을 수 있는 횟수
+  usersNewPerMin: Number(process.env.USERS_NEW_PER_MIN || 20), // IP 하나가 1분에 아이디를 만들 수 있는 횟수 (만들기 시도 모두, 틀린 꼴 포함)
 };
 
 // ---------------- 저장소 ----------------
@@ -59,6 +62,10 @@ database.exec(`
     PRIMARY KEY (env, device, sid, q)
   );
   CREATE INDEX IF NOT EXISTS questions_game ON questions (game, level);
+  CREATE TABLE IF NOT EXISTS users (
+    env TEXT NOT NULL, id TEXT NOT NULL COLLATE NOCASE, created_at TEXT NOT NULL, device TEXT,
+    PRIMARY KEY (env, id)
+  );
 `);
 
 const safe = (text, fallback) => {
@@ -73,6 +80,10 @@ const textOrNull = (value) => (value === undefined || value === null ? null : ty
 
 // 세션 로그 하나 → 회원 기록 항목 하나 (형을 지킨 것, 또는 null). 태블릿(app/member-records.js)과 같은 파일을 쓴다 (docs/SERVER.md '회원 기록')
 const { summarize, cleanEntry } = require('../js/history-entry.js');
+// 글 아이디 규칙 ('<시설 접두어>_<아이디>'). 태블릿(app/member-records.js)과 같은 파일을 쓴다 (docs/SERVER.md '아이디')
+const { MemberId } = require('../js/member-id.js');
+// 회원 기록을 물을 수 있는 회원: 8자리 회원 번호 또는 글 아이디
+const memberOk = (user) => /^\d{8}$/.test(user) || MemberId.isNamed(user);
 
 // 이벤트에서 게임 한 판·문제 하나씩 뽑는다 (docs/SESSION_LOG.md 'events')
 function extract(log) {
@@ -284,6 +295,43 @@ function readBody(request, limit) {
 const selectHistory = database.prepare(`SELECT history FROM sessions
   WHERE env = ? AND user = ? AND ended IS NOT NULL AND ended NOT IN ('abandoned', 'user') AND started_at >= ?`);
 
+// ---------------- 아이디 (docs/SERVER.md '아이디') ----------------
+// 만든 아이디는 users 표에, 그 아이디로 올라온 세션은 sessions 표에 있다. 목록과 겹침 확인은 둘을 함께 본다
+// (서버에 연결하지 못한 채 태블릿에서만 만든 아이디도 세션이 올라오면 보이게)
+// 접두어 'abc' 의 아이디는 'abc_' 이상 'abc`' 미만이다 ('`' 는 '_' 바로 다음 글자) → 색인을 탄다
+const selectUsers = database.prepare('SELECT id, created_at AS last FROM users WHERE env = ? AND id >= ? AND id < ?');
+const selectSessionUsers = database.prepare('SELECT user AS id, MAX(started_at) AS last FROM sessions WHERE env = ? AND user >= ? AND user < ? GROUP BY user');
+const findUser = database.prepare('SELECT 1 FROM users WHERE env = ? AND id = ? LIMIT 1');
+const findSessionUser = database.prepare('SELECT 1 FROM sessions WHERE env = ? AND user = ? COLLATE NOCASE LIMIT 1');
+const insertUser = database.prepare('INSERT INTO users VALUES (?, ?, ?, ?)');
+
+// 접두어 하나의 아이디 목록 [{ id, last }]. 영문 대소문자만 다른 것은 한 줄로. last 는 만든 때와 마지막 세션 중 늦은 것
+function listUsers(env, prefix) {
+  const range = [env, `${prefix}_`, `${prefix}\``];
+  const byKey = new Map();
+  for (const row of [...selectUsers.all(...range), ...selectSessionUsers.all(...range)]) {
+    // 세션의 user 는 누구나 올릴 수 있는 값이다. 아이디 꼴이 아닌 것은 태블릿 화면에 그려지지 않게 뺀다
+    if (!MemberId.isNamed(row.id)) continue;
+    const key = MemberId.keyOf(row.id);
+    const known = byKey.get(key);
+    if (!known) byKey.set(key, { id: row.id, last: row.last || null });
+    else if (row.last && (!known.last || row.last > known.last)) known.last = row.last;
+  }
+  return [...byKey.values()];
+}
+
+// 새 아이디를 적어 둔다. 이미 있으면(영문 대소문자만 달라도) false
+function createUser(env, id, device) {
+  if (findUser.get(env, id) || findSessionUser.get(env, id)) return false;
+  try {
+    insertUser.run(env, id, new Date().toISOString(), device);
+  } catch (error) {
+    if (/UNIQUE|PRIMARY KEY/i.test(error.message)) return false; // 두 태블릿이 같은 아이디를 거의 함께 만들었다
+    throw error;
+  }
+  return true;
+}
+
 const handleAdmin = require('./admin.js')(database, { rawPath, safe });
 
 async function handle(request, response) {
@@ -304,11 +352,30 @@ async function handle(request, response) {
     if (!keyOk(request)) return send(response, 401, { error: 'key' });
     if (limited(clientAddress(request), 'history', config.historyPerMin)) return send(response, 429, { error: 'rate' });
     const user = url.searchParams.get('user') || '';
-    if (!/^\d{8}$/.test(user)) return send(response, 200, { sessions: [] });
+    if (!memberOk(user)) return send(response, 200, { sessions: [] });
     const since = new Date(Date.now() - 2 * 366 * 864e5).toISOString(); // 달력은 최근 2년까지만 넘겨 본다
     // 저장할 때 이미 형을 맞췄지만, 고치기 전에 저장된 줄(--reindex 전)도 있을 수 있으므로 내보낼 때 한 번 더 맞춘다
     const sessions = selectHistory.all(envOf(url), user, since).map((row) => cleanEntry(JSON.parse(row.history))).filter(Boolean);
     return send(response, 200, { sessions });
+  }
+
+  if (url.pathname === '/users' && request.method === 'GET') {
+    if (!keyOk(request)) return send(response, 401, { error: 'key' });
+    if (limited(clientAddress(request), 'users', config.usersPerMin)) return send(response, 429, { error: 'rate' });
+    const prefix = url.searchParams.get('prefix') || '';
+    if (!MemberId.validPrefix(prefix)) return send(response, 400, { error: 'prefix' });
+    return send(response, 200, { users: listUsers(envOf(url), prefix) });
+  }
+
+  if (url.pathname === '/users' && request.method === 'POST') {
+    if (!keyOk(request)) return send(response, 401, { error: 'key' });
+    if (limited(clientAddress(request), 'users-new', config.usersNewPerMin)) return send(response, 429, { error: 'rate' });
+    let body = null;
+    try { body = JSON.parse((await readBody(request, 4096)).toString('utf8')); } catch { /* 아래에서 400 */ }
+    const id = body && typeof body.id === 'string' ? body.id.normalize('NFC') : '';
+    if (!MemberId.isNamed(id)) return send(response, 400, { error: 'id' });
+    if (!createUser(envOf(url), id, safe(body.device, null))) return send(response, 409, { error: 'exists' });
+    return send(response, 201, { ok: true, id });
   }
 
   if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {

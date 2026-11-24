@@ -85,11 +85,12 @@ const request = (urlPath, { method = 'GET', body, headers = {} } = {}) => fetch(
 });
 const auth = { Authorization: `Bearer ${KEY}`, Origin: ORIGIN };
 const post = (log, extra = '') => request(`/sessions${extra}`, { method: 'POST', body: log, headers: { ...auth, 'Content-Type': 'application/json' } });
+const create = (id, extra = '') => request(`/users${extra}`, { method: 'POST', body: { id, device: 'tab-a' }, headers: { ...auth, 'Content-Type': 'application/json' } });
 const adminAuth = { Authorization: 'Basic ' + Buffer.from(`x:${ADMIN}`).toString('base64') };
 
 async function main() {
   const server = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: dir, UPLOAD_KEY: KEY, ADMIN_PASSWORD: ADMIN },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: dir, UPLOAD_KEY: KEY, ADMIN_PASSWORD: ADMIN, USERS_NEW_PER_MIN: '200' },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   await new Promise((resolve) => server.stdout.once('data', resolve));
@@ -203,6 +204,52 @@ async function main() {
       const dev = await (await request('/history?user=12345674&env=dev', { headers: auth })).json();
       assert.strictEqual(prod.sessions.length, 2);
       assert.strictEqual(dev.sessions.length, 1);
+    });
+
+    await check('아이디: 만들기 · 겹치면 409 (대소문자 무시) · 이상한 꼴은 400', async () => {
+      const created = await create('gym-a_철수');
+      assert.strictEqual(created.status, 201);
+      assert.strictEqual(created.headers.get('access-control-allow-origin'), ORIGIN);
+      assert.strictEqual((await create('gym-a_철수')).status, 409);
+      assert.strictEqual((await create('gym-a_Kim')).status, 201);
+      assert.strictEqual((await create('gym-a_kim')).status, 409, '영문 대소문자만 다르면 같은 아이디');
+      assert.strictEqual((await create('gym-b_철수')).status, 201, '접두어가 다르면 다른 아이디');
+      assert.strictEqual((await create('gym-a_철수', '?env=dev')).status, 201, 'env 가 다르면 따로');
+      for (const bad of ['철수', 'gym-a_', 'gym-a_철 수', 'gym-a_<b>', 'GYM_철수', 'gym-a_ㅊ', 'gym-a_열세글자가넘는아이디입니다요']) {
+        assert.strictEqual((await create(bad)).status, 400, bad);
+      }
+      const noKey = await request('/users', { method: 'POST', body: { id: 'gym-a_영희' }, headers: { 'Content-Type': 'application/json' } });
+      assert.strictEqual(noKey.status, 401);
+    });
+
+    await check('아이디 목록: 접두어별, 세션으로만 아는 아이디도, 아이디 꼴이 아닌 user 는 빼고', async () => {
+      await post(fakeSession({ device: 'tab-a', id: 8000, user: 'gym-a_영희', days: 2 }));
+      await post(fakeSession({ device: 'tab-a', id: 8001, user: 'gym-a_철수' }));
+      await post(fakeSession({ device: 'tab-a', id: 8002, user: 'gym-a_<img src=x>' }));
+      const list = await (await request('/users?prefix=gym-a', { headers: auth })).json();
+      const byId = Object.fromEntries(list.users.map((user) => [user.id, user]));
+      assert.deepStrictEqual(Object.keys(byId).sort(), ['gym-a_Kim', 'gym-a_영희', 'gym-a_철수'].sort());
+      assert.ok(Date.parse(byId['gym-a_철수'].last) > Date.parse(byId['gym-a_영희'].last), 'last 는 마지막 세션');
+      assert.deepStrictEqual((await (await request('/users?prefix=gym-b', { headers: auth })).json()).users.map((user) => user.id), ['gym-b_철수']);
+      assert.strictEqual((await request('/users?prefix=Bad_Prefix', { headers: auth })).status, 400);
+      assert.strictEqual((await create('gym-a_영희')).status, 409, '세션으로만 아는 아이디도 겹침');
+      const history = await (await request(`/history?user=${encodeURIComponent('gym-a_철수')}`, { headers: auth })).json();
+      assert.strictEqual(history.sessions.length, 1, '글 아이디로도 회원 기록을 받는다');
+    });
+
+    await check('한글 접두어: 만들기 · 목록 (앞이 같은 다른 접두어는 안 섞임) · 회원 기록', async () => {
+      assert.strictEqual((await create('강남_철수')).status, 201);
+      assert.strictEqual((await create('강남_철수')).status, 409);
+      assert.strictEqual((await create('강남구_영희')).status, 201);
+      assert.strictEqual((await create('강남-2관_민수')).status, 201);
+      for (const bad of ['ㄱ남_철수', '강 남_철수', '강남_ㅊ', 'Gangnam_철수']) assert.strictEqual((await create(bad)).status, 400, bad);
+      await post(fakeSession({ device: 'tab-k', id: 8100, user: '강남_철수' }));
+      const list = await (await request(`/users?prefix=${encodeURIComponent('강남')}`, { headers: auth })).json();
+      assert.deepStrictEqual(list.users.map((user) => user.id), ['강남_철수'], "'강남구' · '강남-2관' 의 아이디는 '강남' 목록에 없다");
+      const otherList = await (await request(`/users?prefix=${encodeURIComponent('강남구')}`, { headers: auth })).json();
+      assert.deepStrictEqual(otherList.users.map((user) => user.id), ['강남구_영희']);
+      const history = await (await request(`/history?user=${encodeURIComponent('강남_철수')}`, { headers: auth })).json();
+      assert.strictEqual(history.sessions.length, 1);
     });
 
     await check('관리 화면: 비밀번호 없으면 401, 있으면 열림', async () => {

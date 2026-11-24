@@ -1,10 +1,14 @@
 // 운영 메뉴 (운영 버전 app/index.html): 대기 화면의 ⚙ 버튼이나 왼쪽 위 모서리 길게 누르기 → PIN → 운영 메뉴.
-// 메뉴 안의 라운드 설정(DEMO_SETTINGS), 자동 업로드 설정, 기록 보기·내려받기도 여기 있다.
+// 하위 메뉴(왼쪽 목록)로 나눈다: 스테이션(번호 · 페달 · 음악) · 라운드(DEMO_SETTINGS) · 회원 · 아이디(접두어 · 회원 기록 주소) ·
+// 서버 · 업로드 · 기록 · 로그(이 태블릿의 기록 · 세션 로그 내보내기) · 테스트. 하위 메뉴 이름 아래에는 그 칸의 지금 상태를 보인다 (renderTabs).
+// 칸을 오가도 적은 값은 그대로이고, '대기 화면 열기'(close)에서 스테이션 번호 · 접두어를 확인해 저장한다. 라운드 설정은 칸 안의 '저장'으로.
 // 스테이션 흐름(js/demo.js 의 Demo)은 isOpen·pinOpen 으로 메뉴가 열려 있는지 보고 게임을 멈춘다.
 import { PRESET_KEYS, ROUND_PRESETS, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, Util } from '../js/config.js';
 import { AXES } from '../js/abilities.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
+import { MemberId } from '../js/member-id.js';
+import { Members } from './member-records.js';
 
 export const OperatorMenu = {
   CORNER_HOLD_MS: 2000,  // 왼쪽 위 모서리를 이만큼 누르고 있으면 PIN 입력
@@ -16,6 +20,10 @@ export const OperatorMenu = {
   pinOpen: false,   // PIN 화면이 열려 있다
   pinInput: '',
   pinTimer: null,
+  tab: 'station',     // 보고 있는 하위 메뉴 (다음에 열 때도 이 칸부터)
+  savedRound: null,   // 라운드 칸에 마지막으로 채운 · 저장한 값 (저장하지 않은 변경을 가린다)
+  roundDirty: false,
+  recordsLabel: '',
 
   init(demo, app) {
     this.demo = demo;
@@ -39,9 +47,62 @@ export const OperatorMenu = {
       (this.pin ? '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.' : '운영 메뉴는 대기 화면의 ⚙ 운영 버튼이나 왼쪽 위 모서리 2초 누르기로 열립니다 (PIN 없음).');
   },
 
+  // 아이디 접두어 칸 아래 안내: 적은 접두어로 아이디가 어떻게 저장되는지, 비었거나 틀렸으면 그 뜻
+  renderPrefixNote() {
+    const prefix = MemberId.cleanPrefix($('#op-prefix').value);
+    const saved = Members.prefix();
+    $('#op-prefix-note').textContent = !prefix
+      ? '비어 있으면 아이디로 들어가기 · 새 아이디 만들기를 쓸 수 없습니다 (QR 회원 카드 · 손님은 됩니다).'
+      : !MemberId.validPrefix(prefix)
+        ? MemberId.prefixProblem(prefix)
+        : `아이디 '철수' 는 '${MemberId.make(prefix, '철수')}' 로 저장됩니다.` +
+          (saved && saved !== prefix ? ` 접두어를 바꾸면 아이디 목록에 '${prefix}' 의 아이디만 보입니다.` : '');
+  },
+
+  // ---------------- 하위 메뉴 ----------------
+  showTab(tab) {
+    this.tab = tab;
+    $('#op .op-box').dataset.tab = tab;
+    for (const button of document.querySelectorAll('#op-tabs [data-tab]')) {
+      const selected = button.dataset.tab === tab;
+      button.classList.toggle('on', selected);
+      button.setAttribute('aria-selected', String(selected));
+    }
+    $('#op .op-main').scrollTop = 0;
+    // 설명이 프리셋마다 길이가 달라 아래 칸들이 오르내리지 않게 가장 긴 설명만큼 자리를 잡아 둔다 (보이는 동안에만 잴 수 있다)
+    if (tab === 'round') Util.reserveHeight($('#op-set-preset-note'), Config.presetNotes());
+  },
+
+  // 하위 메뉴 이름 아래의 작은 글: 그 칸의 지금 상태. 손볼 것이 있으면 warn (강조색)
+  renderTabs() {
+    const label = (tab, text, warn = false) => {
+      const small = $(`#op-tab-${tab}`);
+      small.textContent = text;
+      small.parentElement.classList.toggle('warn', warn);
+    };
+    const station = parseInt($('#op-station').value, 10);
+    const stationOk = station >= 1 && station <= 99;
+    label('station', stationOk ? `스테이션 ${station}` : '번호를 적어 주세요', !stationOk);
+    const changed = Object.keys(Config.demoSaved()).length;
+    label('round', this.roundDirty ? '저장하지 않은 변경' : changed ? `기본값에서 ${changed}개 바꿈` : '기본값', this.roundDirty);
+    const prefix = MemberId.cleanPrefix($('#op-prefix').value);
+    label('members', !prefix ? '아이디 접두어 없음' : MemberId.validPrefix(prefix) ? `접두어 ${prefix}` : '접두어 꼴이 틀림', !MemberId.validPrefix(prefix));
+    const { url } = SessionUpload.settings();
+    const state = SessionUpload.state;
+    label('server', !url ? '업로드 꺼짐' : state.lastError ? '보내기 실패' : state.pending ? `남은 세션 ${state.pending}건` : '모두 보냄', !!(url && state.lastError));
+    label('records', this.recordsLabel);
+    const tests = [this.demo.allowKeyboard && '키보드', this.demo.simResult && '가상 결과'].filter(Boolean);
+    label('test', tests.length ? `켜짐: ${tests.join(' · ')}` : '꺼짐', tests.length > 0);
+  },
+
   // ---------------- 운영 메뉴 ----------------
   bindMenu() {
     $('#op-close').onclick = () => this.close();
+    $('#op-tabs').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-tab]');
+      if (button) this.showTab(button.dataset.tab);
+    });
+    $('#op-station').addEventListener('input', () => this.renderTabs());
     $('#op-end').onclick = () => {
       this.hide();
       if (this.app.state === 'play') this.app.endRound('operator');
@@ -65,13 +126,20 @@ export const OperatorMenu = {
     $('#op-sim').onchange = () => {
       this.demo.simResult = $('#op-sim').checked;
       this.demo.updateAttract();
+      this.renderTabs();
     };
     $('#op-kbd').onchange = () => {
       this.demo.allowKeyboard = $('#op-kbd').checked;
       this.demo.updateAttract();
       if (this.app.state === 'setup') this.demo.pickSetup({});
+      this.renderTabs();
     };
     $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
+    $('#op-prefix').addEventListener('input', () => {
+      $('#op-prefix').classList.remove('invalid');
+      this.renderPrefixNote();
+      this.renderTabs();
+    });
     this.bindSettings();
     // 운영 버전: 대기 화면 오른쪽 아래의 '운영' 버튼 → PIN. 누른 것이 대기 화면으로 퍼지지 않게 막는다
     const openButton = $('#op-open');
@@ -121,18 +189,17 @@ export const OperatorMenu = {
     const mark = (event) => event.target.id !== 'op-set-preset' && this.markSettings();
     box.addEventListener('input', mark);
     box.addEventListener('change', mark);
-    $('#op-set-open').onclick = () => this.openSettings();
-    $('#op-set-cancel').onclick = () => $('#op-set').classList.remove('active');
+    $('#op-set-cancel').onclick = () => this.loadRoundSettings();
     $('#op-set-reset').onclick = () => this.fillSettings(Config.demoDefaults());
     $('#op-set-save').onclick = () => this.saveSettings();
   },
 
-  openSettings() {
-    if (this.app.inRound) return;
+  // 라운드 칸을 지금 적용된 설정으로 채운다 (메뉴를 열 때, '되돌리기')
+  loadRoundSettings() {
+    this.savedRound = null;
     this.fillSettings(this.app.config);
-    $('#op-set').classList.add('active');
-    // 설명이 프리셋마다 길이가 달라 아래 칸들이 오르내리지 않게 가장 긴 설명만큼 자리를 잡아 둔다 (보이는 동안에만 잴 수 있다)
-    Util.reserveHeight($('#op-set-preset-note'), Config.presetNotes());
+    this.savedRound = this.readSettings();
+    this.markSettings();
   },
 
   fillSettings(values) {
@@ -172,6 +239,12 @@ export const OperatorMenu = {
     $('#op-set-preset').value = id;
     $('#op-set-preset-note').textContent = Config.presetNote(id);
     PRESET_KEYS.forEach((key) => $(`#op-set-fields [data-key="${key}"]`).parentElement.classList.toggle('preset', id !== 'custom'));
+    // 저장하지 않은 변경 (칸을 오가거나 메뉴를 닫으면 사라지므로 알린다)
+    const saved = this.savedRound;
+    this.roundDirty = !!saved && DEMO_SETTINGS.some((setting) => values[setting.key] !== saved[setting.key]);
+    $('#op-set-state').textContent = this.roundDirty ? '저장하지 않은 변경이 있습니다' : '';
+    $('#op-set-state').classList.remove('done');
+    if (this.isOpen) this.renderTabs();
   },
 
   saveSettings() {
@@ -179,15 +252,23 @@ export const OperatorMenu = {
     Config.demoSave(values);
     Object.assign(this.app.config, values);
     this.demo.renderConfig();
-    $('#op-set').classList.remove('active');
+    this.savedRound = values;
+    this.markSettings();
+    $('#op-set-state').textContent = '저장했습니다. 다음 판부터 적용됩니다';
+    $('#op-set-state').classList.add('done');
   },
 
   open() {
     const app = this.app;
     this.isOpen = true;
-    $('#op-set-open').disabled = app.inRound;
-    $('#op-set-open').textContent = app.inRound ? '라운드 설정 (라운드 중에는 못 바꿈)' : '라운드 설정';
+    // 라운드 설정은 라운드 중에는 못 바꾼다 (fieldset 째 막는다)
+    $('#op-set-form').disabled = app.inRound;
+    $('#op-set-locked').hidden = !app.inRound;
+    this.loadRoundSettings();
     $('#op-station').value = this.demo.station;
+    $('#op-prefix').value = Members.prefix();
+    $('#op-prefix').classList.remove('invalid');
+    this.renderPrefixNote();
     $('#op-kbd').checked = this.demo.allowKeyboard;
     $('#op-sim').checked = this.demo.simResult;
     $('#op-station').classList.remove('invalid');
@@ -203,7 +284,9 @@ export const OperatorMenu = {
     this.renderUpload();
     this.app.renderMusicTry();
     if (app.inRound) app.log.event('operator', { open: true });
+    this.renderTabs();
     $('#op').classList.add('active');
+    this.showTab(this.tab);
     this.demo.syncPause();
   },
 
@@ -212,18 +295,27 @@ export const OperatorMenu = {
     this.app.renderMusicTry();
     if (this.app.inRound && this.isOpen) this.app.log.event('operator', { open: false });
     this.isOpen = false;
-    $('#op-set').classList.remove('active');
     $('#op').classList.remove('active');
     this.demo.syncPause();
   },
 
   close() {
     const station = parseInt($('#op-station').value, 10);
+    // 틀린 칸이 있으면 그 하위 메뉴를 열어 보여 준다
     if (!(station >= 1 && station <= 99)) {
+      this.showTab('station');
       $('#op-station').classList.add('invalid');
       $('#op-station').focus();
       return;
     }
+    const prefix = MemberId.cleanPrefix($('#op-prefix').value);
+    if (prefix && !MemberId.validPrefix(prefix)) {
+      this.showTab('members');
+      $('#op-prefix').classList.add('invalid');
+      $('#op-prefix').focus();
+      return;
+    }
+    Members.setPrefix(prefix);
     this.demo.station = String(station);
     this.demo.save('station', this.demo.station);
     this.demo.renderStation();
@@ -234,6 +326,7 @@ export const OperatorMenu = {
   renderLog() {
     const log = this.demo.load('log', []);
     $('#op-log-count').textContent = log.length ? `${log.length}건` : '';
+    this.recordsLabel = log.length ? `기록 ${log.length}건` : '기록 없음';
     const list = $('#op-log');
     if (!log.length) {
       list.innerHTML = '<li class="board-empty">아직 기록이 없습니다</li>';
@@ -325,6 +418,7 @@ export const OperatorMenu = {
     SessionUpload.onChange = (state, uploadSettings) => {
       const stateLabel = $('#op-up-state');
       if (stateLabel) stateLabel.textContent = SessionUpload.describe(state, uploadSettings);
+      if (this.isOpen) this.renderTabs();
     };
     SessionUpload.init();
     if (!$('#op-up-url')) return;

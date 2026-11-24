@@ -40,7 +40,7 @@
 | `id` | 기록 시작 시각 (epoch ms, 문자열). IndexedDB 의 키. 태블릿 안에서만 겹치지 않는다 |
 | `device` | 태블릿(브라우저)마다 처음 한 번 만드는 고유 번호 (UUID, localStorage `exergame.device`). 서버에서는 `device` + `id` 가 세션 하나 |
 | `edition` | `prototype` (index.html) \| `app` (운영 버전 app/) |
-| `user`, `guest`, `userNew` | 운영 버전만. 회원 번호(8자리 문자열, `app/members.js`), 손님으로 시작했는지, 이 판 결과 화면에서 새로 만든 번호인지(손님은 결과 화면에서 번호를 받는다). 결과 없이 끝난 손님 판은 `user` 가 null |
+| `user`, `guest`, `userNew` | 운영 버전만. 회원 번호(8자리 문자열, `app/members.js`) 또는 아이디(`<접두어>_<아이디>`, `js/member-id.js`. 손님이 결과 화면에서 아이디로 저장하면 그 판의 `user` 를 아이디로 고쳐 다시 올린다), 손님으로 시작했는지, 이 판 결과 화면에서 새로 만든 번호인지(손님은 결과 화면에서 번호를 받는다). 결과 없이 끝난 손님 판은 `user` 가 null |
 | `session` | 운영 버전만. 참가자가 세션 설정 화면에서 고른 `{ min, difficulty, track }` (`difficulty`: `relax` · `normal` · `challenge`, `track`: 아래 `track` 과 같음). 이것으로 정해진 값은 `config` 에 들어 있다 (`Config.session`) |
 | `landmark` | 운영 버전의 회원 라운드만 (결과 화면까지 간 판). 풍경 길가에 세운 기념물의 생김새 `{ v, kind, size, seed, wall, roof }` — `kind`: `cottage` · `shop` · `tower` (예전 안은 `pinwheel` · `balloon` · `cairn`), `size`: 0~2 (층수 1~3), `seed`: 작은 차이(창가 꽃 색 등)를 정하는 수, `wall` · `roof`: 색 `#rrggbb`. 회원 기록에도 `look` 으로 들어가 다음 라운드부터 이 모양 그대로 선다 (`js/band.js` 의 `Band.lookOf`) |
 | `track` | 운동 방식. `dual` (페달 + 두뇌 게임) \| `brain` (두뇌 게임만, 페달 없이). 테스트 화면은 설정의 **진행 → 페달 없이**, 운영 버전은 세션 설정의 **운동 방식**. `brain` 은 속도 측정이 없고(`calib_skip`), 운동 점수가 없어 `summary.exScore` 가 0, `baseline` 이 null 이며, 속도 전환 구간도 없다. `samples` 의 `rpm` 은 0, `target` 은 null (페달 원시 입력 `capd` · `workout` · `keys` 는 그대로 남는다). 이 필드가 없는 예전 기록은 모두 `dual` |

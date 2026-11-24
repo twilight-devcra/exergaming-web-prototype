@@ -244,6 +244,11 @@ export const SessionStore = {
     return this.run('readwrite', (objectStore) => objectStore.put({ id, at: new Date().toISOString() }), 'uploaded'); // eslint-disable-line id-length -- 저장된 기록 형식
   },
 
+  // 보낸 세션을 고쳤으면 다시 보내게 '보냄' 표시를 지운다 (SessionUpload.resend)
+  unmarkUploaded(id) {
+    return this.run('readwrite', (objectStore) => objectStore.delete(id), 'uploaded');
+  },
+
   // 세션을 하나씩 visit(log) 에 넘긴다 (시험용 회원 기록 서버, app/member-records.js)
   scan(visit) {
     return this.run('readonly', (objectStore) => {

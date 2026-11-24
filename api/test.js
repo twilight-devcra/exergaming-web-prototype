@@ -296,6 +296,25 @@ async function main() {
       assert.match(await replay.text(), /세션 재생/);
       const options = await (await request('/admin/api/options', { headers: adminAuth })).json();
       assert.strictEqual(options.titles.coin, '동전 세기');
+      const cards = await (await request('/admin/api/games', { headers: adminAuth })).json();
+      assert.strictEqual(cards.coin.title, '동전 세기');
+      assert.ok(Object.keys(cards).length >= 19, '게임마다 카드');
+      assert.ok(Object.values(cards).every((card) => card.steps.length && card.steps.every((step) => step.svg.startsWith('<svg') && step.caption)), '카드마다 소개 그림');
+      assert.ok(cards.coin.tags.includes('찾기') && cards.coin.hint);
+      const gameCss = await (await request('/admin/game.css', { headers: adminAuth })).text();
+      assert.match(gameCss, /^:host \{/, '그림자 DOM 용 색 변수');
+      assert.match(gameCss, /\.dg-svg/);
+    });
+
+    await check('관리 날짜는 한국 시간(KST) 하루 기준', async () => {
+      const late = fakeSession({ device: 'tab-k', id: 9100 });
+      late.meta.startedAt = '2026-01-01T16:30:00.000Z'; // KST 1월 2일 01:30
+      assert.ok((await post(late, '?env=kst')).ok);
+      const overviewOf = async (extra) => (await request(`/admin/api/overview?env=kst${extra}`, { headers: adminAuth })).json();
+      assert.deepStrictEqual((await overviewOf('')).days, [{ day: '2026-01-02', n: 1 }]);
+      assert.strictEqual((await overviewOf('&from=2026-01-02&to=2026-01-02')).totals.n, 1);
+      assert.strictEqual((await overviewOf('&from=2026-01-01&to=2026-01-01')).totals.n, 0);
+      assert.strictEqual((await overviewOf('&from=bad')).totals.n, 1, '잘못된 날짜는 무시');
     });
 
     await check('회원 기록 요청 수 제한 (429)', async () => {

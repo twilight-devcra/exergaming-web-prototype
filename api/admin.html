@@ -56,6 +56,13 @@
   .tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px;
     padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); display: none; z-index: 10; white-space: nowrap; }
   .tip b { font-size: 13px; }
+  .tip.card { white-space: normal; width: min(440px, calc(100vw - 16px)); }
+  .tip .tags { color: var(--ink-2); margin-left: 8px; }
+  .tip .hint { margin-top: 8px; color: var(--ink-2); line-height: 1.5; }
+  .tip-dg { display: block; margin-top: 8px; }
+  /* 게임 이름 앞의 작은 그림 (게임 소개 화면의 첫 그림). 올리면 소개 그림 · 설명 툴팁 */
+  .gname { display: inline-flex; align-items: center; gap: 8px; cursor: help; }
+  .gicon { display: inline-block; width: 48px; height: 36px; flex: none; }
   .days svg { width: 100%; height: 160px; display: block; }
   .days .lbl { fill: var(--muted); font-size: 11px; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; }
@@ -147,7 +154,58 @@ const percent = (value, digits = 0) => (value == null ? '–' : `${(value * 100)
 const seconds = (milliseconds) => (milliseconds == null ? '–' : `${(milliseconds / 1000).toFixed(1)}초`);
 const formatNumber = (value, digits = 0) => (value == null ? '–' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits }));
 const gameTitle = (id) => TITLES[id] || id;
+// 저장된 UTC 시각을 한국 시간(KST) 'YYYY-MM-DD HH:MM' 으로 (보는 기기의 시간대와 상관없이)
+const kstTime = (iso) => {
+  const time = Date.parse(iso || '');
+  return Number.isNaN(time) ? (iso || '') : new Date(time + 9 * 3600e3).toISOString().replace('T', ' ').slice(0, 16);
+};
 const MIN_QUESTIONS = 20;
+
+// 게임 알아보기: /admin/api/games 의 카드(이름 · 꼬리표 · 설명 · 소개 그림)와, 그림을 그리는 게임 화면 css.
+// 그림은 게임 css 를 쓰므로 그림자 DOM 안에 그려 관리 화면 css 와 섞이지 않게 한다
+let CARDS = {};
+let GAME_SHEETS = null; // [게임 css, 작은 그림용, 툴팁용]
+const sheetOf = (text) => { const sheet = new CSSStyleSheet(); sheet.replaceSync(text); return sheet; };
+async function loadCards() {
+  try {
+    const [cards, css] = await Promise.all([get('api/games'), fetch(`${BASE}game.css`).then((response) => (response.ok ? response.text() : ''))]);
+    CARDS = cards || {};
+    if (css && 'adoptedStyleSheets' in Document.prototype) {
+      GAME_SHEETS = [sheetOf(css),
+        sheetOf(`:host { display: inline-block; } .dg-svg { width: 100%; height: 100%; padding: 2px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line); } .dg-tap { animation: none; }`),
+        sheetOf(`.dg { display: flex; align-items: center; gap: 8px; margin: 0; } .dg-step { gap: 4px; } .dg-svg { height: 112px; padding: 6px; border-radius: 10px; }
+          .dg-step figcaption { font-size: 12px; font-weight: 600; color: inherit; text-align: center; } .dg-arrow { font-size: 18px; padding-bottom: 22px; }`)];
+    }
+    for (const [id, card] of Object.entries(CARDS)) if (card.title && !TITLES[id]) TITLES[id] = card.title;
+  } catch { CARDS = {}; } // 카드가 없어도 이름만으로 보인다
+}
+function paintShadow(host, sheet, html) {
+  if (!GAME_SHEETS) return;
+  const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
+  root.adoptedStyleSheets = [GAME_SHEETS[0], sheet];
+  root.innerHTML = html;
+}
+// 표 칸에 넣을 게임 이름 (decorate 가 그림과 툴팁을 단다)
+const gameLabel = (id) => `<span class="gname" data-game="${escapeHtml(id)}"><span class="gicon" aria-hidden="true"></span>${escapeHtml(gameTitle(id))}</span>`;
+function showCard(id) {
+  const card = CARDS[id] || {};
+  tip.classList.add('card');
+  tip.innerHTML = `<b>${escapeHtml(gameTitle(id))}</b>${card.tags?.length ? `<span class="tags">${escapeHtml(card.tags.join(' · '))}</span>` : ''}` +
+    (card.steps?.length && GAME_SHEETS ? '<span class="tip-dg"></span>' : '') +
+    (card.hint ? `<div class="hint">${escapeHtml(card.hint).replace(/&lt;br&gt;/g, '<br>')}</div>` : '');
+  const box = tip.querySelector('.tip-dg');
+  if (box) paintShadow(box, GAME_SHEETS[2], `<div class="dg">${card.steps.map((step, i) =>
+    `${i ? '<div class="dg-arrow">→</div>' : ''}<figure class="dg-step">${step.svg}<figcaption><b>${'①②③'[i] || ''}</b> ${escapeHtml(step.caption)}</figcaption></figure>`).join('')}</div>`);
+}
+function decorate(container) {
+  for (const label of container.querySelectorAll('.gname')) {
+    const id = label.dataset.game;
+    const first = CARDS[id]?.steps?.[0];
+    const icon = label.querySelector('.gicon');
+    if (first) paintShadow(icon, GAME_SHEETS?.[1], first.svg); else icon.remove();
+    hover(label, () => showCard(id));
+  }
+}
 
 function query() {
   const params = new URLSearchParams();
@@ -165,7 +223,11 @@ async function get(path) {
 // 툴팁: 마크보다 넓은 칸에 붙인다
 const tip = $('#tip');
 function hover(element, html) {
-  element.addEventListener('pointerenter', () => { tip.innerHTML = html; tip.style.display = 'block'; });
+  element.addEventListener('pointerenter', () => {
+    tip.classList.remove('card');
+    if (typeof html === 'function') html(); else tip.innerHTML = html;
+    tip.style.display = 'block';
+  });
   element.addEventListener('pointermove', (event) => {
     const tipWidth = tip.offsetWidth, tipHeight = tip.offsetHeight;
     tip.style.left = `${Math.min(event.clientX + 14, innerWidth - tipWidth - 8)}px`;
@@ -191,7 +253,7 @@ function heat(cells) {
   const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
   let html = `<tr><th>게임</th>${levels.map((level) => `<th style="text-align:center">Lv${level}</th>`).join('')}</tr>`;
   for (const game of games) {
-    html += `<tr><td>${escapeHtml(gameTitle(game))}</td>`;
+    html += `<tr><td>${gameLabel(game)}</td>`;
     for (const level of levels) {
       const cell = cellByKey.get(`${game}|${level}`);
       if (!cell) { html += '<td class="c"></td>'; continue; }
@@ -206,6 +268,7 @@ function heat(cells) {
     html += '</tr>';
   }
   $('#heat').innerHTML = cells.length ? html : '<tr><td class="l">아직 문제 기록이 없습니다.</td></tr>';
+  decorate($('#heat'));
   for (const element of document.querySelectorAll('#heat .cell')) {
     const cell = cellByKey.get(element.dataset.k);
     const targetNote = cell.target == null ? '' : ` (기준 ${percent(cell.target)}, ${cell.accuracy - cell.target >= 0 ? '+' : ''}${((cell.accuracy - cell.target) * 100).toFixed(0)}%p)`;
@@ -213,13 +276,15 @@ function heat(cells) {
   }
   const rows = [...cells].sort((a, b) => gameTitle(a.game).localeCompare(gameTitle(b.game), 'ko') || a.level - b.level);
   $('#cells').innerHTML = `<tr><th>게임</th><th>Lv</th><th>문제</th><th>정답률</th><th>기준</th><th>시간 초과</th><th>시간 중앙값</th><th>시간 90%</th><th>제한 시간 사용</th></tr>` +
-    rows.map((cell) => `<tr><td>${escapeHtml(gameTitle(cell.game))}</td><td>${cell.level}</td><td>${cell.n}</td><td>${percent(cell.accuracy, 1)}</td><td>${percent(cell.target)}</td><td>${percent(cell.timeoutRate, 1)}</td><td>${seconds(cell.msMedian)}</td><td>${seconds(cell.msP90)}</td><td>${percent(cell.limitUseMedian)}</td></tr>`).join('');
+    rows.map((cell) => `<tr><td>${gameLabel(cell.game)}</td><td>${cell.level}</td><td>${cell.n}</td><td>${percent(cell.accuracy, 1)}</td><td>${percent(cell.target)}</td><td>${percent(cell.timeoutRate, 1)}</td><td>${seconds(cell.msMedian)}</td><td>${seconds(cell.msP90)}</td><td>${percent(cell.limitUseMedian)}</td></tr>`).join('');
+  decorate($('#cells'));
 }
 
 function gamesTable(games) {
   $('#games').innerHTML = `<tr><th>게임</th><th>판 수</th><th>평균 레벨</th><th>최고 레벨</th><th>판 정답률</th><th>잘림</th><th>평균 점수</th></tr>` +
-    (games.length ? games.map((game) => `<tr><td>${escapeHtml(gameTitle(game.game))}</td><td>${formatNumber(game.plays)}</td><td>${formatNumber(game.avg_level, 2)}</td><td>${formatNumber(game.max_level)}</td><td>${percent(game.acc, 1)}</td><td>${percent(game.aborted, 1)}</td><td>${formatNumber(game.points)}</td></tr>`).join('')
+    (games.length ? games.map((game) => `<tr><td>${gameLabel(game.game)}</td><td>${formatNumber(game.plays)}</td><td>${formatNumber(game.avg_level, 2)}</td><td>${formatNumber(game.max_level)}</td><td>${percent(game.acc, 1)}</td><td>${percent(game.aborted, 1)}</td><td>${formatNumber(game.points)}</td></tr>`).join('')
       : '<tr><td class="l" colspan="7">아직 없습니다.</td></tr>');
+  decorate($('#games'));
 }
 
 // 날짜별 막대 (한 계열, 빈 날도 0 으로 채운다)
@@ -254,7 +319,7 @@ function days(list) {
 function recent(list, env) {
   $('#recent').innerHTML = `<tr><th>시작</th><th class="l">태블릿</th><th class="l">버전·모드</th><th class="l">방식·난이도</th><th>분</th><th class="l">회원</th><th class="l">끝</th><th>게임</th><th>점수</th><th>운동</th><th>인지</th><th>속도 유지</th><th>크기</th><th></th></tr>` +
     (list.length ? list.map((session) => `<tr>
-      <td>${escapeHtml((session.started_at || '').replace('T', ' ').slice(0, 16))}</td><td class="l" title="${escapeHtml(session.device)}">${escapeHtml(String(session.device).slice(0, 8))}</td>
+      <td>${escapeHtml(kstTime(session.started_at))}</td><td class="l" title="${escapeHtml(session.device)}">${escapeHtml(String(session.device).slice(0, 8))}</td>
       <td class="l">${escapeHtml(session.edition || '–')} · ${escapeHtml(session.mode || '–')}</td><td class="l">${escapeHtml(session.track || '–')} · ${escapeHtml(session.difficulty || '–')}</td><td>${formatNumber(session.min)}</td>
       <td class="l">${escapeHtml(session.user || '')}</td><td class="l">${escapeHtml(session.ended || '')}</td><td>${session.games}</td><td>${formatNumber(session.score)}</td><td>${formatNumber(session.ex_score)}</td><td>${formatNumber(session.cog_score)}</td>
       <td>${percent(session.in_zone)}</td><td>${formatNumber(session.bytes / 1024)} KB</td>
@@ -283,6 +348,7 @@ let resizeTimer = null;
 (async () => {
   const options = await get('api/options');
   TITLES = options.titles || {};
+  await loadCards();
   const envs = options.env.length ? options.env : ['prod'];
   form.env.innerHTML = envs.map((env) => `<option${env === 'prod' ? ' selected' : ''}>${escapeHtml(env)}</option>`).join('');
   for (const field of ['edition', 'mode', 'track', 'difficulty', 'device']) {

@@ -1,6 +1,8 @@
 // 관리 화면 (/admin): 들어온 세션 보기와 게임 밸런스 집계. 비밀번호는 server.js 가 확인한다.
 //   GET /admin                      화면 (admin.html)
 //   GET /admin/api/options          거르기 칸의 보기 (env · edition · mode …)
+//   GET /admin/api/games            게임 알아보기 카드: 이름 · 꼬리표 · 설명 · 소개 그림 (game-cards.mjs)
+//   GET /admin/game.css             소개 그림을 그리는 게임 화면 css (그림자 DOM 안에서 쓰게 :root → :host)
 //   GET /admin/api/overview?…       세션 수 · 날짜별 · 최근 세션
 //   GET /admin/api/balance?…        게임 × 레벨: 문제 수 · 정답률 · 시간 초과율 · 걸린 시간
 //   GET /admin/export/<표>.csv?…    sessions · games · questions 를 거른 그대로
@@ -8,6 +10,7 @@
 //   GET /admin/replay?env=&device=&sid=   세션 재생 화면 (replay.html). 원본을 받아 브라우저에서 다시 그린다
 // 거르기(쿼리): env(기본 prod) · edition · mode · track · difficulty · device · from · to(YYYY-MM-DD, 시작 시각 기준) · all=1(중단한 판도)
 'use strict';
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -29,6 +32,33 @@ function titles() {
   return out;
 }
 
+// 게임 알아보기 카드 (game-cards.mjs 가 만든다). 게임 코드는 배포 때만 바뀌므로 처음 한 번 만들어 둔다.
+// 못 만들면 이름만 있는 카드로 (관리 화면은 그대로 열리게)
+let cardCache = null;
+function gameCards() {
+  if (cardCache) return cardCache;
+  try {
+    cardCache = JSON.parse(execFileSync(process.execPath, [path.join(__dirname, 'game-cards.mjs')], { encoding: 'utf8', timeout: 20000, maxBuffer: 16 << 20 }));
+  } catch (error) {
+    console.error(new Date().toISOString(), 'game cards', error.message);
+    cardCache = Object.fromEntries(Object.entries(titles()).map(([id, title]) => [id, { title, tags: [], hint: '', steps: [] }]));
+  }
+  return cardCache;
+}
+
+// 게임 화면 css 를 그림자 DOM 용으로 (색 변수를 :root 대신 그림자 뿌리에 단다)
+let cssCache = null;
+function gameCss() {
+  if (cssCache == null) {
+    try { cssCache = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8').replace(/^:root\s*\{/m, ':host {'); } catch { cssCache = ''; }
+  }
+  return cssCache;
+}
+
+// 'YYYY-MM-DD'(KST) 하루의 시작을 UTC ISO 문자열로 (addDays 만큼 뒤 날)
+const KST_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const kstDayStart = (day, addDays = 0) => new Date(Date.parse(`${day}T00:00:00+09:00`) + addDays * 864e5).toISOString();
+
 module.exports = (database, { rawPath, safe }) => {
   // 거르기 → WHERE (sessions 를 s 로 부른다)
   function where(url) {
@@ -38,8 +68,9 @@ module.exports = (database, { rawPath, safe }) => {
     for (const column of ['edition', 'mode', 'track', 'difficulty', 'device']) {
       if (params.get(column)) { conditions.push(`s.${column} = ?`); args.push(params.get(column)); }
     }
-    if (params.get('from')) { conditions.push('s.started_at >= ?'); args.push(params.get('from')); }
-    if (params.get('to')) { conditions.push('s.started_at < ?'); args.push(new Date(new Date(params.get('to')).getTime() + 864e5).toISOString().slice(0, 10)); }
+    // 날짜 거르기는 한국 시간(KST) 하루 기준. 저장된 시각은 UTC 그대로라 경계만 UTC 로 바꿔 비교한다
+    if (KST_DAY.test(params.get('from') || '')) { conditions.push('s.started_at >= ?'); args.push(kstDayStart(params.get('from'))); }
+    if (KST_DAY.test(params.get('to') || '')) { conditions.push('s.started_at < ?'); args.push(kstDayStart(params.get('to'), 1)); }
     if (params.get('all') !== '1') conditions.push("(s.ended IS NULL OR s.ended != 'abandoned')");
     return { sql: conditions.join(' AND '), args };
   }
@@ -62,7 +93,7 @@ module.exports = (database, { rawPath, safe }) => {
     const totals = database.prepare(`SELECT COUNT(*) n, COUNT(DISTINCT s.user) users, COUNT(DISTINCT s.device) devices,
       SUM(s.bytes) bytes, AVG(s.elapsed_sec) avg_sec, AVG(s.score) avg_score, AVG(s.in_zone) in_zone FROM sessions s WHERE ${sql}`).get(...args);
     const answered = database.prepare(`SELECT COUNT(*) n, AVG(t.correct) acc FROM questions t ${JOIN} WHERE ${sql} AND t.answered = 1`).get(...args);
-    const days = database.prepare(`SELECT substr(s.started_at, 1, 10) day, COUNT(*) n FROM sessions s WHERE ${sql} GROUP BY 1 ORDER BY 1`).all(...args);
+    const days = database.prepare(`SELECT substr(datetime(s.started_at, '+9 hours'), 1, 10) day, COUNT(*) n FROM sessions s WHERE ${sql} GROUP BY 1 ORDER BY 1`).all(...args);
     const ended = database.prepare(`SELECT s.ended k, COUNT(*) n FROM sessions s WHERE ${sql} GROUP BY 1 ORDER BY 2 DESC`).all(...args);
     const recent = database.prepare(`SELECT s.env, s.device, s.sid, s.started_at, s.received_at, s.edition, s.mode, s.track, s.difficulty, s.min,
       s.user, s.station, s.ended, s.elapsed_sec, s.score, s.ex_score, s.cog_score, s.in_zone, s.bytes,
@@ -120,6 +151,8 @@ module.exports = (database, { rawPath, safe }) => {
     if (pathname === '/admin' || pathname === '/admin/') return send(response, 200, fs.readFileSync(PAGE), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     if (pathname === '/admin/replay') return send(response, 200, fs.readFileSync(REPLAY), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     if (pathname === '/admin/api/options') return send(response, 200, options());
+    if (pathname === '/admin/api/games') return send(response, 200, gameCards());
+    if (pathname === '/admin/game.css') return send(response, 200, gameCss(), { 'Content-Type': 'text/css; charset=utf-8' });
     if (pathname === '/admin/api/overview') return send(response, 200, overview(url));
     if (pathname === '/admin/api/balance') return send(response, 200, balance(url));
     const exportMatch = /^\/admin\/export\/(sessions|games|questions)\.csv$/.exec(pathname);

@@ -84,6 +84,7 @@ export class BlankGame {
     this.spec = BlankGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.WAIT;
     // 문제 셋은 답 글자가 서로 다르게 고른다
     const picked = [];
@@ -178,6 +179,7 @@ export class BlankGame {
     const { answer } = this.question;
     const ok = syllable === answer;
     this.host.answer({ picked: syllable, correct: ok, timedOut: !button });
+    this.answered++;
 
     // 고른 글자를 모든 빈칸에 넣어 보여 준다: 틀리면 말이 안 되는 낱말이 눈에 보인다
     this.holes.forEach((hole) => {
@@ -222,6 +224,6 @@ export class BlankGame {
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
     this.resizeObserver.disconnect();
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 }

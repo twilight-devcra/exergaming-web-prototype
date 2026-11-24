@@ -90,6 +90,7 @@ export class CoverGame {
     this.spec = CoverGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.SHOW;
     this.lastPair = null; // 지난 문제의 두 숫자 (같은 짝을 연달아 묻지 않게)
   }
@@ -242,6 +243,7 @@ export class CoverGame {
     const { first, second, answer } = this.question;
     const ok = value === answer;
     this.host.answer({ picked: value, correct: ok, timedOut: !button });
+    this.answered++;
 
     // 식 안에서 상자를 열어 무엇이 들어 있었는지 보여 준다
     [first, second].forEach((token) => token.mark && token.element.classList.add('open'));
@@ -303,7 +305,7 @@ export class CoverGame {
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
     this.resizeObserver.disconnect();
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 판 만들기 ----

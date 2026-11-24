@@ -102,6 +102,7 @@ export class ChainGame {
     this.spec = ChainGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.WAIT;
   }
 
@@ -262,6 +263,7 @@ export class ChainGame {
       correct: ok, stuck: how === 'stuck', timedOut: how === 'timeout',
       deadAt: this.deadAt >= 0 ? this.deadAt : null,
     });
+    this.answered++;
 
     Progress.mark(this.progress, this.round, ok);
     this.nextGroup.classList.add('gone');
@@ -298,7 +300,7 @@ export class ChainGame {
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
     this.resizeObserver.disconnect();
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 그리기 ----

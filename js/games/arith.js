@@ -62,6 +62,7 @@ export class ArithGame {
     this.spec = ArithGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.WAIT;
   }
 
@@ -168,6 +169,7 @@ export class ArithGame {
     this.render();
     const ok = !timedOut && ArithGame.value(this.fill.map((entry) => entry.value), this.puzzle.operators) === this.puzzle.answer;
     this.host.answer({ fill: this.fill.map((entry) => (entry ? entry.value : null)), correct: ok, timedOut });
+    this.answered++;
     this.slots.forEach((slot) => slot.classList.add(ok ? 'right' : 'wrong'));
     Progress.mark(this.progress, this.round, ok);
 
@@ -200,7 +202,7 @@ export class ArithGame {
 
   abort() {
     this.resizeObserver.disconnect();
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 계산 ----

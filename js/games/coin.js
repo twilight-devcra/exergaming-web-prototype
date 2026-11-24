@@ -138,6 +138,7 @@ export class CoinGame {
     this.idPrefix = `cn${uid++}`;
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.WAIT;
   }
 
@@ -266,6 +267,7 @@ export class CoinGame {
     const { puzzle } = this;
     const ok = value === puzzle.answer;
     this.host.answer({ picked: value, correct: ok, timedOut: !button });
+    this.answered++;
     this.optionButtons.forEach((option) => {
       option.button.disabled = true;
       if (option.value === puzzle.answer) option.button.classList.add(ok ? 'right' : 'answer');
@@ -334,7 +336,7 @@ export class CoinGame {
   abort() {
     this.phase = Phase.WAIT;
     this.resizeObserver.disconnect();
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 모양 ----

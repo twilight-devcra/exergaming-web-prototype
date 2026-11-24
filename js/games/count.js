@@ -67,6 +67,7 @@ export class CountGame {
     this.spec = CountGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.WAIT;
   }
 
@@ -146,6 +147,7 @@ export class CountGame {
     this.host.stopTimer();
     const ok = i === 0;
     this.host.answer({ picked: i >= 0 ? this.palette[i].id : null, count: i >= 0 ? this.counts[i] : null, correct: ok, timedOut: !button });
+    this.answered++;
 
     // 보기마다 실제 개수를 적어 주고, 정답 색이 아닌 칸은 흐리게 해서 왜 그 색인지 보이게 한다
     this.optionButtons.forEach((option) => {
@@ -186,7 +188,7 @@ export class CountGame {
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
     this.resizeObserver.disconnect();
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 개수 배분 ----

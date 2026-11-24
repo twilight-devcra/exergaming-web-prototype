@@ -107,6 +107,7 @@ export class PipeGame {
     this.spec = PipeGame.levels[host.level - 1];
     this.round = 0;
     this.correct = 0;
+    this.answered = 0; // 채점한 문제 수. round 는 피드백이 끝나야 넘어가므로, 피드백 중에 판이 끝나면(abort) 이것으로 센다
     this.phase = Phase.WAIT;
   }
 
@@ -245,6 +246,8 @@ export class PipeGame {
     const { answer, ends } = this.puzzle;
     const ok = lane === answer;
     this.host.answer({ picked: lane >= 0 ? lane : null, end: lane >= 0 ? ends[lane] : null, correct: ok, timedOut: lane < 0 });
+    this.answered++;
+    if (ok) this.correct++; // 맞고 틀림은 지금 정해진다 (알림 · 점수는 조각이 다 간 뒤). 그 사이에 판이 끝나도(abort) 맞힌 것으로 센다
 
     this.startElements.forEach((element) => element.classList.add('done'));
     const startElement = this.startElements[lane];
@@ -268,7 +271,6 @@ export class PipeGame {
       }
       Progress.mark(this.progress, this.round, ok);
       if (ok) {
-        this.correct++;
         Util.say(this.message, '정답!', 'good');
         this.host.award(pointsPer(this.host, PipeGame.ROUNDS), this.floorElements[ends[lane]]);
         this.host.sfx(Sfx.GOOD);
@@ -292,7 +294,7 @@ export class PipeGame {
 
   // 점수는 맞힐 때마다 바로 지급하므로 중단될 때 따로 줄 것이 없다
   abort() {
-    return abortedResult(this.correct, this.round);
+    return abortedResult(this.correct, this.answered);
   }
 
   // ---- 문제 만들기 ----

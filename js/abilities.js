@@ -71,9 +71,11 @@ export const Abilities = {
         spareMs += gameStats.think.spareMs;
       }
     }
+    // 0~1 로 묶는다. 게임이 센 맞힌 수가 문제 수를 넘으면(예전에 피드백 중에 끝난 판) 100% 넘는 값이 그래프에 나왔다
+    const share = (part, whole) => (whole > 0 ? Math.min(1, Math.max(0, part / whole)) : null);
     const acc = {
-      ...Object.fromEntries(DOMAINS.map((domain) => [domain.id, total[domain.id] > 0 ? correct[domain.id] / total[domain.id] : null])),
-      speed: limitMs > 0 ? spareMs / limitMs : null,
+      ...Object.fromEntries(DOMAINS.map((domain) => [domain.id, share(correct[domain.id], total[domain.id])])),
+      speed: share(spareMs, limitMs),
       exercise: exercise == null ? null : Math.min(1, Math.max(0, exercise)),
     };
     return AXES.map((axis) => ({ ...axis, acc: acc[axis.id], hasData: acc[axis.id] != null }));

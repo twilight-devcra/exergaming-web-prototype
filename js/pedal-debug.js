@@ -10,7 +10,7 @@
 //  RS_G  회전 검출 파라미터 14개 (정지 판정 기준 등) — 연결 때 한 번 읽는다
 // 같은 조합을 페달 쪽 PC 툴이 tools/capture_dbg_cap.py 로 받는다. CAP CSV 는 그 툴과 같은 형식이라
 // 페달 저장소의 tools/verify_phase_detector.py 로 그대로 재생할 수 있다.
-import { Config, $, Util } from './config.js';
+import { Config, $, Util, html } from './config.js';
 import { Pedal } from './pedal.js';
 import { NUS, FrameCodec, PedalLink } from './pedal-link.js';
 import { LzCadence } from './cadence-est.js';
@@ -572,17 +572,17 @@ async function renderSessions() {
   $('#sessions').innerHTML = list.length ? list.map((summary) => {
     const isCurrent = session.recording && summary.id === session.id;
     const when = new Date(summary.startedAt).toLocaleString();
-    const state = isCurrent ? '<b>기록 중</b>' : summary.endedAt ? '완료' : '<span title="기록 중지 전에 페이지가 닫혔습니다. 마지막 자동 저장까지만 남아 있습니다.">중간에 끊김</span>';
-    return `<tr data-id="${escapeHtml(summary.id)}">
-      <td class="l">${escapeHtml(when)}</td><td class="l">${state}</td>
+    const state = isCurrent ? html`<b>기록 중</b>` : summary.endedAt ? '완료' : html`<span title="기록 중지 전에 페이지가 닫혔습니다. 마지막 자동 저장까지만 남아 있습니다.">중간에 끊김</span>`;
+    return html`<tr data-id="${summary.id}">
+      <td class="l">${when}</td><td class="l">${state}</td>
       <td>${formatDuration(summary.duration)}</td><td>${summary.frames}</td><td>${summary.zeros}</td><td>${summary.manual} / ${summary.auto}</td>
       <td class="l actions">
-        ${canShare ? '<button class="btn small" data-act="share">공유</button>' : ''}
+        ${canShare ? html`<button class="btn small" data-act="share">공유</button>` : ''}
         <button class="btn small" data-act="json">JSON</button>
         <button class="btn small" data-act="csv">CSV</button>
-        ${summary.dbg ? '<button class="btn small" data-act="dbg">DBG CSV</button>' : ''}
-        ${summary.cap ? '<button class="btn small" data-act="cap">CAP CSV</button>' : ''}
-        ${isCurrent ? '' : '<button class="btn small danger" data-act="del">삭제</button>'}
+        ${summary.dbg ? html`<button class="btn small" data-act="dbg">DBG CSV</button>` : ''}
+        ${summary.cap ? html`<button class="btn small" data-act="cap">CAP CSV</button>` : ''}
+        ${isCurrent ? '' : html`<button class="btn small danger" data-act="del">삭제</button>`}
       </td></tr>`;
   }).join('') : '<tr><td class="l" colspan="7">아직 저장된 기록이 없습니다. <b>● 기록 시작</b>을 누르면 그때부터 저장됩니다.</td></tr>';
 }
@@ -827,26 +827,22 @@ function renderFrames() {
   items.sort((a, b) => b.t - a.t);
   $('#frames').innerHTML = items.map((item) => {
     if (item.kind === 'mark') {
-      return `<tr class="mark ${item.manual ? 'manual' : ''}"><td>${item.t.toFixed(2)}</td><td colspan="7"></td><td class="l">${item.manual ? '★ 직접 표시' : '▲ ' + escapeHtml(item.note)}</td></tr>`;
+      return html`<tr class="mark ${item.manual ? 'manual' : ''}"><td>${item.t.toFixed(2)}</td><td colspan="7"></td><td class="l">${item.manual ? '★ 직접 표시' : `▲ ${item.note}`}</td></tr>`;
     }
     if (item.kind !== 'workout') {
-      return `<tr class="bad"><td>${item.t.toFixed(2)}</td><td>${item.gap ?? ''}</td><td colspan="6"></td><td class="l">${escapeHtml(item.note)}: ${escapeHtml(item.raw)}</td></tr>`;
+      return html`<tr class="bad"><td>${item.t.toFixed(2)}</td><td>${item.gap}</td><td colspan="6"></td><td class="l">${item.note}: ${item.raw}</td></tr>`;
     }
     const rowClass = item.rpm === 0 ? (item.held > 0 ? 'held' : 'zero') : '';
-    return `<tr class="${rowClass}"><td>${item.t.toFixed(2)}</td><td>${item.gap ?? ''}</td><td>${item.rpm}</td><td>${item.watt}</td><td>${item.rev}</td><td>${item.dRev ?? ''}</td><td>${formatNumber(item.revRpm, 1)}</td><td>${item.held}</td><td class="l">${escapeHtml(item.note)}</td></tr>`;
+    return html`<tr class="${rowClass}"><td>${item.t.toFixed(2)}</td><td>${item.gap}</td><td>${item.rpm}</td><td>${item.watt}</td><td>${item.rev}</td><td>${item.dRev}</td><td>${formatNumber(item.revRpm, 1)}</td><td>${item.held}</td><td class="l">${item.note}</td></tr>`;
   }).join('');
   $('#frame-count').textContent = `${frames.length}개 기록${frames.length > MAX_ROWS ? ` (최근 ${MAX_ROWS}개 표시)` : ''} · 빨강 = 0 정지, 주황 = 0이지만 유예로 유지`;
 }
 
 function renderRaw() {
-  const visible = (text) => escapeHtml(text).replace(/\n/g, '⏎').replace(/\r/g, '␍');
+  const visible = (text) => String(text).replace(/\n/g, '⏎').replace(/\r/g, '␍');
   $('#raw').innerHTML = session.chunks.slice(-MAX_ROWS).reverse().map((chunk) =>
-    `<span class="t">${chunk.t.toFixed(3)}</span> ${chunk.dir === 'out' ? '<span class="out">→ ' + visible(chunk.text) + '</span>' : '← ' + visible(chunk.text)}`
+    html`<span class="t">${chunk.t.toFixed(3)}</span> ${chunk.dir === 'out' ? html`<span class="out">→ ${visible(chunk.text)}</span>` : `← ${visible(chunk.text)}`}`
   ).join('\n');
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[character]));
 }
 
 // ---------------- 그래프 ----------------
@@ -1000,7 +996,7 @@ function renderDbg() {
     ['gx min / max', `${values[index.gx_min]} / ${values[index.gx_max]}`, 'dps, 마지막 회전'],
   ];
   $('#dbg-tiles').innerHTML = items.map(([label, value, detail, warn]) =>
-    `<div class="tile${warn ? ' alert' : ''}"><div class="k">${escapeHtml(label)}</div><div class="v">${escapeHtml(value)}</div><div class="s">${escapeHtml(detail)}</div></div>`).join('');
+    html`<div class="tile${warn ? ' alert' : ''}"><div class="k">${label}</div><div class="v">${value}</div><div class="s">${detail}</div></div>`).join('');
   $('#dbg-note').textContent = `DBG ${session.dbg.length}개 · CAP ${session.cap.count * CAP_BATCH}샘플${session.capSegs.length > 1 ? ` (${session.capSegs.length}구간)` : ''}`;
 }
 
@@ -1091,7 +1087,7 @@ const EST_SERIES = [
 ];
 const seriesShown = Object.fromEntries(EST_SERIES.map((series) => [series.key, true]));
 $('#est-legend').innerHTML = EST_SERIES.map((series) =>
-  `<label><input type="checkbox" data-key="${series.key}" checked><i style="background:var(${series.color})"></i>${escapeHtml(series.name)}</label>`).join('');
+  html`<label><input type="checkbox" data-key="${series.key}" checked><i style="background:var(${series.color})"></i>${series.name}</label>`).join('');
 $('#est-legend').onchange = (event) => (seriesShown[event.target.dataset.key] = event.target.checked);
 
 // 계열마다 [현재 값, 마지막 갱신 뒤 지난 초]
@@ -1234,7 +1230,7 @@ function drawEstimates(now) {
   $('#est-tiles').innerHTML = EST_SERIES.map((series) => {
     const entry = current[series.key];
     const age = entry && entry[1] != null && series.key !== 'game' ? `${entry[1].toFixed(1)}초 전 갱신` : '';
-    return `<div class="tile est-tile" style="border-left:4px solid var(${series.color})"><div class="k">${escapeHtml(series.name)}</div><div class="v">${entry ? formatNumber(entry[0], 1) : '-'}</div><div class="s">${escapeHtml(series.rate)}${age ? ' · ' + age : ''}</div></div>`;
+    return html`<div class="tile est-tile" style="border-left:4px solid var(${series.color})"><div class="k">${series.name}</div><div class="v">${entry ? formatNumber(entry[0], 1) : '-'}</div><div class="s">${series.rate}${age ? ` · ${age}` : ''}</div></div>`;
   }).join('');
 }
 

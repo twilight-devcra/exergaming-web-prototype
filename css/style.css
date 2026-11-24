@@ -1919,7 +1919,6 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
   font-size: 14px;
   color: var(--ink-soft);
 }
-.station-tag .st-name { font-weight: 700; }
 .station-tag .pedal-status { max-width: 40vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 버전 표시 (tools/stamp.js 가 VERSION 으로 채운다): 눈에 띄지 않게 작고 옅게 */
 .build-tag { font-size: 12px; color: var(--ink-soft); opacity: 0.75; white-space: nowrap; font-variant-numeric: tabular-nums; align-self: center; }
@@ -2071,8 +2070,6 @@ body.demo:has(#login.active, #history.active, #setup.active) #op-corner { displa
 #op { z-index: 400; background: var(--scrim); }
 /* 상자 안의 하위 메뉴 배치는 app/app.css (운영 버전만 쓴다) */
 .op-box { max-height: 100%; background: var(--panel); border-radius: 20px; }
-#op-station { width: 90px; font-size: 20px; font-weight: 800; }
-#op-station.invalid { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
 .op-round { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--bad-soft); }
 .op-round-note { margin: 0; font-size: 14px; font-weight: 700; color: var(--bad); }
 .op-round .btn { font-size: 16px; padding: 12px 16px; }

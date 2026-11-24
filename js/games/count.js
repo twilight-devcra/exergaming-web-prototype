@@ -98,7 +98,7 @@ export class CountGame {
     Util.say(this.message, '가장 많은 색을 고르세요', 'act');
     Progress.current(this.progress, this.round);
 
-    this.grid.innerHTML = '';
+    this.grid.replaceChildren();
     this.grid.style.setProperty('--cols', columns);
     this.cells = owner.map((colorIndex) => {
       const cell = Util.element('div', 'ccell');
@@ -114,7 +114,7 @@ export class CountGame {
       return cell;
     });
 
-    this.optionRow.innerHTML = '';
+    this.optionRow.replaceChildren();
     this.optionButtons = Util.shuffle(this.palette.map((color, colorIndex) => ({ color, colorIndex }))).map(({ color, colorIndex }) => {
       const button = Util.element('button', 'cnt-opt', `<svg viewBox="0 0 100 100">${color.glyph}</svg><span class="n"></span>`);
       button.style.background = color.fill;

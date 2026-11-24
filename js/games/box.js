@@ -220,7 +220,7 @@ export class BoxGame {
   closeBox(box) {
     const boxGroup = this.boxGroups[box];
     boxGroup.classList.remove('open');
-    boxGroup.querySelector('.bx-in').innerHTML = '';
+    boxGroup.querySelector('.bx-in').replaceChildren();
   }
 
   // 순서를 보여 준다. 과일마다 출발 시각·자리·도착 자리를 정해 두고(flight), 게임 시계(host.now)로 위치를 고른다 —
@@ -314,8 +314,8 @@ export class BoxGame {
     const { question } = puzzle;
     const twoBoxes = puzzle.boxes.length > 1;
     this.phase = Phase.INPUT;
-    this.backLayer.innerHTML = '';
-    this.frontLayer.innerHTML = '';
+    this.backLayer.replaceChildren();
+    this.frontLayer.replaceChildren();
     if (twoBoxes) this.boxGroups[question.box].classList.add('asked');
     Util.say(this.message, '', 'act');
     this.message.insertBefore(Util.element('span', 'bx-q-text', questionText(question, twoBoxes)), this.message.firstChild);

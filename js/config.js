@@ -322,6 +322,23 @@ export const DEMO = EDITION === 'app';
 
 // 공용 유틸
 export const $ = (selector) => document.querySelector(selector);
+
+// html`<b>${name}</b>`: 끼워 넣는 값은 글자로 바꿔(escape) 넣는다. 이미 마크업인 값은 html`` 로 만든 것이거나 raw() 로 감싼 것만 그대로 넣는다.
+// 배열은 칸마다 같은 규칙으로 이어 붙이고, null · undefined 는 빈 글자가 된다. 결과는 innerHTML 에 그대로 넣으면 된다 (toString)
+class Markup {
+  constructor(text) { this.text = text; }
+  toString() { return this.text; }
+}
+const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const escapeValue = (value) => {
+  if (value == null) return '';
+  if (value instanceof Markup) return value.text;
+  if (Array.isArray(value)) return value.map(escapeValue).join('');
+  return String(value).replace(/[&<>"']/g, (char) => ESCAPES[char]);
+};
+export const html = (strings, ...values) => new Markup(strings.reduce((out, part, i) => out + escapeValue(values[i - 1]) + part));
+// 믿을 수 있는 마크업 글(직접 만든 SVG 같은 것)을 html`` 에 그대로 넣을 때
+export const raw = (text) => new Markup(String(text));
 export const Util = {
   randomBelow: (count) => Math.floor(Math.random() * count),
   randomInt: (min, max) => min + Math.floor(Math.random() * (max - min + 1)),
@@ -334,10 +351,10 @@ export const Util = {
     }
     return items;
   },
-  element(tag, className, html) {
+  element(tag, className, content) {
     const node = document.createElement(tag);
     if (className) node.className = className;
-    if (html != null) node.innerHTML = html;
+    if (content != null) node.innerHTML = content;
     return node;
   },
   // 글이 바뀌어도 아래 칸들이 밀리지 않도록, 들어갈 수 있는 글 가운데 가장 긴 것의 높이를 미리 잡아 둔다.

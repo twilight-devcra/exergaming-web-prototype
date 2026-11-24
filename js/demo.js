@@ -3,7 +3,7 @@
 // 라운드 자체는 main.js 의 App 흐름을 그대로 쓰고, 여기서는 그 앞뒤 화면과 무인 운영 장치만 맡는다.
 // 설정은 js/config.js 의 DEMO_CONFIG 이고, 운영 메뉴의 '라운드 설정'에서 DEMO_SETTINGS 항목만 태블릿마다 바꿀 수 있다.
 // 운영 메뉴(PIN · 라운드 설정 · 업로드 · 기록 내려받기)는 app/operator-menu.js 에 있다.
-import { BASE_LEVEL, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_TRACKS, SESSION_DEFAULT, Config, $, Util } from './config.js';
+import { BASE_LEVEL, SESSION_LENGTHS, SESSION_DIFFICULTIES, SESSION_TRACKS, SESSION_DEFAULT, Config, $, Util, html, raw } from './config.js';
 import { Exercise } from './exercise.js';
 import { Effects } from './fx.js';
 import { GAME_TYPES } from './games/index.js';
@@ -11,6 +11,7 @@ import { SessionStore } from './session-log.js';
 import { SessionUpload } from './session-upload.js';
 import { RoundStats } from './round-stats.js';
 import { RoundReport } from './round-report.js';
+import { ScoreHud } from './score-hud.js';
 import { UpdateCheck } from './update-check.js';
 import { Abilities } from './abilities.js';
 import { AttractVisual } from '../app/attract-visual.js';
@@ -31,9 +32,9 @@ export const Demo = {
   LOG_MAX: 1000,
 
   app: null,
-  station: '',
   allowKeyboard: false,  // 페달 없이 A/D 키로 시작할 수 있게 한다 (점검용). app/?kbd 또는 운영 메뉴에서 켠다. 저장하지 않으므로 새로고침하면 꺼진다
-  simResult: false, // 시작하면 라운드 없이 가상 성적으로 바로 결과 화면을 연다 (흐름 점검용). 저장하지 않는다
+  simResult: false, // 로그인 · 세션 설정 뒤 게임 없이 가상 성적으로 판을 끝낸다 (결과 화면 점검용). 저장하지 않는다
+  simRound: false,  // 지금 판이 가상 결과다 (beginRound 가 simResult 를 옮겨 둔다)
   kiosk: false,     // 운영 메뉴를 한 번 닫은 뒤부터 전체 화면·화면 꺼짐 방지를 유지한다
   menu: null,       // 운영 메뉴 (app/operator-menu.js). menu.isOpen · menu.pinOpen 이면 게임을 멈춘다
   endOpen: false,   // '그만하기' 확인 창이 열려 있다 (게임은 멈춤)
@@ -49,7 +50,6 @@ export const Demo = {
     this.app = app;
     document.body.classList.add('demo');
     this.allowKeyboard = new URLSearchParams(location.search).has('kbd');
-    this.station = this.load('station', '');
     // 대기 화면 오른쪽 그림: 바퀴 안의 두뇌 (app/attract-visual.js)
     this.preview = AttractVisual.init(app);
     // 운영 버전: 속도 측정 화면의 둥근 길과 자전거 (app/calib-visual.js)
@@ -76,12 +76,9 @@ export const Demo = {
     });
     this.renderConfig();
     app.show('attract');
-    this.renderStation();
     this.updateAttract();
     // 바로 대기 화면. 페달은 대기 화면의 '페달 연결' 버튼으로, 전체 화면은 시작을 누를 때 요청한다
     // (페달 연결(기기 선택)과 전체 화면은 사람이 화면을 눌러야만 요청할 수 있다)
-    if (!this.station) this.station = '1'; // 운영 메뉴에서 바꿀 수 있다 (저장은 그때)
-    this.renderStation();
   },
 
   // ---------------- 저장 (태블릿마다 따로) ----------------
@@ -96,7 +93,7 @@ export const Demo = {
     try { localStorage.setItem(`exergame.demo.${key}`, JSON.stringify(value)); } catch { /* 저장 못 해도 넘어간다 */ }
   },
 
-  // 결과마다 붙는 번호. 종이 기록이 섞이지 않도록 스테이션 번호를 앞에 붙여(3-017) 크게 보여준다. 새로고침해도 이어진다.
+  // 결과마다 붙는 이 태블릿의 참가 번호 (017). 새로고침해도 이어진다.
   nextSeq() {
     const next = this.load('seq', 0) + 1;
     this.save('seq', next);
@@ -104,11 +101,7 @@ export const Demo = {
   },
 
   label(participantNumber) {
-    return `${this.station || '?'}-${String(participantNumber).padStart(3, '0')}`;
-  },
-
-  renderStation() {
-    document.querySelectorAll('.st-name').forEach((nameTag) => (nameTag.textContent = this.station ? `스테이션 ${this.station}` : ''));
+    return String(participantNumber).padStart(3, '0');
   },
 
   // ---------------- 대기 화면 ----------------
@@ -129,7 +122,7 @@ export const Demo = {
     // 테스트용 스위치가 켜져 있으면 그렇다고 보여준다 (행사 때 켜 둔 채로 두지 않게)
     const kbdOnly = pedal && this.app.link.state !== 'ready';
     $('#att-hint').textContent = this.simResult
-      ? '가상 결과 모드 · 누르면 게임 없이 결과 화면으로 갑니다'
+      ? '가상 결과 모드 · 로그인과 세션 설정 뒤 게임 없이 끝냅니다 (기록 안 됨)'
       : kbdOnly ? '키보드 테스트 모드 · A/D 키를 번갈아 눌러 페달링합니다'
       : pedal ? '시작 버튼을 누르거나 페달을 밟으면 시작합니다'
       : ok ? '페달이 연결되지 않았어요 · 지금은 두뇌 게임만 할 수 있어요'
@@ -156,7 +149,6 @@ export const Demo = {
     // 새 버전을 확인하는 동안 운영 메뉴가 열렸을 수 있다
     if (!this.canStartNow()) return;
     this.enterKiosk();
-    if (this.simResult) return this.simulateRound();
     if (this.members) return this.members.openLogin(via);
     if ($('#setup')) return this.openSetup(via);
     this.beginRound(via);
@@ -170,12 +162,28 @@ export const Demo = {
     app.startRound();
     // 회원이면 지난 세션들이 기념물로 길가에 선다 (손님·프로토타입은 없음)
     app.band.setLandmarks(this.members ? this.members.landmarks() : []);
-    app.log.meta.station = this.station;
     if (session) app.log.meta.session = { ...session };
     if (this.members) this.members.tagLog(app.log);
     app.log.event('start', { via, ...(session ? { session } : {}) });
     this.activeAt = app.clock;
     this.renderConfig();
+    this.simRound = this.simResult;
+    if (this.simRound) this.finishSimRound();
+  },
+
+  // 가상 결과 (운영 메뉴의 테스트): 로그인 · 세션 설정까지는 진짜로 거치고, 게임 화면이 뜨면 그럴듯한 성적을 채워
+  // 진짜 판과 같은 길(App.endRound → 기념물 짓기 → 마무리 → 결과 화면)로 끝낸다. 결과 화면은 기록하지 않는다 (showResult 의 sim)
+  finishSimRound() {
+    const app = this.app;
+    if (app.state === 'calib') app.finishCalib(); // 속도 측정을 건너뛰고 카운트다운 (게임 화면이 뜬다)
+    app.after(400, () => {
+      this.fillSimStats();
+      app.elapsed = app.config.durationSec;
+      app.state = 'play';
+      ScoreHud.landed = app.score; // 점수판도 끝난 판처럼 (updateHud 가 deltaSec 0 으로 바로 맞춘다)
+      app.updateHud();
+      app.endRound('complete');
+    }, app.generation);
   },
 
   // 라운드 끝에 세울 기념물 { recordNumber, difficulty, min } (js/band.js plant). 운영 버전(회원·손님)만, 아니면 null
@@ -189,17 +197,17 @@ export const Demo = {
   bindSetup() {
     if (!$('#setup')) return;
     const tile = (attrs, title, desc, extra = '') =>
-      `<button class="su-opt" ${attrs}>${extra}<b>${title}</b><small>${desc}</small></button>`;
+      html`<button class="su-opt" ${attrs}>${extra}<b>${title}</b><small>${desc}</small></button>`;
     // 운동 방식 두 칸: 페달 + 두뇌 게임(자전거) / 두뇌 게임만(두뇌, 로고와 같은 모양)
     const icons = {
-      dual: '<svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="22" r="8"/><circle cx="38" cy="22" r="8"/><path d="M10 22l8-13h13l7 13M18 9l6 13 7-13M15 5h7M31 9l-2-5h5"/></svg>',
-      brain: '<svg viewBox="-1 -0.85 2 1.7"><path fill="currentColor" d="M-0.95 0.05 C-1 -0.45 -0.6 -0.8 -0.1 -0.8 C0.45 -0.82 0.95 -0.5 0.95 -0.05 C0.97 0.25 0.85 0.42 0.62 0.45 C0.7 0.62 0.5 0.75 0.3 0.66 C0.22 0.62 0.18 0.56 0.15 0.52 L0.13 0.8 L0.01 0.8 L0.02 0.5 C-0.2 0.55 -0.45 0.5 -0.55 0.38 C-0.8 0.42 -0.92 0.28 -0.95 0.05 Z"/></svg>',
+      dual: raw('<svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="22" r="8"/><circle cx="38" cy="22" r="8"/><path d="M10 22l8-13h13l7 13M18 9l6 13 7-13M15 5h7M31 9l-2-5h5"/></svg>'),
+      brain: raw('<svg viewBox="-1 -0.85 2 1.7"><path fill="currentColor" d="M-0.95 0.05 C-1 -0.45 -0.6 -0.8 -0.1 -0.8 C0.45 -0.82 0.95 -0.5 0.95 -0.05 C0.97 0.25 0.85 0.42 0.62 0.45 C0.7 0.62 0.5 0.75 0.3 0.66 C0.22 0.62 0.18 0.56 0.15 0.52 L0.13 0.8 L0.01 0.8 L0.02 0.5 C-0.2 0.55 -0.45 0.5 -0.55 0.38 C-0.8 0.42 -0.92 0.28 -0.95 0.05 Z"/></svg>'),
     };
     $('#su-track').innerHTML = SESSION_TRACKS.map((track) =>
-      tile(`data-track="${track.id}"`, track.label, track.desc, `<i class="su-ico" aria-hidden="true">${icons[track.id]}</i>`)).join('');
-    $('#su-len').innerHTML = SESSION_LENGTHS.map((length) => tile(`data-min="${length.min}"`, length.label, length.desc)).join('');
+      tile(html`data-track="${track.id}"`, track.label, track.desc, html`<i class="su-ico" aria-hidden="true">${icons[track.id]}</i>`)).join('');
+    $('#su-len').innerHTML = SESSION_LENGTHS.map((length) => tile(html`data-min="${length.min}"`, length.label, length.desc)).join('');
     $('#su-diff').innerHTML = SESSION_DIFFICULTIES.map((difficulty, i) =>
-      tile(`data-diff="${difficulty.id}"`, difficulty.label, difficulty.desc, `<i class="su-bars" data-n="${i + 1}"><span></span><span></span><span></span></i>`)).join('');
+      tile(html`data-diff="${difficulty.id}"`, difficulty.label, difficulty.desc, html`<i class="su-bars" data-n="${i + 1}"><span></span><span></span><span></span></i>`)).join('');
     $('#setup').addEventListener('pointerdown', () => {
       this.activeAt = this.app.clock;
       this.app.audio.ensure(); // 페달로 들어와 소리가 막혀 있었으면 누를 때 풀린다
@@ -241,7 +249,7 @@ export const Demo = {
     if (!this.setup) return;
     Object.assign(this.setup, change);
     // 페달이 없으면 두뇌 게임만 (페달 칸은 막고 까닭을 적는다)
-    const pedal = this.pedalReady();
+    const pedal = this.pedalReady() || this.simResult; // 가상 결과는 페달 없이도 두 방식 다 볼 수 있다
     if (!pedal) this.setup.track = 'brain';
     const { min, difficulty, track } = this.setup;
     document.querySelectorAll('#su-track [data-track]').forEach((button) => {
@@ -255,17 +263,16 @@ export const Demo = {
     document.querySelectorAll('#su-diff [data-diff]').forEach((button) => button.classList.toggle('on', button.dataset.diff === difficulty));
     const chosen = SESSION_DIFFICULTIES.find((candidate) => candidate.id === difficulty);
     $('#su-sum').textContent = `${min}분 · ${chosen ? chosen.label : ''} · ` +
-      (track === 'brain' ? '두뇌 게임만, 바로 시작합니다' : '페달 속도를 잰 뒤 시작합니다');
+      (this.simResult ? '가상 결과: 게임 없이 바로 끝냅니다' : track === 'brain' ? '두뇌 게임만, 바로 시작합니다' : '페달 속도를 잰 뒤 시작합니다');
   },
 
-  // 라운드를 돌리지 않고 그럴듯한 성적을 채워 결과 화면을 연다. 참가 번호를 쓰지 않고 기록에도 남기지 않는다.
-  simulateRound() {
+  // 가상 결과의 그럴듯한 성적 (게임별 성적 · 점수 · 운동량). 고른 운동 방식(app.brainOnly)을 따른다
+  fillSimStats() {
     const app = this.app;
     const config = app.config;
     const randomInt = Util.randomInt;
     const exerciseMax = Math.floor(config.durationSec / config.tickSec) * config.tickMaxPoints;
     app.roundStats = new RoundStats(GAME_TYPES); // 게임별 성적을 아래에서 가상 값으로 바꿔 넣는다
-    app.brainOnly = false;
     let cog = 0;
     for (const gameType of GAME_TYPES) {
       const total = gameType.id === 'path' ? randomInt(8, 14) : 3 * randomInt(1, 2);
@@ -281,17 +288,16 @@ export const Demo = {
       // eslint-disable-next-line id-length -- 세션 로그 형식 (js/round-stats.js)
       app.roundStats.games[gameType.id] = { plays: runs.length, cleared: 0, correct, total, points, level, runs, ms: total * randomInt(4000, 12000), think };
     }
-    app.exScore = Math.round(exerciseMax * randomInt(55, 95) / 100);
+    app.exScore = app.brainOnly ? 0 : Math.round(exerciseMax * randomInt(55, 95) / 100);
     app.cogScore = cog;
     app.score = app.exScore + app.cogScore;
-    const rpm = randomInt(45, 75);
     const meter = app.meter;
     meter.reset();
+    if (app.brainOnly) return;
+    const rpm = randomInt(45, 75);
     meter.activeSec = config.durationSec - randomInt(0, 20);
     meter.revs = (rpm / 60) * meter.activeSec;
     meter.kcal = Exercise.kcalPerSec(rpm) * meter.activeSec;
-    app.state = 'result';
-    this.showResult({ sim: true });
   },
 
   // ---------------- 매 프레임 (일시정지 중에는 불리지 않는다) ----------------
@@ -382,11 +388,12 @@ export const Demo = {
       return;
     }
     if (this.alertKind !== 'idle') app.log.event('idle_prompt');
-    this.showAlert('idle', '아직 하고 계신가요?', `페달을 밟거나 화면을 누르면 계속합니다<br><b>${Math.ceil(left)}</b>초 뒤에 게임을 마칩니다`);
+    this.showAlert('idle', '아직 하고 계신가요?', html`페달을 밟거나 화면을 누르면 계속합니다<br><b>${Math.ceil(left)}</b>초 뒤에 게임을 마칩니다`);
   },
 
   // ---------------- 안내 (페달 끊김 / 자리 비움) ----------------
   // 페달 끊김이 자리 비움보다 우선한다
+  // text 는 html`` 로 만든 마크업
   showAlert(kind, title, text) {
     if (kind === 'idle' && this.alertKind === 'link') return;
     this.alertKind = kind;
@@ -421,7 +428,7 @@ export const Demo = {
     if (lost && !this.menu.isOpen) {
       const retrying = app.link.state === 'reconnecting' || app.link.state === 'connecting';
       this.showAlert('link', '페달 연결이 끊겼어요',
-        retrying ? '다시 연결하는 중입니다. 잠시만 기다려 주세요.<br>게임 시간은 멈춰 있습니다.' : '진행 요원을 불러 주세요.<br>게임 시간은 멈춰 있습니다.');
+        retrying ? html`다시 연결하는 중입니다. 잠시만 기다려 주세요.<br>게임 시간은 멈춰 있습니다.` : html`진행 요원을 불러 주세요.<br>게임 시간은 멈춰 있습니다.`);
     } else {
       this.hideAlert('link');
     }
@@ -430,7 +437,7 @@ export const Demo = {
   },
 
   // ---------------- 결과 ----------------
-  showResult({ sim = false } = {}) {
+  showResult({ sim = this.simRound } = {}) {
     const app = this.app;
     const config = app.config;
     const meter = app.meter;
@@ -450,7 +457,6 @@ export const Demo = {
 
     // 세션 로그에 참가 번호와 능력 점수를 붙여 저장한다
     if (app.log) {
-      app.log.meta.station = this.station;
       app.log.meta.participant = this.label(participantNumber);
       // 두뇌 그래프의 축마다 0~1 (인지 영역 정답률 · 답하는 속도 · 운동, js/abilities.js). 2026-11-20 전 로그는 abilities(별)·abilitiesRaw 였다
       app.log.meta.summary.domains = Abilities.record(abilityAxes);
@@ -466,7 +472,7 @@ export const Demo = {
     const log = this.load('log', []);
     /* eslint-disable id-length -- 저장된 기록 형식 (exergame.demo.log, 운영 메뉴가 내려받는다) */
     log.push({
-      station: this.station, no: participantNumber, at: new Date().toISOString(),
+      no: participantNumber, at: new Date().toISOString(),
       score: app.score, ex: app.exScore, cog: app.cogScore, track: app.brainOnly ? 'brain' : 'dual',
       kcal: Math.round(kcal * 10) / 10, distM: Math.round(meter.distM), revs: Math.round(meter.revs), cfg: Config.demoCode(config),
       domains: Abilities.record(abilityAxes),

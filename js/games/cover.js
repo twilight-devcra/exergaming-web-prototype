@@ -190,7 +190,7 @@ export class CoverGame {
 
     this.host.after(CoverGame.FLY_MS, () => {
       const options = CoverGame.options(first, second, this.tokens, this.spec.optionCount);
-      this.optionRow.innerHTML = '';
+      this.optionRow.replaceChildren();
       this.optionButtons = options.map((value) => {
         const button = Util.element('button', 'ar-cand cv-opt', String(value));
         button.addEventListener('pointerdown', () => this.pick(value, button));
@@ -273,7 +273,7 @@ export class CoverGame {
   // 상자를 닫으며 두 숫자를 제자리로 돌려보낸다
   putBack() {
     const { first, second } = this.question;
-    this.optionRow.innerHTML = '';
+    this.optionRow.replaceChildren();
     this.answerBox.className = 'cv-ans';
     this.answerBox.textContent = '?';
     Util.say(this.message, '', '');

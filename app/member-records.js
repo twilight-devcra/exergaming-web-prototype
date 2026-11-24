@@ -15,7 +15,7 @@ import { MemberId } from '../js/member-id.js';
 
 export const Members = {
   KEY: 'exergame.members',
-  PREFIX_KEY: 'exergame.idPrefix', // 운영 메뉴의 '아이디 접두어' (이 태블릿에만)
+  PREFIX_KEY: 'exergame.idPrefix', // 운영 메뉴의 '센터/단체명' (아이디 접두어, 이 태블릿에만)
 
   // ---------------- 번호 ----------------
   luhn(body) {
@@ -48,9 +48,9 @@ export const Members = {
     return MemberId.isNamed(id) ? MemberId.nameOf(id) : `${id.slice(0, 4)} ${id.slice(4)}`;
   },
 
-  // '회원 번호 1234 5678' · '아이디 철수'
+  // '회원 번호 1234 5678' · '철수'
   label(id) {
-    return `${MemberId.isNamed(id) ? '아이디' : '회원 번호'} ${this.format(id)}`;
+    return `${MemberId.isNamed(id) ? '' : '회원 번호 '}${this.format(id)}`;
   },
 
   // ---------------- 아이디 접두어 (운영 메뉴) ----------------
@@ -185,7 +185,7 @@ export const Members = {
   // 이 태블릿만 보고 만들면 다른 태블릿의 같은 아이디와 기록이 섞일 수 있다
   async createNamed(text) {
     const prefix = this.prefix();
-    if (!MemberId.validPrefix(prefix)) return { error: 'prefix', message: '운영 메뉴에서 아이디 접두어를 먼저 정해 주세요' };
+    if (!MemberId.validPrefix(prefix)) return { error: 'prefix', message: '운영 메뉴에서 센터/단체명을 먼저 정해 주세요' };
     const name = MemberId.cleanName(text);
     const problem = MemberId.nameProblem(name);
     if (problem) return { error: 'invalid', message: problem };

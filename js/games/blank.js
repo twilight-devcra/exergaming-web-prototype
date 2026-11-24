@@ -139,7 +139,7 @@ export class BlankGame {
     Util.say(this.message, this.instruction, 'act');
 
     // 낱말: 글자마다 칸 하나. 빈칸은 테두리가 있는 칸이다. 4낱말은 좁은 화면에서 두 줄로 넘어간다
-    this.board.innerHTML = '';
+    this.board.replaceChildren();
     this.board.classList.toggle('many', words.length >= 4);
     this.holes = words.map((word, i) => {
       const wordElement = Util.element('div', 'bl-word');
@@ -155,7 +155,7 @@ export class BlankGame {
 
     // 보기는 가나다순으로 늘어놓는다 (자리로 답을 짐작할 수 없게)
     const options = [answer, ...wrong].sort((a, b) => a.localeCompare(b, 'ko'));
-    this.optionRow.innerHTML = '';
+    this.optionRow.replaceChildren();
     this.optionButtons = options.map((syllable) => {
       const button = Util.element('button', 'ar-cand bl-opt', syllable);
       button.addEventListener('pointerdown', () => this.pick(syllable, button));

@@ -1,9 +1,11 @@
 // 운영 메뉴 (운영 버전 app/index.html): 대기 화면의 ⚙ 버튼이나 왼쪽 위 모서리 길게 누르기 → PIN → 운영 메뉴.
-// 하위 메뉴(왼쪽 목록)로 나눈다: 스테이션(번호 · 페달 · 음악) · 라운드(DEMO_SETTINGS) · 회원 · 아이디(접두어 · 회원 기록 주소) ·
-// 서버 · 업로드 · 기록 · 로그(이 태블릿의 기록 · 세션 로그 내보내기) · 테스트. 하위 메뉴 이름 아래에는 그 칸의 지금 상태를 보인다 (renderTabs).
-// 칸을 오가도 적은 값은 그대로이고, '대기 화면 열기'(close)에서 스테이션 번호 · 접두어를 확인해 저장한다. 라운드 설정은 칸 안의 '저장'으로.
+// 하위 메뉴(왼쪽 목록)로 나눈다. 담당자가 손대는 것은 기본 설정(센터/단체명 · 페달) 하나이고, 나머지는 '고급 설정' 을 펼쳐야 보인다:
+// 라운드 · 음악(DEMO_SETTINGS · 음악) · 회원 기록(회원 기록 주소) · 서버 · 업로드 · 기록 · 로그(이 태블릿의 기록 · 세션 로그 내보내기) · 테스트.
+// 하위 메뉴 이름 아래에는 그 칸의 지금 상태를 보인다 (renderTabs). 고급 설정을 접어 두었을 때 손볼 것이 있으면 '고급 설정' 에 알린다.
+// 칸을 오가도 적은 값은 그대로이고, '대기 화면 열기'(close)에서 센터/단체명을 확인해 저장한다. 라운드 설정은 칸 안의 '저장'으로.
+// 센터/단체명은 코드 · 저장소에서는 아이디 접두어(prefix)라고 부른다 (js/member-id.js).
 // 스테이션 흐름(js/demo.js 의 Demo)은 isOpen·pinOpen 으로 메뉴가 열려 있는지 보고 게임을 멈춘다.
-import { PRESET_KEYS, ROUND_PRESETS, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, Util } from '../js/config.js';
+import { PRESET_KEYS, ROUND_PRESETS, DEMO_SETTINGS, APP_OPERATOR_PIN, Config, $, Util, html } from '../js/config.js';
 import { AXES } from '../js/abilities.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
@@ -14,13 +16,14 @@ export const OperatorMenu = {
   CORNER_HOLD_MS: 2000,  // 왼쪽 위 모서리를 이만큼 누르고 있으면 PIN 입력
   PIN_TIMEOUT_MS: 20000, // PIN 화면에서 이만큼 아무것도 누르지 않으면 닫는다
 
-  demo: null,       // js/demo.js 의 Demo (스테이션 번호·저장·멈춤)
+  demo: null,       // js/demo.js 의 Demo (저장·멈춤)
   app: null,
   isOpen: false,    // 운영 메뉴가 열려 있다 (게임은 멈춤)
   pinOpen: false,   // PIN 화면이 열려 있다
   pinInput: '',
   pinTimer: null,
-  tab: 'station',     // 보고 있는 하위 메뉴 (다음에 열 때도 이 칸부터)
+  tab: 'basic',       // 보고 있는 하위 메뉴 (다음에 열 때도 이 칸부터)
+  advancedOpen: false, // '고급 설정' 을 펼쳤다 (고급 칸을 보고 있으면 늘 펼쳐 둔다)
   savedRound: null,   // 라운드 칸에 마지막으로 채운 · 저장한 값 (저장하지 않은 변경을 가린다)
   roundDirty: false,
   recordsLabel: '',
@@ -39,15 +42,15 @@ export const OperatorMenu = {
     const settings = this.app.config;
     const changed = Object.keys(Config.demoSaved()).length;
     const preset = Config.preset(Config.presetOf(settings));
-    $('#op-cfg').innerHTML = `설정 코드 <b>${Config.demoCode(settings)}</b>${changed ? ` (기본값에서 ${changed}개 바꿈)` : ' (기본값)'} · ` +
-      ($('#setup')
-        ? `라운드 길이·난이도는 참가자가 고름 · `
-        : `라운드 난이도 ${preset ? preset.label : '직접 설정'} · 라운드 ${Util.formatTime(settings.durationSec)} · `) +
-      `측정 ${settings.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
+    const round = $('#setup')
+      ? '라운드 길이·난이도는 참가자가 고름'
+      : `라운드 난이도 ${preset ? preset.label : '직접 설정'} · 라운드 ${Util.formatTime(settings.durationSec)}`;
+    $('#op-cfg').innerHTML = html`설정 코드 <b>${Config.demoCode(settings)}</b>${changed ? ` (기본값에서 ${changed}개 바꿈)` : ' (기본값)'} · ` +
+      html`${round} · 측정 ${settings.calibrationSec}초 · 게임 ${this.app.enabledTypes().length}종<br>` +
       (this.pin ? '운영 메뉴는 왼쪽 위 모서리를 2초 누른 뒤 PIN 을 입력하면 열립니다.' : '운영 메뉴는 대기 화면의 ⚙ 운영 버튼이나 왼쪽 위 모서리 2초 누르기로 열립니다 (PIN 없음).');
   },
 
-  // 아이디 접두어 칸 아래 안내: 적은 접두어로 아이디가 어떻게 저장되는지, 비었거나 틀렸으면 그 뜻
+  // 센터/단체명 칸 아래 안내: 적은 이름으로 아이디가 어떻게 저장되는지, 비었거나 틀렸으면 그 뜻
   renderPrefixNote() {
     const prefix = MemberId.cleanPrefix($('#op-prefix').value);
     const saved = Members.prefix();
@@ -56,13 +59,14 @@ export const OperatorMenu = {
       : !MemberId.validPrefix(prefix)
         ? MemberId.prefixProblem(prefix)
         : `아이디 '철수' 는 '${MemberId.make(prefix, '철수')}' 로 저장됩니다.` +
-          (saved && saved !== prefix ? ` 접두어를 바꾸면 아이디 목록에 '${prefix}' 의 아이디만 보입니다.` : '');
+          (saved && saved !== prefix ? ` 센터/단체명을 바꾸면 아이디 목록에 '${prefix}' 의 아이디만 보입니다.` : '');
   },
 
   // ---------------- 하위 메뉴 ----------------
   showTab(tab) {
     this.tab = tab;
     $('#op .op-box').dataset.tab = tab;
+    if (tab !== 'basic') this.setAdvanced(true);
     for (const button of document.querySelectorAll('#op-tabs [data-tab]')) {
       const selected = button.dataset.tab === tab;
       button.classList.toggle('on', selected);
@@ -73,26 +77,36 @@ export const OperatorMenu = {
     if (tab === 'round') Util.reserveHeight($('#op-set-preset-note'), Config.presetNotes());
   },
 
+  // '고급 설정' 펼치기 · 접기. 고급 칸을 보다가 접으면 기본 설정으로 돌아간다
+  setAdvanced(open) {
+    this.advancedOpen = open;
+    $('#op .op-box').classList.toggle('adv-open', open);
+    $('#op-adv').setAttribute('aria-expanded', String(open));
+    if (!open && this.tab !== 'basic') this.showTab('basic');
+  },
+
   // 하위 메뉴 이름 아래의 작은 글: 그 칸의 지금 상태. 손볼 것이 있으면 warn (강조색)
   renderTabs() {
+    const warnings = [];
     const label = (tab, text, warn = false) => {
       const small = $(`#op-tab-${tab}`);
       small.textContent = text;
       small.parentElement.classList.toggle('warn', warn);
+      if (warn && tab !== 'basic') warnings.push(text);
     };
-    const station = parseInt($('#op-station').value, 10);
-    const stationOk = station >= 1 && station <= 99;
-    label('station', stationOk ? `스테이션 ${station}` : '번호를 적어 주세요', !stationOk);
+    const prefix = MemberId.cleanPrefix($('#op-prefix').value);
+    label('basic', !prefix ? '센터/단체명 없음' : MemberId.validPrefix(prefix) ? prefix : '센터/단체명 꼴이 틀림', !MemberId.validPrefix(prefix));
     const changed = Object.keys(Config.demoSaved()).length;
     label('round', this.roundDirty ? '저장하지 않은 변경' : changed ? `기본값에서 ${changed}개 바꿈` : '기본값', this.roundDirty);
-    const prefix = MemberId.cleanPrefix($('#op-prefix').value);
-    label('members', !prefix ? '아이디 접두어 없음' : MemberId.validPrefix(prefix) ? `접두어 ${prefix}` : '접두어 꼴이 틀림', !MemberId.validPrefix(prefix));
-    const { url } = SessionUpload.settings();
+    const { url, historyUrl, localHistory } = SessionUpload.settings();
+    label('members', localHistory ? '시험용: 이 태블릿의 세션 로그' : historyUrl ? '서버 기록' : '이 태블릿 기록만');
     const state = SessionUpload.state;
     label('server', !url ? '업로드 꺼짐' : state.lastError ? '보내기 실패' : state.pending ? `남은 세션 ${state.pending}건` : '모두 보냄', !!(url && state.lastError));
     label('records', this.recordsLabel);
     const tests = [this.demo.allowKeyboard && '키보드', this.demo.simResult && '가상 결과'].filter(Boolean);
     label('test', tests.length ? `켜짐: ${tests.join(' · ')}` : '꺼짐', tests.length > 0);
+    // 고급 설정을 접어 두었어도 손볼 것은 보이게
+    label('adv', warnings.join(' · '), warnings.length > 0);
   },
 
   // ---------------- 운영 메뉴 ----------------
@@ -102,7 +116,7 @@ export const OperatorMenu = {
       const button = event.target.closest('[data-tab]');
       if (button) this.showTab(button.dataset.tab);
     });
-    $('#op-station').addEventListener('input', () => this.renderTabs());
+    $('#op-adv').onclick = () => this.setAdvanced(!this.advancedOpen);
     $('#op-end').onclick = () => {
       this.hide();
       if (this.app.state === 'play') this.app.endRound('operator');
@@ -116,7 +130,7 @@ export const OperatorMenu = {
     $('#op-sess-export').onclick = async () => {
       this.demo.leaving = true; // 내려받기가 beforeunload 를 부를 수 있다
       try {
-        const exported = await SessionStore.exportAll(`exergame-sessions-station${this.demo.station || ''}-${new Date().toISOString().slice(0, 10)}.jsonl`);
+        const exported = await SessionStore.exportAll(`exergame-sessions-${new Date().toISOString().slice(0, 10)}.jsonl`);
         if (!exported) $('#op-sess-count').textContent = '저장된 로그가 없습니다';
       } catch (error) {
         $('#op-sess-count').textContent = `내보내기 실패: ${error.message || error}`;
@@ -134,7 +148,6 @@ export const OperatorMenu = {
       if (this.app.state === 'setup') this.demo.pickSetup({});
       this.renderTabs();
     };
-    $('#op-station').addEventListener('input', () => $('#op-station').classList.remove('invalid'));
     $('#op-prefix').addEventListener('input', () => {
       $('#op-prefix').classList.remove('invalid');
       this.renderPrefixNote();
@@ -265,13 +278,11 @@ export const OperatorMenu = {
     $('#op-set-form').disabled = app.inRound;
     $('#op-set-locked').hidden = !app.inRound;
     this.loadRoundSettings();
-    $('#op-station').value = this.demo.station;
     $('#op-prefix').value = Members.prefix();
     $('#op-prefix').classList.remove('invalid');
     this.renderPrefixNote();
     $('#op-kbd').checked = this.demo.allowKeyboard;
     $('#op-sim').checked = this.demo.simResult;
-    $('#op-station').classList.remove('invalid');
     $('#op-round').style.display = app.inRound ? '' : 'none';
     $('#op-end').style.display = app.state === 'play' ? '' : 'none';
     if (app.inRound) {
@@ -286,6 +297,7 @@ export const OperatorMenu = {
     if (app.inRound) app.log.event('operator', { open: true });
     this.renderTabs();
     $('#op').classList.add('active');
+    this.setAdvanced(this.tab !== 'basic');
     this.showTab(this.tab);
     this.demo.syncPause();
   },
@@ -300,25 +312,15 @@ export const OperatorMenu = {
   },
 
   close() {
-    const station = parseInt($('#op-station').value, 10);
-    // 틀린 칸이 있으면 그 하위 메뉴를 열어 보여 준다
-    if (!(station >= 1 && station <= 99)) {
-      this.showTab('station');
-      $('#op-station').classList.add('invalid');
-      $('#op-station').focus();
-      return;
-    }
     const prefix = MemberId.cleanPrefix($('#op-prefix').value);
+    // 꼴이 틀렸으면 기본 설정을 열어 보여 준다
     if (prefix && !MemberId.validPrefix(prefix)) {
-      this.showTab('members');
+      this.showTab('basic');
       $('#op-prefix').classList.add('invalid');
       $('#op-prefix').focus();
       return;
     }
     Members.setPrefix(prefix);
-    this.demo.station = String(station);
-    this.demo.save('station', this.demo.station);
-    this.demo.renderStation();
     this.demo.enterKiosk();
     this.hide();
   },
@@ -335,7 +337,7 @@ export const OperatorMenu = {
     list.innerHTML = log.slice(-40).reverse().map((round) => {
       const time = new Date(round.at);
       const hourMinute = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
-      return `<li><b>${round.station || '?'}-${String(round.no).padStart(3, '0')}</b><span>${hourMinute}${round.track === 'brain' ? ' · 두뇌만' : ''}</span><span class="sc">${round.score.toLocaleString('ko-KR')}점</span></li>`;
+      return html`<li><b>${String(round.no).padStart(3, '0')}</b><span>${hourMinute}${round.track === 'brain' ? ' · 두뇌만' : ''}</span><span class="sc">${round.score.toLocaleString('ko-KR')}점</span></li>`;
     }).join('');
   },
 
@@ -343,12 +345,12 @@ export const OperatorMenu = {
     const log = this.demo.load('log', []);
     // track: dual(페달 + 두뇌 게임) · brain(두뇌 게임만). 이 열을 더하기 전 기록은 dual.
     // 끝의 열은 두뇌 그래프의 축 (0~1, js/abilities.js AXES). 2026-11-20 전 기록은 축이 달라(별점) 비어 있다
-    const header = ['station', 'no', 'time', 'settings', 'track', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...AXES.map((axis) => axis.id)];
-    const rows = log.map((round) => [round.station, round.no, round.at, round.config ?? '', round.track || 'dual', round.score, round.ex, round.cog, round.kcal, round.distM ?? '', round.revs, ...AXES.map((axis) => round.domains?.[axis.id] ?? '')]);
+    const header = ['no', 'time', 'settings', 'track', 'score', 'exercise', 'cognitive', 'kcal', 'dist_m', 'revs', ...AXES.map((axis) => axis.id)];
+    const rows = log.map((round) => [round.no, round.at, round.config ?? '', round.track || 'dual', round.score, round.ex, round.cog, round.kcal, round.distM ?? '', round.revs, ...AXES.map((axis) => round.domains?.[axis.id] ?? '')]);
     const csv = '﻿' + [header, ...rows].map((row) => row.join(',')).join('\r\n');
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    link.download = `exergame-station${this.demo.station || ''}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `exergame-${new Date().toISOString().slice(0, 10)}.csv`;
     this.demo.leaving = true; // 다운로드도 beforeunload 를 부를 수 있다
     link.click();
     setTimeout(() => { this.demo.leaving = false; URL.revokeObjectURL(link.href); }, 1000);
@@ -430,6 +432,7 @@ export const OperatorMenu = {
         ...(local ? { localHistory: local.checked } : {}),
       });
       if (historyInput && local) historyInput.disabled = local.checked;
+      if (this.isOpen) this.renderTabs(); // 회원 기록 칸의 상태 글
     };
     $('#op-up-url').addEventListener('change', save);
     $('#op-up-key').addEventListener('change', save);

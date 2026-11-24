@@ -113,7 +113,7 @@ export class SymbolGame {
       this.host.sfx(Sfx.BLINK);
     });
     this.host.after(1100 + (this.spec.show || SymbolGame.SHOW_MS), () => {
-      this.cells.forEach((cell) => (cell.innerHTML = ''));
+      this.cells.forEach((cell) => cell.replaceChildren());
       Util.say(this.message, '');
       this.host.after(350, () => this.ask());
     });
@@ -130,7 +130,7 @@ export class SymbolGame {
   ask() {
     const ask = this.asks[this.answered];
     this.current = ask;
-    this.target.innerHTML = '';
+    this.target.replaceChildren();
     this.target.append(symbolElement(ask.symbol));
     this.target.classList.add('active');
     Util.say(this.message, '이 그림은 어디 있었나요?', 'act');
@@ -191,7 +191,7 @@ export class SymbolGame {
   complete() {
     this.phase = Phase.END;
     this.target.classList.remove('active');
-    this.target.innerHTML = '';
+    this.target.replaceChildren();
     Util.say(this.message, `${this.questions}개 중 ${this.correct}개 정답`, this.correct === this.questions ? 'good' : '');
     // 문제마다 이미 정답/오답 소리를 들려줬다. 다 맞혔을 때의 축하음은 host가 울린다.
     this.host.after(1200, () => {

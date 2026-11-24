@@ -111,7 +111,7 @@ export class FitGame {
     this.boardSvg = this.board.querySelector('svg');
 
     const pieceView = FitGame.PIECE_VIEW;
-    this.candidateRow.innerHTML = '';
+    this.candidateRow.replaceChildren();
     this.candidateButtons = this.choices.map((choice, i) => {
       const button = Util.element('button', 'fit-cand',
         `<svg viewBox="${-pieceView / 2} ${-pieceView / 2} ${pieceView} ${pieceView}">${FitGame.drawPiece(FitGame.turn(choice.piece, choice.rotation))}</svg>`);

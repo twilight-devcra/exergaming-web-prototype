@@ -165,7 +165,7 @@ export class NovelGame {
 
   render() {
     this.cells.forEach((cell) => {
-      cell.innerHTML = '';
+      cell.replaceChildren();
       cell.className = 'scell';
     });
     this.board.forEach(({ shapeIndex, markIndex, cell }) => this.cells[cell].append(Util.element('div', 'sym', `<svg viewBox="0 0 100 100">${novelPic(shapeIndex, markIndex)}</svg>`)));

@@ -176,7 +176,7 @@ export class RecallGame {
     this.cardSvg.innerHTML = `<g class="rc-fig">${RecallGame.objectSvg(item.shape, item.count, cardWidth / 2, cardHeight / 2, size, 94)}</g>`;
     this.host.sfx(Sfx.BLINK);
     this.host.after(this.spec.show, () => {
-      this.cardSvg.innerHTML = '';
+      this.cardSvg.replaceChildren();
       this.host.after(RecallGame.GAP_MS, () => this.play(i + 1));
     });
   }
@@ -329,7 +329,7 @@ export class RecallGame {
   // keep = 칸 번호·표시(.rc-num, .mark, .rc-fix)는 남긴다
   static fillValue(target, prop, value, keep = false) {
     if (keep) [...target.children].forEach((child) => !child.matches('.rc-num, .mark, .rc-fix') && child.remove());
-    else target.innerHTML = '';
+    else target.replaceChildren();
     let icon;
     let name;
     if (prop === 'shape') {

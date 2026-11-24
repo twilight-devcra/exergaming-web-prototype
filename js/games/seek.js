@@ -126,7 +126,7 @@ export class SeekGame {
 
     // 찾을 순서: 천천히 도는 사슬. 그림은 판에서와 같은 방향으로 서 있도록 반대로 돌린다.
     const turn = `${-Math.random() * 30}s`; // 문제마다 다른 각도에서 시작
-    this.target.innerHTML = '';
+    this.target.replaceChildren();
     const chain = Util.element('div', 'seek-chain');
     chain.style.animationDelay = turn;
     sequence.forEach((symbol) => {

@@ -47,6 +47,8 @@ const App = {
   generation: 0, // 인지 게임 세대. 바뀌면 이전 게임의 예약 콜백/점수 지급은 무시된다
 
   init() {
+    this.gameScreen = $('#game'); // 게임 화면 전체 (띠 + 인지 게임)
+    this.cogBox = $('#cog');      // 인지 게임이 들어가는 칸
     this.band = new Band($('#band-canvas'), this.config);
     // 큰 깃발을 지날 때만 소리를 낸다. 작은 깃발까지 울리면 박자 소리와 섞여 시끄럽다.
     this.band.onMilestone = (milestone) => {
@@ -112,11 +114,12 @@ const App = {
   // 게임 탭 이름 옆에 켜 둔 게임 수 (다른 탭을 보고 있어도 몇 개 꺼 두었는지 보이게).
   // 하나도 안 골랐으면 시작 버튼을 막고 이유를 버튼에 적는다
   renderGamesCount() {
-    if (!$('#cfg-games-count')) return; // 운영 버전에는 없다
+    const countLabel = $('#cfg-games-count');
+    if (!countLabel) return; // 운영 버전에는 없다
     const boxes = [...document.querySelectorAll('#cfg-games input')];
     const checkedCount = boxes.filter((checkbox) => checkbox.checked).length;
-    $('#cfg-games-count').textContent = `${checkedCount}/${boxes.length}`;
-    $('#cfg-games-count').classList.toggle('none', !checkedCount);
+    countLabel.textContent = `${checkedCount}/${boxes.length}`;
+    countLabel.classList.toggle('none', !checkedCount);
     $('#cfg-games-all').disabled = checkedCount === boxes.length;
     $('#cfg-games-none').disabled = !checkedCount;
     const start = $('#btn-start');
@@ -230,8 +233,8 @@ const App = {
       if (this.log) this.log.workoutFrame(workout);
     };
     this.link.onFrame = (raw, frame) => this.onPedalFrame(frame);
-    $('#cfg-source').onchange = () => {
-      this.config.rpmSource = $('#cfg-source').value;
+    $('#cfg-source').onchange = (event) => {
+      this.config.rpmSource = event.target.value;
       Config.save(this.config);
       this.applySource();
     };
@@ -335,7 +338,7 @@ const App = {
       this.current = null;
     }
     this.clearShift();
-    $('#cog').innerHTML = '';
+    this.cogBox.replaceChildren();
     this.show(this.edition.homeScreen);
   },
 
@@ -494,11 +497,11 @@ const App = {
     ScoreHud.renderStreak(this.roundStats.streak);
     this.band.config = this.config;
     this.band.brainOnly = this.brainOnly;
-    $('#game').classList.toggle('brain-only', this.brainOnly);
+    this.gameScreen.classList.toggle('brain-only', this.brainOnly);
     this.band.setSlope(0);
     this.band.theta = 0;
     this.band.restart();
-    $('#game').classList.remove('build'); // 지난 판의 짓기 연출이 남아 있지 않게
+    this.gameScreen.classList.remove('build'); // 지난 판의 짓기 연출이 남아 있지 않게
     this.show('game');
     this.band.resize();
     this.updateHud();
@@ -511,7 +514,7 @@ const App = {
       return Util.lerp(startTempo, this.target, progress * progress * (3 - 2 * progress)) * 2;
     });
 
-    const cog = $('#cog');
+    const cog = this.cogBox;
     const generation = this.generation;
     const intro = Util.element('div', 'intro');
     intro.innerHTML = this.brainOnly ? `
@@ -523,7 +526,7 @@ const App = {
       <div class="hint">비트에 맞춰 ${this.pedal.sensorOn ? '<b>페달</b>을' : '<b>A · D</b>를'} 밟아 ${EDITION === 'app' ? '자전거를 <b style="color:var(--good)">초록 구간</b>' : '공을 <b style="color:var(--good)">초록 구역</b>'} 안에 두세요.<br>
       그러면서 아래에 나오는 게임을 풀면 됩니다.</div>
       <div class="big-count">3</div>`;
-    cog.innerHTML = '';
+    cog.replaceChildren();
     cog.append(intro);
     const countLabel = intro.querySelector('.big-count');
     this.audio.sfx(Sfx.COUNT);
@@ -556,8 +559,8 @@ const App = {
     this.log.event('game_start', { game: GameType.id, level, mult: Math.round(multiplier * 100) / 100, diff: Math.round(this.difficulty.value * 100) / 100 });
 
     const generation = ++this.generation;
-    const cog = $('#cog');
-    cog.innerHTML = '';
+    const cog = this.cogBox;
+    cog.replaceChildren();
     const intro = Util.element('div', 'intro');
     intro.innerHTML = `
       <div class="title"><div class="name">${GameType.title}</div><span class="level">Lv.${level}</span></div>
@@ -576,7 +579,7 @@ const App = {
       begun = true;
       this.inIntro = false;
       this.log.event('intro_end', { game: GameType.id, ms: Math.round(this.clock - introStartClock), skipped: !!skipped }); // eslint-disable-line id-length -- 세션 로그 형식
-      cog.innerHTML = '';
+      cog.replaceChildren();
       const stage = Util.element('div', 'stage');
       cog.append(stage);
       const host = this.makeHost(GameType, stage, level, multiplier, generation);
@@ -716,12 +719,12 @@ const App = {
   beginShift() {
     const generation = ++this.generation;
     this.current = null;
-    $('#cog').innerHTML = '';
+    this.cogBox.replaceChildren();
     const toLevel = SLOPE_PATTERN[++this.slopeStep % SLOPE_PATTERN.length];
     this.shift = { fromLevel: this.slopeLevel, toLevel, startedAt: this.elapsed };
     this.log.event('shift_start', { from: this.slopeLevel, to: toLevel }); // eslint-disable-line id-length -- 세션 로그 형식
     $('#shift-name').textContent = SLOPE_MESSAGES[toLevel];
-    $('#game').classList.add('shift');
+    this.gameScreen.classList.add('shift');
     this.audio.sfx(Sfx.START);
     this.audio.setRest(true);
     this.after(this.config.shiftSec * 1000, () => this.endShift(), generation);
@@ -745,7 +748,7 @@ const App = {
   clearShift() {
     this.audio.setRest(false, false);
     this.shift = null;
-    $('#game').classList.remove('shift');
+    this.gameScreen.classList.remove('shift');
   },
 
   // 구간 안에서 목표 RPM과 지면 각도를 shiftRampSec에 걸쳐 부드럽게 옮긴다 (smoothstep)
@@ -773,7 +776,7 @@ const App = {
     } else {
       // 길게 이어 온 연속이 끊기면 그냥 틀렸을 때보다 아깝게 들리게
       this.audio.sfx(streakBefore >= 3 ? Sfx.DROP : Sfx.BAD);
-      Effects.miss($('#cog'));
+      Effects.miss(this.cogBox);
     }
     ScoreHud.renderStreak(this.roundStats.streak);
   },
@@ -869,7 +872,7 @@ const App = {
     this.clearShift();
     this.audio.stop();
     this.audio.sfx(Sfx.END);
-    $('#cog').innerHTML = '';
+    this.cogBox.replaceChildren();
     this.showEnding(ended);
   },
 
@@ -895,21 +898,21 @@ const App = {
       // 생김새를 세션 로그에 남긴다 (회원 기록에도 들어가 다음 라운드부터 같은 모양으로 선다)
       const look = this.band.plant(this.score, plant);
       if (this.log) this.log.meta.landmark = look;
-      $('#game').classList.add('build');
+      this.gameScreen.classList.add('build');
       cardAt = this.band.planting.doneAt * 1000 + this.BUILD_HOLD_MS;
     }
 
     const finish = () => {
       if (generation !== this.generation || this.state !== 'ending') return;
       card.remove();
-      $('#game').classList.remove('build');
+      this.gameScreen.classList.remove('build');
       this.state = 'result';
       this.showResult();
     };
     const showCard = () => {
       if (generation !== this.generation || this.state !== 'ending') return;
-      $('#game').classList.remove('build');
-      (plant ? $('#cog') : $('#game')).append(card);
+      this.gameScreen.classList.remove('build');
+      (plant ? this.cogBox : this.gameScreen).append(card);
       Effects.confetti(0.5);
       const scoreLabel = card.querySelector('.score b');
       const countStartAt = performance.now();

@@ -201,7 +201,7 @@ export class CoinGame {
       this.legend.classList.add('flash');
     }
 
-    this.optionRow.innerHTML = '';
+    this.optionRow.replaceChildren();
     const unit = this.valueMode ? UNIT : '개';
     this.optionButtons = puzzle.options.map((value) => {
       const button = Util.element('button', 'ar-cand cn-opt', `${value}<small>${unit}</small>`);

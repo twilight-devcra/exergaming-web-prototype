@@ -428,10 +428,18 @@ body[data-theme="scenic"] {
 .op-tabs button small { max-width: 100%; min-height: 1.3em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-soft); }
 .op-tabs button.on { background: var(--panel); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1); }
 .op-tabs button.warn small { color: var(--warn); font-weight: 700; }
+/* '고급 설정': 누르면 아래에 고급 칸들이 펼쳐진다. 접혀 있을 때만 손볼 것을 작은 글로 알린다 (펼치면 칸마다 보인다) */
+.op-tabs .op-adv-toggle { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; }
+.op-adv-toggle b::after { content: ' ▸'; color: var(--ink-soft); }
+.op-box.adv-open .op-adv-toggle b::after { content: ' ▾'; }
+.op-box.adv-open .op-adv-toggle small { display: none; }
+.op-adv-tabs { display: none; flex-direction: column; gap: 4px; }
+.op-box.adv-open .op-adv-tabs { display: flex; }
+.op-adv-tabs button { padding-left: 22px; }
 .op-nav #op-close { margin-top: 10px; }
 .op-main { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding: 24px 28px; }
 .op-panel { display: none; flex-direction: column; gap: 10px; }
-.op-box[data-tab="station"] [data-panel="station"], .op-box[data-tab="round"] [data-panel="round"],
+.op-box[data-tab="basic"] [data-panel="basic"], .op-box[data-tab="round"] [data-panel="round"],
 .op-box[data-tab="members"] [data-panel="members"], .op-box[data-tab="server"] [data-panel="server"],
 .op-box[data-tab="records"] [data-panel="records"], .op-box[data-tab="test"] [data-panel="test"] { display: flex; }
 .op-panel h2 { margin: 0 0 4px; font-size: 22px; }
@@ -464,9 +472,14 @@ body[data-theme="scenic"] {
   .op-tabs button { flex: none; padding: 8px 12px; }
   .op-tabs button small { display: none; }
   .op-tabs button.warn b::after { content: ' •'; color: var(--warn); }
+  .op-tabs .op-adv-toggle { margin: 0; padding-top: 8px; border-top: 0; border-left: 1px solid var(--line); border-radius: 0 12px 12px 0; }
+  .op-tabs .op-adv-toggle.warn b::after { content: ' ▸ •'; }
+  .op-box.adv-open .op-adv-toggle.warn b::after { content: ' ▾'; color: var(--ink-soft); }
+  .op-box.adv-open .op-adv-tabs { display: contents; }
+  .op-adv-tabs button { padding-left: 12px; }
   .op-main { padding: 16px 18px; }
 }
-/* 운영 메뉴의 아이디 접두어 (app/operator-menu.js renderPrefixNote) */
+/* 운영 메뉴의 센터/단체명 (app/operator-menu.js renderPrefixNote). 저장소에서는 아이디 접두어 */
 #op-prefix { flex: none; width: 170px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font: 600 16px var(--font); }
 #op-prefix.invalid { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
 
@@ -499,15 +512,22 @@ body[data-theme="scenic"] {
 .calib-state { font-size: 20px; }
 
 /* ================= 회원: 로그인 · 기록 · 결과의 회원 카드 (app/members.js) ================= */
-/* 로그인 화면은 보기 셋 (data-view): home · list · number. 보이는 보기만 그린다 */
+/* 로그인 화면은 보기 넷 (data-view): home · scan(QR 회원 카드) · list · number. 보이는 보기만 그린다 */
 .lg-view { display: none; min-height: 0; }
-#login[data-view="home"] .lg-home, #login[data-view="list"] .lg-list, #login[data-view="number"] .lg-number { display: flex; }
+#login[data-view="home"] .lg-home, #login[data-view="scan"] .lg-qr, #login[data-view="list"] .lg-list, #login[data-view="number"] .lg-number { display: flex; }
 /* 아이디 목록은 화면 아래까지 채우고 목록만 스크롤한다 */
 #login[data-view="list"] { justify-content: flex-start; }
 
-/* ----- 처음 보기: 큰 칸 셋 + QR 회원 카드 ----- */
+/* ----- 처음 보기: 큰 칸 넷 (2 × 2) ----- */
 .lg-home { flex-direction: column; gap: clamp(14px, 2.4vh, 22px); }
-.lg-main { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: clamp(12px, 1.6vw, 20px); }
+.lg-main { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 1.6vw, 20px); }
+.lg-main .lg-opt { min-height: clamp(120px, 25vh, 210px); }
+
+/* ----- QR 회원 카드 보기: 카메라를 크게 ----- */
+.lg-qr { justify-content: center; }
+.lg-qr .lg-card { width: min(920px, 100%); padding: clamp(14px, 2vh, 20px); }
+.lg-qr .lg-cam { height: clamp(200px, 48vh, 420px); }
+.lg-qr .lg-card-text { gap: 12px; }
 .lg-opt {
   display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 6px;
   min-height: clamp(150px, 30vh, 240px); padding: clamp(16px, 2.8vh, 24px) clamp(18px, 2vw, 26px);
@@ -699,6 +719,18 @@ body[data-theme="scenic"] {
 .dm-saved span { font-size: 15px; color: var(--ink-soft); }
 .dm-note { margin: 0; color: var(--ink-soft); }
 /* 손님의 새 회원 칸 맨 아래: QR 회원 카드 대신 아이디로 저장하기 (app/members.js saveAsNamed) */
+/* 손님의 고르기 칸: 아이디 만들기 · QR 회원 카드 받기 (센터/단체명이 있는 태블릿) */
+.dm-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dm-pick {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 16px; background: var(--panel);
+  font-family: var(--font); text-align: left; color: var(--ink); cursor: pointer; transition: transform 0.15s;
+}
+.dm-pick i { width: 40px; height: 40px; margin-bottom: 4px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+.dm-pick i svg { width: 60%; height: 60%; }
+.dm-pick b { font-size: clamp(18px, 2.8vh, 22px); font-weight: 700; line-height: 1.25; }
+.dm-pick small { font-size: 14px; line-height: 1.4; color: var(--ink-soft); }
+.dm-pick:active { transform: scale(0.98); border-color: var(--accent); }
 .dm-named { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
 .dm-named span { font-size: 14px; color: var(--ink-soft); }
 .dm-named .btn { flex: none; padding: 10px 18px; font-size: clamp(16px, 2.4vh, 18px); border-radius: 12px; }
@@ -706,7 +738,7 @@ body[data-theme="scenic"] {
   .hs-body { grid-template-columns: 1fr; }
   /* 로그인 첫 보기: 큰 칸 셋을 위아래로, 그림은 글 왼쪽에 */
   .lg-main { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .lg-opt { min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; row-gap: 2px; align-items: center; }
+  .lg-opt, .lg-main .lg-opt { min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; row-gap: 2px; align-items: center; }
   .lg-opt i { grid-row: span 2; margin: 0; }
   .lg-opt br { display: none; }
 }
@@ -780,7 +812,8 @@ body[data-theme="scenic"] {
 
   .lg-home { gap: 12px; }
   .lg-card { flex-direction: column; align-items: stretch; padding: 10px; border-radius: 18px; }
-  .lg-cam { height: auto; width: 100%; max-height: 34vh; }
+  .lg-cam, .lg-qr .lg-cam { height: auto; width: 100%; max-height: 50vh; }
+  .lg-qr { justify-content: flex-start; }
   .lg-card-text { padding: 0 4px 4px; }
   .lg-ids { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lg-opt { padding: 14px 16px; border-radius: 18px; }
@@ -805,6 +838,10 @@ body[data-theme="scenic"] {
   .dm-card, .dm-new .dm-card { flex-direction: column; align-items: center; }
   .dm-new .dm-qr { width: min(56vw, 200px); }
   .dm-new { margin: 4px 0 0; }
+  /* 고르기 칸 둘을 위아래로, 그림은 글 왼쪽에 */
+  .dm-picks { grid-template-columns: minmax(0, 1fr); }
+  .dm-pick { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 0; align-items: center; padding: 12px; }
+  .dm-pick i { grid-row: span 2; margin: 0; }
   .hold-btn { flex: none; }
 
   /* ----- 안내 창 ----- */

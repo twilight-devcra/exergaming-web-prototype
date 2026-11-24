@@ -155,7 +155,7 @@ export class ChainGame {
     this.nextGroup = this.rowSvg.querySelector('.ch-next');
 
     const { KNOB } = ChainGame;
-    this.tray.innerHTML = '';
+    this.tray.replaceChildren();
     this.pieceButtons = this.order.map((pieceIndex) => {
       const [sock, knob] = puzzle.pieces[pieceIndex];
       const button = Util.element('button', 'ch-piece',

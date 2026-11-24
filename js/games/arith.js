@@ -105,7 +105,7 @@ export class ArithGame {
     Util.say(this.message, '빈칸에 들어갈 숫자를 고르세요', 'act');
     Progress.current(this.progress, this.round);
 
-    this.equation.innerHTML = '';
+    this.equation.replaceChildren();
     this.slots = puzzle.solution.map((_, i) => {
       const slot = Util.element('div', `ar-slot${this.fill[i] ? ' given' : ''}`, '?');
       slot.addEventListener('pointerdown', () => this.unpick(i));
@@ -115,7 +115,7 @@ export class ArithGame {
     });
     this.equation.append(Util.element('div', '', '='), Util.element('div', '', String(puzzle.answer)));
 
-    this.candidateRow.innerHTML = '';
+    this.candidateRow.replaceChildren();
     this.candidateButtons = shown.map((value) => {
       const button = Util.element('button', 'ar-cand', String(value));
       button.addEventListener('pointerdown', () => this.pick(value, button));

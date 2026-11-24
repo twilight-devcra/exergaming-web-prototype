@@ -10,7 +10,7 @@
 | 모드 | 방법 | 파일 |
 |---|---|---|
 | 테스트 화면 | 결과 화면의 **세션 로그 저장** | `exergame-session-<YYYYMMDD-HHMMSS>.json` — 세션 하나, JSON 객체 하나 |
-| 운영 버전 (`app/`) | 판이 끝날 때마다 태블릿(IndexedDB `exergame-sessions`)에 자동 저장 → 운영 메뉴 **세션 로그 → 전체 내보내기** | `exergame-sessions-station<N>-<YYYY-MM-DD>.jsonl` — 한 줄에 세션 하나 (JSON Lines) |
+| 운영 버전 (`app/`) | 판이 끝날 때마다 태블릿(IndexedDB `exergame-sessions`)에 자동 저장 → 운영 메뉴 **세션 로그 → 전체 내보내기** | `exergame-sessions-<YYYY-MM-DD>.jsonl` — 한 줄에 세션 하나 (JSON Lines) |
 
 운영 버전은 결과 없이 끝난 판(중단, 측정 중 자리 비움)도 저장합니다. 예전 프로토타입 시연 모드(`index.html?demo`, 지금은 없음)도 같은 방식이었고, 그 기록은 `edition: prototype`, `mode: demo` 입니다. 결과 화면 없이 끝난 테스트 화면의 판은 내려받을 수 없습니다.
 크기는 페달로 5분 한 판에 약 0.6 MB 이고 대부분 `capd` 입니다.
@@ -45,7 +45,7 @@
 | `landmark` | 운영 버전의 회원 라운드만 (결과 화면까지 간 판). 풍경 길가에 세운 기념물의 생김새 `{ v, kind, size, seed, wall, roof }` — `kind`: `cottage` · `shop` · `tower` (예전 안은 `pinwheel` · `balloon` · `cairn`), `size`: 0~2 (층수 1~3), `seed`: 작은 차이(창가 꽃 색 등)를 정하는 수, `wall` · `roof`: 색 `#rrggbb`. 회원 기록에도 `look` 으로 들어가 다음 라운드부터 이 모양 그대로 선다 (`js/band.js` 의 `Band.lookOf`) |
 | `track` | 운동 방식. `dual` (페달 + 두뇌 게임) \| `brain` (두뇌 게임만, 페달 없이). 테스트 화면은 설정의 **진행 → 페달 없이**, 운영 버전은 세션 설정의 **운동 방식**. `brain` 은 속도 측정이 없고(`calib_skip`), 운동 점수가 없어 `summary.exScore` 가 0, `baseline` 이 null 이며, 속도 전환 구간도 없다. `samples` 의 `rpm` 은 0, `target` 은 null (페달 원시 입력 `capd` · `workout` · `keys` 는 그대로 남는다). 이 필드가 없는 예전 기록은 모두 `dual` |
 | `mode` | `test` (테스트 화면) \| `demo` (스테이션 흐름: 운영 버전, 그리고 예전 프로토타입 시연 모드(`index.html?demo`, 지금은 없음)) |
-| `station`, `participant` | 운영 버전(스테이션 흐름)의 스테이션 번호(문자열)와 참가 번호(`"3-017"`). 결과 화면이 열릴 때 붙으므로 중단된 판은 `participant` 가 없다. 테스트 화면은 없음 |
+| `participant` | 운영 버전(스테이션 흐름)의 참가 번호(`"017"`, 태블릿마다 이어 센다). 결과 화면이 열릴 때 붙으므로 중단된 판은 없다. 테스트 화면은 없음. 2026-11-24 전 로그에는 스테이션 번호 `station` 이 있고 참가 번호가 그 번호를 앞에 붙인 꼴(`"3-017"`)이다 |
 | `startedAt`, `endedAt` | ISO 시각 |
 | `durationMs` | 기록 길이 (실제 시간) |
 | `ended` | 끝난 방식. `complete`(시간이 다 됨) · `operator`(운영 메뉴에서 끝냄) · `idle`(자리 비움으로 끝남) · `user`(참가자가 그만하기로 도중에 마침, 결과 화면 없이 대기 화면으로) · `abandoned`(결과 없이 버림: 중단, 측정 중 자리 비움, 테스트 화면에서 메뉴로) |

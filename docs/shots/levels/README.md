@@ -211,3 +211,14 @@
 | 장면 | Lv1 | Lv4 | Lv8 |
 |---|---|---|---|
 | 문제 화면 | <img src="safe-lv1-1-question.png" width="260"> | <img src="safe-lv4-1-question.png" width="260"> | <img src="safe-lv8-1-question.png" width="260"> |
+
+## 그림 조각 기억하기 (`art`)
+
+추상화를 잠깐 본 뒤, 뒤집힌 칸 가운데 노란 칸에 있던 조각을 고른다.
+
+**Lv1 → Lv4 → Lv8**: 1×2 차분한 그림 · 보기 2 → 2×3 보통 그림 · 보기 3 (먼 칸) → 3×4 · 보기 4 (이웃 칸 + 무늬 하나를 바꾼 조각)
+
+| 장면 | Lv1 | Lv4 | Lv8 |
+|---|---|---|---|
+| 그림 보기 | <img src="art-lv1-1-show.png" width="260"> | <img src="art-lv4-1-show.png" width="260"> | <img src="art-lv8-1-show.png" width="260"> |
+| 문제 화면 | <img src="art-lv1-2-ask.png" width="260"> | <img src="art-lv4-2-ask.png" width="260"> | <img src="art-lv8-2-ask.png" width="260"> |

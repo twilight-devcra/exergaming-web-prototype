@@ -107,7 +107,7 @@ body[data-theme="scenic"] {
 #cog :is(.nv-wrap, .tr-wrap, .cp-wrap, .pr-wrap, .seek-side, .seek-board, .pipe-svg,
          .sym-target, .sym-grid, .ar-eq, .ar-cands, .cnt-grid, .cnt-opts, .fit-board, .fit-cands,
          .bx-arena, .bx-opts, .cmp-board, .cmp-opts, .cv-opts, .cn-arena, .cn-legend, .cn-opts, .rc-show, .rc-slots, .rc-opts, .ch-rowbox, .ch-tray, .bl-board, .bl-opts,
-         .sf-key, .sf-pad) {
+         .sf-key, .sf-pad, .art-pic, .art-choices) {
   background: var(--panel);
   border-radius: 12px;
   box-shadow: var(--mat-shadow);
@@ -117,7 +117,7 @@ body[data-theme="scenic"] {
    보기가 아직 없을 때(상자 속 과일 세기는 상자를 다 연 뒤에 나온다)는 빈 바탕을 그리지 않는다.
    게임은 이 간격을 U.gapOf 로 읽어 판 크기를 맞춘다 (js/games/count.js 등) */
 #cog { --answer-gap: calc(2 * var(--mat-pad) + 20px); }
-#cog :is(.sym-wrap, .ar-wrap, .cnt-wrap, .fit-wrap, .bx-wrap, .cmp-wrap, .cn-wrap, .rc-wrap, .ch-wrap, .bl-wrap) { gap: var(--answer-gap); }
+#cog :is(.sym-wrap, .ar-wrap, .cnt-wrap, .fit-wrap, .bx-wrap, .cmp-wrap, .cn-wrap, .rc-wrap, .ch-wrap, .bl-wrap, .art-board) { gap: var(--answer-gap); }
 #cog .cn-side { gap: var(--answer-gap); }
 #cog .cv-center { gap: calc(var(--tk) * 0.3 + var(--answer-gap)); }
 #cog .cnt-opts { padding-bottom: 0; }

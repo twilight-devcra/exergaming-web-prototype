@@ -1653,6 +1653,53 @@ body.theme-dark :is(.sym svg, .seek-bead svg, .hcell > g) { filter: drop-shadow(
 .stacked .sf-pad .ar-cand.sf-num { width: calc(var(--u) * 58); height: calc(var(--u) * 60); font-size: calc(var(--u) * 30); }
 @media (prefers-reduced-motion: reduce) { .sf-win.cur::after { animation: none; } }
 
+/* 그림 조각 기억하기 (js/games/art.js): 그림(칸 --cols × --rows) | 보기. 칸 크기 --t, 보기 크기 --c 는 게임이 판 자리를 재어 정한다 (layout).
+   넓은 판: 그림 옆에 칸과 같은 크기의 보기 (2개까지 한 줄, 3~4개는 2×2). 좁고 긴 판(.stacked, 휴대폰): 그림 아래에 보기 한 줄.
+   그림과 칸 뒷면 색은 금고 문처럼 그림 안에 정해 둔다 (화면 스타일과 상관없이 같은 그림) */
+.art-board { --t: 100px; --c: 100px; display: flex; align-items: center; justify-content: center; gap: 48px; width: 100%; height: 100%; }
+.art-board.stacked { flex-direction: column; gap: 20px; }
+
+/* 그림: 칸을 빈틈없이 붙여 한 장으로. 뒤집힌 뒤에는 칸 사이가 살짝 벌어진다 */
+.art-pic { display: grid; grid-template-columns: repeat(var(--cols), var(--t)); grid-template-rows: repeat(var(--rows), var(--t));
+  flex: none; overflow: hidden; border-radius: 6px; background: #22304e; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+.art-tile { position: relative; perspective: 400px; }
+.art-tile > svg { display: block; width: 100%; height: 100%; }
+.art-board:not(.mode-study) .art-pic { gap: 3px; padding: 1.5px;
+  grid-template-columns: repeat(var(--cols), calc(var(--t) - 3px)); grid-template-rows: repeat(var(--rows), calc(var(--t) - 3px)); }
+
+/* 칸 뒷면: 남색 + 가운데 점. 물어보는 칸은 노랑 + ? (색만으로 가리지 않게) */
+.art-back { position: absolute; inset: 0; background: #34456b radial-gradient(circle, rgba(255, 255, 255, 0.16) 0 14%, transparent 15%);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.3); }
+.art-back.target { display: grid; place-items: center; background: #ffd23f; box-shadow: inset 0 0 0 4px #b8860b; }
+.art-back.target span { font: 900 calc(var(--t) * 0.48) / 1 Nunito, var(--font); color: #5a4000; }
+/* 답한 뒤 도로 뒤집힌 노란 칸: 맞으면 초록, 틀리면 노랑 테두리 */
+.art-tile.shown::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 4px #22a06b; }
+.art-tile.shown.wrong::after { box-shadow: inset 0 0 0 4px #ffd23f; }
+
+/* 뒤집기: 앞면 = 그림 조각, 뒷면 = 칸 뒷면. 대각선 번호 --d 마다 90ms 늦게 돈다 (art.js 의 FLIP_STEP · FLIP_MS 와 같은 값) */
+.art-flip { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 0.32s ease-in-out calc(var(--d) * 90ms); }
+.art-front, .art-flip > .art-back { position: absolute; inset: 0; backface-visibility: hidden; }
+.art-front { inset: -0.5px; } /* 이웃 칸과 반 픽셀씩 겹쳐, 잘라 그린 칸 사이에 가는 틈이 비치지 않게 */
+.art-front svg { display: block; width: 100%; height: 100%; }
+.art-flip > .art-back { transform: rotateY(180deg); }
+.flipped .art-flip { transform: rotateY(180deg); }
+
+/* 보기. 그림 보기 동안은 그 자리에 점선 칸 */
+.art-choices { display: grid; grid-template-columns: repeat(min(var(--k), 2), var(--c)); gap: 12px; flex: none; }
+.art-board.stacked .art-choices { grid-template-columns: repeat(var(--k), var(--c)); }
+.art-choice { position: relative; width: var(--c); height: var(--c); padding: 0; overflow: hidden; cursor: pointer;
+  border: 3px solid #fff; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22); }
+.art-choice svg { display: block; width: 100%; height: 100%; }
+.art-choice:active { transform: scale(0.96); }
+.art-choice.right { border-color: #22a06b; box-shadow: 0 0 0 4px #22a06b; }
+.art-choice.wrong { border-color: #d93f3f; box-shadow: 0 0 0 4px #d93f3f; }
+.art-choice.wrong svg { opacity: 0.55; }
+.art-mark { position: absolute; right: 4px; top: 4px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  font: 900 20px/1 Nunito, var(--font); font-style: normal; color: #fff; background: #22a06b; box-shadow: 0 0 0 2px #fff; }
+.wrong > .art-mark { background: #d93f3f; }
+.art-slot { box-sizing: border-box; width: var(--c); height: var(--c); border: 3px dashed rgba(52, 69, 107, 0.28); border-radius: 10px; }
+@media (prefers-reduced-motion: reduce) { .art-flip { transition-duration: 0.01s; } }
+
 /* ---------- 측정 화면 ---------- */
 #calib {
   align-items: center;

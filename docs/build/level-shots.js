@@ -23,7 +23,7 @@ const WIDTH = 1600;
 const HEIGHT = 1000;
 const SCALE = 1.6; // 2560 × 1600 (docs/shots 의 다른 레벨 사진과 같은 크기)
 const ESSENCE_LEVEL = 4;
-const ALL_GAMES = ['path', 'symbol', 'arith', 'count', 'fit', 'seek', 'cover', 'pipe', 'novel', 'track', 'follow', 'pair', 'box', 'compare', 'coin', 'recall', 'chain', 'blank', 'safe'];
+const ALL_GAMES = ['path', 'symbol', 'arith', 'count', 'fit', 'seek', 'cover', 'pipe', 'novel', 'track', 'follow', 'pair', 'box', 'compare', 'coin', 'recall', 'chain', 'blank', 'safe', 'art'];
 
 function serve() {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2' };
@@ -148,6 +148,11 @@ const HELPERS = `
     async novel(name) {
       await shotAfterPhase(name('1-show'), 'show', 700);
       await shotAfterPhase(name('2-find'), 'input', 500);
+    },
+    // 그림을 보여 주는 화면 · 칸이 뒤집힌 뒤 노란 칸과 보기
+    async art(name) {
+      await shotAfterPhase(name('1-show'), 'show', 700);
+      await shotAfterPhase(name('2-ask'), 'input', 500);
     },
     // ★ 이 뜬 공 · Lv8 은 움직이는 중(공끼리 겹쳐 지나간다) · Lv4 는 멈춘 뒤 고르는 화면
     async track(name, level) {

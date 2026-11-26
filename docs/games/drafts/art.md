@@ -2,11 +2,17 @@
 
 > Game-draft workflow ([README.md](README.md)). **Clickable sketch: [`play.html`](../../../tools/sketch/art/play.html)** · mockup: [`tools/sketch/art/`](../../../tools/sketch/art/index.html) · generated pictures: [`gallery.html`](../../../tools/sketch/art/gallery.html) · style comparison: [`styles.html`](../../../tools/sketch/art/styles.html) (`node server.js` → http://localhost:5173/tools/sketch/art/).
 
-**Status:** card · mockup · **sketch** (round 4) · approved · built
+**Status:** card · mockup · sketch (round 4) · approved · **built** (2026-11-26: [`js/games/art.js`](../../../js/games/art.js), pictures in [`js/games/art-picture.js`](../../../js/games/art-picture.js), checked by `node tools/art-check.js`)
 **Gap it fills:** honestly, mostly **즉시 기억 (시각·위치)**, which is already over-represented (4 games). What's new is **연합 기억** (△, priority medium): "what was where" is an object-location pairing. Option D below would reach **지연 회상** (☐, priority high), but that needs session-level support.
 **Tags / clashes:** `Tag.MEMORY`, shared with path, symbol, cover, novel, box and recall. That makes 7 memory games out of 20, so rerun the order check (200 rounds, no adjacent similar games) when it's built.
 
 ## Review log
+- **Sketch → built:** sketch round 4 approved and added to the app as `art` (v1.7.0).
+  - The sketch's game class and board became `js/games/art.js`. Layout now follows the board's shape (wide → choices beside the picture, narrow → one row below) through a `ResizeObserver` instead of a media query, and tiles grow up to 200 px on wide boards (150 in the sketch).
+  - The generator moved to `js/games/art-picture.js`; the sketch's `generate.js` now re-exports it, so the gallery shows exactly what the app generates. Variable names were spelled out for the repo's lint rule; output is byte-identical to the sketch (5,600 pictures and altered pieces compared).
+  - The session log keeps each question's picture as SVG (1–3 KB) plus the altered piece, so the admin replay draws what the player saw.
+  - Checks: `tools/art-check.js` (8,000 games, no bad picture or question, altered piece from the answer 40%); played through Lv1–8 on 1280×800, 390×844 and 360×640 with no overflow (smallest choice 66 px at 360×640).
+  - Game order: with 7 of 20 games tagged memory, one long order search left about 1% of neighbouring games similar. `planPass` now restarts with a fresh shuffle (12 × 1,500 steps): 0 in 12,000 simulated games.
 - **Sketch round 3 → 4:** Lv3 → Lv4 felt steep (calm 2×3 straight to normal 3×3). Lv4 is now a **normal 2×3** (same grid as Lv3, only the picture style steps up); 3×3 starts at Lv5.
 - **Sketch round 2 → 3:** the round-2 calm pictures "don't look much different from before". Replaced with a new calm composition: a few big shapes split across tile pairs, no accents (see Generator, item 7).
 - **Sketch round 1 → 2:** everything fine except **Lv3 felt harder than intended**. Pictures for Lv1–3 are now **calm** (see Generator). Lv4+ unchanged.

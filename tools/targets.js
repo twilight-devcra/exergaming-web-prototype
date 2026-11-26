@@ -116,6 +116,7 @@ const GAME_TARGETS = {
   chain: ['planning'],
   blank: ['fluency', '~naming', '~wm'],
   safe: ['speed', 'reasoning', '~calc', '~wm'],
+  art: ['stm', 'assoc', '~discrim'],
 };
 
 // 기획만 된 게임 (아직 js/games 에 없다)

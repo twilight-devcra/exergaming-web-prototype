@@ -264,6 +264,15 @@
 
 `correct` 는 모든 자리를 맞혔을 때만 true. 제한 시간의 `load` 는 암호 자릿수 + 3 × 단서 줄 수입니다.
 
+**`art` 그림 조각 기억하기** — 게임 하나에 그림 하나, 문제 둘 (2026-11-26 부터)
+
+| 이벤트 | 필드 |
+|---|---|
+| `question` | `grid`: `[가로 칸, 세로 칸]` · `nth`: 이 그림의 몇 번째 문제 (1, 2) · `target`: 물은 칸 (왼쪽 위부터 줄 차례, 0부터) · `choices`: 보기 차례대로, 칸 번호 또는 `'5*'` (5번 칸의 작은 무늬 하나를 모양이 다른 짝으로 바꾼 조각, Lv6·Lv8) · `seed`: 그림 씨앗 · `calm`: 차분한 그림인가 (Lv1~3) · `picture`: 그림 전체 svg (100 단위 칸, 다시 그리기용, 1~3KB) · `alteredSvg`: 바꾼 조각이 보기에 있으면 그 칸의 svg |
+| `answer` | `choice`: 고른 보기 (`choices` 의 값 그대로), 시간 초과면 null · `altered`: 바꾼 조각을 골랐는가 |
+
+`correct` 는 바꾸지 않은 정답 칸을 골랐을 때만 true. 제한 시간의 `load` 는 보기 수이고, 칸이 다 뒤집힌 뒤부터 잰다. 그림은 씨앗만으로도 `makePicture(가로, 세로, seed, { calm })` (`js/games/art-picture.js`) 로 다시 만들 수 있지만, 생성기가 바뀌어도 그때 본 그림을 보이도록 svg 를 함께 남긴다.
+
 ## `keys`
 
 `[t, code]` — 모든 keydown 의 `KeyboardEvent.code` (`KeyA`, `KeyD`, `Escape` ...). 눌린 채 반복되는 입력은 뺍니다.

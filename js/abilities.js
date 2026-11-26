@@ -47,6 +47,7 @@ export const DOMAIN_GAMES = {
   chain: { executive: 1, spatial: 1 },      // 조각 잇기
   blank: { language: 1 },                   // 같은 글자 넣기
   safe: { calc: 1, executive: 0.5, attention: 0.5 }, // 금고 열기
+  art: { memory: 1, spatial: 0.5 },         // 그림 조각 기억하기
 };
 
 export const Abilities = {

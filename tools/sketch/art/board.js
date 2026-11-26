@@ -23,7 +23,7 @@ const element = (tag, cls, html = '') => {
 
 // 그림 svg. tile = 칸 번호 (없으면 그림 전체), alter = 그 칸에서 바꿔 그릴지
 export function pictureSvg(picKey, tile = null, alter = false) {
-  const pic = PICTURES[picKey];
+  const pic = typeof picKey === 'string' ? PICTURES[picKey] : picKey; // 손 그림 이름 또는 generate.js 가 만든 그림
   const p = `art${uid++}-`;
   const box = tile == null ? `0 0 ${pic.cols * 100} ${pic.rows * 100}` : `${(tile % pic.cols) * 100} ${Math.floor(tile / pic.cols) * 100} 100 100`;
   // 바꾼 조각: 그 칸 안에 있는 부분 가운데 alt 가 있는 것을 바꾼다 (손 그림이라 칸마다 하나뿐)
@@ -36,7 +36,7 @@ export const choiceOf = (choice) => ({ tile: parseInt(choice, 10), alter: String
 const back = (target) => `<div class="art-back${target ? ' target' : ''}">${target ? '<span>?</span>' : ''}</div>`;
 
 export function drawBoard(body, state) {
-  const pic = PICTURES[state.pic];
+  const pic = typeof state.pic === 'string' ? PICTURES[state.pic] : state.pic;
   const { cols, rows } = pic;
   const layout = state.layout || 'big';
   const wrap = element('div', `art-board layout-${layout} mode-${state.mode}`);

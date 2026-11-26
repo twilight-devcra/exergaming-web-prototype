@@ -13,7 +13,7 @@
 </head>
 <body data-theme="scenic">
 <script type="module">
-// 그림 조각 기억하기 목업 (2단계, 1회차). 설계 카드: docs/games/drafts/art.md. 화풍 비교(1단계 덤)는 styles.html.
+// 그림 조각 기억하기 목업 (2단계, 2회차: 배치 B 로 정함, 한 판에 문제 2개). 설계 카드: docs/games/drafts/art.md. 화풍 비교(1단계 덤)는 styles.html.
 // 판은 board.js, 그림은 pictures.js (손 그림, A+C 화풍). 태블릿 배치 두 가지(big · same)와 휴대폰 배치 하나.
 import { Sketch, Diagram } from '../sketch.js';
 import { drawBoard, pictureSvg, staticTimer } from './board.js';
@@ -28,7 +28,7 @@ const shot = (id, caption, state, timer = null) => ({
   id, caption,
   render(stage) {
     const [msg, kind] = MSG[state.mode];
-    const { body, message } = Sketch.frame(stage, `${TITLE} · Lv.${state.level}`, msg, kind, 3);
+    const { body, message } = Sketch.frame(stage, `${TITLE} · Lv.${state.level}`, msg, kind, 2);
     if (timer != null) staticTimer(message, timer);
     drawBoard(body, state);
   },
@@ -72,11 +72,11 @@ const diagram = () => {
 const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음)', render: (stage) => Sketch.intro(stage, { name: TITLE, level: 1, steps: diagram(), hint: HINT }) });
 
 Sketch.page({
-  title: '그림 조각 기억하기 (art) · 목업 1회차',
-  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 화풍 비교: <a href="styles.html">styles.html</a>. 그림은 모두 A+C 화풍으로 손으로 그렸다.</p>`,
+  title: '그림 조각 기억하기 (art) · 목업 2회차',
+  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 화풍 비교: <a href="styles.html">styles.html</a> · 만든 그림 모음: <a href="gallery.html">gallery.html</a>. 이 화면의 그림은 손으로 그렸다.</p>`,
   groups: [
-    { title: '태블릿 — 배치 A: 그림 옆에 큰 보기 한 줄 (132px)', shots: [...variants('big', 'a'), introShot('intro')] },
-    { title: '태블릿 — 배치 B: 보기를 칸과 같은 크기로, 2줄', shots: variants('same', 'b').filter((one) => !/-(lv1|lv3-flip)$/.test(one.id)) },
+    { title: '태블릿 — 배치 B (고름): 보기를 칸과 같은 크기로, 2줄', shots: [...variants('same', 'b'), introShot('intro')] },
+    { title: '태블릿 — 배치 A (지난 안): 그림 옆에 큰 보기 한 줄', shots: variants('big', 'a').filter((one) => /-(lv3-ask|lv8-ask)$/.test(one.id)) },
     { title: '휴대폰 390×844', device: 'phone', shots: [...variants('phone', 'p'), introShot('p-intro')] },
     { title: '작은 휴대폰 360×640', device: 'phone-small', shots: variants('phone', 's').filter((one) => /-(lv3-ask|lv8|lv8-ask)$/.test(one.id)) },
   ],

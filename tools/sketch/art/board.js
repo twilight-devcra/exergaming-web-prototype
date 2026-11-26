@@ -56,6 +56,30 @@ export const STYLES = {
       ${[22, 42, 62, 82].map((x) => `<circle cx="${x}" cy="280" r="6" fill="${C.black}"/>`).join('')}
       <circle cx="268" cy="276" r="10" fill="none" stroke="${C.red}" stroke-width="4"/>`,
   },
+  // A+C. 섞음 — C 의 색종이 바탕 위에 A 의 원·선·체크·지그재그. 바탕색에 묻히지 않게 A 의 색을 바꿨다
+  //   (파란 바탕 위 동심원은 노랑·빨강·흰색, 분홍 위 세모는 검정, 반원은 빨강, 고리는 흰색)
+  mix: {
+    name: 'A+C · 섞음 (색종이 위 원과 선)',
+    svg: (p) => `${defs(p)}
+      <rect width="300" height="300" fill="${C.white}"/>
+      <polygon points="0,0 158,0 150,172 0,164" fill="${C.blue}"/>
+      <polygon points="166,0 300,0 300,138 160,128" fill="${C.pink}"/>
+      <polygon points="0,172 148,180 136,300 0,300" fill="${C.yellow}"/>
+      <polygon points="156,136 300,146 300,300 144,300" fill="${C.teal}"/>
+      <circle cx="72" cy="82" r="56" fill="${C.yellow}"/>
+      <circle cx="78" cy="76" r="34" fill="${C.red}"/>
+      <circle cx="82" cy="72" r="13" fill="${C.white}"/>
+      <polygon points="214,16 292,28 250,104" fill="${C.black}"/>
+      <path d="M96 300 A46 46 0 0 1 188 300 Z" fill="${C.red}"/>
+      <g transform="rotate(14 232 228)"><rect x="196" y="192" width="72" height="72" fill="url(#${p}checker)" stroke="${C.black}" stroke-width="3"/></g>
+      <line x1="0" y1="262" x2="300" y2="44" stroke="${C.black}" stroke-width="3"/>
+      <path d="M16 240 Q66 164 136 186" fill="none" stroke="${C.black}" stroke-width="9" stroke-linecap="round"/>
+      <polyline points="196,156 214,136 232,156 250,136 268,156 286,136" fill="none" stroke="${C.black}" stroke-width="6" stroke-linejoin="round"/>
+      <circle cx="154" cy="132" r="13" fill="${C.white}" stroke="${C.black}" stroke-width="3"/>
+      ${[22, 42, 62, 82].map((x) => `<circle cx="${x}" cy="280" r="6" fill="${C.black}"/>`).join('')}
+      <circle cx="270" cy="278" r="10" fill="none" stroke="${C.white}" stroke-width="5"/>
+      <circle cx="180" cy="52" r="9" fill="${C.white}"/>`,
+  },
   // B. 포스터 — 넓은 색면, 반원, 줄무늬 띠, 사분원 (바우하우스 풍)
   poster: {
     name: 'B · 포스터 (색면과 반원)',

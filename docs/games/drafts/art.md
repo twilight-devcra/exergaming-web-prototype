@@ -26,6 +26,7 @@ It isn't a grid of random shapes but **one composition**: big planes, a hero sha
 | | **B · 포스터** (flat colour planes, half-discs, striped band: Bauhaus-like) | bold and readable; tiles 1 and 4 both read "red disc + stripes" | low |
 | | **C · 종이 오리기** (paper panels, leaf, starburst, wave: Matisse cut-out-like) | the most attractive; panel colour helps place a tile, but tiles 1/4/5 are mostly panel seams | medium: organic paths |
 | | **D · 선과 별** (black calligraphic curve, outlined blobs, star, crescent, eye: Miró-like) | lots of empty cream ground; tiles 3 and 6 are sparse even after a fix | medium |
+| | **A+C · 섞음** (A's rings, checker, zigzag, dot row and lines on C's four paper panels; A's colours swapped where a panel would swallow them) | all 9 distinct, each piece carries 1–3 panel colours plus a motif; looks more like a picture than A | low: A's primitives + 4 panel polygons |
 
 **Recommendation: A's motifs on C's coloured ground panels.** A gives the most even spread of distinct tiles and its motifs can be named ("checker", "zigzag", "rings"), which helps older players encode them. C's panels make each tile's background a second cue, and the result looks more like a picture.
 

@@ -27,7 +27,7 @@ const shot = (id, caption, state, msg, kind) => ({
   },
 });
 // 물어보는 칸과 보기는 화풍마다 다르게 (같은 그림 안의 다른 칸이 오답)
-const ASK = { comp: [4, [4, 1, 5, 3]], poster: [7, [6, 7, 8, 4]], cutout: [0, [3, 1, 0, 4]], lines: [5, [2, 4, 8, 5]] };
+const ASK = { mix: [4, [4, 1, 5, 7]], comp: [4, [4, 1, 5, 3]], poster: [7, [6, 7, 8, 4]], cutout: [0, [3, 1, 0, 4]], lines: [5, [2, 4, 8, 5]] };
 
 const group = (style) => {
   const [target, choices] = ASK[style];
@@ -47,7 +47,8 @@ Sketch.page({
   title: '그림 조각 기억하기 (art) · 그림 미리 보기',
   notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 목업 전에 그림 화풍부터 고르려고 손으로 그린 4가지. 모두 3×3, 태블릿만.</p>
     <p>볼 것: 칸 하나만 떼어 봐도 어디인지 알 수 있는가 (검토용 화면) · 보기 4개가 서로 헷갈리지 않는가 · 어르신이 보기에 편한 그림인가.</p>`,
-  groups: Object.keys(STYLES).map(group),
+  // 섞음(A+C)을 맨 앞에
+  groups: ['mix', ...Object.keys(STYLES).filter((key) => key !== 'mix')].map(group),
 });
 </script>
 </body>

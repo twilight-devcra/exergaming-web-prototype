@@ -37,7 +37,7 @@ import { makePicture } from './generate.js';
 import { pictureSvg } from './board.js';
 
 // [가로 칸, 세로 칸, 제목, 차분한 그림(낮은 단계)]
-const GRIDS = [[2, 1, 'Lv1 · 1×2', true], [2, 2, 'Lv2 · 2×2', true], [3, 2, 'Lv3 · 2×3', true], [3, 2, 'Lv3 · 2×3 (지난 판: 차분하지 않음)', false], [3, 3, 'Lv4–6 · 3×3', false], [4, 3, 'Lv7–8 · 3×4', false]];
+const GRIDS = [[2, 1, 'Lv1 · 1×2', true], [2, 2, 'Lv2 · 2×2', true], [3, 2, 'Lv3 · 2×3', true], [3, 2, 'Lv3 · 2×3 (보통 그림, 비교용)', false], [3, 3, 'Lv4–6 · 3×3', false], [4, 3, 'Lv7–8 · 3×4', false]];
 const PER_ROW = 8;
 const params = new URLSearchParams(location.search);
 let base = Number(params.get('seed') || 1);

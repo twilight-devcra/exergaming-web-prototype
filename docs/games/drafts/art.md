@@ -2,11 +2,12 @@
 
 > Game-draft workflow ([README.md](README.md)). **Clickable sketch: [`play.html`](../../../tools/sketch/art/play.html)** · mockup: [`tools/sketch/art/`](../../../tools/sketch/art/index.html) · generated pictures: [`gallery.html`](../../../tools/sketch/art/gallery.html) · style comparison: [`styles.html`](../../../tools/sketch/art/styles.html) (`node server.js` → http://localhost:5173/tools/sketch/art/).
 
-**Status:** card · mockup · **sketch** (round 2) · approved · built
+**Status:** card · mockup · **sketch** (round 3) · approved · built
 **Gap it fills:** honestly, mostly **즉시 기억 (시각·위치)**, which is already over-represented (4 games). What's new is **연합 기억** (△, priority medium): "what was where" is an object-location pairing. Option D below would reach **지연 회상** (☐, priority high), but that needs session-level support.
 **Tags / clashes:** `Tag.MEMORY`, shared with path, symbol, cover, novel, box and recall. That makes 7 memory games out of 20, so rerun the order check (200 rounds, no adjacent similar games) when it's built.
 
 ## Review log
+- **Sketch round 2 → 3:** the round-2 calm pictures "don't look much different from before". Replaced with a new calm composition: a few big shapes split across tile pairs, no accents (see Generator, item 7).
 - **Sketch round 1 → 2:** everything fine except **Lv3 felt harder than intended**. Pictures for Lv1–3 are now **calm** (see Generator). Lv4+ unchanged.
 - **Mockup → sketch:** `play.html` runs the real game shape on freshly generated pictures. The playthrough exposed an altered-copy loophole, now fixed (see Distractor kinds).
 - **Mockup round 2 verdict:** the generated pictures (gallery) are accepted for now, 3×4 busyness included. Next: the clickable sketch.
@@ -43,7 +44,7 @@ It isn't a grid of random shapes but **one composition**: coloured paper panels,
 4. **Line (optional):** thin straight line, thick arc, S-curve, or none (20 %).
 5. **Accents:** one per tile, except that a tile mostly covered by a large shape usually gets none. They are drawn from a shuffled bag of 12 kinds (triangle, zigzag, checker, stripes, dot row, ring, dot, square, ✕, star, wave, half-moon), so no kind repeats within a picture. Each sits at least 8 units inside its tile. Its colour is picked to contrast with the panel beneath.
 6. **Check:** each tile gets a signature (large shapes covering it, its accent's kind, its main panel colour). If two signatures match, a tile has nothing on it, or a large shape grazes a tile, the picture is rebuilt from the next seed.
-7. **Calm pictures (Lv1–3):** 2 panels (1×2) or 3, no line across, only bold, easy-to-name accents (triangle, square, star, dot, ring, zigzag, checker, half-moon) drawn larger (58–70 units), and no accent on a tile a large shape covers by a quarter or more. The number of shapes per picture drops less than the clutter does: every tile must stay recognisable without relying on colour, so a 2×3 picture still needs about one shape per uncovered tile. What goes is everything extra: the line, extra seams, small fiddly shapes.
+7. **Calm pictures (Lv1–3, `calmAttempt`):** a different composition, not a thinned-out normal one. Two paper panels, no line, no small accents: adjacent tiles are paired up, and each pair gets one big bold shape (disc, rings, triangle, square, half-disc, arch, checker square, striped disc, star), centred on the edge between the two tiles. 1×2 → 1 shape, 2×2 → 2, 2×3 → 3. Every piece shows a large part of one shape, and pieces are told apart by the shape and by which part of it shows, not by colour. Lv1–3 have no altered copies, so no accents are needed. 500 seeds each at 1×2, 2×2 and 2×3: no failures. (A first attempt that only removed the line, extra seams and small fiddly shapes from the normal generator didn't look different enough and was dropped.)
 8. **Altered copy:** every accent has a sibling of a different shape (zigzag → bar, dot → square, ring → dot, triangle → square …) for the Lv6+ distractor. Only tiles with an accent can be asked with an altered copy.
 
 **Tested:** 500 seeds per grid size (1×2 to 3×4). No failures, at most 3 rebuilds, under 0.2 ms per picture. Palettes and large-shape kinds come out evenly. The gallery shows 8 per grid size, whole or pulled apart into pieces.
@@ -77,7 +78,7 @@ It isn't a grid of random shapes but **one composition**: coloured paper panels,
 | 1 | **1×2** calm, study 5 s, 2 choices (the other tile is the only distractor) | — (teaches the rule: "left or right piece?") |
 | 2 | 2×2 calm, study 4.5 s, 2 choices | 4 tiles |
 | 3 | **2×3** calm, study 4 s, 3 choices (any) | standard |
-| 4 | 3×3, study 4 s, 3 choices (far) | 9 tiles, full-detail pictures (line, 4–5 panels) |
+| 4 | 3×3, study 4 s, 3 choices (far) | 9 tiles, normal pictures (~6 shapes and accents, line, 5 panels vs Lv3's 3 shapes on 2 panels) |
 | 5 | 3×3, study 3.5 s, 4 choices (near) | choices share shapes across the seam |
 | 6 | 3×3, study 3.5 s, 4 choices, one **altered copy** of the target | details, not just "which part" |
 | 7 | **3×4**, study 4 s, 4 choices (near) | 12 tiles |
@@ -123,9 +124,10 @@ Sizes come from measuring the board (`fit` in `board.js`, a ResizeObserver like 
 - **Timer:** is 4.8 s at Lv3 enough to compare 3 pieces, and does the bar add pressure the memory task doesn't need?
 
 ## Open questions for review
-1. **Lv3 again:** is it right now with calm pictures? If not, the next levers are a longer show time (4 → 5 s) or far distractors at Lv3 (wrong answers from non-adjacent tiles, which differ more). If Lv3 → Lv4 now feels like a jump, Lv4 can be calm too.
-2. Playing the sketch: does each level feel right, especially the steps Lv1 → Lv3 (1×2 to 2×3) and Lv6 → Lv7 (3×3 to 3×4)?
-3. Show times (Lv3 4 s, Lv8 3.5 s) and question timer (Lv3 4.8 s): too short, too long?
-4. Faint tile grid lines during study, so players know where the cuts are? (Recommended: no, keep it one picture. The flip shows the grid.)
-5. Option D (delayed recall) as a later follow-up? (Recommended: park it.)
-6. Title: 그림 조각 기억하기, or something shorter like 그림 조각 찾기?
+1. **Lv3 again:** is it right now with the new calm pictures? Note a new kind of near-miss: the two halves of the same shape are complementary, so a Lv3 distractor can be the other half of the right shape ("which side was it?"). If Lv3 is still hard, take its wrong answers only from tiles of other shapes.
+2. **Lv3 → Lv4 is now a big step** (3 big shapes → ~6 shapes and accents, a line, 5 panels). A calm 3×3 is possible (the calm composition works at 3×3 with an odd tile out: 3 failures in 500 seeds, which would need fixing), or Lv4 could get a middle setting.
+3. Playing the sketch: does each level feel right, especially the steps Lv1 → Lv3 (1×2 to 2×3) and Lv6 → Lv7 (3×3 to 3×4)?
+4. Show times (Lv3 4 s, Lv8 3.5 s) and question timer (Lv3 4.8 s): too short, too long?
+5. Faint tile grid lines during study, so players know where the cuts are? (Recommended: no, keep it one picture. The flip shows the grid.)
+6. Option D (delayed recall) as a later follow-up? (Recommended: park it.)
+7. Title: 그림 조각 기억하기, or something shorter like 그림 조각 찾기?

@@ -141,8 +141,6 @@ const ACCENTS = {
   moon: (x, y, s, c, turn) => `<path d="M${f(x - s * 0.36)} ${y} A${f(s * 0.36)} ${f(s * 0.36)} 0 0 1 ${f(x + s * 0.36)} ${y} Z" fill="${c}" transform="rotate(${turn} ${x} ${y})"/>`,
 };
 const ACCENT_KINDS = ['tri', 'zigzag', 'checker', 'stripes', 'dots', 'ring', 'dot', 'square', 'cross', 'star', 'wave', 'moon'];
-// 차분한 그림(낮은 단계)은 굵고 이름 붙이기 쉬운 것만
-const CALM_KINDS = ['tri', 'square', 'star', 'dot', 'ring', 'zigzag', 'checker', 'moon'];
 const SIBLING = { tri: 'square', zigzag: 'bar', checker: 'stripes', stripes: 'checker', dots: 'bar', ring: 'dot', dot: 'square', square: 'dot', cross: 'ring', star: 'dot', wave: 'bar', moon: 'tri' };
 
 // 큰 모양: 여러 칸에 걸친다
@@ -212,14 +210,14 @@ function crossLine(r, W, H) {
 
 const overlap = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
 
-function attempt(cols, rows, seed, calm) {
+function attempt(cols, rows, seed) {
   const r = rng(seed);
   const W = cols * 100;
   const H = rows * 100;
   const tiles = cols * rows;
   const paletteName = pick(r, Object.keys(PALETTES));
   const colors = shuffle(r, PALETTES[paletteName]);
-  const { list, seams } = panels(r, W, H, calm ? (tiles <= 2 ? 2 : 3) : Math.min(5, Math.max(2, Math.round(tiles / 2.2) + 1)));
+  const { list, seams } = panels(r, W, H, Math.min(5, Math.max(2, Math.round(tiles / 2.2) + 1)));
   const panelColor = list.map((_, i) => colors[i % colors.length]);
   const groundAt = (x, y) => {
     const i = list.findIndex((poly) => inside([x, y], poly));
@@ -242,19 +240,18 @@ function attempt(cols, rows, seed, calm) {
     }
     return h;
   });
-  const line = calm ? '' : crossLine(r, W, H);
+  const line = crossLine(r, W, H);
 
-  // 칸마다 작은 무늬 (큰 모양이 칸의 35% 넘게 덮으면 대개 건너뛴다. 차분한 그림은 늘 건너뛴다)
+  // 칸마다 작은 무늬 (큰 모양이 칸의 35% 넘게 덮으면 대개 건너뛴다)
   const bag = [];
   const accents = [];
   for (const t of shuffle(r, [...Array(tiles).keys()])) {
     const box = tileBox(t);
-    // 큰 모양이 덮은 칸: 보통은 35% 넘게, 차분한 그림은 25% 넘게 덮으면 그 부분만으로 알아볼 수 있다
-    const covered = heroes.some((h) => overlap(h.box, box) > (calm ? 2500 : 3500));
-    if (covered && (calm || r() < 0.8)) continue;
-    if (!bag.length) bag.push(...shuffle(r, calm ? CALM_KINDS : ACCENT_KINDS));
+    const covered = heroes.some((h) => overlap(h.box, box) > 3500);
+    if (covered && r() < 0.8) continue;
+    if (!bag.length) bag.push(...shuffle(r, ACCENT_KINDS));
     const kind = bag.pop();
-    const s = calm ? between(r, 58, 70) : between(r, 48, 64);
+    const s = between(r, 48, 64);
     for (let tries = 0; tries < 25; tries++) {
       const margin = s / 2 + 8;
       const x = between(r, box[0] + margin, box[2] - margin);
@@ -291,12 +288,104 @@ function attempt(cols, rows, seed, calm) {
   return { ok, cols, rows, seed, palette: paletteName, heroes: heroKinds, accents, parts };
 }
 
+// ---------- 차분한 그림 (낮은 단계) ----------
+// 작은 무늬 없이 굵은 큰 모양 몇 개만. 모양마다 이웃한 두 칸의 경계에 가운데를 두어 두 칸에 반씩 걸친다.
+// 그래서 조각마다 큰 모양 하나의 큰 부분(세모의 왼쪽, 원의 아래쪽 …)이 보이고, 조각끼리는 모양과 '어느 쪽이 보이나'로 갈린다 (색이 아니라).
+// 칸을 빠짐없이 덮도록 이웃한 칸끼리 짝을 지어(맞짝) 짝마다 모양 하나: 1×2 → 1개, 2×2 → 2개, 2×3 → 3개. 종이는 2장, 선 없음.
+// 낮은 단계에는 바꾼 조각이 없으므로 작은 무늬가 필요 없다 (accents 는 빈 목록).
+const CALM_SHAPES = {
+  disc: (x, y, R, c) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(R)}" fill="${c}"/>`,
+  rings: (x, y, R, c, turn, p, c2) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(R)}" fill="${c}"/><circle cx="${f(x)}" cy="${f(y)}" r="${f(R * 0.58)}" fill="${c2}"/><circle cx="${f(x)}" cy="${f(y)}" r="${f(R * 0.22)}" fill="${c}"/>`,
+  tri: (x, y, R, c, turn) => `<polygon points="${[0, 120, 240].map((d) => { const a = ((d + turn) * Math.PI) / 180; return `${f(x + Math.sin(a) * R * 1.2)},${f(y - Math.cos(a) * R * 1.2)}`; }).join(' ')}" fill="${c}"/>`,
+  square: (x, y, R, c, turn) => `<rect x="${f(x - R * 0.8)}" y="${f(y - R * 0.8)}" width="${f(R * 1.6)}" height="${f(R * 1.6)}" fill="${c}" transform="rotate(${turn % 90} ${f(x)} ${f(y)})"/>`,
+  half: (x, y, R, c, turn) => `<path d="M${f(x - R * 1.1)} ${f(y + R * 0.3)} A${f(R * 1.1)} ${f(R * 1.1)} 0 0 1 ${f(x + R * 1.1)} ${f(y + R * 0.3)} Z" fill="${c}" transform="rotate(${turn} ${f(x)} ${f(y)})"/>`,
+  arch: (x, y, R, c, turn) => `<path d="M${f(x - R * 0.85)} ${f(y + R * 0.4)} A${f(R * 0.85)} ${f(R * 0.85)} 0 0 1 ${f(x + R * 0.85)} ${f(y + R * 0.4)}" fill="none" stroke="${c}" stroke-width="${f(R * 0.4)}" transform="rotate(${turn} ${f(x)} ${f(y)})"/>`,
+  checker: (x, y, R, c, turn, p) => `<rect x="${f(x - R * 0.75)}" y="${f(y - R * 0.75)}" width="${f(R * 1.5)}" height="${f(R * 1.5)}" fill="url(#${p}checker)" stroke="${INK.black}" stroke-width="4" transform="rotate(${turn % 30} ${f(x)} ${f(y)})"/>`,
+  stripes: (x, y, R, c, turn, p) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(R)}" fill="url(#${p}stripes)" stroke="${INK.blue}" stroke-width="4"/>`,
+  star: (x, y, R, c, turn) => `<polygon points="${Array.from({ length: 10 }, (_, i) => { const a = ((-90 + turn % 72 + i * 36) * Math.PI) / 180; const rad = (i % 2 ? 0.5 : 1.2) * R; return `${f(x + Math.cos(a) * rad)},${f(y + Math.sin(a) * rad)}`; }).join(' ')}" fill="${c}"/>`,
+};
+
+function calmAttempt(cols, rows, seed) {
+  const r = rng(seed);
+  const W = cols * 100;
+  const H = rows * 100;
+  const tiles = cols * rows;
+  const paletteName = pick(r, Object.keys(PALETTES));
+  const colors = shuffle(r, PALETTES[paletteName]);
+  const { list, seams } = panels(r, W, H, 2);
+  const panelColor = list.map((_, i) => colors[i]);
+  const groundAt = (x, y) => {
+    const i = list.findIndex((poly) => inside([x, y], poly));
+    return i < 0 ? PAPER : panelColor[i];
+  };
+  const tileBox = (t) => [(t % cols) * 100, Math.floor(t / cols) * 100, (t % cols) * 100 + 100, Math.floor(t / cols) * 100 + 100];
+
+  // 이웃한 칸끼리 짝짓기 (모든 칸이 한 번씩). 칸 수가 홀수면 남는 칸 하나는 제 칸 안에 모양을 둔다
+  const left = new Set([...Array(tiles).keys()]);
+  const pairs = [];
+  for (const t of shuffle(r, [...left])) {
+    if (!left.has(t)) continue;
+    left.delete(t);
+    const neighbours = shuffle(r, [t - cols, t + cols, t % cols ? t - 1 : -1, (t + 1) % cols ? t + 1 : -1].filter((n) => left.has(n)));
+    if (neighbours.length) {
+      left.delete(neighbours[0]);
+      pairs.push([t, neighbours[0]]);
+    } else pairs.push([t]);
+  }
+
+  const kinds = shuffle(r, Object.keys(CALM_SHAPES));
+  const shapes = pairs.map((pair, i) => {
+    const kind = kinds[i];
+    const R = between(r, 34, 42);
+    const [a, b] = pair.map(tileBox);
+    let x;
+    let y;
+    if (!b) [x, y] = [a[0] + 50, a[1] + 50];
+    else if (a[1] === b[1]) [x, y] = [Math.max(a[0], b[0]) + between(r, -14, 14), a[1] + 50 + between(r, -14, 14)]; // 좌우 경계
+    else [x, y] = [a[0] + 50 + between(r, -14, 14), Math.max(a[1], b[1]) + between(r, -14, 14)]; // 위아래 경계
+    const ground = groundAt(x, y);
+    const c = inkOn(r, ground, [], 2);
+    const c2 = inkOn(r, c, [], 1.8);
+    const turn = Math.round(between(r, 0, 360));
+    const reach = R * 1.2;
+    return { kind, pair, x, y, R, box: [x - reach, y - reach, x + reach, y + reach], svg: CALM_SHAPES[kind](x, y, R, c, turn, '__P__', c2) };
+  });
+
+  // 칸 표: 걸친 모양 + 모양의 가운데가 칸의 어느 쪽에 있나 + 바탕 종이 색. 모양이 칸을 조금만 스치면 실패
+  let grazes = false;
+  const signatures = [...Array(tiles).keys()].map((t) => {
+    const box = tileBox(t);
+    const parts = [];
+    for (const shape of shapes) {
+      const w = Math.min(shape.box[2], box[2]) - Math.max(shape.box[0], box[0]);
+      const d = Math.min(shape.box[3], box[3]) - Math.max(shape.box[1], box[1]);
+      if (w <= 0 || d <= 0) continue;
+      if (Math.min(w, d) < 18) grazes = true;
+      const side = (shape.x < box[0] + 35 ? 'L' : shape.x > box[0] + 65 ? 'R' : 'C') + (shape.y < box[1] + 35 ? 'U' : shape.y > box[1] + 65 ? 'D' : 'C');
+      parts.push(`${shape.kind}:${side}`);
+    }
+    const features = parts.length;
+    parts.push(groundAt(box[0] + 50, box[1] + 50));
+    return { key: parts.sort().join('|'), features };
+  });
+  const ok = !grazes && new Set(signatures.map((one) => one.key)).size === tiles && signatures.every((one) => one.features > 0);
+
+  const parts = (p) => [
+    ['defs', `<defs><pattern id="${p}checker" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="20" height="20" fill="${INK.white}"/><rect width="10" height="10" fill="${INK.black}"/><rect x="10" y="10" width="10" height="10" fill="${INK.black}"/></pattern><pattern id="${p}stripes" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="${INK.white}"/><rect width="12" height="6" fill="${INK.blue}"/></pattern></defs>`],
+    ...list.map((poly, i) => [`panel${i}`, `<polygon points="${poly.map(([x, y]) => `${f(x)},${f(y)}`).join(' ')}" fill="${panelColor[i]}"/>`]),
+    ...seams.map((cut, i) => [`seam${i}`, `<line x1="${f(cut[0][0])}" y1="${f(cut[0][1])}" x2="${f(cut[1][0])}" y2="${f(cut[1][1])}" stroke="${PAPER}" stroke-width="7"/>`]),
+    ...shapes.map((shape, i) => [`shape${i}`, shape.svg.replaceAll('__P__', p)]),
+  ];
+  return { ok, cols, rows, seed, palette: paletteName, heroes: shapes.map((shape) => shape.kind), accents: [], parts };
+}
+
+// calm = 차분한 그림 (낮은 단계, calmAttempt). 그 밖에는 attempt
 // 칸이 저마다 다른 그림이 나올 때까지 씨앗을 바꿔 가며 만든다
-// calm = 차분한 그림 (낮은 단계): 종이 2~3장, 가로지르는 선 없음, 큰 모양이 덮은 칸에는 작은 무늬를 두지 않고, 작은 무늬는 크고 굵은 것만
 export function makePicture(cols, rows, seed, { calm = false } = {}) {
+  const build = calm ? calmAttempt : attempt;
   for (let i = 0; i < 50; i++) {
-    const pic = attempt(cols, rows, seed * 7919 + i, calm);
+    const pic = build(cols, rows, seed * 7919 + i);
     if (pic.ok) return { ...pic, seed, attempts: i + 1 };
   }
-  return { ...attempt(cols, rows, seed * 7919, calm), seed, attempts: 50, failed: true };
+  return { ...build(cols, rows, seed * 7919), seed, attempts: 50, failed: true };
 }

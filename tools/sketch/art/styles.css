@@ -1,0 +1,26 @@
+/* 그림 조각 기억하기 — 그림 미리 보기 */
+.art-board { display: flex; align-items: center; justify-content: center; gap: 40px; height: 100%; width: 100%; }
+.art-pic { display: grid; grid-template-columns: repeat(var(--n), 1fr); grid-template-rows: repeat(var(--n), 1fr); height: min(300px, 100%); aspect-ratio: 1;
+  border-radius: 6px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.18); flex: none; }
+.art-tile { position: relative; width: 100%; height: 100%; }
+.art-tile > svg { display: block; width: 100%; height: 100%; }
+/* 칸을 떼어 늘어놓기 (검토용) */
+.art-pic.art-crops { gap: 8px; overflow: visible; box-shadow: none; height: min(316px, 100%); }
+.art-crops .art-tile { border-radius: 4px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+/* 칸 뒷면: 남색 바탕 + 마름모 무늬. 물어보는 칸은 노란 테두리 + ? */
+.art-back { position: absolute; inset: 0; background: #34456b;
+  background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 14%, transparent 15%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); }
+.mode-study .art-pic, .mode-flip .art-pic { gap: 0; }
+.mode-hidden .art-pic, .mode-flip .art-pic { background: #22304e; }
+.mode-hidden .art-pic { gap: 3px; }
+.art-back.target { background: #ffd23f; box-shadow: inset 0 0 0 4px #b8860b; display: grid; place-items: center; }
+.art-back.target span { font: 900 48px Nunito, sans-serif; color: #5a4000; }
+.art-half { position: absolute; inset: 0; transform: scaleX(.35); }
+/* 보기 */
+.art-choices { display: flex; gap: 18px; }
+.art-choice { width: 132px; height: 132px; padding: 0; border: 3px solid #fff; border-radius: 10px; overflow: hidden; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2); background: #fff; }
+.art-choice svg { display: block; width: 100%; height: 100%; }
+.art-choice.right { outline: 6px solid #22a06b; outline-offset: 2px; }
+.art-choice.wrong { outline: 6px solid #d93f3f; outline-offset: 2px; opacity: .6; }

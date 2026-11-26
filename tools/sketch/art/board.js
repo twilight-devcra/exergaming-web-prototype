@@ -1,202 +1,123 @@
-// 그림 조각 기억하기 (art) — 그림 미리 보기 (1단계 덤). 설계 카드: docs/games/drafts/art.md
-// 손으로 그린 추상화 4가지 화풍. 모두 300×300 단위로 그리고, 칸(타일)은 그 그림을 viewBox 로 잘라 보여 준다.
-// 줄무늬·물방울·체크 무늬는 userSpaceOnUse 라 잘라도 이웃 칸과 이어진다.
-//
+// 그림 조각 기억하기 (art) — 목업 판 그리기. 목업(index.html)과 눌러 보는 스케치가 같이 쓴다. 설계 카드: docs/games/drafts/art.md
 // drawBoard(body, state)
-//   state.style  — STYLES 의 키
-//   state.grid   — 한 줄 칸 수 (3 = 3×3)
-//   state.mode   — 'study' 그림 보기 · 'flip' 칸이 뒤집히는 중 · 'hidden' 다 뒤집힘 + 보기 · 'crops' 칸을 떼어 늘어놓기 (검토용)
-//   state.target — 물어보는 칸 번호 (왼쪽 위부터 0)
-//   state.choices — 보기 칸 번호들 (hidden)
-const SIZE = 300;
+//   pic      — PICTURES 의 키 (pictures.js)
+//   mode     — 'study' 그림 보기 · 'flip' 칸이 뒤집히는 중 · 'ask' 노란 칸 + 보기 · 'right' 맞힘 · 'wrong' 틀림 (정답 표시)
+//   front    — flip: 지금 반쯤 돌아간 대각선 번호 (왼쪽 위 = 0). 그보다 앞은 다 뒤집힘
+//   target   — 물어보는 칸 번호 (왼쪽 위부터 줄 순서, 0 부터)
+//   choices  — 보기: 칸 번호, 또는 '5*' (5번 칸에서 무늬 하나를 바꾼 조각)
+//   picked   — right / wrong: 누른 보기
+//   layout   — 'big' 태블릿: 그림 옆에 큰 보기 한 줄 · 'same' 태블릿: 칸과 같은 크기의 보기 2줄 · 'phone' 위에서 아래로
+// 크기는 판 자리를 재어 정한다 (진짜 게임은 ResizeObserver). 칸 --t, 보기 --c. 키우는 데 끝이 있다 (TILE_MAX)
+import { PICTURES, defs, C } from './pictures.js';
+
+const TILE_MAX = 150;
+const CHOICE_BIG = 132;
 let uid = 0;
 
-const C = {
-  cream: '#f3ead6', paper: '#efe6d2', red: '#d94b3d', blue: '#2c5aa0', yellow: '#f2b928',
-  black: '#1d1d1f', teal: '#2a9d8f', pink: '#e98a9b', orange: '#e8772e', sky: '#cfe0e8', white: '#fbf8f1',
+const element = (tag, cls, html = '') => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  node.innerHTML = html;
+  return node;
 };
 
-const defs = (p) => `<defs>
-  <pattern id="${p}checker" width="20" height="20" patternUnits="userSpaceOnUse">
-    <rect width="20" height="20" fill="${C.white}"/><rect width="10" height="10" fill="${C.black}"/><rect x="10" y="10" width="10" height="10" fill="${C.black}"/>
-  </pattern>
-  <pattern id="${p}stripes" width="12" height="12" patternUnits="userSpaceOnUse">
-    <rect width="12" height="12" fill="${C.white}"/><rect width="12" height="6" fill="${C.blue}"/>
-  </pattern>
-  <pattern id="${p}dots" width="14" height="14" patternUnits="userSpaceOnUse">
-    <rect width="14" height="14" fill="${C.teal}"/><circle cx="7" cy="7" r="3.2" fill="${C.white}"/>
-  </pattern>
-</defs>`;
-
-const star = (cx, cy, outer, inner, points) => Array.from({ length: points * 2 }, (_, i) => {
-  const angle = (-90 + (180 / points) * i) * Math.PI / 180;
-  const radius = i % 2 ? inner : outer;
-  return `${(cx + Math.cos(angle) * radius).toFixed(1)},${(cy + Math.sin(angle) * radius).toFixed(1)}`;
-}).join(' ');
-
-// 화풍마다 그림 하나. p = 이 svg 안의 id 머리말
-export const STYLES = {
-  // A. 구성 — 동심원, 가로지르는 가는 선, 체크 무늬 판, 호, 점 줄 (칸딘스키 풍)
-  comp: {
-    name: 'A · 구성 (원과 선)',
-    svg: (p) => `${defs(p)}
-      <rect width="300" height="300" fill="${C.cream}"/>
-      <polygon points="0,186 124,150 142,300 0,300" fill="${C.sky}"/>
-      <circle cx="80" cy="86" r="64" fill="${C.blue}"/>
-      <circle cx="90" cy="78" r="38" fill="${C.yellow}"/>
-      <circle cx="97" cy="74" r="15" fill="${C.red}"/>
-      <polygon points="214,16 292,28 250,104" fill="${C.red}"/>
-      <path d="M100 300 A50 50 0 0 1 200 300 Z" fill="${C.teal}"/>
-      <g transform="rotate(14 230 224)"><rect x="192" y="186" width="76" height="76" fill="url(#${p}checker)" stroke="${C.black}" stroke-width="3"/></g>
-      <line x1="0" y1="262" x2="300" y2="44" stroke="${C.black}" stroke-width="3"/>
-      <line x1="168" y1="0" x2="192" y2="300" stroke="${C.black}" stroke-width="2"/>
-      <path d="M16 238 Q70 150 142 178" fill="none" stroke="${C.black}" stroke-width="9" stroke-linecap="round"/>
-      <polyline points="200,154 218,134 236,154 254,134 272,154 290,134" fill="none" stroke="${C.orange}" stroke-width="6" stroke-linejoin="round"/>
-      <circle cx="150" cy="130" r="13" fill="${C.pink}" stroke="${C.black}" stroke-width="2"/>
-      ${[22, 42, 62, 82].map((x) => `<circle cx="${x}" cy="280" r="6" fill="${C.black}"/>`).join('')}
-      <circle cx="268" cy="276" r="10" fill="none" stroke="${C.red}" stroke-width="4"/>`,
-  },
-  // A+C. 섞음 — C 의 색종이 바탕 위에 A 의 원·선·체크·지그재그. 바탕색에 묻히지 않게 A 의 색을 바꿨다
-  //   (파란 바탕 위 동심원은 노랑·빨강·흰색, 분홍 위 세모는 검정, 반원은 빨강, 고리는 흰색)
-  mix: {
-    name: 'A+C · 섞음 (색종이 위 원과 선)',
-    svg: (p) => `${defs(p)}
-      <rect width="300" height="300" fill="${C.white}"/>
-      <polygon points="0,0 158,0 150,172 0,164" fill="${C.blue}"/>
-      <polygon points="166,0 300,0 300,138 160,128" fill="${C.pink}"/>
-      <polygon points="0,172 148,180 136,300 0,300" fill="${C.yellow}"/>
-      <polygon points="156,136 300,146 300,300 144,300" fill="${C.teal}"/>
-      <circle cx="72" cy="82" r="56" fill="${C.yellow}"/>
-      <circle cx="78" cy="76" r="34" fill="${C.red}"/>
-      <circle cx="82" cy="72" r="13" fill="${C.white}"/>
-      <polygon points="214,16 292,28 250,104" fill="${C.black}"/>
-      <path d="M96 300 A46 46 0 0 1 188 300 Z" fill="${C.red}"/>
-      <g transform="rotate(14 232 228)"><rect x="196" y="192" width="72" height="72" fill="url(#${p}checker)" stroke="${C.black}" stroke-width="3"/></g>
-      <line x1="0" y1="262" x2="300" y2="44" stroke="${C.black}" stroke-width="3"/>
-      <path d="M16 240 Q66 164 136 186" fill="none" stroke="${C.black}" stroke-width="9" stroke-linecap="round"/>
-      <polyline points="196,156 214,136 232,156 250,136 268,156 286,136" fill="none" stroke="${C.black}" stroke-width="6" stroke-linejoin="round"/>
-      <circle cx="154" cy="132" r="13" fill="${C.white}" stroke="${C.black}" stroke-width="3"/>
-      ${[22, 42, 62, 82].map((x) => `<circle cx="${x}" cy="280" r="6" fill="${C.black}"/>`).join('')}
-      <circle cx="270" cy="278" r="10" fill="none" stroke="${C.white}" stroke-width="5"/>
-      <circle cx="180" cy="52" r="9" fill="${C.white}"/>`,
-  },
-  // B. 포스터 — 넓은 색면, 반원, 줄무늬 띠, 사분원 (바우하우스 풍)
-  poster: {
-    name: 'B · 포스터 (색면과 반원)',
-    svg: (p) => `${defs(p)}
-      <rect width="300" height="300" fill="${C.paper}"/>
-      <polygon points="0,0 214,0 0,214" fill="${C.yellow}"/>
-      <path d="M300 0 L300 84 A84 84 0 0 1 216 0 Z" fill="${C.teal}"/>
-      <rect x="186" y="36" width="34" height="176" fill="url(#${p}stripes)" stroke="${C.blue}" stroke-width="3"/>
-      <circle cx="110" cy="96" r="46" fill="${C.red}"/>
-      <rect x="20" y="22" width="40" height="40" fill="${C.black}" transform="rotate(18 40 42)"/>
-      <polygon points="244,120 300,118 300,196" fill="${C.pink}"/>
-      <line x1="0" y1="212" x2="300" y2="212" stroke="${C.black}" stroke-width="5"/>
-      <path d="M50 300 A92 92 0 0 1 234 300 Z" fill="${C.black}"/>
-      <path d="M104 300 A38 38 0 0 1 180 300 Z" fill="${C.red}"/>
-      <rect x="246" y="232" width="54" height="68" fill="url(#${p}dots)"/>
-      <circle cx="30" cy="250" r="14" fill="none" stroke="${C.blue}" stroke-width="6"/>
-      <circle cx="150" cy="176" r="8" fill="${C.blue}"/>`,
-  },
-  // C. 종이 오리기 — 색종이 바탕 위 잎, 별, 물결 (마티스 풍)
-  cutout: {
-    name: 'C · 종이 오리기 (잎과 물결)',
-    svg: (p) => `${defs(p)}
-      <rect width="300" height="300" fill="${C.white}"/>
-      <polygon points="0,0 158,0 150,172 0,164" fill="${C.blue}"/>
-      <polygon points="166,0 300,0 300,138 160,128" fill="${C.pink}"/>
-      <polygon points="0,172 148,180 136,300 0,300" fill="${C.yellow}"/>
-      <polygon points="156,136 300,146 300,300 144,300" fill="${C.teal}"/>
-      <path d="M72 160 C62 130 32 120 24 96 C44 100 54 108 62 112 C44 86 28 70 34 40 C54 56 62 80 68 96 C66 70 70 40 86 14 C96 40 90 70 84 96 C94 76 106 60 130 54 C122 80 102 100 88 116 C102 110 116 110 132 118 C112 130 92 136 80 160 Z" fill="${C.white}"/>
-      <polygon points="${star(230, 62, 50, 20, 7)}" fill="${C.black}"/>
-      <path d="M8 252 C40 208 70 272 104 228 C136 188 164 252 196 214 L204 234 C168 274 138 212 106 252 C74 292 42 232 14 274 Z" fill="${C.white}"/>
-      <circle cx="240" cy="222" r="36" fill="${C.red}"/>
-      <path d="M262 270 A26 26 0 1 1 290 300 A20 20 0 1 0 262 270 Z" fill="${C.black}"/>
-      ${[[180, 160], [202, 176], [184, 190]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="${C.yellow}"/>`).join('')}
-      <path d="M40 196 l14 0 l-7 14 z M70 186 l14 0 l-7 14 z" fill="${C.red}"/>`,
-  },
-  // D. 선과 별 — 굵은 검은 곡선, 테두리 친 색 덩어리, 별, 초승달, 눈 (미로 풍)
-  lines: {
-    name: 'D · 선과 별 (곡선과 기호)',
-    svg: (p) => `${defs(p)}
-      <rect width="300" height="300" fill="${C.cream}"/>
-      <path d="M118 176 C150 160 176 196 160 224 C140 256 100 236 104 206 C106 190 110 182 118 176 Z" fill="${C.yellow}"/>
-      <path d="M8 206 C60 116 120 262 170 168 S260 54 292 122" fill="none" stroke="${C.black}" stroke-width="7" stroke-linecap="round"/>
-      <path d="M44 70 C44 26 136 26 136 70 C136 112 44 112 44 70 Z" fill="${C.red}" stroke="${C.black}" stroke-width="5"/>
-      <circle cx="90" cy="70" r="15" fill="${C.white}" stroke="${C.black}" stroke-width="4"/><circle cx="92" cy="72" r="6" fill="${C.black}"/>
-      <circle cx="240" cy="58" r="36" fill="${C.blue}"/><circle cx="256" cy="46" r="30" fill="${C.cream}"/>
-      <circle cx="270" cy="176" r="13" fill="${C.pink}" stroke="${C.black}" stroke-width="4"/>
-      <g stroke="${C.black}" stroke-width="5" stroke-linecap="round">
-        <line x1="204" y1="232" x2="260" y2="232"/><line x1="232" y1="204" x2="232" y2="260"/>
-        <line x1="212" y1="212" x2="252" y2="252"/><line x1="252" y1="212" x2="212" y2="252"/>
-      </g>
-      <circle cx="232" cy="232" r="8" fill="${C.yellow}" stroke="${C.black}" stroke-width="3"/>
-      <path d="M232 204 C226 180 244 172 236 150" fill="none" stroke="${C.black}" stroke-width="2.5"/>
-      <polygon points="150,96 176,140 124,140" fill="${C.teal}" stroke="${C.black}" stroke-width="3"/>
-      <circle cx="34" cy="262" r="12" fill="${C.black}"/>
-      <circle cx="184" cy="28" r="7" fill="${C.black}"/>
-      <path d="M60 300 C60 270 96 262 110 286 C118 300 140 296 140 300 Z" fill="${C.teal}" stroke="${C.black}" stroke-width="3"/>
-      <path d="M262 290 l10 -18 l10 18 z" fill="${C.red}"/>
-      <line x1="20" y1="140" x2="34" y2="156" stroke="${C.black}" stroke-width="3"/><line x1="34" y1="140" x2="20" y2="156" stroke="${C.black}" stroke-width="3"/>`,
-  },
-};
-
-// 칸 하나 (또는 전체 그림) 를 svg 로. tile = 칸 번호, 없으면 전체
-export function pictureSvg(style, grid = 3, tile = null) {
+// 그림 svg. tile = 칸 번호 (없으면 그림 전체), alter = 그 칸에서 바꿔 그릴지
+export function pictureSvg(picKey, tile = null, alter = false) {
+  const pic = PICTURES[picKey];
   const p = `art${uid++}-`;
-  const step = SIZE / grid;
-  const box = tile == null ? `0 0 ${SIZE} ${SIZE}` : `${(tile % grid) * step} ${Math.floor(tile / grid) * step} ${step} ${step}`;
-  return `<svg viewBox="${box}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${STYLES[style].svg(p)}</svg>`;
+  const box = tile == null ? `0 0 ${pic.cols * 100} ${pic.rows * 100}` : `${(tile % pic.cols) * 100} ${Math.floor(tile / pic.cols) * 100} 100 100`;
+  // 바꾼 조각: 그 칸 안에 있는 부분 가운데 alt 가 있는 것을 바꾼다 (손 그림이라 칸마다 하나뿐)
+  const body = pic.parts(p).map(([, svg, alt]) => (alter && alt ? alt : svg)).join('');
+  const paper = `<rect width="${pic.cols * 100}" height="${pic.rows * 100}" fill="${C.paper}"/>`; // 종이 사이 틈은 흰 종이
+  return `<svg viewBox="${box}" aria-hidden="true">${defs(p)}${paper}${body}</svg>`;
 }
+export const choiceOf = (choice) => ({ tile: parseInt(choice, 10), alter: String(choice).endsWith('*') });
 
-const back = (extra = '') => `<div class="art-back ${extra}">${extra.includes('target') ? '<span>?</span>' : ''}</div>`;
+const back = (target) => `<div class="art-back${target ? ' target' : ''}">${target ? '<span>?</span>' : ''}</div>`;
 
-function grid(state, tileContent) {
-  const wrap = document.createElement('div');
-  wrap.className = 'art-pic';
-  wrap.style.setProperty('--n', state.grid);
-  for (let i = 0; i < state.grid * state.grid; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'art-tile';
-    cell.innerHTML = tileContent(i);
-    wrap.append(cell);
+export function drawBoard(body, state) {
+  const pic = PICTURES[state.pic];
+  const { cols, rows } = pic;
+  const layout = state.layout || 'big';
+  const wrap = element('div', `art-board layout-${layout} mode-${state.mode}`);
+  const picture = element('div', 'art-pic');
+  picture.style.setProperty('--cols', cols);
+  picture.style.setProperty('--rows', rows);
+  const done = state.mode === 'right' || state.mode === 'wrong';
+  for (let i = 0; i < cols * rows; i++) {
+    const cell = element('div', 'art-tile');
+    const diagonal = (i % cols) + Math.floor(i / cols);
+    if (state.mode === 'study') cell.innerHTML = pictureSvg(state.pic, i);
+    else if (state.mode === 'flip') {
+      cell.innerHTML = diagonal < state.front ? back() : diagonal === state.front ? `<div class="art-half">${back()}</div>` : pictureSvg(state.pic, i);
+    } else if (done && i === state.target) {
+      cell.innerHTML = pictureSvg(state.pic, i); // 맞든 틀리든 노란 칸이 도로 뒤집혀 제 조각을 보여 준다
+      cell.classList.add('shown', state.mode);
+    } else cell.innerHTML = back(i === state.target);
+    picture.append(cell);
   }
+  wrap.append(picture);
+
+  if (state.mode !== 'study' && state.mode !== 'flip') {
+    const choices = element('div', 'art-choices');
+    choices.style.setProperty('--k', state.choices.length);
+    for (const choice of state.choices) {
+      const { tile, alter } = choiceOf(choice);
+      const button = element('button', 'art-choice', pictureSvg(state.pic, tile, alter));
+      const right = tile === state.target && !alter;
+      if (done && right) button.classList.add('right');
+      if (done && choice === state.picked && !right) button.classList.add('wrong');
+      if (button.classList.contains('right')) button.append(element('i', 'art-mark', '✓'));
+      if (button.classList.contains('wrong')) button.append(element('i', 'art-mark', '✕'));
+      choices.append(button);
+    }
+    wrap.append(choices);
+  } else {
+    // 그림 보기 동안 보기 자리에 점선 칸을 둔다: 보기가 나올 때 그림이 옮겨 다니지 않고, 어디에 나올지 미리 보인다
+    const slots = element('div', 'art-choices');
+    slots.style.setProperty('--k', state.choices.length);
+    for (let i = 0; i < state.choices.length; i++) slots.append(element('div', 'art-slot'));
+    wrap.append(slots);
+  }
+  body.append(wrap);
+  fit(body, wrap, pic, state);
   return wrap;
 }
 
-export function drawBoard(body, state) {
-  const n = state.grid;
-  const board = document.createElement('div');
-  board.className = `art-board mode-${state.mode}`;
-
-  if (state.mode === 'study') {
-    board.append(grid(state, (i) => pictureSvg(state.style, n, i)));
-  } else if (state.mode === 'flip') {
-    // 왼쪽 위부터 대각선 차례로 뒤집힌다: 대각선 번호 d 가 front 보다 작으면 다 뒤집힘, 같으면 반쯤
-    board.append(grid(state, (i) => {
-      const d = (i % n) + Math.floor(i / n);
-      if (d < state.front) return back();
-      if (d === state.front) return `<div class="art-half">${back()}</div>`;
-      return pictureSvg(state.style, n, i);
-    }));
-  } else if (state.mode === 'crops') {
-    board.append(grid(state, (i) => pictureSvg(state.style, n, i)));
-    const crops = grid(state, (i) => pictureSvg(state.style, n, i));
-    crops.classList.add('art-crops');
-    board.append(crops);
-  } else {
-    board.append(grid(state, (i) => back(i === state.target ? 'target' : '')));
-    const choices = document.createElement('div');
-    choices.className = 'art-choices';
-    for (const tile of state.choices) {
-      const button = document.createElement('button');
-      button.className = 'art-choice';
-      if (state.reveal != null && tile === state.target) button.classList.add('right');
-      if (state.reveal === tile && tile !== state.target) button.classList.add('wrong');
-      button.innerHTML = pictureSvg(state.style, n, tile);
-      choices.append(button);
+// 판 자리에 맞춰 칸(--t)과 보기(--c) 크기를 정한다
+function fit(body, wrap, pic, state) {
+  const k = state.choices?.length || 4;
+  const gap = 16;
+  const run = () => {
+    const W = body.clientWidth;
+    const H = body.clientHeight;
+    let t;
+    let c;
+    if (state.layout === 'phone') {
+      // 보기는 한 줄. 남은 높이를 그림이 쓴다
+      c = Math.min(110, Math.floor((W - (k - 1) * 12) / k));
+      t = Math.min(TILE_MAX, Math.floor(W / pic.cols), Math.floor((H - c - 20) / pic.rows));
+    } else if (state.layout === 'same') {
+      // 보기를 칸과 같은 크기로: 2개까지는 한 줄, 3~4개는 2줄
+      const perRow = k <= 2 ? k : 2;
+      const lines = Math.ceil(k / perRow);
+      t = Math.min(TILE_MAX, Math.floor(H / pic.rows), Math.floor((H - (lines - 1) * 12) / lines),
+        Math.floor((W - 48) / (pic.cols + perRow)));
+      c = t;
+    } else {
+      c = CHOICE_BIG;
+      t = Math.min(TILE_MAX, Math.floor(H / pic.rows), Math.floor((W - 48 - k * (c + gap)) / pic.cols));
     }
-    board.append(choices);
-  }
-  body.append(board);
+    wrap.style.setProperty('--t', `${t}px`);
+    wrap.style.setProperty('--c', `${c}px`);
+  };
+  body.artFit?.disconnect();
+  body.artFit = new ResizeObserver(run);
+  body.artFit.observe(body);
+  run();
+}
+
+// 안내 문구 안의 제한 시간 막대를 멈춘 모습으로 (목업용). left = 남은 비율
+export function staticTimer(message, left) {
+  message.append(element('div', `qtimer on${left < 0.4 ? ' warn' : ''}`, `<i style="transform: scaleX(${left})"></i>`));
 }

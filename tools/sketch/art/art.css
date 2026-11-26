@@ -1,26 +1,36 @@
-/* 그림 조각 기억하기 — 그림 미리 보기 */
-.art-board { display: flex; align-items: center; justify-content: center; gap: 40px; height: 100%; width: 100%; }
-.art-pic { display: grid; grid-template-columns: repeat(var(--n), 1fr); grid-template-rows: repeat(var(--n), 1fr); height: min(300px, 100%); aspect-ratio: 1;
-  border-radius: 6px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.18); flex: none; }
-.art-tile { position: relative; width: 100%; height: 100%; }
+/* 그림 조각 기억하기 — 목업. 칸 크기 --t, 보기 크기 --c 는 board.js 의 fit 이 판 자리를 재어 정한다 */
+.art-board { --t: 100px; --c: 132px; display: flex; align-items: center; justify-content: center; gap: 48px; width: 100%; height: 100%; }
+.art-board.layout-phone { flex-direction: column; gap: 20px; }
+
+/* 그림: 칸을 빈틈없이 붙여 한 장으로. 뒤집힌 뒤에는 칸 사이가 살짝 벌어진다 */
+.art-pic { display: grid; grid-template-columns: repeat(var(--cols), var(--t)); grid-template-rows: repeat(var(--rows), var(--t));
+  border-radius: 6px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.18); flex: none; background: #22304e; }
+.art-tile { position: relative; perspective: 400px; }
 .art-tile > svg { display: block; width: 100%; height: 100%; }
-/* 칸을 떼어 늘어놓기 (검토용) */
-.art-pic.art-crops { gap: 8px; overflow: visible; box-shadow: none; height: min(316px, 100%); }
-.art-crops .art-tile { border-radius: 4px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
-/* 칸 뒷면: 남색 바탕 + 마름모 무늬. 물어보는 칸은 노란 테두리 + ? */
+.mode-ask .art-pic, .mode-right .art-pic, .mode-wrong .art-pic { gap: 3px; padding: 1.5px; grid-template-columns: repeat(var(--cols), calc(var(--t) - 3px)); grid-template-rows: repeat(var(--rows), calc(var(--t) - 3px)); }
+
+/* 칸 뒷면: 남색 + 가운데 점. 물어보는 칸은 노랑 + ? (색만으로 가리지 않게) */
 .art-back { position: absolute; inset: 0; background: #34456b;
-  background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 14%, transparent 15%);
-  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); }
-.mode-study .art-pic, .mode-flip .art-pic { gap: 0; }
-.mode-hidden .art-pic, .mode-flip .art-pic { background: #22304e; }
-.mode-hidden .art-pic { gap: 3px; }
+  background-image: radial-gradient(circle, rgba(255,255,255,.16) 0 14%, transparent 15%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.3); }
 .art-back.target { background: #ffd23f; box-shadow: inset 0 0 0 4px #b8860b; display: grid; place-items: center; }
-.art-back.target span { font: 900 48px Nunito, sans-serif; color: #5a4000; }
+.art-back.target span { font: 900 calc(var(--t) * .48) Nunito, sans-serif; color: #5a4000; line-height: 1; }
 .art-half { position: absolute; inset: 0; transform: scaleX(.35); }
+/* 답한 뒤 도로 뒤집힌 노란 칸: 초록(맞음) / 빨강(틀림) 테두리 */
+.art-tile.shown::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 4px #22a06b; }
+.art-tile.shown.wrong::after { box-shadow: inset 0 0 0 4px #ffd23f; }
+
 /* 보기 */
-.art-choices { display: flex; gap: 18px; }
-.art-choice { width: 132px; height: 132px; padding: 0; border: 3px solid #fff; border-radius: 10px; overflow: hidden; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,.2); background: #fff; }
+.art-choices { display: flex; gap: 16px; flex: none; }
+.layout-same .art-choices { display: grid; grid-template-columns: repeat(min(var(--k), 2), var(--c)); gap: 12px; }
+.layout-phone .art-choices { gap: 12px; }
+.art-choice { position: relative; width: var(--c); height: var(--c); padding: 0; border: 3px solid #fff; border-radius: 10px; overflow: hidden;
+  cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.22); background: #fff; }
 .art-choice svg { display: block; width: 100%; height: 100%; }
-.art-choice.right { outline: 6px solid #22a06b; outline-offset: 2px; }
-.art-choice.wrong { outline: 6px solid #d93f3f; outline-offset: 2px; opacity: .6; }
+.art-choice.right { border-color: #22a06b; box-shadow: 0 0 0 4px #22a06b; }
+.art-choice.wrong { border-color: #d93f3f; box-shadow: 0 0 0 4px #d93f3f; }
+.art-choice.wrong svg { opacity: .55; }
+.art-mark { position: absolute; right: 4px; top: 4px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font: 900 20px/1 Nunito, sans-serif; font-style: normal; color: #fff; background: #22a06b; box-shadow: 0 0 0 2px #fff; }
+.wrong .art-mark { background: #d93f3f; }
+.art-slot { width: var(--c); height: var(--c); border: 3px dashed rgba(52,69,107,.28); border-radius: 10px; box-sizing: border-box; }

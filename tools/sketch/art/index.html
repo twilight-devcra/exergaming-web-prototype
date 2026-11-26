@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>그림 조각 기억하기 · 그림 미리 보기</title>
+  <title>그림 조각 기억하기 · 스케치</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
   <link rel="stylesheet" href="../../../css/style.css">
   <link rel="stylesheet" href="../../../css/themes.css">
@@ -13,42 +13,73 @@
 </head>
 <body data-theme="scenic">
 <script type="module">
-// 그림 조각 기억하기 — 그림 미리 보기 (1단계 덤, 목업 전). 설계 카드: docs/games/drafts/art.md
-// 화풍 4가지를 손으로 그렸다. 화풍마다: 그림 보기 · 칸을 떼어 늘어놓기 · 뒤집히는 중 · 다 뒤집힘 + 보기 4개 · 오답 표시.
-import { Sketch } from '../sketch.js';
-import { drawBoard, STYLES } from './board.js';
+// 그림 조각 기억하기 목업 (2단계, 1회차). 설계 카드: docs/games/drafts/art.md. 화풍 비교(1단계 덤)는 styles.html.
+// 판은 board.js, 그림은 pictures.js (손 그림, A+C 화풍). 태블릿 배치 두 가지(big · same)와 휴대폰 배치 하나.
+import { Sketch, Diagram } from '../sketch.js';
+import { drawBoard, pictureSvg, staticTimer } from './board.js';
 
 const TITLE = '그림 조각 기억하기';
-const shot = (id, caption, state, msg, kind) => ({
+const HINT = '그림을 잘 봐 두었다가<br>칸이 뒤집히면 노란 칸에 있던 조각을 고르세요';
+const MSG = {
+  study: ['그림을 잘 보세요', 'look'], flip: ['그림을 잘 보세요', 'look'],
+  ask: ['노란 칸에 있던 조각을 고르세요', 'act'], right: ['맞았어요!', 'good'], wrong: ['이 조각이었어요', 'bad'],
+};
+const shot = (id, caption, state, timer = null) => ({
   id, caption,
   render(stage) {
-    const { body } = Sketch.frame(stage, `${TITLE} · Lv.3`, msg, kind);
-    drawBoard(body, { grid: 3, ...state });
+    const [msg, kind] = MSG[state.mode];
+    const { body, message } = Sketch.frame(stage, `${TITLE} · Lv.${state.level}`, msg, kind, 3);
+    if (timer != null) staticTimer(message, timer);
+    drawBoard(body, state);
   },
 });
-// 물어보는 칸과 보기는 화풍마다 다르게 (같은 그림 안의 다른 칸이 오답)
-const ASK = { mix: [4, [4, 1, 5, 7]], comp: [4, [4, 1, 5, 3]], poster: [7, [6, 7, 8, 4]], cutout: [0, [3, 1, 0, 4]], lines: [5, [2, 4, 8, 5]] };
 
-const group = (style) => {
-  const [target, choices] = ASK[style];
-  return {
-    title: STYLES[style].name,
-    shots: [
-      shot(`${style}-study`, '그림 보기', { style, mode: 'study' }, '그림을 잘 보세요', 'look'),
-      shot(`${style}-crops`, '검토용: 칸 9개를 떼어 놓으면 저마다 알아볼 수 있나', { style, mode: 'crops' }, '', ''),
-      shot(`${style}-flip`, '칸이 왼쪽 위부터 차례로 뒤집힌다', { style, mode: 'flip', front: 2 }, '그림을 잘 보세요', 'look'),
-      shot(`${style}-ask`, '노란 칸에 있던 조각 고르기', { style, mode: 'hidden', target, choices }, '노란 칸에 있던 조각을 고르세요', 'act'),
-      shot(`${style}-wrong`, '틀리면 정답을 1초 보여 준다', { style, mode: 'hidden', target, choices, reveal: choices.find((one) => one !== target) }, '틀렸어요', 'bad'),
-    ],
-  };
+// 레벨마다 손으로 쓴 판 하나 (보기 차례는 섞어 둠). '5*' = 5번 칸에서 무늬 하나를 바꾼 조각
+const LV1 = { level: 1, pic: 'p12', target: 0, choices: [1, 0] };
+const LV2 = { level: 2, pic: 'p22', target: 3, choices: [3, 0] };
+const LV3 = { level: 3, pic: 'p23', target: 4, choices: [1, 4, 5] };
+const LV6 = { level: 6, pic: 'p33', target: 5, choices: ['5*', 2, 5, 8] };
+const LV8 = { level: 8, pic: 'p34', target: 6, choices: [5, '6*', 10, 6] };
+
+const variants = (layout, prefix) => [
+  shot(`${prefix}-lv1`, 'Lv1 그림 보기: 1×2, 칸 2개', { ...LV1, layout, mode: 'study' }, 0.6),
+  shot(`${prefix}-lv1-ask`, 'Lv1 묻기: 보기 2개 (남은 칸 하나가 오답)', { ...LV1, layout, mode: 'ask' }, 0.9),
+  shot(`${prefix}-lv2-ask`, 'Lv2 묻기: 2×2, 보기 2개', { ...LV2, layout, mode: 'ask' }, 0.9),
+  shot(`${prefix}-lv3`, 'Lv3 (표준) 그림 보기: 2×3', { ...LV3, layout, mode: 'study' }, 0.4),
+  shot(`${prefix}-lv3-flip`, 'Lv3 칸이 왼쪽 위부터 대각선 차례로 뒤집힌다 (0.8초)', { ...LV3, layout, mode: 'flip', front: 2 }),
+  shot(`${prefix}-lv3-ask`, 'Lv3 묻기: 보기 3개', { ...LV3, layout, mode: 'ask' }, 0.8),
+  shot(`${prefix}-lv3-right`, '맞힘: 노란 칸이 도로 뒤집혀 제 조각을 보여 준다', { ...LV3, layout, mode: 'right', picked: 4 }),
+  shot(`${prefix}-lv3-wrong`, '틀림: 누른 것 ✕, 정답 ✓, 노란 칸이 도로 뒤집힌다 (1초)', { ...LV3, layout, mode: 'wrong', picked: 5 }),
+  shot(`${prefix}-lv6-ask`, 'Lv6 새 규칙: 보기 하나는 정답 조각에서 무늬 하나를 바꾼 것 (지그재그 → 곧은 줄)', { ...LV6, layout, mode: 'ask' }, 0.8),
+  shot(`${prefix}-lv6-wrong`, 'Lv6 바꾼 조각을 골랐을 때', { ...LV6, layout, mode: 'wrong', picked: '5*' }),
+  shot(`${prefix}-lv8`, 'Lv8 (가장 붐빔) 그림 보기: 3×4, 칸 12개', { ...LV8, layout, mode: 'study' }, 0.4),
+  shot(`${prefix}-lv8-ask`, 'Lv8 묻기: 보기 4개 = 정답 · 바꾼 조각(원 → 네모) · 이웃 칸 둘', { ...LV8, layout, mode: 'ask' }, 0.8),
+];
+
+// 소개: ① 그림 보기 → ② 칸이 뒤집히면 노란 칸의 조각 고르기
+const at = (svg, x, y, w, h) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${w}" height="${h}" `);
+const diagram = () => {
+  const backRect = (x, y, size, target) => target
+    ? `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="3" fill="#ffd23f" stroke="#b8860b" stroke-width="3"/><text x="${x + size / 2}" y="${y + size / 2 + 1}" text-anchor="middle" dominant-baseline="middle" font-family="Nunito" font-weight="900" font-size="30" fill="#5a4000">?</text>`
+    : `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="3" fill="#34456b"/>`;
+  // 보기 조각: 회색 테두리, 정답(right)은 초록 테두리
+  const choice = (tile, x, y, right) => at(pictureSvg('p12', tile), x, y, 44, 44) + `<rect x="${x - 2}" y="${y - 2}" width="48" height="48" rx="5" fill="none" stroke="${right ? '#22a06b' : '#c9c4b8'}" stroke-width="${right ? 4 : 2}"/>`;
+  return [
+    { svg: Diagram.svg('0 0 176 140', at(pictureSvg('p12'), 18, 30, 140, 70)), caption: '그림을 잘 봐 두기' },
+    { svg: Diagram.svg('0 0 176 140', backRect(40, 8, 46, true) + backRect(90, 8, 46) + choice(1, 36, 82) + choice(0, 96, 82, true) + Diagram.tap(118, 104)), caption: '노란 칸에 있던 조각 고르기' },
+  ];
 };
+const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음)', render: (stage) => Sketch.intro(stage, { name: TITLE, level: 1, steps: diagram(), hint: HINT }) });
 
 Sketch.page({
-  title: '그림 조각 기억하기 (art) · 그림 미리 보기',
-  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 목업 전에 그림 화풍부터 고르려고 손으로 그린 4가지. 모두 3×3, 태블릿만.</p>
-    <p>볼 것: 칸 하나만 떼어 봐도 어디인지 알 수 있는가 (검토용 화면) · 보기 4개가 서로 헷갈리지 않는가 · 어르신이 보기에 편한 그림인가.</p>`,
-  // 섞음(A+C)을 맨 앞에
-  groups: ['mix', ...Object.keys(STYLES).filter((key) => key !== 'mix')].map(group),
+  title: '그림 조각 기억하기 (art) · 목업 1회차',
+  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 화풍 비교: <a href="styles.html">styles.html</a>. 그림은 모두 A+C 화풍으로 손으로 그렸다.</p>`,
+  groups: [
+    { title: '태블릿 — 배치 A: 그림 옆에 큰 보기 한 줄 (132px)', shots: [...variants('big', 'a'), introShot('intro')] },
+    { title: '태블릿 — 배치 B: 보기를 칸과 같은 크기로, 2줄', shots: variants('same', 'b').filter((one) => !/-(lv1|lv3-flip)$/.test(one.id)) },
+    { title: '휴대폰 390×844', device: 'phone', shots: [...variants('phone', 'p'), introShot('p-intro')] },
+    { title: '작은 휴대폰 360×640', device: 'phone-small', shots: variants('phone', 's').filter((one) => /-(lv3-ask|lv8|lv8-ask)$/.test(one.id)) },
+  ],
 });
 </script>
 </body>

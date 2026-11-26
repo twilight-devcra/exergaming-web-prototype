@@ -2,11 +2,12 @@
 
 > Game-draft workflow ([README.md](README.md)). **Clickable sketch: [`play.html`](../../../tools/sketch/art/play.html)** · mockup: [`tools/sketch/art/`](../../../tools/sketch/art/index.html) · generated pictures: [`gallery.html`](../../../tools/sketch/art/gallery.html) · style comparison: [`styles.html`](../../../tools/sketch/art/styles.html) (`node server.js` → http://localhost:5173/tools/sketch/art/).
 
-**Status:** card · mockup · **sketch** (round 3) · approved · built
+**Status:** card · mockup · **sketch** (round 4) · approved · built
 **Gap it fills:** honestly, mostly **즉시 기억 (시각·위치)**, which is already over-represented (4 games). What's new is **연합 기억** (△, priority medium): "what was where" is an object-location pairing. Option D below would reach **지연 회상** (☐, priority high), but that needs session-level support.
 **Tags / clashes:** `Tag.MEMORY`, shared with path, symbol, cover, novel, box and recall. That makes 7 memory games out of 20, so rerun the order check (200 rounds, no adjacent similar games) when it's built.
 
 ## Review log
+- **Sketch round 3 → 4:** Lv3 → Lv4 felt steep (calm 2×3 straight to normal 3×3). Lv4 is now a **normal 2×3** (same grid as Lv3, only the picture style steps up); 3×3 starts at Lv5.
 - **Sketch round 2 → 3:** the round-2 calm pictures "don't look much different from before". Replaced with a new calm composition: a few big shapes split across tile pairs, no accents (see Generator, item 7).
 - **Sketch round 1 → 2:** everything fine except **Lv3 felt harder than intended**. Pictures for Lv1–3 are now **calm** (see Generator). Lv4+ unchanged.
 - **Mockup → sketch:** `play.html` runs the real game shape on freshly generated pictures. The playthrough exposed an altered-copy loophole, now fixed (see Distractor kinds).
@@ -78,8 +79,8 @@ It isn't a grid of random shapes but **one composition**: coloured paper panels,
 | 1 | **1×2** calm, study 5 s, 2 choices (the other tile is the only distractor) | — (teaches the rule: "left or right piece?") |
 | 2 | 2×2 calm, study 4.5 s, 2 choices | 4 tiles |
 | 3 | **2×3** calm, study 4 s, 3 choices (any) | standard |
-| 4 | 3×3, study 4 s, 3 choices (far) | 9 tiles, normal pictures (~6 shapes and accents, line, 5 panels vs Lv3's 3 shapes on 2 panels) |
-| 5 | 3×3, study 3.5 s, 4 choices (near) | choices share shapes across the seam |
+| 4 | **2×3** normal, study 4 s, 3 choices (far) | same grid as Lv3, normal pictures (~4 shapes and accents, line, 4 panels vs Lv3's 3 shapes on 2 panels) |
+| 5 | **3×3**, study 3.5 s, 4 choices (near) | 9 tiles; choices share shapes across the seam |
 | 6 | 3×3, study 3.5 s, 4 choices, one **altered copy** of the target | details, not just "which part" |
 | 7 | **3×4**, study 4 s, 4 choices (near) | 12 tiles |
 | 8 | 3×4, study 3.5 s, 4 choices (near + altered) | densest |
@@ -125,7 +126,7 @@ Sizes come from measuring the board (`fit` in `board.js`, a ResizeObserver like 
 
 ## Open questions for review
 1. **Lv3 again:** is it right now with the new calm pictures? Note a new kind of near-miss: the two halves of the same shape are complementary, so a Lv3 distractor can be the other half of the right shape ("which side was it?"). If Lv3 is still hard, take its wrong answers only from tiles of other shapes.
-2. **Lv3 → Lv4 is now a big step** (3 big shapes → ~6 shapes and accents, a line, 5 panels). A calm 3×3 is possible (the calm composition works at 3×3 with an odd tile out: 3 failures in 500 seeds, which would need fixing), or Lv4 could get a middle setting.
+2. **Lv4 → Lv5** now carries the jump to 3×3 together with 4 near choices and a shorter show (4 → 3.5 s), since the old Lv4 (3×3, 3 far choices) was replaced by the normal 2×3. If it feels steep, Lv5 can keep 4 s.
 3. Playing the sketch: does each level feel right, especially the steps Lv1 → Lv3 (1×2 to 2×3) and Lv6 → Lv7 (3×3 to 3×4)?
 4. Show times (Lv3 4 s, Lv8 3.5 s) and question timer (Lv3 4.8 s): too short, too long?
 5. Faint tile grid lines during study, so players know where the cuts are? (Recommended: no, keep it one picture. The flip shows the grid.)

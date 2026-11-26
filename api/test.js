@@ -20,7 +20,7 @@ function assertEntry(entry) {
       : type === 'object' ? typeof value === 'object' && !Array.isArray(value)
       : type === 'games' ? typeof value === 'object' && !Array.isArray(value) && Object.entries(value).every(([id, game]) =>
         /^[a-z][a-z0-9]{0,15}$/.test(id) && game.total > 0
-        && ['correct', 'total', 'limitMs', 'spareMs'].every((field) => game[field] === null || (typeof game[field] === 'number' && game[field] >= 0)))
+        && ['correct', 'total', 'limitMs', 'spareMs'].every((key) => game[key] === null || (typeof game[key] === 'number' && game[key] >= 0)))
       : false;
     assert.ok(ok, `${field} 는 ${type} 이어야 한다: ${JSON.stringify(value)}`);
   }

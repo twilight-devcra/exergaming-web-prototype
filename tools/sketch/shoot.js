@@ -36,7 +36,9 @@ const PORT = 5190 + Math.floor(Math.random() * 40);
         const body = document.querySelector('.stage-body');
         if (!body) return '';
         const box = body.getBoundingClientRect();
+        // svg 안의 도형은 svg 가 잘라 보이므로 svg 상자만 잰다 (조각 그림처럼 viewBox 로 자른 그림이 넘침으로 잡히지 않게)
         const over = [...body.querySelectorAll('*')].some((node) => {
+          if (node.ownerSVGElement) return false;
           const rect = node.getBoundingClientRect();
           return rect.width && (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1);
         });

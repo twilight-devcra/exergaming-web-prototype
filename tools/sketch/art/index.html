@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko" data-edition="app">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>그림 조각 기억하기 · 그림 미리 보기</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
+  <link rel="stylesheet" href="../../../css/style.css">
+  <link rel="stylesheet" href="../../../css/themes.css">
+  <link rel="stylesheet" href="../../../app/app.css">
+  <link rel="stylesheet" href="../sketch.css">
+  <link rel="stylesheet" href="art.css">
+</head>
+<body data-theme="scenic">
+<script type="module">
+// 그림 조각 기억하기 — 그림 미리 보기 (1단계 덤, 목업 전). 설계 카드: docs/games/drafts/art.md
+// 화풍 4가지를 손으로 그렸다. 화풍마다: 그림 보기 · 칸을 떼어 늘어놓기 · 뒤집히는 중 · 다 뒤집힘 + 보기 4개 · 오답 표시.
+import { Sketch } from '../sketch.js';
+import { drawBoard, STYLES } from './board.js';
+
+const TITLE = '그림 조각 기억하기';
+const shot = (id, caption, state, msg, kind) => ({
+  id, caption,
+  render(stage) {
+    const { body } = Sketch.frame(stage, `${TITLE} · Lv.3`, msg, kind);
+    drawBoard(body, { grid: 3, ...state });
+  },
+});
+// 물어보는 칸과 보기는 화풍마다 다르게 (같은 그림 안의 다른 칸이 오답)
+const ASK = { comp: [4, [4, 1, 5, 3]], poster: [7, [6, 7, 8, 4]], cutout: [0, [3, 1, 0, 4]], lines: [5, [2, 4, 8, 5]] };
+
+const group = (style) => {
+  const [target, choices] = ASK[style];
+  return {
+    title: STYLES[style].name,
+    shots: [
+      shot(`${style}-study`, '그림 보기', { style, mode: 'study' }, '그림을 잘 보세요', 'look'),
+      shot(`${style}-crops`, '검토용: 칸 9개를 떼어 놓으면 저마다 알아볼 수 있나', { style, mode: 'crops' }, '', ''),
+      shot(`${style}-flip`, '칸이 왼쪽 위부터 차례로 뒤집힌다', { style, mode: 'flip', front: 2 }, '그림을 잘 보세요', 'look'),
+      shot(`${style}-ask`, '노란 칸에 있던 조각 고르기', { style, mode: 'hidden', target, choices }, '노란 칸에 있던 조각을 고르세요', 'act'),
+      shot(`${style}-wrong`, '틀리면 정답을 1초 보여 준다', { style, mode: 'hidden', target, choices, reveal: choices.find((one) => one !== target) }, '틀렸어요', 'bad'),
+    ],
+  };
+};
+
+Sketch.page({
+  title: '그림 조각 기억하기 (art) · 그림 미리 보기',
+  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 목업 전에 그림 화풍부터 고르려고 손으로 그린 4가지. 모두 3×3, 태블릿만.</p>
+    <p>볼 것: 칸 하나만 떼어 봐도 어디인지 알 수 있는가 (검토용 화면) · 보기 4개가 서로 헷갈리지 않는가 · 어르신이 보기에 편한 그림인가.</p>`,
+  groups: Object.keys(STYLES).map(group),
+});
+</script>
+</body>
+</html>

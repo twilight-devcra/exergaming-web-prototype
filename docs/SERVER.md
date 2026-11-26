@@ -115,6 +115,10 @@ Authorization: Bearer <키>        (키를 적었을 때만)
 | `gameAcc` (선택) | `number` | `meta.summary.stats` 의 `correct` 합 ÷ `total` 합 (0~1, 소수 둘째 자리. 문제가 없으면 `null`) | 지난번 게임 정확도가 85% 이상이면 다음 세션 설정에 한 단계 높은 난이도를, 50% 아래면 한 단계 낮은 난이도를 골라 둔다 (`js/stars.js`). 없으면 지난번 난이도 그대로 |
 | `level`, `distM`, `kcal` (선택) | `number` | `meta.summary.stats` 의 `level` 최댓값, `meta.summary.exercise.distM` · `kcal` | 지금은 쓰지 않음 (나중에 그래프용) |
 | `look` (선택) | `object` | `meta.landmark` 그대로 | 풍경 길가에 세운 기념물(건물)의 생김새. 그대로 돌려주면 다른 태블릿에서도 같은 건물로 선다. 없으면(이 필드를 더하기 전 세션) 태블릿이 난이도·시간으로 정한다 |
+| `games` (선택) | `games` | `meta.summary.stats` 의 게임마다 `{ correct, total, limitMs, spareMs }` (`limitMs` · `spareMs` 는 `think` 에서). 게임 id 는 영문 소문자·숫자만, 값은 0 이상 수만 남기고 `total` 이 없는 게임은 버린다 | 기록 화면에서 지난 세션을 고르면 이것으로 그때의 두뇌 그래프를 지금 규칙으로 다시 계산한다 (`js/abilities.js` `fromEntry`). 없으면 그 세션은 고를 수 없다 |
+| `exAcc` (선택) | `number` | `meta.summary.accuracy.exercise` (속도 유지율 0~1, 두뇌 게임만 한 판은 `null`) | 다시 계산한 두뇌 그래프의 '운동' 축. 없으면 '–' |
+
+`games` · `exAcc` 를 더하기 전에 올라온 세션은 서버에서 `node api/server.js --reindex` 로 원본에서 다시 뽑으면 채워집니다. `exAcc` 는 2026-11-18, 답하는 속도 재료(`limitMs`)는 2026-11-20 부터의 세션에만 있습니다.
 
 **형 지키기**: 업로드 키는 공개라 누구나 세션을 올릴 수 있고, 회원 기록은 다른 태블릿 화면에 그려집니다. 그래서 서버는 저장할 때와 내보낼 때, 태블릿은 받을 때 항목을 위 형으로 맞춥니다 (`cleanEntry`). 형이 다른 값(숫자 칸의 글 등)은 `null` 이 되고, 표에 없는 필드는 버립니다.
 

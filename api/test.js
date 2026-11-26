@@ -18,6 +18,9 @@ function assertEntry(entry) {
       : type === 'string' ? typeof value === 'string'
       : type === 'date' ? typeof value === 'string' && !isNaN(Date.parse(value))
       : type === 'object' ? typeof value === 'object' && !Array.isArray(value)
+      : type === 'games' ? typeof value === 'object' && !Array.isArray(value) && Object.entries(value).every(([id, game]) =>
+        /^[a-z][a-z0-9]{0,15}$/.test(id) && game.total > 0
+        && ['correct', 'total', 'limitMs', 'spareMs'].every((field) => game[field] === null || (typeof game[field] === 'number' && game[field] >= 0)))
       : false;
     assert.ok(ok, `${field} 는 ${type} 이어야 한다: ${JSON.stringify(value)}`);
   }
@@ -59,7 +62,8 @@ function fakeSession({ device, id, user = null, ended = 'complete', days = 0, di
     }
     events.push({ t: 9000 + clock, clock, type: 'points', game, pts: correct * 40 });
     events.push({ t: 9000 + clock, clock, type: 'game_end', game, cleared: correct === 3, correct, total: 3 });
-    stats[game] = { plays: 1, cleared: correct === 3 ? 1 : 0, correct, total: 3, points: correct * 40, level, runs: [[level, correct, 3]], ms: clock };
+    stats[game] = { plays: 1, cleared: correct === 3 ? 1 : 0, correct, total: 3, points: correct * 40, level, runs: [[level, correct, 3]], ms: clock,
+      think: { n: 3, ms: 6000, first: 3000, out: 0, outMs: 0, limitMs: 27000, spareMs: 9000 } };
   }
   events.push({ t: 9000 + clock, clock, type: 'session_end', ended });
   const stepUp = { relax: 0.3, normal: 0.4, challenge: 0.5 }[difficulty];
@@ -71,7 +75,8 @@ function fakeSession({ device, id, user = null, ended = 'complete', days = 0, di
       input: 'pedal', theme: 'meadow', music: 'beat', config: { difficulty: 'adaptive', diffUp: stepUp, diffDown: stepDown },
       landmark: { v: 1, kind: 'cottage', size: 1, seed: 7, wall: '#ffeecc', roof: '#aa3322' },
       summary: { score: 4000 + Number(id) % 900, exScore: 2500, cogScore: 1500, baseline: 60, bestStreak: 4, elapsedSec: clock / 1000, stats,
-        exercise: { kcal: 30, distM: 900, revs: 150, avgRpm: 58, activeSec: 290 } },
+        exercise: { kcal: 30, distM: 900, revs: 150, avgRpm: 58, activeSec: 290 },
+        accuracy: { exercise: 0.82, game: 0.67, recommend: 'keep', recommendTo: null } },
     },
     events,
     keys: [], capd: [], workout: [],
@@ -154,6 +159,10 @@ async function main() {
       assert.strictEqual(typeof entry.score, 'number');
       assert.strictEqual(typeof entry.gameAcc, 'number');
       assert.strictEqual(entry.look.kind, 'cottage');
+      assert.strictEqual(entry.exAcc, 0.82);
+      const games = Object.values(entry.games);
+      assert.ok(games.length > 0, '게임별 성적이 있다');
+      for (const game of games) assert.deepStrictEqual([game.total, game.limitMs, game.spareMs], [3, 27000, 9000]);
     });
 
     await check('회원 기록: 형이 다른 값은 null, 없는 필드는 버린다 (XSS 막기)', async () => {
@@ -164,7 +173,8 @@ async function main() {
       bad.meta.session.difficulty = { toString: html };
       Object.assign(bad.meta.summary, { score: html });
       bad.meta.summary.exercise.kcal = '30';
-      bad.meta.summary.stats = { a: { level: html, correct: '9', total: 3 }, b: null };
+      bad.meta.summary.stats = { a: { level: html, correct: '9', total: 3, think: { limitMs: html, spareMs: -5 } }, b: null, [html]: { correct: 0, total: 1 } };
+      bad.meta.summary.accuracy = { exercise: html };
       await post(bad);
       await post(fakeSession({ device: 'tab-x', id: 7001, user: '76543214', ended: 'complete' }));
       const noDate = fakeSession({ device: 'tab-x', id: 7002, user: '76543214' });
@@ -177,6 +187,8 @@ async function main() {
       for (const field of ['min', 'difficulty', 'track', 'score', 'kcal', 'look']) assert.strictEqual(entry[field], null, field);
       assert.strictEqual(entry.level, 0);
       assert.strictEqual(entry.gameAcc, 0); // 글 '9' 는 맞힌 수로 세지 않는다
+      assert.deepStrictEqual(entry.games, { a: { correct: null, total: 3, limitMs: null, spareMs: null } }, '이상한 게임 id 와 값은 버린다');
+      assert.strictEqual(entry.exAcc, null);
       assert.ok(!JSON.stringify(history).includes('<'), 'HTML 이 응답에 남지 않는다');
     });
 

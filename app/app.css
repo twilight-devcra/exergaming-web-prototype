@@ -669,6 +669,29 @@ body[data-theme="scenic"] {
 .hs-recent li { display: grid; grid-template-columns: 1.3fr 1fr auto; gap: 10px; align-items: center; background: var(--panel); border-radius: 14px; padding: 10px 14px; font-size: 16px; }
 .hs-recent li b { font: 800 17px var(--font-num); }
 .hs-recent li.empty { display: block; color: var(--ink-soft); }
+/* 지난 세션 고르기: 그래프를 그릴 수 있는 날짜 · 줄은 누를 수 있다. 고르면 오른쪽 칸을 세션 카드로 바꾼다 */
+.hs-cal span.tap, .hs-recent li.tap { cursor: pointer; }
+.hs-cal span.sel { box-shadow: 0 0 0 3px var(--panel), 0 0 0 6px var(--accent); }
+.hs-recent li.tap { grid-template-columns: 1.3fr 1fr auto auto; }
+.hs-recent li.tap::after { content: '›'; font-size: 22px; line-height: 1; color: var(--ink-soft); }
+.hs-recent li.tap:active { transform: scale(0.98); }
+.hs-detail { display: none; flex-direction: column; gap: 8px; min-width: 0; padding: clamp(12px, 2vh, 18px) clamp(14px, 2vw, 20px); border-radius: 24px; background: var(--panel); box-shadow: var(--card-shadow); animation: fadein 0.2s ease-out; }
+.hs-body.picked .hs-side { display: none; }
+.hs-body.picked .hs-detail { display: flex; }
+.hs-detail .hs-recent li { background: var(--cell); }
+.hd-head { display: flex; align-items: center; gap: 8px; }
+.hd-back { padding: 6px 4px; border: 0; background: none; font: 700 17px var(--font); color: var(--accent); cursor: pointer; white-space: nowrap; }
+.hd-date { flex: 1; text-align: center; font-size: clamp(19px, 3vh, 23px); font-weight: 700; }
+.hd-step { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--cell); font-size: 22px; color: var(--ink); cursor: pointer; }
+.hd-step:disabled { opacity: 0.3; cursor: default; }
+.hd-meta { display: flex; justify-content: center; align-items: baseline; gap: 12px; font-size: 16px; color: var(--ink-soft); }
+.hd-meta b { font: 900 24px var(--font-num); color: var(--ink); }
+/* 숫자 요약·최근 기록 칸과 비슷한 높이에 들게, 그래프 높이를 화면 높이에 맞춰 묶는다 */
+.hs-detail .radar { flex: none; width: 100%; height: clamp(170px, 30vh, 320px); }
+.hs-detail .radar .rd-shape { animation: radarin 0.6s cubic-bezier(0.2, 1.2, 0.4, 1) both; transform-origin: 270px 194px; }
+.hd-praise { margin: 0; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-size: 16px; font-weight: 700; text-align: center; word-break: keep-all; }
+.hd-praise b { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .hs-detail, .hs-detail .radar .rd-shape { animation: none; } }
 
 /* 결과 화면의 회원 카드 */
 .dr-member { width: 100%; margin-top: auto; }
@@ -827,6 +850,7 @@ body[data-theme="scenic"] {
   .hs-stats b { font-size: 24px; }
   .hs-recent li { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; padding: 9px 12px; font-size: 14px; }
   .hs-recent li b { font-size: 15px; }
+  .hs-recent li.tap { grid-template-columns: auto minmax(0, 1fr) auto auto; }
 
   /* ----- 결과 ----- */
   .dr-id { font-size: 18px; }

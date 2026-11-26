@@ -81,6 +81,17 @@ export const Abilities = {
     return AXES.map((axis) => ({ ...axis, acc: acc[axis.id], hasData: acc[axis.id] != null }));
   },
 
+  // 회원 기록 항목 하나(js/history-entry.js 의 games · exAcc)로 그때의 두뇌 그래프를 지금 규칙으로 다시 계산한다.
+  // games 가 없는 항목(이 필드를 더하기 전 태블릿 기록)은 null. 답하는 속도는 limitMs 를 잰 판(2026-11-20 부터)만 채워진다
+  fromEntry(entry) {
+    if (!entry || !entry.games) return null;
+    const stats = {};
+    for (const [id, game] of Object.entries(entry.games)) {
+      stats[id] = { correct: game.correct || 0, total: game.total, think: game.limitMs > 0 ? { limitMs: game.limitMs, spareMs: game.spareMs || 0 } : null };
+    }
+    return this.compute(stats, entry.exAcc);
+  },
+
   // 칭찬할 축: 데이터가 있는 인지 영역·답하는 속도 가운데 정답률이 가장 높은 것 (운동은 운동량 카드에서 따로 보여 준다).
   // PRAISE_MIN 에 못 미치면 칭찬하지 않는다 — 0% 인 영역을 '가장 돋보인 능력'이라 하면 오히려 힘이 빠진다
   PRAISE_MIN: 0.4,

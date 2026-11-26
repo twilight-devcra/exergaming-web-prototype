@@ -9,6 +9,7 @@
 // 의존성 없음 (서버가 require 로 읽으므로 다른 모듈을 import 하지 않는다)
 
 // 필드 → 형. number: 유한한 수 · string: 글 (수는 글로 바꾼다, 200자까지) · date: Date 로 읽히는 글 · object: 배열 아닌 객체
+// games: 게임별 성적 { 게임 id: { correct, total, limitMs, spareMs } } — 기록 화면이 두뇌 그래프를 다시 계산한다 (js/abilities.js fromEntry)
 export const HISTORY_FIELDS = Object.freeze({
   at: 'date', // eslint-disable-line id-length -- 저장된 기록 형식. 필수. 없거나 날짜가 아니면 항목을 버린다
   min: 'number',
@@ -22,7 +23,13 @@ export const HISTORY_FIELDS = Object.freeze({
   distM: 'number',
   kcal: 'number',
   look: 'object',
+  games: 'games',
+  exAcc: 'number',
 });
+
+const GAME_FIELDS = ['correct', 'total', 'limitMs', 'spareMs'];
+const GAME_ID = /^[a-z][a-z0-9]{0,15}$/;
+const GAMES_MAX = 40;
 
 const finiteNumber = (value) => (typeof value === 'number' && isFinite(value) ? value : null);
 
@@ -31,7 +38,29 @@ const COERCE = {
   string: (value) => (typeof value === 'string' ? value.slice(0, 200) : finiteNumber(value) !== null ? String(value) : null),
   date: (value) => (typeof value === 'string' && !isNaN(Date.parse(value)) ? value : null),
   object: (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : null),
+  // 게임 id 는 영문 소문자·숫자만, 값은 GAME_FIELDS 의 0 이상 수만 남긴다. 낸 문제(total)가 없는 게임은 버린다
+  games: (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const out = {};
+    for (const [id, game] of Object.entries(value).slice(0, GAMES_MAX)) {
+      if (!GAME_ID.test(id) || !game || typeof game !== 'object') continue;
+      const clean = Object.fromEntries(GAME_FIELDS.map((field) => [field, finiteNumber(game[field]) !== null && game[field] >= 0 ? game[field] : null]));
+      if (clean.total > 0) out[id] = clean;
+    }
+    return Object.keys(out).length ? out : null;
+  },
 };
+
+// 게임별 성적 (세션 로그의 meta.summary.stats · App.roundStats.games) → games 필드 꼴
+export function compactGames(stats) {
+  const out = {};
+  for (const [id, game] of Object.entries(stats || {})) {
+    if (!game || typeof game !== 'object') continue;
+    const think = game.think && typeof game.think === 'object' ? game.think : {};
+    out[id] = { correct: game.correct, total: game.total, limitMs: think.limitMs, spareMs: think.spareMs };
+  }
+  return COERCE.games(out);
+}
 
 // 아무 값 → 형을 지킨 회원 기록 항목, 또는 null (at 이 없을 때)
 export function cleanEntry(raw) {
@@ -68,5 +97,8 @@ export function summarize(log) {
     distM: exercise.distM,
     kcal: exercise.kcal,
     look: meta.landmark,
+    games: compactGames(summary.stats),
+    // 속도 유지율 0~1. 결과 화면이 summary.accuracy 를 남긴 세션(2026-11-18 부터)만, 두뇌 게임만 한 판은 null
+    exAcc: summary.accuracy && summary.accuracy.exercise,
   });
 }

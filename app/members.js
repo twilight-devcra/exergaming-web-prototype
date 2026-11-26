@@ -10,6 +10,10 @@
 //       손님은 결과 화면에서 새 회원 번호와 QR 코드를 받고(오늘 기록이 그 번호로 저장된다), 그 대신 아이디를 만들어 저장할 수도 있다
 import { SESSION_DIFFICULTIES, $, html } from '../js/config.js';
 import { Stars } from '../js/stars.js';
+import { Abilities } from '../js/abilities.js';
+import { Radar } from '../js/radar.js';
+import { RoundReport } from '../js/round-report.js';
+import { compactGames } from '../js/history-entry.js';
 import { SessionStore } from '../js/session-log.js';
 import { SessionUpload } from '../js/session-upload.js';
 import { MemberId } from '../js/member-id.js';
@@ -48,6 +52,7 @@ export const MemberUI = {
   idForm: null,      // 열려 있는 새 아이디 창 { onCreated, busy }
   resultLog: null,   // 결과 화면의 세션 로그 (손님이 아이디로 저장하면 meta.user 를 고쳐 다시 저장한다)
   simulated: false,  // 지금 결과 화면이 가상 결과다 (기록하지 않는다)
+  pick: null,        // 기록 화면 오른쪽 칸: null(숫자 요약·최근 기록) · { day: Date }(그날 고르기) · { key }(그 세션의 두뇌 그래프)
 
   init(demo, app) {
     if (!$('#login')) return null;
@@ -114,6 +119,22 @@ export const MemberUI = {
     // 기록 (달력)
     $('#hs-prev').onclick = () => this.moveMonth(-1);
     $('#hs-next').onclick = () => this.moveMonth(1);
+    // 지난 세션 고르기: 그래프를 그릴 수 있는 날짜 · 최근 기록 줄 · 세션 카드의 목록/앞뒤 단추
+    $('#history').addEventListener('click', (event) => {
+      if (app.state !== 'history') return;
+      const day = event.target.closest('#hs-cal span.tap');
+      const row = event.target.closest('li.tap[data-key]');
+      const action = event.target.closest('[data-act]');
+      if (day) this.pick = { day: new Date(this.month.getFullYear(), this.month.getMonth(), +day.dataset.day) };
+      else if (row) this.pick = { key: row.dataset.key };
+      else if (action && action.dataset.act === 'list') this.pick = null;
+      else if (action && action.dataset.act === 'step' && !action.disabled) {
+        this.pick = { key: action.dataset.key };
+        const date = new Date(action.dataset.at);
+        this.month = new Date(date.getFullYear(), date.getMonth(), 1);
+      } else return;
+      this.renderHistory();
+    });
     $('#hs-go').onclick = () => {
       if (app.state !== 'history') return;
       const last = Members.merged(this.user).slice(-1)[0];
@@ -352,6 +373,7 @@ export const MemberUI = {
     const app = this.app;
     const now = new Date();
     this.month = new Date(now.getFullYear(), now.getMonth(), 1);
+    this.pick = null;
     this.renderHistory();
     app.show('history');
     app.state = 'history';
@@ -372,10 +394,14 @@ export const MemberUI = {
     const sessions = Members.merged(id);
     const dayKey = (date) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     const byDay = {};
+    const graphDays = new Set(); // 두뇌 그래프를 그릴 수 있는 세션이 있는 날 (누를 수 있다)
     for (const session of sessions) {
       const key = dayKey(new Date(session.at));
       byDay[key] = (byDay[key] || 0) + 1;
+      if (this.axesOf(session)) graphDays.add(key);
     }
+    const picked = this.resolvePick(sessions);
+    const pickedDay = picked && dayKey(picked.day || new Date(picked.entry.at));
     const now = new Date();
     const month = this.month;
     $('#hs-title').textContent = sessions.length ? '다시 오셨네요, 반가워요!' : '첫 트레이닝을 시작해 볼까요?';
@@ -393,8 +419,9 @@ export const MemberUI = {
       const date = new Date(month.getFullYear(), month.getMonth(), day);
       const dayCount = byDay[dayKey(date)] || 0;
       monthCount += dayCount;
-      const classes = [dayCount ? 'done' : '', isThisMonth && day === now.getDate() ? 'today' : '', date > now ? 'future' : ''].filter(Boolean).join(' ');
-      cells.push(html`<span class="${classes}">${day}${dayCount > 1 ? html`<small>${dayCount}</small>` : ''}</span>`);
+      const classes = [dayCount ? 'done' : '', graphDays.has(dayKey(date)) ? 'tap' : '', pickedDay === dayKey(date) ? 'sel' : '',
+        isThisMonth && day === now.getDate() ? 'today' : '', date > now ? 'future' : ''].filter(Boolean).join(' ');
+      cells.push(html`<span class="${classes}" data-day="${day}">${day}${dayCount > 1 ? html`<small>${dayCount}</small>` : ''}</span>`);
     }
     $('#hs-cal').innerHTML = html`${cells}`;
     // 숫자 요약과 최근 기록
@@ -407,12 +434,8 @@ export const MemberUI = {
       ['지난번', last ? (ago === 0 ? '오늘' : ago === 1 ? '어제' : html`${ago}<small>일 전</small>`) : '–'],
     ].map(([label, value]) => html`<div><span>${label}</span><b>${value}</b></div>`).join('');
     const difficultyLabel = (difficultyId) => (SESSION_DIFFICULTIES.find((difficulty) => difficulty.id === difficultyId) || {}).label || '';
-    const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
     $('#hs-recent').innerHTML = sessions.length
-      ? sessions.slice(-4).reverse().map((session) => {
-        const date = new Date(session.at);
-        return html`<li><span>${date.getMonth() + 1}월 ${date.getDate()}일 (${weekdayNames[date.getDay()]})</span><span>${session.min ?? '–'}분 ·${difficultyLabel(session.difficulty)}${session.track === 'brain' ? ' · 두뇌만' : ''}</span><b>${(session.score || 0).toLocaleString('ko-KR')}점</b></li>`;
-      }).join('')
+      ? sessions.slice(-4).reverse().map((session) => this.sessionRow(session, this.dateText(new Date(session.at)))).join('')
       : html`<li class="empty">${Members.hasRemote() ? '아직 기록이 없어요' : '이 태블릿에는 아직 기록이 없어요'}. 오늘 트레이닝부터 쌓여요</li>`;
     // 받침이 있으면(ㄹ 받침 빼고) '으로', 없으면 '로'
     const roParticle = (word) => { const syllable = word.charCodeAt(word.length - 1) - 0xac00; return syllable >= 0 && syllable < 11172 && syllable % 28 && syllable % 28 !== 8 ? '으로' : '로'; };
@@ -426,6 +449,79 @@ export const MemberUI = {
       : '';
     $('#hs-sum').textContent = summary;
     void monthCount;
+    this.renderPick(sessions, picked);
+  },
+
+  // ---------------- 기록: 지난 세션의 두뇌 그래프 ----------------
+  // 그 세션의 두뇌 그래프 축들 (지금 규칙으로 다시 계산, js/abilities.js fromEntry). 인지 영역이 하나도 없으면 null
+  axesOf(entry) {
+    const axes = Abilities.fromEntry(entry);
+    return axes && axes.some((axis) => axis.hasData && axis.id !== 'exercise') ? axes : null;
+  },
+
+  dateText(date) {
+    return `${date.getMonth() + 1}월 ${date.getDate()}일 (${'일월화수목금토'[date.getDay()]})`;
+  },
+
+  timeText(date) {
+    const hour = date.getHours();
+    return `${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시`;
+  },
+
+  setupText(entry) {
+    const difficulty = (SESSION_DIFFICULTIES.find((candidate) => candidate.id === entry.difficulty) || {}).label || '';
+    return `${entry.min ?? '–'}분 · ${difficulty}${entry.track === 'brain' ? ' · 두뇌만' : ''}`;
+  },
+
+  // 최근 기록 · 그날 고르기의 한 줄. 그래프를 그릴 수 있으면 누를 수 있다
+  sessionRow(entry, when) {
+    const tap = !!this.axesOf(entry);
+    return html`<li class="${tap ? 'tap' : ''}" data-key="${tap ? Members.keyOf(entry) : ''}"><span>${when}</span><span>${this.setupText(entry)}</span><b>${(entry.score || 0).toLocaleString('ko-KR')}점</b></li>`;
+  },
+
+  // this.pick → { day, list }(그날 고르기) · { entry, graphable }(세션 하나) · null. 하루에 그래프가 하나뿐이면 바로 그 세션
+  resolvePick(sessions) {
+    if (!this.pick) return null;
+    const graphable = sessions.filter((session) => this.axesOf(session));
+    if (this.pick.day) {
+      const pickedDay = this.pick.day.toDateString();
+      const list = graphable.filter((session) => new Date(session.at).toDateString() === pickedDay);
+      if (list.length > 1) return { day: this.pick.day, list };
+      if (!list.length) return (this.pick = null);
+      this.pick = { key: Members.keyOf(list[0]) };
+    }
+    const entry = graphable.find((session) => Members.keyOf(session) === this.pick.key);
+    if (!entry) return (this.pick = null);
+    return { entry, graphable };
+  },
+
+  renderPick(sessions, picked) {
+    const detail = $('#hs-detail');
+    $('#history .hs-body').classList.toggle('picked', !!picked);
+    if (!picked) { detail.replaceChildren(); return; }
+    const back = html`<button class="hd-back" data-act="list">‹ 목록</button>`;
+    if (picked.list) {
+      detail.innerHTML = html`<div class="hd-head">${back}<span class="hd-date">${this.dateText(picked.day)}</span></div>
+        <ol class="hs-recent">${picked.list.map((entry) => this.sessionRow(entry, this.timeText(new Date(entry.at))))}</ol>`;
+      return;
+    }
+    const { entry, graphable } = picked;
+    const index = graphable.indexOf(entry);
+    const date = new Date(entry.at);
+    const sameDay = sessions.filter((session) => new Date(session.at).toDateString() === date.toDateString()).length > 1;
+    const step = (targetIndex, label, symbol) => {
+      const target = graphable[targetIndex];
+      return target
+        ? html`<button class="hd-step" data-act="step" data-key="${Members.keyOf(target)}" data-at="${target.at}" aria-label="${label}">${symbol}</button>`
+        : html`<button class="hd-step" disabled aria-label="${label}">${symbol}</button>`;
+    };
+    const axes = this.axesOf(entry);
+    const best = Abilities.best(axes);
+    detail.innerHTML = html`<div class="hd-head">${back}${step(index - 1, '이전 트레이닝', '‹')}<span class="hd-date">${this.dateText(date)}${sameDay ? ` · ${this.timeText(date)}` : ''}</span>${step(index + 1, '다음 트레이닝', '›')}</div>
+      <div class="hd-meta"><span>${this.setupText(entry)}</span><b>${(entry.score || 0).toLocaleString('ko-KR')}점</b></div>
+      <svg class="radar" role="img" aria-label="영역별 정답률"></svg>
+      ${best ? html`<p class="hd-praise"><b>${best.name}</b> · ${best.praise}</p>` : ''}`;
+    Radar.render(detail.querySelector('.radar'), axes);
   },
 
   // ---------------- 매 프레임 ----------------
@@ -506,6 +602,9 @@ export const MemberUI = {
       device: app.log ? app.log.meta.device : null, sid: app.log ? app.log.meta.id : null,
       // 풍경에 세운 기념물의 생김새 (js/landmarks.js Landmarks.look). 다음 라운드부터 이대로 그린다
       look: (app.log && app.log.meta.landmark) || null,
+      // 기록 화면에서 이 판의 두뇌 그래프를 다시 계산할 재료 (js/history-entry.js · js/abilities.js fromEntry)
+      games: compactGames(games),
+      exAcc: app.brainOnly ? null : RoundReport.keep(app) / 100,
     });
   },
 

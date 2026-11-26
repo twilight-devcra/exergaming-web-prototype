@@ -253,10 +253,14 @@ export const Members = {
 
   // 이 태블릿 기록 + 서버 기록. 같은 세션(태블릿 번호 + 세션 번호)은 한 번만, 시간순.
   // 화면은 모두 이 목록으로 그리므로 여기서 한 번 더 형을 맞춘다 (예전 태블릿 기록 · 시험용 로컬 서버도)
+  // 세션 하나를 가리키는 열쇠 (태블릿 번호 + 세션 번호, 없으면 시각). 기록 화면이 고른 세션도 이것으로 기억한다
+  keyOf(entry) {
+    return entry.sid ? `${entry.device || ''}:${entry.sid}` : `at:${entry.at}`;
+  },
+
   merged(id) {
     const bySession = new Map();
-    const keyOf = (entry) => (entry.sid ? `${entry.device || ''}:${entry.sid}` : `at:${entry.at}`);
-    for (const entry of [...(this.remote[id] || []), ...this.history(id)].map(cleanEntry)) if (entry) bySession.set(keyOf(entry), entry);
+    for (const entry of [...(this.remote[id] || []), ...this.history(id)].map(cleanEntry)) if (entry) bySession.set(this.keyOf(entry), entry);
     return [...bySession.values()].sort((a, b) => new Date(a.at) - new Date(b.at));
   },
 };

@@ -13,12 +13,18 @@ export const RoundReport = {
 
   // root 안의 카드를 이번 라운드로 채운다. 두뇌 그래프(영역별 정답률 · 답하는 속도 · 운동, js/abilities.js)도 그린다
   // 반환: { abilityAxes(두뇌 그래프의 축들), keep(속도 유지율 %), kcal, gameAccuracy(게임 정확도 0~1 또는 null), recommendation(권하는 다음 난이도, js/stars.js) }
+  // 속도 유지율 (%, 0~100): 운동 점수 ÷ 이 라운드에서 받을 수 있던 운동 점수. 회원 기록(app/members.js)에도 남긴다
+  keep(app) {
+    const { config } = app;
+    const exerciseMax = Math.floor(config.durationSec / config.tickSec) * config.tickMaxPoints;
+    return Util.clamp(Math.round((app.exScore / exerciseMax) * 100), 0, 100);
+  },
+
   fill(app, root) {
-    const { config, meter } = app;
+    const { meter } = app;
     const field = (name) => root.querySelector(`.rp-${name}`);
     const games = app.roundStats.games;
-    const exerciseMax = Math.floor(config.durationSec / config.tickSec) * config.tickMaxPoints;
-    const keep = Util.clamp(Math.round((app.exScore / exerciseMax) * 100), 0, 100);
+    const keep = this.keep(app);
     const abilityAxes = Abilities.compute(games, app.brainOnly ? null : keep / 100);
     Radar.render(field('radar'), abilityAxes);
     // 가장 잘한 영역을 칭찬한다. 칭찬할 만큼 잘한 영역이 없으면 북돋는 말 한 줄 (푼 문제가 하나도 없으면 비운다)

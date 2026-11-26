@@ -221,15 +221,15 @@ export const MemberUI = {
   async loadRemote(id) {
     const sourceNote = $('#hs-src');
     delete Members.remote[id];
-    if (!Members.hasRemote()) { sourceNote.textContent = ''; return; }
+    // 잘 불러오면 아무것도 적지 않는다. 시험용 로컬 서버와 연결 실패만 알린다
+    sourceNote.textContent = '';
+    if (!Members.hasRemote()) return;
     const local = SessionUpload.settings().localHistory;
-    sourceNote.textContent = '다른 태블릿의 기록도 불러오는 중…';
     try {
       const list = await Members.fetchRemote(id);
       if (this.user !== id) return;
       // 시험용 로컬 서버는 언제나 알린다. 실제 서버로 착각하지 않게
-      sourceNote.textContent = local ? `시험용: 이 태블릿의 세션 로그를 서버 대신 썼어요 (${list.length}건)`
-        : list && list.length ? '다른 태블릿의 기록까지 모두 보여 드려요' : '';
+      if (local) sourceNote.textContent = `시험용: 이 태블릿의 세션 로그를 서버 대신 썼어요 (${list.length}건)`;
     } catch {
       if (this.user !== id) return;
       sourceNote.textContent = '지금은 서버에 연결하지 못해 이 태블릿의 기록만 보여 드려요';
@@ -419,10 +419,11 @@ export const MemberUI = {
     const next = Members.nextSetup(last);
     const nextDifficulty = next ? difficultyLabel(next.difficulty) : '';
     const tail = `${next && next.track === 'brain' ? ' · 두뇌 게임만' : ''}${next ? roParticle(next.track === 'brain' ? '만' : nextDifficulty) : ''} 골라 둘게요`;
-    const summary = !next ? '다음 화면에서 시간과 난이도를 골라요'
+    // 난이도를 바꿔 골라 둘 때만 알린다 (지난번과 같으면 세션 설정 화면에서 보인다)
+    const summary = !next ? ''
       : next.shift === 'up' ? `지난번에 아주 잘하셔서 난이도를 올려 ${next.min}분 · ${nextDifficulty}${tail}`
       : next.shift === 'down' ? `이번엔 조금 편하게 ${next.min}분 · ${nextDifficulty}${tail}`
-      : `지난번처럼 ${next.min}분 · ${nextDifficulty}${tail}`;
+      : '';
     $('#hs-sum').textContent = summary;
     void monthCount;
   },
@@ -477,7 +478,7 @@ export const MemberUI = {
     $('#dr-id').textContent = `${Members.label(id)} 님${simulated ? ' · 가상 결과' : ''}`;
     if (!fresh) {
       const recordCount = Members.merged(id).length + (simulated ? 1 : 0);
-      box.innerHTML = html`<p class="dm-saved"><b>${recordCount}번째 트레이닝</b>을 기록했어요<br></p>`;
+      box.innerHTML = html`<p class="dm-saved"><b>${recordCount}번째 트레이닝</b>을 기록했어요</p>`;
       return;
     }
     if (MemberId.validPrefix(Members.prefix())) this.showRegisterChoice(id);
@@ -579,7 +580,7 @@ export const MemberUI = {
         $('#demo-result').classList.remove('with-card');
         $('#dr-id').textContent = `${Members.label(id)} 님`;
         $('#dr-member').innerHTML =
-          html`<p class="dm-saved"><b>${Members.format(id)}</b> 아이디로 오늘 기록을 저장했어요<br><span>다음에는 '아이디로 들어가기'에서 골라 주세요</span></p>`;
+          html`<p class="dm-saved"><b>${Members.format(id)}</b> 아이디로 오늘 기록을 저장했어요</p>`;
       },
     });
   },

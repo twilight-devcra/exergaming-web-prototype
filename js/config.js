@@ -127,9 +127,9 @@ export const ROUND_PRESETS = [
 // hold = 레벨이 제자리에 머무는 정답률. 이보다 잘 맞히면 오르고 못 맞히면 내려간다 (diffDown 을 여기서 정한다).
 // 다른 값(페달 허용 구역, 점수 등)은 운영 메뉴의 '라운드 설정'을 따른다.
 export const SESSION_LENGTHS = [
-  { min: 5, label: '5분', desc: '가볍게 한 번' },
-  { min: 10, label: '10분', desc: '꾸준한 운동' },
-  { min: 15, label: '15분', desc: '충분한 운동' },
+  { min: 5, label: '5분' },
+  { min: 10, label: '10분' },
+  { min: 15, label: '15분' },
 ];
 export const SESSION_DIFFICULTIES = [
   { id: 'relax', label: '편안하게', desc: '난이도가 천천히 올라요', maxLevel: 5, climb: 0.9, hold: 0.8, questionTimeScale: 1.3 },
@@ -138,8 +138,8 @@ export const SESSION_DIFFICULTIES = [
 ];
 // 운동 방식: 페달을 밟으며 두뇌 게임 (dual) · 두뇌 게임만 (brain, 페달 없이). 페달이 연결돼 있지 않으면 두뇌 게임만 고를 수 있다
 export const SESSION_TRACKS = [
-  { id: 'dual', label: '페달 + 두뇌 게임', desc: '페달을 밟으며 풀어요' },
-  { id: 'brain', label: '두뇌 게임만', desc: '페달 없이 풀어요' },
+  { id: 'dual', label: '페달 + 두뇌 게임' },
+  { id: 'brain', label: '두뇌 게임만' },
 ];
 export const SESSION_DEFAULT = { min: 10, difficulty: 'normal', track: 'dual' }; // 화면을 열 때 미리 골라 둔 것
 const SESSION_ANSWERS_PER_MIN = 10; // 분당 답 수 어림값 (게임 하나에 문제 3개, 대개 10초 안팎 — docs/DEMO_BRIEF.md 'Round pacing')

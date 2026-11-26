@@ -196,16 +196,17 @@ export const Demo = {
   // ---------------- 세션 설정 (운영 버전) ----------------
   bindSetup() {
     if (!$('#setup')) return;
+    // desc 가 null 이면 작은 글씨 줄이 없다. 운동 방식 칸은 비워 두었다가 페달이 없을 때 까닭을 적는다 (pickSetup)
     const tile = (attrs, title, desc, extra = '') =>
-      html`<button class="su-opt" ${attrs}>${extra}<b>${title}</b><small>${desc}</small></button>`;
+      html`<button class="su-opt" ${attrs}>${extra}<b>${title}</b>${desc === null ? '' : html`<small>${desc}</small>`}</button>`;
     // 운동 방식 두 칸: 페달 + 두뇌 게임(자전거) / 두뇌 게임만(두뇌, 로고와 같은 모양)
     const icons = {
       dual: raw('<svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="22" r="8"/><circle cx="38" cy="22" r="8"/><path d="M10 22l8-13h13l7 13M18 9l6 13 7-13M15 5h7M31 9l-2-5h5"/></svg>'),
       brain: raw('<svg viewBox="-1 -0.85 2 1.7"><path fill="currentColor" d="M-0.95 0.05 C-1 -0.45 -0.6 -0.8 -0.1 -0.8 C0.45 -0.82 0.95 -0.5 0.95 -0.05 C0.97 0.25 0.85 0.42 0.62 0.45 C0.7 0.62 0.5 0.75 0.3 0.66 C0.22 0.62 0.18 0.56 0.15 0.52 L0.13 0.8 L0.01 0.8 L0.02 0.5 C-0.2 0.55 -0.45 0.5 -0.55 0.38 C-0.8 0.42 -0.92 0.28 -0.95 0.05 Z"/></svg>'),
     };
     $('#su-track').innerHTML = SESSION_TRACKS.map((track) =>
-      tile(html`data-track="${track.id}"`, track.label, track.desc, html`<i class="su-ico" aria-hidden="true">${icons[track.id]}</i>`)).join('');
-    $('#su-len').innerHTML = SESSION_LENGTHS.map((length) => tile(html`data-min="${length.min}"`, length.label, length.desc)).join('');
+      tile(html`data-track="${track.id}"`, track.label, '', html`<i class="su-ico" aria-hidden="true">${icons[track.id]}</i>`)).join('');
+    $('#su-len').innerHTML = SESSION_LENGTHS.map((length) => tile(html`data-min="${length.min}"`, length.label, null)).join('');
     $('#su-diff').innerHTML = SESSION_DIFFICULTIES.map((difficulty, i) =>
       tile(html`data-diff="${difficulty.id}"`, difficulty.label, difficulty.desc, html`<i class="su-bars" data-n="${i + 1}"><span></span><span></span><span></span></i>`)).join('');
     $('#setup').addEventListener('pointerdown', () => {
@@ -257,13 +258,12 @@ export const Demo = {
       const off = option.id === 'dual' && !pedal;
       button.classList.toggle('on', option.id === track);
       button.disabled = off;
-      button.querySelector('small').textContent = off ? '페달 연결 필요' : option.desc;
+      button.querySelector('small').textContent = off ? '페달 연결 필요' : '';
     });
     document.querySelectorAll('#su-len [data-min]').forEach((button) => button.classList.toggle('on', +button.dataset.min === min));
     document.querySelectorAll('#su-diff [data-diff]').forEach((button) => button.classList.toggle('on', button.dataset.diff === difficulty));
-    const chosen = SESSION_DIFFICULTIES.find((candidate) => candidate.id === difficulty);
-    $('#su-sum').textContent = `${min}분 · ${chosen ? chosen.label : ''} · ` +
-      (this.simResult ? '가상 결과: 게임 없이 바로 끝냅니다' : track === 'brain' ? '두뇌 게임만, 바로 시작합니다' : '페달 속도를 잰 뒤 시작합니다');
+    // 고른 것을 다시 적지 않는다. 가상 결과(운영 메뉴의 테스트)일 때만 그렇다고 알린다
+    $('#su-sum').textContent = this.simResult ? '가상 결과: 게임 없이 바로 끝냅니다' : '';
   },
 
   // 가상 결과의 그럴듯한 성적 (게임별 성적 · 점수 · 운동량). 고른 운동 방식(app.brainOnly)을 따른다

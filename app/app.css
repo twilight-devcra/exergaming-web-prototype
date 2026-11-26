@@ -626,7 +626,6 @@ body[data-theme="scenic"] {
   border-radius: 24px; background: var(--panel); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); animation: fadein 0.2s ease-out;
 }
 .idn-box h2 { margin: 0; font-size: clamp(24px, 4vh, 32px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
-.idn-sub { margin: 0; font-size: clamp(15px, 2.3vh, 17px); color: var(--ink-soft); }
 #idn-input {
   width: 100%; box-sizing: border-box; margin-top: 4px; padding: 12px 16px; border: 3px solid var(--line); border-radius: 14px;
   background: var(--bg); font: 700 clamp(24px, 4vh, 30px) var(--font); color: var(--ink);
@@ -716,7 +715,6 @@ body[data-theme="scenic"] {
 .dm-save-msg:empty { display: none; }
 .dm-phone .dm-id strong { color: var(--accent); }
 .dm-saved { margin: 0; font-size: 18px; color: var(--ink); }
-.dm-saved span { font-size: 15px; color: var(--ink-soft); }
 .dm-note { margin: 0; color: var(--ink-soft); }
 /* 손님의 새 회원 칸 맨 아래: QR 회원 카드 대신 아이디로 저장하기 (app/members.js saveAsNamed) */
 /* 손님의 고르기 칸: 아이디 만들기 · QR 회원 카드 받기 (센터/단체명이 있는 태블릿) */

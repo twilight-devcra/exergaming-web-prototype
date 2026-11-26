@@ -182,9 +182,9 @@
       </div>
       <p class="att-tagline">자전거를 타며 몸과 두뇌를 함께 단련하는<br>나만의 두뇌 트레이닝</p>
       <ol class="att-steps">
-        <li><b>1</b><span>준비 운동<small>내 속도 찾기 · <i id="att-calib"></i></small></span></li>
-        <li><b>2</b><span>두뇌 트레이닝<small>페달+두뇌 게임 · <i id="att-dur"></i></small></span></li>
-        <li><b>3</b><span>오늘의 리포트<small>그래프와 운동량</small></span></li>
+        <li><b>1</b><span>준비 운동<small><i id="att-calib"></i></small></span></li>
+        <li><b>2</b><span>두뇌 트레이닝<small><i id="att-dur"></i></small></span></li>
+        <li><b>3</b><span>오늘의 리포트</span></li>
       </ol>
       <button class="btn att-start" id="att-start">트레이닝 시작</button>
       <div class="att-hint" id="att-hint">시작 버튼을 누르거나 페달을 밟으면 시작합니다</div>
@@ -214,19 +214,19 @@
       <div class="lg-main">
         <button class="lg-opt lg-primary" id="lg-pick">
           <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></i>
-          <b>아이디로 들어가기</b><small>목록에서 아이디를 골라요</small>
+          <b>아이디로 들어가기</b>
         </button>
         <button class="lg-opt" id="lg-qr">
           <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><rect x="7.5" y="7.5" width="9" height="9" rx="1"/></svg></i>
-          <b>QR 회원 카드로 들어가기</b><small>회원 카드를 카메라에 비춰요</small>
+          <b>QR 회원 카드로 들어가기</b>
         </button>
         <button class="lg-opt" id="lg-new">
           <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.6 3.1-6 7-6 1.3 0 2.5.3 3.5.8M18 14v6M15 17h6"/></svg></i>
-          <b>새 아이디 만들기</b><small>처음 오셨으면 아이디를 만들어요</small>
+          <b>새 아이디 만들기</b>
         </button>
         <button class="lg-opt" id="lg-guest">
           <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.8 3.6-6 8-6s8 2.2 8 6"/></svg></i>
-          <b>손님으로 하기</b><small>기록 없이 해 봐요. <br>끝나고 아이디를 만들 수 있어요</small>
+          <b>손님으로 하기</b><small>끝나고 아이디를 만들 수 있어요</small>
         </button>
       </div>
       <p class="lg-note" id="lg-note"></p>
@@ -387,12 +387,12 @@
       <div class="dm-card">
         <div class="dm-qr"></div>
         <ol class="dm-steps">
-          <li>휴대폰 <b>카메라를 켜고</b> 이 QR 코드에 <b>비춰</b> 주세요 <small>(사진은 찍지 않아도 돼요)</small></li>
+          <li>휴대폰 <b>카메라를 켜고</b> 이 QR 코드에 <b>비춰</b> 주세요</li>
           <li>화면에 뜨는 <b>링크를 누르면</b> 회원 카드가 열려요</li>
           <li>회원 카드의 <b>'갤러리에 저장'</b>을 누르세요</li>
         </ol>
       </div>
-      <p class="dm-id">다음에 오시면 저장한 사진을 태블릿 카메라에 보여 주세요. 안 되면 회원 번호 <b></b> 를 눌러도 돼요</p>
+      <p class="dm-id">회원 번호 <b></b></p>
       <div class="dm-named"><span>QR 대신</span><button class="btn" type="button">아이디로 저장하기</button></div>
     </div>
   </template>
@@ -419,7 +419,6 @@
         <dt>평균 속도</dt><dd class="rp-rpm"></dd>
         <dt>속도 유지</dt><dd class="rp-keep"></dd>
       </dl>
-      <div class="dr-fine">페달 속도로 어림한 값입니다. 거리는 한 바퀴 6 m, 열량은 운동 강도표(MET)와 체중 65 kg 기준</div>
       <!-- 두뇌 게임만 한 판: 위의 운동량 대신 이것만 보인다 (.dr-ex.brain-only) -->
       <p class="dr-ex-none">오늘은 페달 없이<br><b>두뇌 게임만</b> 했어요</p>
     </div>
@@ -430,7 +429,6 @@
   <div id="id-new" class="overlay">
     <form class="idn-box" id="idn-form" autocomplete="off">
       <h2 id="idn-title">새 아이디 만들기</h2>
-      <p class="idn-sub">한글 · 영문 · 숫자로 12자까지, 띄어쓰기 없이</p>
       <input id="idn-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="아이디">
       <p class="idn-msg" id="idn-msg" aria-live="polite"></p>
       <div class="idn-btns">

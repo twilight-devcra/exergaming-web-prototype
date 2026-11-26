@@ -26,10 +26,11 @@ export class ArtGame {
   static title = '그림 조각 기억하기';
   static hint = '그림을 잘 봐 두었다가<br>칸이 뒤집히면 노란 칸에 있던 조각을 고르세요';
   // cols × rows 칸 (가로 × 세로), show = 그림을 보여 주는 시간(ms), choices = 보기 수
+  // calm = 차분한 그림 (종이 2~3장, 가로지르는 선 없음, 작은 무늬는 크고 굵은 것만). 스케치 1회차에 Lv3 이 생각보다 어려워 Lv1~3 에 쓴다
   static levels = [
-    { cols: 2, rows: 1, show: 5000, choices: 2, pick: 'any' },
-    { cols: 2, rows: 2, show: 4500, choices: 2, pick: 'far' },
-    { cols: 3, rows: 2, show: 4000, choices: 3, pick: 'any' },
+    { cols: 2, rows: 1, show: 5000, choices: 2, pick: 'any', calm: true },
+    { cols: 2, rows: 2, show: 4500, choices: 2, pick: 'far', calm: true },
+    { cols: 3, rows: 2, show: 4000, choices: 3, pick: 'any', calm: true },
     { cols: 3, rows: 3, show: 4000, choices: 3, pick: 'far' },
     { cols: 3, rows: 3, show: 3500, choices: 4, pick: 'near' },
     { cols: 3, rows: 3, show: 3500, choices: 4, pick: 'near', altered: true },
@@ -69,12 +70,12 @@ export class ArtGame {
   }
 
   // 바로 앞 판과 색 묶음이 다른 그림 (?seed=N 이면 그 그림)
-  static newPicture({ cols, rows }) {
+  static newPicture({ cols, rows, calm }) {
     const forced = Number(new URLSearchParams(location.search).get('seed'));
-    if (forced) return makePicture(cols, rows, forced);
+    if (forced) return makePicture(cols, rows, forced, { calm });
     let pic;
     for (let tries = 0; tries < 10; tries++) {
-      pic = makePicture(cols, rows, 1 + Util.randomBelow(1e6));
+      pic = makePicture(cols, rows, 1 + Util.randomBelow(1e6), { calm });
       if (pic.palette !== ArtGame.lastPalette) break;
     }
     ArtGame.lastPalette = pic.palette;

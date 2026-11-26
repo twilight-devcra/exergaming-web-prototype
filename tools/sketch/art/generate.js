@@ -1,6 +1,6 @@
 // 그림 조각 기억하기 (art) — 그림 만들기 시제품 (A+C 화풍). 설계 카드: docs/games/drafts/art.md
 // 사용자가 '만든 그림이 서로 너무 닮지 않은지' 보려고 2단계에서 미리 만들었다. 진짜 게임으로 옮길 때 다듬는다.
-// makePicture(cols, rows, seed) → { cols, rows, seed, palette, heroes, attempts, parts(p) }  (pictures.js 의 손 그림과 같은 모양)
+// makePicture(cols, rows, seed, { calm }) → { cols, rows, seed, palette, heroes, attempts, parts(p) }  (pictures.js 의 손 그림과 같은 모양)
 //
 // 차례: 색종이 나누기 → 종이 사이 흰 틈 → 큰 모양(1~2) → 가로지르는 선 → 칸마다 작은 무늬 → 칸이 저마다 다른지 확인
 //   - 색종이: 가장 넓은 종이를 비스듬히 자르기를 되풀이한다. 자른 선의 두 끝은 칸 경계에서 22 이상 떨어진다 (조각에 부스러기가 남지 않게)
@@ -141,6 +141,8 @@ const ACCENTS = {
   moon: (x, y, s, c, turn) => `<path d="M${f(x - s * 0.36)} ${y} A${f(s * 0.36)} ${f(s * 0.36)} 0 0 1 ${f(x + s * 0.36)} ${y} Z" fill="${c}" transform="rotate(${turn} ${x} ${y})"/>`,
 };
 const ACCENT_KINDS = ['tri', 'zigzag', 'checker', 'stripes', 'dots', 'ring', 'dot', 'square', 'cross', 'star', 'wave', 'moon'];
+// 차분한 그림(낮은 단계)은 굵고 이름 붙이기 쉬운 것만
+const CALM_KINDS = ['tri', 'square', 'star', 'dot', 'ring', 'zigzag', 'checker', 'moon'];
 const SIBLING = { tri: 'square', zigzag: 'bar', checker: 'stripes', stripes: 'checker', dots: 'bar', ring: 'dot', dot: 'square', square: 'dot', cross: 'ring', star: 'dot', wave: 'bar', moon: 'tri' };
 
 // 큰 모양: 여러 칸에 걸친다
@@ -210,14 +212,14 @@ function crossLine(r, W, H) {
 
 const overlap = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
 
-function attempt(cols, rows, seed) {
+function attempt(cols, rows, seed, calm) {
   const r = rng(seed);
   const W = cols * 100;
   const H = rows * 100;
   const tiles = cols * rows;
   const paletteName = pick(r, Object.keys(PALETTES));
   const colors = shuffle(r, PALETTES[paletteName]);
-  const { list, seams } = panels(r, W, H, Math.min(5, Math.max(2, Math.round(tiles / 2.2) + 1)));
+  const { list, seams } = panels(r, W, H, calm ? (tiles <= 2 ? 2 : 3) : Math.min(5, Math.max(2, Math.round(tiles / 2.2) + 1)));
   const panelColor = list.map((_, i) => colors[i % colors.length]);
   const groundAt = (x, y) => {
     const i = list.findIndex((poly) => inside([x, y], poly));
@@ -240,18 +242,19 @@ function attempt(cols, rows, seed) {
     }
     return h;
   });
-  const line = crossLine(r, W, H);
+  const line = calm ? '' : crossLine(r, W, H);
 
-  // 칸마다 작은 무늬 (큰 모양이 칸의 35% 넘게 덮으면 반쯤은 건너뛴다)
+  // 칸마다 작은 무늬 (큰 모양이 칸의 35% 넘게 덮으면 대개 건너뛴다. 차분한 그림은 늘 건너뛴다)
   const bag = [];
   const accents = [];
   for (const t of shuffle(r, [...Array(tiles).keys()])) {
     const box = tileBox(t);
-    const covered = heroes.some((h) => overlap(h.box, box) > 3500);
-    if (covered && r() < 0.8) continue;
-    if (!bag.length) bag.push(...shuffle(r, ACCENT_KINDS));
+    // 큰 모양이 덮은 칸: 보통은 35% 넘게, 차분한 그림은 25% 넘게 덮으면 그 부분만으로 알아볼 수 있다
+    const covered = heroes.some((h) => overlap(h.box, box) > (calm ? 2500 : 3500));
+    if (covered && (calm || r() < 0.8)) continue;
+    if (!bag.length) bag.push(...shuffle(r, calm ? CALM_KINDS : ACCENT_KINDS));
     const kind = bag.pop();
-    const s = between(r, 48, 64);
+    const s = calm ? between(r, 58, 70) : between(r, 48, 64);
     for (let tries = 0; tries < 25; tries++) {
       const margin = s / 2 + 8;
       const x = between(r, box[0] + margin, box[2] - margin);
@@ -289,10 +292,11 @@ function attempt(cols, rows, seed) {
 }
 
 // 칸이 저마다 다른 그림이 나올 때까지 씨앗을 바꿔 가며 만든다
-export function makePicture(cols, rows, seed) {
+// calm = 차분한 그림 (낮은 단계): 종이 2~3장, 가로지르는 선 없음, 큰 모양이 덮은 칸에는 작은 무늬를 두지 않고, 작은 무늬는 크고 굵은 것만
+export function makePicture(cols, rows, seed, { calm = false } = {}) {
   for (let i = 0; i < 50; i++) {
-    const pic = attempt(cols, rows, seed * 7919 + i);
+    const pic = attempt(cols, rows, seed * 7919 + i, calm);
     if (pic.ok) return { ...pic, seed, attempts: i + 1 };
   }
-  return { ...attempt(cols, rows, seed * 7919), seed, attempts: 50, failed: true };
+  return { ...attempt(cols, rows, seed * 7919, calm), seed, attempts: 50, failed: true };
 }

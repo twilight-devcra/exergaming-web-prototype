@@ -1,12 +1,13 @@
 # 그림 조각 기억하기 (`art`) — design card
 
-> Game-draft workflow ([README.md](README.md)). Mockup: [`tools/sketch/art/`](../../../tools/sketch/art/index.html) · generated pictures: [`gallery.html`](../../../tools/sketch/art/gallery.html) · style comparison: [`styles.html`](../../../tools/sketch/art/styles.html) (`node server.js` → http://localhost:5173/tools/sketch/art/).
+> Game-draft workflow ([README.md](README.md)). **Clickable sketch: [`play.html`](../../../tools/sketch/art/play.html)** · mockup: [`tools/sketch/art/`](../../../tools/sketch/art/index.html) · generated pictures: [`gallery.html`](../../../tools/sketch/art/gallery.html) · style comparison: [`styles.html`](../../../tools/sketch/art/styles.html) (`node server.js` → http://localhost:5173/tools/sketch/art/).
 
-**Status:** card · **mockup** (round 2) · sketch · approved · built
+**Status:** card · mockup · **sketch** (round 1) · approved · built
 **Gap it fills:** honestly, mostly **즉시 기억 (시각·위치)**, which is already over-represented (4 games). What's new is **연합 기억** (△, priority medium): "what was where" is an object-location pairing. Option D below would reach **지연 회상** (☐, priority high), but that needs session-level support.
 **Tags / clashes:** `Tag.MEMORY`, shared with path, symbol, cover, novel, box and recall. That makes 7 memory games out of 20, so rerun the order check (200 rounds, no adjacent similar games) when it's built.
 
 ## Review log
+- **Mockup → sketch:** `play.html` runs the real game shape on freshly generated pictures. The playthrough exposed an altered-copy loophole, now fixed (see Distractor kinds).
 - **Mockup round 2 verdict:** the generated pictures (gallery) are accepted for now, 3×4 busyness included. Next: the clickable sketch.
 - **Mockup round 1 → 2:** tablet layout **B** (choices at tile size, 2×2). **2 questions per game** (`ROUNDS = 2`). Asked to see many generated pictures to check they don't look alike, so a picture-generator prototype (`generate.js`) and a gallery were built ahead of the sketch.
 - **Card → mockup:** the A+C style was chosen. Lv1 is **1×2** (two tiles). Pictures don't have to be square: grids like 2×3 and 3×4 are fine.
@@ -66,7 +67,7 @@ It isn't a grid of random shapes but **one composition**: coloured paper panels,
 | | C. Reverse: show one piece, tap where it was on the hidden grid | location memory | 1-in-6 guessing at Lv3. Possible later variant |
 | | D. Delayed: show the picture at session start, ask at the end | **지연 회상** (☐, high) | needs a hook outside the minigame round; parked |
 
-**Distractor kinds:** *far* tiles (not adjacent) → *near* tiles (adjacent, sharing shapes across the seam) → at Lv6+ **one altered copy** of the target. **Loophole:** with two or more altered copies among the choices, the right one is simply "the one the others share" (the 금고 열기 leftover-digit problem). So allow at most one altered copy, and fill the other choices with real tiles. No rotated or mirrored distractors (the same policy as novel.js).
+**Distractor kinds:** *far* tiles (not adjacent) → *near* tiles (adjacent, sharing shapes across the seam) → at Lv6+ **one altered copy**: a piece with one small shape changed (zigzag → bar, dot → square …). **Loophole 1 (found in the sketch):** if the altered copy is always made from the right piece, two look-alike pieces always mean "the answer is one of these two", so a player who remembers nothing gets 50/50 instead of 25 %. So the altered copy is made from the right piece only about 40 % of the time, otherwise from one of the wrong tiles. With 4 choices, a look-alike pair then holds the answer less often than chance (40 % vs 50 %). **Loophole 2:** with two or more altered copies among the choices, the right one is simply "the one the others share" (the 금고 열기 leftover-digit problem). So allow at most one altered copy, and fill the other choices with real tiles. No rotated or mirrored distractors (the same policy as novel.js).
 
 ## Levels
 | Lv | Board | What makes it harder |
@@ -101,17 +102,27 @@ Sizes come from measuring the board (`fit` in `board.js`, a ResizeObserver like 
 - [x] One right answer: the choices are different tiles with different signatures. An altered copy changes a shape, not a shade.
 - [x] Intro diagram: ① 그림을 잘 봐 두기 → ② 노란 칸에 있던 조각 고르기.
 
-## Risks to check in the sketch
+## Clickable sketch (round 1)
+- `play.html` runs `ArtGame` (`art-game.js`, ready to move to `js/games/art.js`) on the stub host. Each game makes a fresh picture with `generate.js` and avoids the previous game's palette. Which tile is asked and which wrong answers appear follow the level's `pick` rule (far / near / any) plus the altered copy at Lv6 and Lv8. That is a small rule set rather than hand-written puzzles, since the pictures themselves are generated. Level bar at the bottom; `?level=N`, `?intro=0`, `?seed=N` (fix the picture).
+- Flow: picture for the level's show time → tiles flip in a 3D diagonal wave (90 ms per diagonal, 320 ms each; ~0.8 s at 3×4) → question 1 → 0.9 s (right) or 1.4 s (wrong, the right piece shown) → question 2 on the same picture, every tile hidden again → done.
+- Timer: `questionTime { base: 3, per: 0.6 }` × number of choices → Lv1 8.4 s and Lv2 6.9 s (with EASY_TIME), Lv3 4.8 s, Lv5–8 5.4 s.
+- Checked automatically: every level on the tablet and the phone (right answer, wrong answer, timeout, progress dots, score); 2,000 sampled questions per level (choice count, no duplicates, the answer present, no repeated tile, altered-copy source split).
+
+## Risks to check in the sketch (playtest checklist)
+- **Lv1 without help:** after the intro, does the player get "pick the piece that was under the yellow tile" on the first question? Watch for taps on the yellow tile itself.
 - Is 4 s enough to take in an abstract picture, or do older players fixate on one shape and fail the other tile?
 - **Lv1 1×2:** is "left or right piece" too trivial, or a good first step?
 - Does the flip read as "hidden", not "shuffled"?
 - "뭘 그린 거예요?": does abstract art feel pleasant or confusing? Nameable shapes may matter more than style.
 - **3×4 busyness:** can a player hold 12 pieces, or does Lv7–8 turn into guessing?
 - Edge shapes (a half-disc on the bottom edge) give away "bottom row". That's fair spatial reasoning, but check that it doesn't make Lv5+ trivial.
+- **Second question:** without seeing the picture again, can players still answer, or does Q2 feel like guessing?
+- **Altered copy (Lv6, Lv8):** do players notice the changed shape, or does it feel unfair?
+- **Timer:** is 4.8 s at Lv3 enough to compare 3 pieces, and does the bar add pressure the memory task doesn't need?
 
 ## Open questions for review
-1. Do the generated pictures (gallery) look varied enough, and abstract-art enough? In particular, are the 3×4 pictures too busy?
-2. Faint tile grid lines during study, so players know where the cuts are? (Recommended: no, keep it one picture. The flip shows the grid.)
-3. Altered-copy distractors from Lv6, at most one per question? (Recommended: yes.)
+1. Playing the sketch: does each level feel right, especially the steps Lv1 → Lv3 (1×2 to 2×3) and Lv6 → Lv7 (3×3 to 3×4)?
+2. Show times (Lv3 4 s, Lv8 3.5 s) and question timer (Lv3 4.8 s): too short, too long?
+3. Faint tile grid lines during study, so players know where the cuts are? (Recommended: no, keep it one picture. The flip shows the grid.)
 4. Option D (delayed recall) as a later follow-up? (Recommended: park it.)
 5. Title: 그림 조각 기억하기, or something shorter like 그림 조각 찾기?

@@ -19,4 +19,4 @@ When a game is built, keep its card. It records why the design is the way it is,
 | Game | Status |
 |---|---|
 | [금고 열기 (`safe`)](safe.md) | built: [`js/games/safe.js`](../../../js/games/safe.js) (generator checked by `node tools/safe-check.js`) |
-| [그림 조각 기억하기 (`art`)](art.md) | mockup round 2: [`tools/sketch/art/`](../../../tools/sketch/art/index.html), generated pictures in `gallery.html` |
+| [그림 조각 기억하기 (`art`)](art.md) | clickable sketch round 1: [`play.html`](../../../tools/sketch/art/play.html) |

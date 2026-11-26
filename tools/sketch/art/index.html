@@ -15,11 +15,11 @@
 <script type="module">
 // 그림 조각 기억하기 목업 (2단계, 2회차: 배치 B 로 정함, 한 판에 문제 2개). 설계 카드: docs/games/drafts/art.md. 화풍 비교(1단계 덤)는 styles.html.
 // 판은 board.js, 그림은 pictures.js (손 그림, A+C 화풍). 태블릿 배치 두 가지(big · same)와 휴대폰 배치 하나.
-import { Sketch, Diagram } from '../sketch.js';
-import { drawBoard, pictureSvg, staticTimer } from './board.js';
+import { Sketch } from '../sketch.js';
+import { drawBoard, staticTimer } from './board.js';
+import { ArtGame } from './art-game.js';
 
 const TITLE = '그림 조각 기억하기';
-const HINT = '그림을 잘 봐 두었다가<br>칸이 뒤집히면 노란 칸에 있던 조각을 고르세요';
 const MSG = {
   study: ['그림을 잘 보세요', 'look'], flip: ['그림을 잘 보세요', 'look'],
   ask: ['노란 칸에 있던 조각을 고르세요', 'act'], right: ['맞았어요!', 'good'], wrong: ['이 조각이었어요', 'bad'],
@@ -56,24 +56,12 @@ const variants = (layout, prefix) => [
   shot(`${prefix}-lv8-ask`, 'Lv8 묻기: 보기 4개 = 정답 · 바꾼 조각(원 → 네모) · 이웃 칸 둘', { ...LV8, layout, mode: 'ask' }, 0.8),
 ];
 
-// 소개: ① 그림 보기 → ② 칸이 뒤집히면 노란 칸의 조각 고르기
-const at = (svg, x, y, w, h) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${w}" height="${h}" `);
-const diagram = () => {
-  const backRect = (x, y, size, target) => target
-    ? `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="3" fill="#ffd23f" stroke="#b8860b" stroke-width="3"/><text x="${x + size / 2}" y="${y + size / 2 + 1}" text-anchor="middle" dominant-baseline="middle" font-family="Nunito" font-weight="900" font-size="30" fill="#5a4000">?</text>`
-    : `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="3" fill="#34456b"/>`;
-  // 보기 조각: 회색 테두리, 정답(right)은 초록 테두리
-  const choice = (tile, x, y, right) => at(pictureSvg('p12', tile), x, y, 44, 44) + `<rect x="${x - 2}" y="${y - 2}" width="48" height="48" rx="5" fill="none" stroke="${right ? '#22a06b' : '#c9c4b8'}" stroke-width="${right ? 4 : 2}"/>`;
-  return [
-    { svg: Diagram.svg('0 0 176 140', at(pictureSvg('p12'), 18, 30, 140, 70)), caption: '그림을 잘 봐 두기' },
-    { svg: Diagram.svg('0 0 176 140', backRect(40, 8, 46, true) + backRect(90, 8, 46) + choice(1, 36, 82) + choice(0, 96, 82, true) + Diagram.tap(118, 104)), caption: '노란 칸에 있던 조각 고르기' },
-  ];
-};
-const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음)', render: (stage) => Sketch.intro(stage, { name: TITLE, level: 1, steps: diagram(), hint: HINT }) });
+// 소개: 눌러 보는 스케치와 같은 그림 (ArtGame.diagram)
+const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음)', render: (stage) => Sketch.intro(stage, { name: TITLE, level: 1, steps: ArtGame.diagram(), hint: ArtGame.hint }) });
 
 Sketch.page({
   title: '그림 조각 기억하기 (art) · 목업 2회차',
-  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 화풍 비교: <a href="styles.html">styles.html</a> · 만든 그림 모음: <a href="gallery.html">gallery.html</a>. 이 화면의 그림은 손으로 그렸다.</p>`,
+  notes: `<p>설계 카드: <code>docs/games/drafts/art.md</code>. 화풍 비교: <a href="styles.html">styles.html</a> · 만든 그림 모음: <a href="gallery.html">gallery.html</a>. 이 화면의 그림은 손으로 그렸다. <b>눌러 보기: <a href="play.html">play.html</a></b></p>`,
   groups: [
     { title: '태블릿 — 배치 B (고름): 보기를 칸과 같은 크기로, 2줄', shots: [...variants('same', 'b'), introShot('intro')] },
     { title: '태블릿 — 배치 A (지난 안): 그림 옆에 큰 보기 한 줄', shots: variants('big', 'a').filter((one) => /-(lv3-ask|lv8-ask)$/.test(one.id)) },

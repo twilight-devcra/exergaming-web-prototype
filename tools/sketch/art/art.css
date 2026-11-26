@@ -34,3 +34,11 @@
   font: 900 20px/1 Nunito, sans-serif; font-style: normal; color: #fff; background: #22a06b; box-shadow: 0 0 0 2px #fff; }
 .wrong .art-mark { background: #d93f3f; }
 .art-slot { width: var(--c); height: var(--c); border: 3px dashed rgba(52,69,107,.28); border-radius: 10px; box-sizing: border-box; }
+
+/* 뒤집기 (눌러 보는 스케치): 앞면 = 그림 조각, 뒷면 = 칸 뒷면. 대각선 번호 --d 마다 FLIP_STEP 늦게 돈다 (art-game.js 와 같은 값) */
+.art-flip { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .32s ease-in-out calc(var(--d) * 90ms); }
+.art-front, .art-flip > .art-back { position: absolute; inset: 0; backface-visibility: hidden; }
+.art-front svg { display: block; width: 100%; height: 100%; }
+.art-flip > .art-back { transform: rotateY(180deg); }
+.flipped .art-flip { transform: rotateY(180deg); }
+.art-choice:active { transform: scale(.96); }

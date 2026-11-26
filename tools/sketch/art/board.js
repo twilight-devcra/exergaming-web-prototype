@@ -47,7 +47,10 @@ export function drawBoard(body, state) {
   for (let i = 0; i < cols * rows; i++) {
     const cell = element('div', 'art-tile');
     const diagonal = (i % cols) + Math.floor(i / cols);
-    if (state.mode === 'study') cell.innerHTML = pictureSvg(state.pic, i);
+    // 그림 보기: 칸마다 앞면(그림 조각)과 뒷면을 겹쳐 둔다. 판에 flipped 를 붙이면 대각선 차례(--d)로 뒤집힌다 (art.css)
+    if (state.mode === 'study') {
+      cell.innerHTML = `<div class="art-flip" style="--d: ${diagonal}"><div class="art-front">${pictureSvg(state.pic, i)}</div>${back()}</div>`;
+    }
     else if (state.mode === 'flip') {
       cell.innerHTML = diagonal < state.front ? back() : diagonal === state.front ? `<div class="art-half">${back()}</div>` : pictureSvg(state.pic, i);
     } else if (done && i === state.target) {
@@ -64,6 +67,7 @@ export function drawBoard(body, state) {
     for (const choice of state.choices) {
       const { tile, alter } = choiceOf(choice);
       const button = element('button', 'art-choice', pictureSvg(state.pic, tile, alter));
+      button.dataset.choice = choice;
       const right = tile === state.target && !alter;
       if (done && right) button.classList.add('right');
       if (done && choice === state.picked && !right) button.classList.add('wrong');

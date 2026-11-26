@@ -7,6 +7,7 @@
 **Tags / clashes:** `Tag.MEMORY`, shared with path, symbol, cover, novel, box and recall. That makes 7 memory games out of 20, so rerun the order check (200 rounds, no adjacent similar games) when it's built.
 
 ## Review log
+- **Mockup round 2 verdict:** the generated pictures (gallery) are accepted for now, 3×4 busyness included. Next: the clickable sketch.
 - **Mockup round 1 → 2:** tablet layout **B** (choices at tile size, 2×2). **2 questions per game** (`ROUNDS = 2`). Asked to see many generated pictures to check they don't look alike, so a picture-generator prototype (`generate.js`) and a gallery were built ahead of the sketch.
 - **Card → mockup:** the A+C style was chosen. Lv1 is **1×2** (two tiles). Pictures don't have to be square: grids like 2×3 and 3×4 are fine.
 

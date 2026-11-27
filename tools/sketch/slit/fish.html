@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>틈으로 보고 찾기 · 물고기</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+  <style>
+    :root { --ink: #1f2328; --paper: #ffffff; --page: #f3f1ec; --band: #2b2f36; --muted: #6b6f76; --line: #d9d5cc; --good: #2f8f4e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font-family: 'IBM Plex Sans KR', sans-serif; }
+    header { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+    h1 { margin: 0 0 4px; font-size: 18px; }
+    h2 { font-size: 16px; margin: 0 0 8px; }
+    header p, .note { margin: 0 0 10px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; }
+    .controls label { display: flex; align-items: center; gap: 6px; }
+    .controls output { min-width: 3em; font-variant-numeric: tabular-nums; }
+    button { font: inherit; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); cursor: pointer; }
+    main { padding: 16px; display: grid; gap: 16px; }
+    section { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-x: auto; }
+    .window { position: relative; height: 150px; overflow: hidden; background: var(--paper); border-radius: 8px; width: 720px; max-width: 100%; }
+    .window .item { position: absolute; top: 15px; left: 0; will-change: transform; }
+    .window .panel { position: absolute; top: 0; bottom: 0; background: var(--band); transition: opacity .2s; }
+    .window .slit-edge { position: absolute; top: 0; bottom: 0; border-left: 2px solid #f2c94c; border-right: 2px solid #f2c94c; pointer-events: none; }
+    body.peek .window .panel { opacity: .55; }
+    .choices { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .choice { border: 2px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--paper); }
+    .choice .change { display: none; font-size: 12px; color: var(--muted); margin-top: 4px; }
+    body.reveal .choice .change { display: block; }
+    body.reveal .choice.answer { border-color: var(--good); box-shadow: 0 0 0 2px var(--good); }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .gallery > div { border: 1px solid var(--line); border-radius: 8px; padding: 4px; display: flex; justify-content: center; }
+    table { border-collapse: collapse; font-size: 13px; }
+    td, th { border-bottom: 1px solid var(--line); padding: 4px 10px 4px 0; text-align: left; vertical-align: top; }
+    svg { display: block; color: var(--ink); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>틈으로 보고 찾기 · 물고기 생성기</h1>
+  <p>Every choice is one change from a hidden base fish (no "centre" card). The top one swims past the slit. Throwaway preview for docs/games/drafts/slit.md.</p>
+  <div class="controls">
+    <label>물고기 복잡도 <select id="complexity"><option value="1">1 단순</option><option value="2" selected>2 보통</option><option value="3">3 자세함</option></select></label>
+    <label>차이 <select id="change-size"><option value="big">큰 차이 (종류)</option><option value="mixed" selected>섞음</option><option value="small">작은 차이 (개수·눈·입)</option></select></label>
+    <label>물고기 수 <select id="school-size"><option>1</option><option>2</option><option>3</option></select></label>
+    <label>보기 수 <select id="choice-count"><option>2</option><option>3</option><option selected>4</option></select></label>
+    <button id="regenerate">새로 만들기</button> <output id="seed-out"></output>
+  </div>
+  <div class="controls" style="margin-top:8px">
+    <label>틈 너비 (물고기 한 마리 대비) <input id="slit-fraction" type="range" min="0.06" max="0.6" step="0.02" value="0.25"> <output id="slit-fraction-out"></output></label>
+    <label>한 마리 지나가는 시간 <input id="pass-seconds" type="range" min="0.6" max="4" step="0.1" value="1.8"> <output id="pass-seconds-out"></output></label>
+    <label><input id="peek" type="checkbox"> 가림막 반투명</label>
+    <label><input id="reveal" type="checkbox"> 정답·바뀐 곳 표시</label>
+    <label><input id="paused" type="checkbox"> 멈춤</label>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>문제</h2>
+    <div class="window" id="window"><div class="item" id="item"></div><div class="panel" id="left-panel"></div><div class="panel" id="right-panel"></div><div class="slit-edge" id="slit-edge"></div></div>
+    <div class="choices" id="choices"></div>
+  </section>
+  <section>
+    <h2>몸 모양 5가지</h2>
+    <p class="note">Same tail, fin and eye; only the body differs. Lv1 uses 날씬 · 둥긂 · 상자, complexity 2 adds 마름모, 3 adds 혹 머리.</p>
+    <div class="gallery" id="bodies"></div>
+  </section>
+  <section>
+    <h2>이 복잡도에서 만든 물고기 24마리</h2>
+    <p class="note">Do they look different enough from one another across games, and is each one still a fish?</p>
+    <div class="gallery" id="gallery"></div>
+  </section>
+  <section>
+    <h2>손잡이 (knobs)</h2>
+    <table id="knob-table"></table>
+  </section>
+</main>
+<script type="module">
+import { makeRandom, FEATURES, BODIES, randomFish, schoolSvg, schoolWidth, makeQuestion, FISH_WIDTH } from './fish.js';
+
+// ---------- page ----------
+const controlValue = (id) => document.getElementById(id).value;
+const itemElement = document.getElementById('item');
+const windowElement = document.getElementById('window');
+const ITEM_HEIGHT_PX = 120;
+const fishWidthPx = (FISH_WIDTH * ITEM_HEIGHT_PX) / 100;
+let seed = 1;
+let view = { itemWidthPx: fishWidthPx, slitLeft: 0, slitWidth: 0 };
+
+const render = () => {
+  const complexity = Number(controlValue('complexity'));
+  const question = makeQuestion(seed, complexity, controlValue('change-size'), Number(controlValue('school-size')), Number(controlValue('choice-count')));
+  document.getElementById('seed-out').textContent = `seed ${seed}`;
+  const answer = question.choices[question.answerIndex];
+  itemElement.innerHTML = schoolSvg(answer.school, ITEM_HEIGHT_PX);
+  view.itemWidthPx = (schoolWidth(answer.school) * ITEM_HEIGHT_PX) / 100;
+  document.getElementById('choices').innerHTML = question.choices.length < Number(controlValue('choice-count'))
+    ? '<p class="note">Not enough features to change at this setting. Try more fish, a higher complexity or mixed changes.</p>'
+    : '';
+  document.getElementById('choices').innerHTML += question.choices.map((choice, i) =>
+    `<div class="choice${i === question.answerIndex ? ' answer' : ''}">${schoolSvg(choice.school, 64)}<div class="change">${choice.change}</div></div>`).join('');
+  document.getElementById('bodies').innerHTML = Object.keys(BODIES).map((body) =>
+    `<div>${schoolSvg([{ body, tail: 'forked', dorsal: 'sail', ventral: 'one', pattern: 'none', count: 1, eye: 'dot', mouth: 'closed', gill: 'none' }], 64)}</div>`).join('');
+  const galleryRandom = makeRandom(seed * 7919);
+  document.getElementById('gallery').innerHTML = Array.from({ length: 24 }, () => `<div>${schoolSvg([randomFish(galleryRandom, complexity)], 56)}</div>`).join('');
+  layoutSlit();
+};
+
+const layoutSlit = () => {
+  const slitFraction = Number(controlValue('slit-fraction'));
+  document.getElementById('slit-fraction-out').textContent = `${Math.round(slitFraction * 100)}%`;
+  document.getElementById('pass-seconds-out').textContent = `${Number(controlValue('pass-seconds')).toFixed(1)} 초`;
+  view.slitWidth = Math.max(6, slitFraction * fishWidthPx);
+  view.slitLeft = (windowElement.clientWidth - view.slitWidth) / 2;
+  document.getElementById('left-panel').style.cssText = `left:0;width:${view.slitLeft}px`;
+  document.getElementById('right-panel').style.cssText = `left:${view.slitLeft + view.slitWidth}px;right:0`;
+  document.getElementById('slit-edge').style.cssText = `left:${view.slitLeft - 2}px;width:${view.slitWidth + 4}px`;
+};
+
+for (const id of ['complexity', 'change-size', 'school-size', 'choice-count']) document.getElementById(id).addEventListener('change', render);
+for (const id of ['slit-fraction', 'pass-seconds']) document.getElementById(id).addEventListener('input', layoutSlit);
+document.getElementById('regenerate').addEventListener('click', () => { seed += 1; render(); });
+for (const id of ['peek', 'reveal']) {
+  const input = document.getElementById(id);
+  input.addEventListener('change', () => document.body.classList.toggle(id, input.checked));
+}
+window.addEventListener('resize', layoutSlit);
+
+// Speed is set per fish: one fish width crosses the slit in pass-seconds, so a school takes longer.
+let animationSeconds = 0;
+let previousFrameMs = performance.now();
+const GAP_SECONDS = 0.5;
+const animate = (frameMs) => {
+  if (!document.getElementById('paused').checked) animationSeconds += (frameMs - previousFrameMs) / 1000;
+  previousFrameMs = frameMs;
+  const pixelsPerSecond = (fishWidthPx + view.slitWidth) / Number(controlValue('pass-seconds'));
+  const travel = view.slitWidth + view.itemWidthPx;
+  const passSeconds = travel / pixelsPerSecond;
+  const progress = (animationSeconds % (passSeconds + GAP_SECONDS)) / passSeconds;
+  itemElement.style.transform = `translateX(${view.slitLeft + view.slitWidth - Math.min(progress, 1) * travel}px)`;
+  itemElement.style.visibility = progress <= 1 ? 'visible' : 'hidden';
+  requestAnimationFrame(animate);
+};
+
+// Knob table: what each control could become in the level table.
+const KNOBS = [
+  ['물고기 복잡도', 'How many features a fish has (1: body, tail, back fin, stripes · 3: adds belly fins, eye, mouth, gill). More features = more to hold while it passes.'],
+  ['차이 크기', 'Big = a different kind of part (tail fork → round). Small = a count or a detail (2 stripes → 3, small eye → big eye).'],
+  ['바뀐 곳의 위치', 'Head and tail pass the slit first and last; a change mid-body sits between other details. (Not a control yet; follows from the feature.)'],
+  ['물고기 수 (떼)', '2–3 fish in a row: which fish changed must be kept too. Choices get wide, so it suits the tablet more than the phone.'],
+  ['보기 수', '2 → 4.'],
+  ['틈 너비', 'Fraction of one fish visible at once.'],
+  ['빠르기', 'Seconds for one fish to cross; a school takes proportionally longer.'],
+  ['다시 보기', 'Loop vs one pass (in the card: loop until Lv4).'],
+];
+document.getElementById('knob-table').innerHTML = KNOBS.map(([knob, meaning]) => `<tr><th>${knob}</th><td>${meaning}</td></tr>`).join('');
+
+// URL presets for screenshots: ?complexity=3&change=small&school=2&choices=3&seed=5&reveal=1&peek=1
+const urlParameters = new URLSearchParams(location.search);
+const presetControls = { complexity: 'complexity', change: 'change-size', school: 'school-size', choices: 'choice-count' };
+for (const [parameter, id] of Object.entries(presetControls)) if (urlParameters.has(parameter)) document.getElementById(id).value = urlParameters.get(parameter);
+if (urlParameters.has('seed')) seed = Number(urlParameters.get('seed'));
+for (const id of ['peek', 'reveal']) if (urlParameters.get(id) === '1') { document.getElementById(id).checked = true; document.body.classList.add(id); }
+
+render();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

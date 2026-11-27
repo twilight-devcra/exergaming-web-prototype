@@ -19,5 +19,6 @@ import { ChainGame } from './chain.js';
 import { BlankGame } from './blank.js';
 import { SafeGame } from './safe.js';
 import { ArtGame } from './art.js';
+import { SlitGame } from './slit.js';
 
-export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, PipeGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame, RecallGame, ChainGame, BlankGame, SafeGame, ArtGame];
+export const GAME_TYPES = [PathGame, SymbolGame, ArithGame, CountGame, FitGame, SeekGame, CoverGame, PipeGame, NovelGame, TrackGame, FollowGame, PairGame, BoxGame, CompareGame, CoinGame, RecallGame, ChainGame, BlankGame, SafeGame, ArtGame, SlitGame];

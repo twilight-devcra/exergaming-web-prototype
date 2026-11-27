@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>틈으로 보고 찾기 · 종류 비교</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+  <style>
+    :root { --ink: #1f2328; --paper: #ffffff; --page: #f3f1ec; --band: #2b2f36; --muted: #6b6f76; --line: #d9d5cc; --good: #2f8f4e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font-family: 'IBM Plex Sans KR', sans-serif; }
+    header { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+    h1 { margin: 0 0 4px; font-size: 18px; }
+    header p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; font-size: 14px; }
+    .controls label { display: flex; align-items: center; gap: 6px; }
+    .controls output { min-width: 3.5em; font-variant-numeric: tabular-nums; }
+    main { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; padding: 16px; }
+    @media (max-width: 600px) { main { grid-template-columns: 1fr; } }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .card h2 { margin: 0; font-size: 16px; }
+    .card .skill { margin: 2px 0 10px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .window { position: relative; height: 150px; overflow: hidden; background: var(--paper); border-radius: 8px; margin: 0 auto; max-width: 100%; }
+    .window .item { position: absolute; top: 15px; left: 0; will-change: transform; }
+    .window .panel { position: absolute; top: 0; bottom: 0; background: var(--band); transition: opacity .2s; }
+    .window .slit-edge { position: absolute; top: 0; bottom: 0; border-left: 2px solid #f2c94c; border-right: 2px solid #f2c94c; pointer-events: none; }
+    body.peek .window .panel { opacity: .55; }
+    .choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .choice { border: 2px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--paper); display: flex; align-items: center; }
+    body.reveal .choice.answer { border-color: var(--good); box-shadow: 0 0 0 2px var(--good); }
+    svg { display: block; color: var(--ink); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>틈으로 보고 찾기 · 종류 비교</h1>
+  <p>Each kind slides right to left behind the dark band; only the slit (yellow edges) shows it. The cards below are the choices (one change each). Throwaway preview for docs/games/drafts/slit.md.</p>
+  <div class="controls">
+    <label>틈 너비 <input id="slit-fraction" type="range" min="0.08" max="0.6" step="0.02" value="0.25"> <output id="slit-fraction-out"></output></label>
+    <label>한 번 지나가는 시간 <input id="pass-seconds" type="range" min="0.8" max="5" step="0.1" value="2.2"> <output id="pass-seconds-out"></output></label>
+    <label><input id="peek" type="checkbox"> 가림막 반투명 (전체 보기)</label>
+    <label><input id="reveal" type="checkbox"> 정답 표시</label>
+    <label><input id="paused" type="checkbox"> 멈춤</label>
+  </div>
+</header>
+<main id="cards"></main>
+<script>
+// All items are drawn in a viewBox 100 units high; each kind sets its own width.
+// items[0] is the one that scrolls past; the rest are the distractors (one change each).
+
+let clipCounter = 0;
+
+const KOREAN_FONT = `font-family="IBM Plex Sans KR, sans-serif" font-weight="700" fill="currentColor"`;
+const textItem = (text, width, fontSize, baselineY) =>
+  `<text x="${width / 2}" y="${baselineY}" text-anchor="middle" font-size="${fontSize}" ${KOREAN_FONT}>${text}</text>`;
+
+// ---- line drawing on a dot grid ----
+const gridPoint = ([column, row]) => [22 + 39 * column, 14 + 36 * row];
+const lineDrawing = (segments) => {
+  let dots = '';
+  for (let column = 0; column < 5; column++) for (let row = 0; row < 3; row++) {
+    const [dotX, dotY] = gridPoint([column, row]);
+    dots += `<circle cx="${dotX}" cy="${dotY}" r="4" fill="#bbb"/>`;
+  }
+  const lines = segments.map(([from, to]) => {
+    const [fromX, fromY] = gridPoint(from); const [toX, toY] = gridPoint(to);
+    return `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}"/>`;
+  }).join('');
+  return `${dots}<g stroke="currentColor" stroke-width="9" stroke-linecap="round">${lines}</g>`;
+};
+const DRAWING_BASE = [[[0, 2], [1, 0]], [[1, 0], [2, 1]], [[2, 1], [3, 1]], [[3, 1], [4, 0]], [[2, 1], [2, 2]]];
+const withSegment = (index, segment) => DRAWING_BASE.map((original, i) => (i === index ? segment : original));
+
+// ---- key ----
+const keyItem = (teethHeights, squareBow = false) => {
+  const bow = squareBow
+    ? `M12,20 h60 v60 h-60 z M30,50 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0`
+    : `M10,50 a32,32 0 1,0 64,0 a32,32 0 1,0 -64,0 M30,50 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0`;
+  const teeth = teethHeights.map((toothHeight, i) => `<rect x="${158 + i * 30}" y="56" width="20" height="${toothHeight}"/>`).join('');
+  return `<g fill="currentColor"><path fill-rule="evenodd" d="${bow}"/><rect x="70" y="42" width="182" height="16" rx="3"/>${teeth}</g>`;
+};
+
+// ---- face ----
+const eye = (centerX, open) => (open
+  ? `<circle cx="${centerX}" cy="40" r="8" fill="currentColor"/>`
+  : `<path d="M${centerX - 10},40 q10,9 20,0" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>`);
+const MOUTHS = { smile: 'M60,64 q30,24 60,0', frown: 'M60,78 q30,-20 60,0', flat: 'M60,71 h60' };
+const faceItem = (leftOpen, rightOpen, mouth) =>
+  `<ellipse cx="90" cy="50" rx="82" ry="46" fill="none" stroke="currentColor" stroke-width="7"/>${eye(55, leftOpen)}${eye(125, rightOpen)}` +
+  `<path d="${MOUTHS[mouth]}" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>`;
+
+// ---- skyline ----
+const skylineItem = (buildings) => buildings.map(([buildingHeight, roof], i) => {
+  const left = 4 + i * 58; const top = 100 - buildingHeight; const buildingWidth = 54;
+  let shape = `<rect x="${left}" y="${top}" width="${buildingWidth}" height="${buildingHeight}"/>`;
+  if (roof === 'tri') shape += `<polygon points="${left},${top} ${left + buildingWidth / 2},${top - 18} ${left + buildingWidth},${top}"/>`;
+  if (roof === 'dome') shape += `<path d="M${left},${top} a27,27 0 0,1 54,0 z"/>`;
+  return shape;
+}).join('').replace(/^/, '<g fill="currentColor">') + '</g>';
+const SKYLINE_BASE = [[55, 'flat'], [66, 'tri'], [40, 'flat'], [58, 'dome'], [50, 'flat']];
+const withBuilding = (index, building) => SKYLINE_BASE.map((original, i) => (i === index ? building : original));
+
+// ---- train ----
+const cargoShape = (kind, centerX) => {
+  if (kind === 'circle') return `<circle cx="${centerX}" cy="33" r="16"/>`;
+  if (kind === 'tri') return `<polygon points="${centerX - 18},49 ${centerX},15 ${centerX + 18},49"/>`;
+  return `<rect x="${centerX - 15}" y="19" width="30" height="30"/>`;
+};
+const trainItem = (cargo) => {
+  let parts = `<rect x="6" y="40" width="70" height="40" rx="4"/><rect x="46" y="16" width="30" height="26"/><rect x="16" y="22" width="12" height="20"/>` +
+    `<circle cx="24" cy="86" r="10"/><circle cx="60" cy="86" r="10"/>`;
+  cargo.forEach((kind, i) => {
+    const left = 86 + i * 80;
+    parts += `<rect x="${left - 10}" y="66" width="12" height="4"/><rect x="${left}" y="50" width="72" height="30" rx="3"/>` +
+      `<circle cx="${left + 16}" cy="86" r="10"/><circle cx="${left + 56}" cy="86" r="10"/>${cargoShape(kind, left + 36)}`;
+  });
+  return `<g fill="currentColor">${parts}</g>`;
+};
+
+// ---- barcode ----
+const barcodeItem = (pattern) => {
+  let cursor = 8; let bars = '';
+  for (const bar of pattern) {
+    const barWidth = bar === 'W' ? 16 : 6;
+    bars += `<rect x="${cursor}" y="8" width="${barWidth}" height="84"/>`;
+    cursor += barWidth + 9;
+  }
+  return `<g fill="currentColor">${bars}</g>`;
+};
+
+// ---- symbol strip ----
+const symbolShape = (kind, centerX) => {
+  const stroke = 'fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"';
+  if (kind === 'circle') return `<circle cx="${centerX}" cy="50" r="26" ${stroke}/>`;
+  if (kind === 'tri') return `<polygon points="${centerX - 29},76 ${centerX},22 ${centerX + 29},76" ${stroke}/>`;
+  if (kind === 'square') return `<rect x="${centerX - 25}" y="25" width="50" height="50" ${stroke}/>`;
+  if (kind === 'plus') return `<path d="M${centerX},22 v56 M${centerX - 28},50 h56" ${stroke} stroke-linecap="round"/>`;
+  const starPoints = Array.from({ length: 10 }, (_, i) => {
+    const angle = (-90 + i * 36) * Math.PI / 180; const radius = i % 2 ? 13 : 31;
+    return `${(centerX + Math.cos(angle) * radius).toFixed(1)},${(52 + Math.sin(angle) * radius).toFixed(1)}`;
+  }).join(' ');
+  return `<polygon points="${starPoints}" ${stroke}/>`;
+};
+const symbolStripItem = (symbols) => symbols.map((kind, i) => symbolShape(kind, 40 + i * 70)).join('');
+
+// ---- heartbeat line ----
+const heartbeatItem = (features) => {
+  let cursor = 4; const points = [[cursor, 60]];
+  for (const feature of features) {
+    if (feature === 'flat') { cursor += 30; points.push([cursor, 60]); continue; }
+    if (feature === 'spike') points.push([cursor + 10, 10], [cursor + 22, 84], [cursor + 34, 60]);
+    if (feature === 'bump') points.push([cursor + 8, 44], [cursor + 17, 38], [cursor + 26, 44], [cursor + 34, 60]);
+    if (feature === 'dip') points.push([cursor + 12, 88], [cursor + 22, 88], [cursor + 34, 60]);
+    cursor += 34;
+  }
+  return `<polyline points="${points.map((point) => point.join(',')).join(' ')}" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>`;
+};
+const HEARTBEAT_BASE = ['flat', 'spike', 'flat', 'bump', 'flat', 'dip', 'flat', 'spike', 'flat'];
+const withFeature = (index, feature) => HEARTBEAT_BASE.map((original, i) => (i === index ? feature : original));
+
+// ---- fish ----
+const fishItem = ({ tail, topFin, stripes }) => {
+  const clipId = `fish-clip-${clipCounter++}`;
+  const tails = {
+    forked: '<polygon points="196,50 250,16 236,50 250,84"/>',
+    round: '<ellipse cx="224" cy="50" rx="30" ry="26"/>',
+  };
+  const stripeMarks = Array.from({ length: stripes }, (_, i) => `<rect x="${120 + i * 26}" y="0" width="10" height="100" fill="#fff"/>`).join('');
+  return `<defs><clipPath id="${clipId}"><ellipse cx="115" cy="50" rx="86" ry="34"/></clipPath></defs>` +
+    `<g fill="currentColor">${tails[tail]}${topFin ? '<polygon points="100,20 150,4 156,22"/>' : ''}<polygon points="110,80 140,96 146,80"/>` +
+    `<ellipse cx="115" cy="50" rx="86" ry="34"/></g><g clip-path="url(#${clipId})">${stripeMarks}</g>` +
+    `<circle cx="62" cy="42" r="7" fill="#fff"/>`;
+};
+
+const KINDS = [
+  { name: '낱말', width: 190, skill: 'Reading through the slit: a narrow slit shows jamo strokes, not syllables. Distractor: one syllable different.',
+    items: ['사자', '사과', '가자', '상자'].map((word) => textItem(word, 190, 78, 80)) },
+  { name: '큰 글자 한 자', width: 112, skill: 'One syllable block taken apart stroke by stroke (초성 → 중성 → 받침). Distractor: one jamo different.',
+    items: ['봄', '봅', '붐', '범'].map((syllable) => textItem(syllable, 112, 100, 88)) },
+  { name: '숫자 줄', width: 220, skill: 'Close to sequential reading; easy closure. IADL flavour (a phone number, a bus number).',
+    items: ['3172', '3712', '3127', '8172'].map((digits) => textItem(digits, 220, 74, 78)) },
+  { name: '선 그림 (점 격자)', width: 200, skill: 'Pure shape integration: where does each line go? The dots give positions a frame.',
+    items: [lineDrawing(DRAWING_BASE), lineDrawing(withSegment(4, [[3, 1], [3, 2]])), lineDrawing(withSegment(3, [[3, 1], [4, 2]])), lineDrawing(withSegment(0, [[0, 0], [1, 0]]))] },
+  { name: '물건 실루엣 (열쇠)', width: 262, skill: 'A familiar object: the whole is known at once, so attention goes to the detail (teeth, bow).',
+    items: [keyItem([24, 12, 24]), keyItem([12, 24, 24]), keyItem([24, 24, 12]), keyItem([24, 12, 24], true)] },
+  { name: '물고기', width: 256, skill: 'A living thing that swims past, which fits the motion. Distractors: tail, fin, stripes.',
+    items: [fishItem({ tail: 'forked', topFin: true, stripes: 1 }), fishItem({ tail: 'round', topFin: true, stripes: 1 }), fishItem({ tail: 'forked', topFin: false, stripes: 1 }), fishItem({ tail: 'forked', topFin: true, stripes: 2 })] },
+  { name: '얼굴 표정', width: 180, skill: 'Eyes and mouth seen separately and joined into an expression. Touches 정서 인식 (☐).',
+    items: [faceItem(true, true, 'smile'), faceItem(false, true, 'smile'), faceItem(true, true, 'frown'), faceItem(true, true, 'flat')] },
+  { name: '건물 줄 (스카이라인)', width: 296, skill: 'A horizontal scene: heights and roofs in order. Sequence + shape.',
+    items: [skylineItem(SKYLINE_BASE), skylineItem(withBuilding(1, [66, 'dome'])), skylineItem(withBuilding(2, [58, 'flat'])), skylineItem(withBuilding(4, [50, 'tri']))] },
+  { name: '기차와 짐', width: 330, skill: 'Familiar frame (a train) carrying a sequence of shapes. Order matters, the frame helps keep the place.',
+    items: [trainItem(['circle', 'tri', 'square']), trainItem(['square', 'tri', 'square']), trainItem(['circle', 'circle', 'square']), trainItem(['circle', 'tri', 'circle'])] },
+  { name: '도형 줄', width: 290, skill: 'A row of symbols; little integration because each symbol fits the slit. Close to 숨은 순서 찾기.',
+    items: [symbolStripItem(['circle', 'tri', 'square', 'star']), symbolStripItem(['circle', 'plus', 'square', 'star']), symbolStripItem(['circle', 'tri', 'star', 'star']), symbolStripItem(['circle', 'tri', 'square', 'plus'])] },
+  { name: '심전도 선', width: 300, skill: 'One continuous line whose bumps differ: tracking the line through the slit.',
+    items: [heartbeatItem(HEARTBEAT_BASE), heartbeatItem(withFeature(3, 'dip')), heartbeatItem(withFeature(5, 'spike')), heartbeatItem(withFeature(7, 'bump'))] },
+  { name: '바코드', width: 220, skill: 'Thick/thin rhythm with no shape to hold on to: pure temporal pattern. Probably too hard.',
+    items: ['WnWnnWnW', 'WnnWnWnW', 'WnWnnWWW', 'WnWWnWnW'].map(barcodeItem) },
+];
+
+const ITEM_HEIGHT_PX = 120;
+const WINDOW_WIDTH_PX = 420;
+const GAP_SECONDS = 0.5;
+
+const svgOf = (kind, item, heightPx) =>
+  `<svg viewBox="0 0 ${kind.width} 100" width="${(kind.width * heightPx) / 100}" height="${heightPx}">${item}</svg>`;
+
+// Fixed shuffle so the answer isn't always the first card.
+const CHOICE_ORDERS = [[2, 0, 3, 1], [1, 3, 0, 2], [3, 1, 2, 0], [0, 2, 1, 3]];
+
+const cardsElement = document.getElementById('cards');
+const slitViews = KINDS.map((kind, kindIndex) => {
+  const card = document.createElement('section');
+  card.className = 'card';
+  const order = CHOICE_ORDERS[kindIndex % CHOICE_ORDERS.length];
+  card.innerHTML = `<h2>${kind.name}</h2><p class="skill">${kind.skill}</p>` +
+    `<div class="window" style="width:${WINDOW_WIDTH_PX}px"><div class="item">${svgOf(kind, kind.items[0], ITEM_HEIGHT_PX)}</div>` +
+    `<div class="panel left"></div><div class="panel right"></div><div class="slit-edge"></div></div>` +
+    `<div class="choices">${order.map((itemIndex) => `<div class="choice${itemIndex === 0 ? ' answer' : ''}">${svgOf(kind, kind.items[itemIndex], 56)}</div>`).join('')}</div>`;
+  cardsElement.append(card);
+  return {
+    itemWidthPx: (kind.width * ITEM_HEIGHT_PX) / 100,
+    itemElement: card.querySelector('.item'),
+    leftPanel: card.querySelector('.panel.left'),
+    rightPanel: card.querySelector('.panel.right'),
+    slitEdge: card.querySelector('.slit-edge'),
+    windowElement: card.querySelector('.window'),
+  };
+});
+
+const slitFractionInput = document.getElementById('slit-fraction');
+const passSecondsInput = document.getElementById('pass-seconds');
+const bindToggle = (id, className) => {
+  const input = document.getElementById(id);
+  input.addEventListener('change', () => document.body.classList.toggle(className, input.checked));
+};
+bindToggle('peek', 'peek');
+bindToggle('reveal', 'reveal');
+const pausedInput = document.getElementById('paused');
+
+const layoutSlits = () => {
+  const slitFraction = Number(slitFractionInput.value);
+  document.getElementById('slit-fraction-out').textContent = `${Math.round(slitFraction * 100)}%`;
+  document.getElementById('pass-seconds-out').textContent = `${Number(passSecondsInput.value).toFixed(1)} 초`;
+  for (const view of slitViews) {
+    const windowWidth = view.windowElement.clientWidth;
+    view.slitWidth = Math.max(6, slitFraction * view.itemWidthPx);
+    view.slitLeft = (windowWidth - view.slitWidth) / 2;
+    view.leftPanel.style.cssText = `left:0;width:${view.slitLeft}px`;
+    view.rightPanel.style.cssText = `left:${view.slitLeft + view.slitWidth}px;right:0`;
+    view.slitEdge.style.cssText = `left:${view.slitLeft - 2}px;width:${view.slitWidth + 4}px`;
+  }
+};
+slitFractionInput.addEventListener('input', layoutSlits);
+passSecondsInput.addEventListener('input', layoutSlits);
+window.addEventListener('resize', layoutSlits);
+layoutSlits();
+
+// Animation: the item's left edge enters at the slit's right edge and leaves when its right edge passes the slit's left edge.
+let animationSeconds = 0;
+let previousFrameMs = performance.now();
+const animate = (frameMs) => {
+  if (!pausedInput.checked) animationSeconds += (frameMs - previousFrameMs) / 1000;
+  previousFrameMs = frameMs;
+  const passSeconds = Number(passSecondsInput.value);
+  const cycleSeconds = passSeconds + GAP_SECONDS;
+  const progress = (animationSeconds % cycleSeconds) / passSeconds;
+  for (const view of slitViews) {
+    const travel = view.slitWidth + view.itemWidthPx;
+    const itemLeft = view.slitLeft + view.slitWidth - Math.min(progress, 1) * travel;
+    view.itemElement.style.transform = `translateX(${itemLeft}px)`;
+    view.itemElement.style.visibility = progress <= 1 ? 'visible' : 'hidden';
+  }
+  requestAnimationFrame(animate);
+};
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

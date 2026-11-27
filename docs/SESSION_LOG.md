@@ -273,6 +273,15 @@
 
 `correct` 는 바꾸지 않은 정답 칸을 골랐을 때만 true. 제한 시간의 `load` 는 보기 수이고, 칸이 다 뒤집힌 뒤부터 잰다. 그림은 씨앗만으로도 `makePicture(가로, 세로, seed, { calm })` (`js/games/art-picture.js`) 로 다시 만들 수 있지만, 생성기가 바뀌어도 그때 본 그림을 보이도록 svg 를 함께 남긴다.
 
+**`slit` 물고기 엿보기** — 게임 하나에 문제 둘, 문제마다 새 물고기 (2026-11-27 부터)
+
+| 이벤트 | 필드 |
+|---|---|
+| `question` | `nth`: 몇 번째 문제 (1, 2) · `answer`: 지나간 물고기의 보기 번호 (0부터) · `seed`: 문제 씨앗 · `choices`: 보기 물고기의 특징 (`body` `tail` `dorsal` `pattern` `count` `ventral` `eye` `mouth` `gill`) · `changes`: 보기마다 바탕 물고기에서 바꾼 곳 (예: `'꼬리: 갈래 → 둥긂'`) · `svgs`: 보기마다 그린 svg (다시 그리기용, 하나에 1KB 안팎) |
+| `answer` | `choice`: 고른 보기 번호, 시간 초과면 null · `early`: 물고기가 처음 다 지나가기 전에 골랐는가 |
+
+문제는 입력을 받은 채로(`question(..., false)`) 띄우고, 물고기가 처음 다 지나간 순간 `open` 을 남긴다. 그 전에 고르면 `open` 을 남기고 바로 `answer` 를 남긴다. 제한 시간의 `load` 는 초이고 (레벨의 볼 횟수에서 셈한다), 처음 다 지나간 뒤부터 잰다. 물고기는 씨앗만으로도 `fishQuestion(seed, 레벨)` (`js/games/slit-fish.js`) 로 다시 만들 수 있지만, 생성기가 바뀌어도 그때 본 물고기를 보이도록 svg 를 함께 남긴다.
+
 ## `keys`
 
 `[t, code]` — 모든 keydown 의 `KeyboardEvent.code` (`KeyA`, `KeyD`, `Escape` ...). 눌린 채 반복되는 입력은 뺍니다.

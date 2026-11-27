@@ -222,3 +222,13 @@
 |---|---|---|---|
 | 그림 보기 | <img src="art-lv1-1-show.png" width="260"> | <img src="art-lv4-1-show.png" width="260"> | <img src="art-lv8-1-show.png" width="260"> |
 | 문제 화면 | <img src="art-lv1-2-ask.png" width="260"> | <img src="art-lv4-2-ask.png" width="260"> | <img src="art-lv8-2-ask.png" width="260"> |
+
+## 물고기 엿보기 (`slit`)
+
+좁은 틈 뒤로 헤엄쳐 지나가는 물고기를 보고, 아래 보기에서 똑같은 물고기를 고른다. 장면은 첫 번째로 지나가는 도중.
+
+**Lv1 → Lv4 → Lv8**: 단순한 물고기 · 틈 50% · 보기 2 (크게 다름) → 틈 22% · 보기 3 (큰 차이와 작은 차이) → 자세한 물고기 · 틈 7% · 보기 4 (눈 · 입 · 아가미 · 무늬 개수만 다름)
+
+| 장면 | Lv1 | Lv4 | Lv8 |
+|---|---|---|---|
+| 지나가는 중 | <img src="slit-lv1-1-watch.png" width="260"> | <img src="slit-lv4-1-watch.png" width="260"> | <img src="slit-lv8-1-watch.png" width="260"> |

@@ -176,7 +176,7 @@
     path: '길 따라 그리기', symbol: '심볼 위치 외우기', arith: '사칙연산 역산', count: '우세한 색 찾기', fit: '빈자리 채우기',
     seek: '숨은 순서 찾기', cover: '가린 숫자 더하기', ladder: '사다리 타기', pipe: '배관 타기', novel: '없던 그림 찾기', track: '공 따라가기',
     follow: '지시 따르기', pair: '짝 없는 것 찾기', box: '상자 속 과일 세기', compare: '두 그림 비교하기', coin: '동전 세기',
-    recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기', safe: '금고 열기', art: '그림 조각 기억하기',
+    recall: '차례대로 외우기', chain: '조각 잇기', blank: '같은 글자 넣기', safe: '금고 열기', art: '그림 조각 기억하기', slit: '물고기 엿보기',
   };
   const clockText = (milliseconds, tenths = true) => {
     if (milliseconds == null || !isFinite(milliseconds)) return '–';
@@ -872,6 +872,23 @@
       });
       const width = Math.max(choicesLeft + choices.length * (choiceSize + choiceGap) + pad, 260);
       return svg(width, top + Math.max(pictureHeight, choiceSize + 16) + pad, body, '그림과 보기 조각');
+    },
+
+    // 물고기 엿보기: 보기 물고기 (로그에 남긴 svg). 정답에 '지나간 물고기', 각 보기 아래에 바탕에서 바꾼 곳
+    slit(question, inputs, answer) {
+      const data = question.data, svgs = data.svgs || [], changes = data.changes || [], pad = 8, top = 18, cardWidth = 120, cardHeight = 50, gap = 12;
+      const place = (markup, x, y) => markup.replace(/^<svg /, `<svg x="${x}" y="${y}" width="${cardWidth}" height="${cardHeight}" `);
+      let body = `<text x="${pad}" y="12" font-size="11" class="b-mut">보기 (${data.nth || 1}번째 문제)</text>`;
+      svgs.forEach((markup, i) => {
+        const x = pad + i * (cardWidth + gap), isRight = i === data.answer, picked = answer && answer.choice === i;
+        body += `<rect x="${x}" y="${top}" width="${cardWidth}" height="${cardHeight}" rx="6" class="b-surf s-axis" stroke-width="1"/>`;
+        body += `<g style="color: var(--ink)">${place(markup, x, top)}</g>`;
+        if (isRight) body += `<text x="${x + cardWidth / 2}" y="${top + cardHeight + 13}" text-anchor="middle" font-size="10" class="b-ink2">지나간 물고기</text>`;
+        body += `<text x="${x + cardWidth / 2}" y="${top + cardHeight + (isRight ? 25 : 13)}" text-anchor="middle" font-size="9" class="b-mut">${escapeHtml(changes[i] || '')}</text>`;
+        body += pickRing(x, top, cardWidth, cardHeight, answer, picked, isRight);
+      });
+      const width = Math.max(pad * 2 + svgs.length * (cardWidth + gap), 260);
+      return svg(width, top + cardHeight + 32, body, '보기 물고기');
     },
   };
 

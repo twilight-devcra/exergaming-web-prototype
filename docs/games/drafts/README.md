@@ -20,3 +20,4 @@ When a game is built, keep its card. It records why the design is the way it is,
 |---|---|
 | [금고 열기 (`safe`)](safe.md) | built: [`js/games/safe.js`](../../../js/games/safe.js) (generator checked by `node tools/safe-check.js`) |
 | [그림 조각 기억하기 (`art`)](art.md) | built: [`js/games/art.js`](../../../js/games/art.js) (generator checked by `node tools/art-check.js`) |
+| [물고기 엿보기 (`slit`)](slit.md) | built: [`js/games/slit.js`](../../../js/games/slit.js) (generator checked by `node tools/slit-check.js`) |

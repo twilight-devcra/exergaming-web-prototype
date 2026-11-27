@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko" data-edition="app">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>물고기 엿보기 · 스케치</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nunito:wght@700;800;900&display=swap">
+  <link rel="stylesheet" href="../../../css/style.css">
+  <link rel="stylesheet" href="../../../css/themes.css">
+  <link rel="stylesheet" href="../../../app/app.css">
+  <link rel="stylesheet" href="../sketch.css">
+  <link rel="stylesheet" href="slit.css">
+</head>
+<body data-theme="scenic">
+<script type="module">
+// 물고기 엿보기 목업 (2단계, 2회차). 설계 카드: docs/games/drafts/slit.md. 판은 board.js, 물고기와 문제는 fish.js, 소개 그림은 slit-game.js.
+// 물고기는 실제로는 움직이지만 여기서는 한 장면씩 멈춰 그린다. 움직임은 play.html (눌러 보기) 과 fish.html (생성기 미리 보기).
+import { Sketch } from '../sketch.js';
+import { drawBoard, staticTimer } from './board.js';
+import { levelQuestion } from './fish.js';
+import { SlitGame } from './slit-game.js';
+
+const TITLE = SlitGame.title;
+
+// 레벨마다 정해 둔 씨앗 (같은 문제가 모든 기기에 나오게)
+const QUESTIONS = { 1: levelQuestion(1, 11), 3: levelQuestion(3, 31), 5: levelQuestion(5, 51), 8: levelQuestion(8, 81) };
+const wrongPick = (question) => (question.answerIndex + 1) % question.choices.length;
+
+const shot = (id, caption, state, { msg = '똑같은 물고기를 누르세요', kind = 'act', timer = 0.75, done = 0 } = {}) => ({
+  id, caption,
+  render(stage) {
+    const { body, message, dots } = Sketch.frame(stage, `${TITLE} · Lv.${state.level}`, msg, kind, SlitGame.ROUNDS);
+    if (timer != null) staticTimer(message, timer);
+    [...dots.children].forEach((dot, i) => dot.classList.toggle(i < done ? 'right' : 'cur', i <= done));
+    drawBoard(body, { ...state, question: QUESTIONS[state.level] });
+  },
+});
+
+const variants = (layout, prefix) => [
+  shot(`${prefix}-lv1`, 'Lv1: 틈 50% · 보기 2 (큰 차이). 첫 번째로 지나가는 중이라 아직 제한 시간이 없다', { level: 1, layout, progress: 0.45 },
+    { msg: '틈으로 물고기를 보세요', kind: 'look', timer: null }),
+  shot(`${prefix}-lv3`, 'Lv3 (표준): 틈 32% · 보기 3 (큰 차이). 한 번 지나간 뒤 다시 도는 중', { level: 3, layout, progress: 0.3 }),
+  shot(`${prefix}-wrong`, '틀렸을 때: 가림막이 걷혀 물고기 전체가 보이고, 누른 보기 ✕ · 정답 ✓', { level: 3, layout, mode: 'wrong', picked: wrongPick(QUESTIONS[3]) },
+    { msg: '이 물고기였어요', kind: 'bad', timer: null }),
+  shot(`${prefix}-right`, '맞았을 때: 가림막이 걷히고 띠와 정답에 초록 테두리', { level: 3, layout, mode: 'right' }, { msg: '맞았어요!', kind: 'good', timer: null, done: 1 }),
+  shot(`${prefix}-lv5`, 'Lv5: 틈 17% · 보기 4 (큰 차이와 작은 차이 섞임)', { level: 5, layout, progress: 0.55 }, { timer: 0.6 }),
+  shot(`${prefix}-lv8`, 'Lv8 (가장 빽빽함): 복잡도 3 · 작은 차이 · 틈 7% · 1.9초에 한 번', { level: 8, layout, progress: 0.25 }, { timer: 0.5 }),
+];
+
+const INTRO = { name: TITLE, level: 1, steps: SlitGame.diagram(), hint: SlitGame.hint };
+const introShot = (id) => ({ id, caption: '소개 (모든 레벨 같음)', render: (stage) => Sketch.intro(stage, INTRO) });
+
+Sketch.page({
+  title: '물고기 엿보기 (slit) · 목업 2회차',
+  notes: `<p>설계 카드: <code>docs/games/drafts/slit.md</code>. <b>눌러 보기: <a href="play.html">play.html</a></b> · 물고기 생성기와 움직임: <a href="fish.html">fish.html</a>.</p>
+    <p>1회차 결정: 태블릿은 배치 B (띠 위, 보기 한 줄), 휴대폰은 작은 휴대폰까지 2×2, 물고기는 모든 레벨에서 되풀이해 지나간다, 이름은 물고기 엿보기.</p>`,
+  groups: [
+    { title: '태블릿 1280×800 — 띠 위, 보기 한 줄 아래', shots: [...variants('below', 'b'), introShot('intro')] },
+    { title: '휴대폰 390×844 — 띠 위, 보기 2×2 아래', device: 'phone', notes: '판 자리 330×494.', shots: [...variants('phone', 'p'), introShot('p-intro')] },
+    { title: '작은 휴대폰 360×640', device: 'phone-small', notes: '판 자리 300×339.', shots: variants('phone', 's').filter((one) => /-(lv3|wrong|lv8)$/.test(one.id)) },
+  ],
+});
+</script>
+</body>
+</html>
